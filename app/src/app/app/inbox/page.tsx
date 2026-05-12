@@ -1,19 +1,28 @@
-import { Inbox } from "lucide-react";
-import { EmptyState, PageHeader } from "@/components/app/EmptyState";
+import { MessageSquare } from "lucide-react";
 
-export default function InboxPage() {
+export default function InboxIndexPage() {
   return (
-    <>
-      <PageHeader
-        eyebrow="Conversations"
-        title="Inbox"
-        description="Realtime WhatsApp conversations with your contacts."
-      />
-      <EmptyState
-        icon={Inbox}
-        title="No conversations yet"
-        description="Connect a WhatsApp Business number in Settings, then incoming messages will stream in here automatically via Convex reactive queries."
-      />
-    </>
+    <div className="flex-1 flex flex-col items-center justify-center text-center px-6 bg-[#f4f6f9]">
+      <div className="relative mb-5">
+        <div
+          className="absolute inset-0 rounded-2xl opacity-40"
+          style={{
+            background:
+              "linear-gradient(137deg, #FF3D77 0%, #06B6D4 50%, #4361EE 100%)",
+            filter: "blur(28px)",
+          }}
+        />
+        <div className="relative w-14 h-14 rounded-2xl bg-white border border-slate-200 flex items-center justify-center shadow-sm">
+          <MessageSquare size={22} className="text-[#0a1b33]" strokeWidth={2} />
+        </div>
+      </div>
+      <h2 className="font-[var(--font-outfit)] text-[20px] font-medium tracking-tight text-[#0a1b33]">
+        Pick a conversation
+      </h2>
+      <p className="text-slate-500 text-sm mt-2 max-w-sm leading-relaxed">
+        Select a conversation from the left to view messages and reply within
+        the 24h service window.
+      </p>
+    </div>
   );
 }
