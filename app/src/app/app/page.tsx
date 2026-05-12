@@ -1,123 +1,131 @@
 "use client";
 
-import { useEffect } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useQuery } from "convex/react";
-import { useAuthActions } from "@convex-dev/auth/react";
+import { ArrowRight, MessageSquare, Send, Shield, Activity } from "lucide-react";
+import Link from "next/link";
 import { api } from "../../../convex/_generated/api";
 
-export default function AppDashboard() {
-  const tenant = useQuery(api.tenantsQueries.getActiveOptional);
-  const { signOut } = useAuthActions();
-  const router = useRouter();
+export default function AppOverview() {
+  const tenant = useQuery(api.tenantsQueries.getActive);
 
-  useEffect(() => {
-    if (tenant === null) {
-      router.replace("/onboarding");
-    }
-  }, [tenant, router]);
-
-  async function handleSignOut() {
-    await signOut();
-    router.push("/");
-  }
-
-  if (tenant === undefined || tenant === null) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-slate-400 text-sm">Loading workspace…</div>
-      </div>
-    );
-  }
+  if (!tenant) return null;
 
   return (
-    <div className="min-h-screen bg-[#f9fafb] flex flex-col">
-      <header className="border-b border-slate-200 bg-white/80 backdrop-blur sticky top-0 z-40">
-        <div className="mx-auto max-w-6xl px-6 h-14 flex items-center justify-between">
-          <Link
-            href="/app"
-            className="flex items-center gap-2 font-[var(--font-outfit)] font-semibold tracking-tight text-[#0a1b33]"
-          >
-            <span className="inline-block w-6 h-6 rounded-md bg-gradient-to-br from-[#F5C344] via-[#F28482] to-[#B567C2]" />
-            openbsp
-          </Link>
-          <div className="flex items-center gap-3">
-            <div className="text-xs text-slate-500 hidden sm:block">
-              {tenant.name} · <span className="text-slate-400">{tenant.role}</span>
-            </div>
-            <button
-              type="button"
-              onClick={handleSignOut}
-              className="px-3 py-1.5 rounded-lg text-xs text-slate-600 hover:text-[#0a1b33] hover:bg-slate-100 transition-all"
-            >
-              Sign out
-            </button>
-          </div>
+    <div className="px-8 py-10 max-w-6xl">
+      <div className="mb-10">
+        <div className="text-xs uppercase tracking-[0.18em] text-slate-400 mb-2">
+          Overview
         </div>
-      </header>
+        <h1 className="font-[var(--font-outfit)] text-[28px] font-medium tracking-tight text-[#0a1b33]">
+          Welcome back to {tenant.name}
+        </h1>
+        <p className="text-slate-500 mt-1 text-sm">
+          Your workspace is live. Connect a WhatsApp number to start the work.
+        </p>
+      </div>
 
-      <main className="flex-1 mx-auto max-w-6xl w-full px-6 py-12">
-        <div className="mb-10">
-          <h1 className="font-[var(--font-outfit)] text-[32px] font-medium tracking-tight text-[#0a1b33]">
-            Welcome to {tenant.name}
-          </h1>
-          <p className="text-slate-500 mt-1 text-sm">
-            Your workspace is live. Next: connect your WhatsApp Business
-            Account to start receiving messages.
-          </p>
-        </div>
-
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[
-            { title: "Connect WhatsApp", note: "Sandbox or production WABA" },
-            { title: "Invite team", note: "Roles: admin, agent, marketing" },
-            {
-              title: "Sign DPA",
-              note: tenant.healthcareMode
-                ? "Required (healthcare mode active)"
-                : "Optional",
-            },
-            {
-              title: "Complete DPIA",
-              note: tenant.healthcareMode ? "Required for healthcare" : "—",
-            },
-            { title: "Import contacts", note: "CSV with consent proof per row" },
-            { title: "Submit first template", note: "appointment_reminder pre-built" },
-          ].map((step) => (
-            <div
-              key={step.title}
-              className="bg-white rounded-2xl border border-slate-200 p-5 hover:border-slate-300 transition-all cursor-default"
-            >
-              <div className="font-semibold text-[#0a1b33] text-[15px]">
-                {step.title}
-              </div>
-              <div className="text-slate-500 text-xs mt-1">{step.note}</div>
-              <div className="text-[11px] text-slate-400 mt-3 uppercase tracking-wider">
-                Coming next
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="mt-16 p-6 rounded-2xl bg-[#0A0A0B] text-white">
+      {/* Stat strip */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-10">
+        {[
+          { label: "Conversations", value: "0", icon: MessageSquare },
+          { label: "Messages today", value: "0", icon: Send },
+          { label: "Quality rating", value: "—", icon: Shield },
+          { label: "Active agents", value: "1", icon: Activity },
+        ].map(({ label, value, icon: Icon }) => (
           <div
-            className="text-xs uppercase tracking-[0.18em] mb-3"
-            style={{
-              background: "linear-gradient(90deg, #FF3D77, #06B6D4, #4361EE)",
-              WebkitBackgroundClip: "text",
-              backgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-              color: "transparent",
-            }}
+            key={label}
+            className="bg-white rounded-xl border border-slate-200 px-4 py-3.5"
           >
-            Workspace details
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[11px] uppercase tracking-wider text-slate-400 font-medium">
+                {label}
+              </span>
+              <Icon size={14} className="text-slate-300" />
+            </div>
+            <div className="font-[var(--font-outfit)] text-2xl font-medium text-[#0a1b33]">
+              {value}
+            </div>
           </div>
-          <pre className="text-[12px] text-slate-300 font-mono overflow-x-auto">
-{JSON.stringify(tenant, null, 2)}
-          </pre>
+        ))}
+      </div>
+
+      {/* Getting started */}
+      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+          <div>
+            <div className="font-semibold text-[#0a1b33] text-[15px]">
+              Get to first message
+            </div>
+            <div className="text-xs text-slate-500 mt-0.5">
+              {tenant.healthcareMode
+                ? "Healthcare mode is active. DPA + DPIA required before connecting WhatsApp."
+                : "5 quick steps to send your first WhatsApp message."}
+            </div>
+          </div>
+          <span className="text-xs text-slate-400">0 of 5 done</span>
         </div>
-      </main>
+
+        <ul>
+          {[
+            {
+              n: 1,
+              title: "Connect WhatsApp Business Account",
+              note: "Sandbox or production. We validate scopes via Graph API.",
+              href: "/app/settings",
+            },
+            {
+              n: 2,
+              title: "Submit appointment_reminder template",
+              note: "Pre-built utility template for clinic reminders 24h before.",
+              href: "/app/templates",
+            },
+            {
+              n: 3,
+              title: "Import contacts with consent proof",
+              note: "CSV with one consent row per contact for marketing.",
+              href: "/app/contacts",
+            },
+            {
+              n: 4,
+              title: "Invite your team",
+              note: "Add agents and a marketing role.",
+              href: "/app/settings",
+            },
+            {
+              n: 5,
+              title: "Send first reminder",
+              note: "End-to-end test in Inbox.",
+              href: "/app/inbox",
+            },
+          ].map((step) => (
+            <li
+              key={step.n}
+              className="border-b border-slate-100 last:border-b-0"
+            >
+              <Link
+                href={step.href}
+                className="flex items-center gap-4 px-6 py-3.5 hover:bg-slate-50 transition-colors group"
+              >
+                <span className="w-6 h-6 rounded-full border border-slate-200 flex items-center justify-center text-[11px] text-slate-500 font-medium flex-shrink-0">
+                  {step.n}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <div className="text-[14px] font-medium text-[#0a1b33]">
+                    {step.title}
+                  </div>
+                  <div className="text-xs text-slate-500 mt-0.5">
+                    {step.note}
+                  </div>
+                </div>
+                <ArrowRight
+                  size={16}
+                  className="text-slate-300 group-hover:text-[#0a1b33] group-hover:translate-x-0.5 transition-all"
+                />
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </div>
     </div>
   );
 }
