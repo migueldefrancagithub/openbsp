@@ -55,8 +55,8 @@
 }
 
 .c1-card {
-  border-radius: 20px;
-  height: 360px;
+  border-radius: 24px;
+  height: 380px;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
@@ -64,16 +64,32 @@
   overflow: hidden;
   text-align: left;
   background: #f4f8f9;
-  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.08);
 }
 
-.c1-card h3 {
-  font-size: 1.05rem;
-  font-weight: 600;
-  color: #1e293b;
-  padding: 24px;
+/* Clerk-style title block: display-font title + tight subline */
+.c1-card-meta {
+  position: relative;
   z-index: 2;
+  padding: 22px 26px 26px;
+}
+.c1-card-meta h3 {
+  font-family: var(--font-outfit), Outfit, system-ui, sans-serif;
+  font-size: 1.35rem;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  color: #0a1b33;
   margin: 0;
+  line-height: 1.15;
+}
+.c1-card-desc {
+  font-family: var(--font-inter), Inter, system-ui, sans-serif;
+  font-size: 0.82rem;
+  font-weight: 400;
+  color: #64748b;
+  line-height: 1.45;
+  margin: 6px 0 0;
+  letter-spacing: -0.005em;
 }
 
 .c1-card-1 {
@@ -110,7 +126,7 @@
   top: 24px;
   left: 24px;
   right: 24px;
-  bottom: 70px;
+  bottom: 110px;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
@@ -207,7 +223,7 @@
   top: 24px;
   left: 24px;
   right: 24px;
-  bottom: 70px;
+  bottom: 110px;
   background: #ffffff;
   border-radius: 14px;
   padding: 14px;
@@ -308,7 +324,7 @@
   top: 28px;
   left: 24px;
   right: 24px;
-  bottom: 70px;
+  bottom: 110px;
   display: flex;
   flex-direction: column;
   gap: 8px;

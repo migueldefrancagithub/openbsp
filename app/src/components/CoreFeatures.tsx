@@ -13,7 +13,7 @@ export function CoreFeatures() {
         </p>
 
         <div className="c1-grid">
-          {/* ===== Card 1 — Real-time inbox (animated chat) ===== */}
+          {/* Card 1 — Real-time inbox */}
           <div className="c1-card c1-card-1">
             <div className="c1-chat">
               <div className="c1-bubble c1-bubble-in">
@@ -29,10 +29,16 @@ export function CoreFeatures() {
                 <span className="c1-tick">✓✓</span>
               </div>
             </div>
-            <h3>Real-time WhatsApp inbox</h3>
+            <div className="c1-card-meta">
+              <h3>Real-time inbox</h3>
+              <p className="c1-card-desc">
+                Conversations stream in via Convex reactive subscriptions.
+                No polling, no refresh.
+              </p>
+            </div>
           </div>
 
-          {/* ===== Card 2 — Broadcasts dispatching live ===== */}
+          {/* Card 2 — Smart broadcasts */}
           <div className="c1-card c1-card-2">
             <div className="c1-broadcast">
               <div className="c1-broadcast-row">
@@ -66,10 +72,15 @@ export function CoreFeatures() {
                 <span className="c1-comp-meta">€8.42 estimated</span>
               </div>
             </div>
-            <h3>Smart broadcasts with quality-aware throttle</h3>
+            <div className="c1-card-meta">
+              <h3>Smart broadcasts</h3>
+              <p className="c1-card-desc">
+                Quality-aware throttle. Auto-pause when rating drops to red.
+              </p>
+            </div>
           </div>
 
-          {/* ===== Card 3 — Compliance feed ticking live ===== */}
+          {/* Card 3 — Compliance feed */}
           <div className="c1-card c1-card-3">
             <div className="c1-compliance">
               <div className="c1-comp-row">
@@ -93,7 +104,12 @@ export function CoreFeatures() {
                 <span className="c1-comp-meta">2,481 events</span>
               </div>
             </div>
-            <h3>Compliance evidence, append-only</h3>
+            <div className="c1-card-meta">
+              <h3>Compliance built-in</h3>
+              <p className="c1-card-desc">
+                Append-only audit. DPA, DPIA, per-purpose consent vector.
+              </p>
+            </div>
           </div>
         </div>
       </div>
