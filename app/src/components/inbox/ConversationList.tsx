@@ -7,6 +7,7 @@ import { Inbox } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import { cn } from "@/lib/cn";
 import { relativeTime } from "@/lib/relativeTime";
+import { friendlyId } from "@/lib/friendlyId";
 
 export function ConversationList() {
   const conversations = useQuery(api.conversations.listOpen, { limit: 80 });
@@ -82,18 +83,29 @@ export function ConversationList() {
                       </span>
                     </div>
                     <div className="flex items-center justify-between gap-2 mt-0.5">
-                      <span className="text-[11px] text-slate-500 truncate">
-                        {c.contactName ? c.contactE164 : "WhatsApp contact"}
+                      <span className="text-[10px] text-slate-400 font-[var(--font-mono)] truncate">
+                        {friendlyId("CONV", c._id)}
                       </span>
                       <div className="flex items-center gap-1.5 flex-shrink-0">
-                        {within24h && (
-                          <span
-                            className="w-1.5 h-1.5 rounded-full bg-emerald-500"
-                            title="24h service window open"
-                          />
-                        )}
+                        <span
+                          className={cn(
+                            "w-1.5 h-1.5 rounded-full",
+                            within24h
+                              ? "bg-emerald-500"
+                              : hasUnread
+                                ? "bg-amber-500"
+                                : "bg-slate-300",
+                          )}
+                          title={
+                            within24h
+                              ? "24h window open"
+                              : hasUnread
+                                ? "Awaiting reply, window expired"
+                                : "Idle"
+                          }
+                        />
                         {hasUnread && (
-                          <span className="px-1.5 py-0.5 rounded-full bg-[#0a152d] text-white text-[10px] font-semibold leading-none">
+                          <span className="px-1.5 py-0.5 rounded-md bg-[#0a152d] text-white text-[10px] font-semibold leading-none">
                             {c.unreadCount}
                           </span>
                         )}

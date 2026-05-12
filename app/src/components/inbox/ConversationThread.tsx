@@ -8,6 +8,7 @@ import type { Id } from "../../../convex/_generated/dataModel";
 import { MessageBubble } from "./MessageBubble";
 import { Composer } from "./Composer";
 import { relativeTime } from "@/lib/relativeTime";
+import { friendlyId } from "@/lib/friendlyId";
 
 type Props = { conversationId: Id<"conversations"> };
 
@@ -54,8 +55,13 @@ export function ConversationThread({ conversationId }: Props) {
               .toUpperCase()}
           </div>
           <div>
-            <div className="text-[14px] font-semibold text-[#0a1b33] leading-tight">
-              {conversation.contactName ?? conversation.contactE164}
+            <div className="flex items-center gap-2">
+              <div className="text-[14px] font-semibold text-[#0a1b33] leading-tight">
+                {conversation.contactName ?? conversation.contactE164}
+              </div>
+              <span className="text-[10px] font-[var(--font-mono)] text-slate-400">
+                {friendlyId("CONV", conversationId)}
+              </span>
             </div>
             <div className="flex items-center gap-1.5 text-[11px] text-slate-500 mt-0.5">
               <Phone size={10} />

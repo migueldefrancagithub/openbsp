@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import { cn } from "@/lib/cn";
+import { CommandPalette, KbdHint } from "@/components/CommandPalette";
 
 const NAV = [
   { href: "/app", label: "Overview", icon: LayoutDashboard, exact: true },
@@ -84,6 +85,24 @@ export default function AppLayout({ children }: { children: ReactNode }) {
           </button>
         </div>
 
+        {/* Search hint */}
+        <div className="px-3 py-2 border-b border-slate-200">
+          <button
+            type="button"
+            onClick={() => {
+              window.dispatchEvent(
+                new KeyboardEvent("keydown", { key: "k", metaKey: true }),
+              );
+            }}
+            className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md border border-slate-200 bg-slate-50 hover:bg-slate-100 transition-colors text-left"
+          >
+            <span className="text-[11px] text-slate-400 flex-1">
+              Quick switch…
+            </span>
+            <KbdHint keys={["⌘", "K"]} />
+          </button>
+        </div>
+
         {/* Nav */}
         <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto">
           {NAV.map((item) => {
@@ -146,6 +165,8 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 
       {/* Main content */}
       <main className="flex-1 min-w-0">{children}</main>
+
+      <CommandPalette />
     </div>
   );
 }
