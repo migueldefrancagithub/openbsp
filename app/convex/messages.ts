@@ -12,6 +12,7 @@ import {
 } from "./lib/customFunctions";
 import { sendWhatsAppText } from "./lib/meta/graph";
 import { requireConsent } from "./lib/consent";
+import { validateHealthcareContent } from "./lib/dlp/healthcare";
 import type { Id } from "./_generated/dataModel";
 
 const messageTypeValidator = v.union(
@@ -193,6 +194,16 @@ export const sendText = tenantMutation({
     conversationId: v.id("conversations"),
     text: v.string(),
     clientNonce: v.string(),
+    /**
+     * Optional override when healthcare DLP soft-blocked the content.
+     * Required when DLP returns matched categories that aren't hardBlocked.
+     * Always audited.
+     */
+    healthcareOverride: v.optional(
+      v.object({
+        justification: v.string(),
+      }),
+    ),
   },
   returns: v.id("messages"),
   handler: async (ctx, args): Promise<Id<"messages">> => {
@@ -209,6 +220,37 @@ export const sendText = tenantMutation({
       "conversations",
       args.conversationId,
     );
+
+    // Healthcare DLP gate (Codex round2 #5)
+    const tenant = await ctx.db.get(ctx.tenantId);
+    let dlpResult: ReturnType<typeof validateHealthcareContent> | null = null;
+    if (tenant?.healthcareMode) {
+      dlpResult = validateHealthcareContent(trimmed);
+      if (!dlpResult.passed) {
+        if (dlpResult.hardBlocked) {
+          throw new ConvexError({
+            code: "HEALTHCARE_HARD_BLOCKED",
+            categories: dlpResult.matched,
+            message:
+              "Content includes terms that cannot be sent via WhatsApp in healthcare mode (diagnosis claims or controlled medication names). Use a portal link or in-person communication.",
+          });
+        }
+        if (!args.healthcareOverride) {
+          throw new ConvexError({
+            code: "HEALTHCARE_OVERRIDE_REQUIRED",
+            categories: dlpResult.matched,
+            message:
+              "Content includes sensitive terms (dose / frequency). Provide a written justification to send.",
+          });
+        }
+        if (args.healthcareOverride.justification.trim().length < 10) {
+          throw new ConvexError({
+            code: "HEALTHCARE_OVERRIDE_JUSTIFICATION_TOO_SHORT",
+            minLength: 10,
+          });
+        }
+      }
+    }
 
     // 24h service window check (free-text outside template requires it).
     const now = Date.now();
@@ -250,6 +292,16 @@ export const sendText = tenantMutation({
       status: "queued",
       dispatchAttempts: 0,
       sentByAgentId: ctx.memberId,
+      contentValidationResult: dlpResult
+        ? {
+            passed: dlpResult.passed,
+            blockedReasons: dlpResult.matched,
+            overrideByMemberId: args.healthcareOverride
+              ? ctx.memberId
+              : undefined,
+            overrideJustification: args.healthcareOverride?.justification,
+          }
+        : undefined,
       createdAt: now,
     });
 

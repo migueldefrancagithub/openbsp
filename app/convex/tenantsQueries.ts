@@ -10,6 +10,8 @@ const ActiveTenantValidator = v.object({
   vertical: v.string(),
   healthcareMode: v.boolean(),
   role: v.string(),
+  dpaSignedAt: v.optional(v.number()),
+  dpiaCompletedAt: v.optional(v.number()),
 });
 
 // Strict: throws if not authenticated or no active tenant. Use inside the app.
@@ -25,6 +27,8 @@ export const getActive = tenantQuery({
       vertical: tenant.vertical,
       healthcareMode: tenant.healthcareMode,
       role: ctx.role,
+      dpaSignedAt: tenant.rgpd.dpaSignedAt,
+      dpiaCompletedAt: tenant.rgpd.dpiaCompletedAt,
     };
   },
 });
@@ -57,6 +61,8 @@ export const getActiveOptional = query({
       vertical: tenant.vertical,
       healthcareMode: tenant.healthcareMode,
       role: member.role,
+      dpaSignedAt: tenant.rgpd.dpaSignedAt,
+      dpiaCompletedAt: tenant.rgpd.dpiaCompletedAt,
     };
   },
 });

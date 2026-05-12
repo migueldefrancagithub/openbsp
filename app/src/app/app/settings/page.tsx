@@ -1,9 +1,10 @@
 "use client";
 
 import { useQuery } from "convex/react";
-import { Smartphone, Shield, ShieldAlert, CheckCircle2 } from "lucide-react";
+import { Smartphone, Shield, CheckCircle2, AlertTriangle } from "lucide-react";
 import { PageHeader } from "@/components/app/EmptyState";
 import { ConnectWabaForm } from "@/components/settings/ConnectWabaForm";
+import { DpaCard, DpiaCard } from "@/components/settings/ComplianceWizards";
 import { api } from "../../../../convex/_generated/api";
 
 export default function SettingsPage() {
@@ -12,6 +13,10 @@ export default function SettingsPage() {
   if (!tenant) return null;
 
   const hasConnection = (wabaAccounts?.length ?? 0) > 0;
+  const dpaSigned = !!tenant.dpaSignedAt;
+  const dpiaCompleted = !!tenant.dpiaCompletedAt;
+  const dpiaRequired = tenant.healthcareMode;
+  const canConnect = dpaSigned && (!dpiaRequired || dpiaCompleted);
 
   return (
     <>
@@ -69,6 +74,15 @@ export default function SettingsPage() {
           </div>
 
           <div className="px-6 py-6">
+            {!hasConnection && !canConnect && (
+              <div className="flex items-start gap-2 text-[12px] text-amber-700 bg-amber-50 border border-amber-200 px-3 py-2.5 rounded-lg mb-5">
+                <AlertTriangle size={14} className="flex-shrink-0 mt-0.5" />
+                <span>
+                  Sign DPA{dpiaRequired ? " and complete DPIA" : ""} below
+                  before you can connect WhatsApp.
+                </span>
+              </div>
+            )}
             {hasConnection ? (
               <div className="space-y-4">
                 {wabaAccounts!.map((acc) => (
@@ -141,52 +155,26 @@ export default function SettingsPage() {
                     </p>
                   </div>
                 </div>
-                <ConnectWabaForm />
+                {canConnect ? (
+                  <ConnectWabaForm />
+                ) : (
+                  <p className="text-xs text-slate-500 mt-3">
+                    Connect form unlocks once compliance docs below are
+                    signed.
+                  </p>
+                )}
               </div>
             )}
           </div>
         </section>
 
-        {/* Compliance */}
-        <section className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-100">
-            <h2 className="font-semibold text-[#0a1b33] text-[15px]">
-              Compliance documents
-            </h2>
+        {/* Compliance — DPA + DPIA wizards */}
+        <section className="space-y-4">
+          <div className="text-xs uppercase tracking-[0.18em] text-slate-400 font-medium">
+            Compliance documents
           </div>
-          <ul className="divide-y divide-slate-100">
-            <li className="px-6 py-3.5 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <ShieldAlert size={16} className="text-slate-400" />
-                <div>
-                  <div className="text-[14px] text-[#0a1b33] font-medium">
-                    DPA (Data Processing Agreement)
-                  </div>
-                  <div className="text-xs text-slate-500">
-                    Required to connect WhatsApp
-                    {tenant.healthcareMode ? " (healthcare)" : ""}
-                  </div>
-                </div>
-              </div>
-              <span className="text-xs text-slate-400">Not signed</span>
-            </li>
-            <li className="px-6 py-3.5 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <ShieldAlert size={16} className="text-slate-400" />
-                <div>
-                  <div className="text-[14px] text-[#0a1b33] font-medium">
-                    DPIA (Data Protection Impact Assessment)
-                  </div>
-                  <div className="text-xs text-slate-500">
-                    {tenant.healthcareMode
-                      ? "Required for healthcare workspaces"
-                      : "Optional"}
-                  </div>
-                </div>
-              </div>
-              <span className="text-xs text-slate-400">Not completed</span>
-            </li>
-          </ul>
+          <DpaCard signedAt={tenant.dpaSignedAt} />
+          {dpiaRequired && <DpiaCard completedAt={tenant.dpiaCompletedAt} />}
         </section>
       </div>
     </>

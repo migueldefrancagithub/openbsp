@@ -176,6 +176,97 @@ export const resolvePhoneNumber = internalQuery({
 });
 
 /**
+ * Detect STOP-style opt-out keyword in inbound text. Per PLAN section 7.5.
+ * Per Meta policy + RGPD best practice: revoke marketing consent on these.
+ * Transactional stays granted (appointment reminders are a separate
+ * legitimate basis once the contact has an active relationship).
+ */
+const STOP_KEYWORD_REGEX =
+  /^\s*(stop|parar|cancelar|sair|unsubscribe|cancel|baja|chega|chega disso)[\s.!?]*$/i;
+
+export function isStopKeyword(text: string): boolean {
+  return STOP_KEYWORD_REGEX.test(text);
+}
+
+export const handleStopKeyword = internalMutation({
+  args: {
+    tenantId: v.id("tenants"),
+    contactId: v.id("contacts"),
+    triggeredByText: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    // Append immutable consent event for marketing → revoked.
+    const eventId = await ctx.db.insert("consentEvents", {
+      tenantId: args.tenantId,
+      contactId: args.contactId,
+      purpose: "marketing",
+      channel: "whatsapp",
+      newStatus: "revoked",
+      source: "stop_keyword",
+      proofText: args.triggeredByText.slice(0, 500),
+      capturedAt: Date.now(),
+    });
+    // Upsert currentConsents marketing → revoked
+    const existing = await ctx.db
+      .query("currentConsents")
+      .withIndex("by_tenant_contact_purpose_channel", (q) =>
+        q
+          .eq("tenantId", args.tenantId)
+          .eq("contactId", args.contactId)
+          .eq("purpose", "marketing")
+          .eq("channel", "whatsapp"),
+      )
+      .unique();
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        status: "revoked",
+        effectiveAt: Date.now(),
+        lastEventId: eventId,
+      });
+    } else {
+      await ctx.db.insert("currentConsents", {
+        tenantId: args.tenantId,
+        contactId: args.contactId,
+        purpose: "marketing",
+        channel: "whatsapp",
+        status: "revoked",
+        effectiveAt: Date.now(),
+        lastEventId: eventId,
+      });
+    }
+    // Cascade: cancel any queued outbound to this contact (handled inline
+    // here since cancelPendingForContact lives in lib/consent.ts).
+    const conversations = await ctx.db
+      .query("conversations")
+      .withIndex("by_tenant_phone_contact", (q) =>
+        q.eq("tenantId", args.tenantId),
+      )
+      .filter((q) => q.eq(q.field("contactId"), args.contactId))
+      .collect();
+    for (const conv of conversations) {
+      const queued = await ctx.db
+        .query("messages")
+        .withIndex("by_conversation", (q) => q.eq("conversationId", conv._id))
+        .filter((q) =>
+          q.and(
+            q.eq(q.field("direction"), "outgoing"),
+            q.eq(q.field("status"), "queued"),
+          ),
+        )
+        .collect();
+      for (const m of queued) {
+        await ctx.db.patch(m._id, {
+          status: "failed",
+          failureReason: "consent_revoked_by_stop_keyword",
+        });
+      }
+    }
+    return null;
+  },
+});
+
+/**
  * Recording transactional consent based on inbound message (Meta service
  * window). Only writes if no granted record already exists for the purpose.
  */
@@ -298,6 +389,19 @@ export const processOne = internalAction({
             contactId,
           },
         );
+
+        // STOP keyword auto-revoke (Meta policy + RGPD). Only for text msgs.
+        if (messageType === "text") {
+          const rawAny = item.raw as { text?: { body?: string } } | undefined;
+          const body = rawAny?.text?.body ?? "";
+          if (body && isStopKeyword(body)) {
+            await ctx.runMutation(internal.webhooks.handleStopKeyword, {
+              tenantId: phone.tenantId,
+              contactId,
+              triggeredByText: body,
+            });
+          }
+        }
       } else if (item.kind === "status") {
         const pricing = item.pricing as
           | { category?: string; pricing_model?: string }

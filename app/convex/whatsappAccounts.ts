@@ -216,13 +216,37 @@ export const connectManual = action({
     validatedScopes: string[];
   }> => {
     // Resolve tenant + role inline (action ctx — must use runQuery).
-    const me: { tenantId: Id<"tenants">; role: string } | null =
-      await ctx.runQuery(internal.whatsappAccounts._meTenant, {});
+    const me: {
+      tenantId: Id<"tenants">;
+      role: string;
+      healthcareMode: boolean;
+      dpaSignedAt?: number;
+      dpiaCompletedAt?: number;
+    } | null = await ctx.runQuery(
+      internal.whatsappAccounts._meTenant,
+      {},
+    );
     if (!me) throw new ConvexError({ code: "UNAUTHENTICATED" });
     if (me.role !== "owner" && me.role !== "admin") {
       throw new ConvexError({
         code: "FORBIDDEN",
         message: "Only owner or admin can connect a WhatsApp number",
+      });
+    }
+
+    // RGPD compliance gate (PLAN section 7.1, Codex round2 #6)
+    if (!me.dpaSignedAt) {
+      throw new ConvexError({
+        code: "DPA_REQUIRED",
+        message:
+          "Sign the Data Processing Agreement before connecting WhatsApp.",
+      });
+    }
+    if (me.healthcareMode && !me.dpiaCompletedAt) {
+      throw new ConvexError({
+        code: "DPIA_REQUIRED",
+        message:
+          "Complete the DPIA before connecting WhatsApp in a healthcare workspace.",
       });
     }
 
@@ -274,6 +298,9 @@ export const _meTenant = internalQuery({
     v.object({
       tenantId: v.id("tenants"),
       role: v.string(),
+      healthcareMode: v.boolean(),
+      dpaSignedAt: v.optional(v.number()),
+      dpiaCompletedAt: v.optional(v.number()),
     }),
     v.null(),
   ),
@@ -292,7 +319,15 @@ export const _meTenant = internalQuery({
       )
       .unique();
     if (!member || member.status !== "active") return null;
-    return { tenantId: session.activeTenantId, role: member.role as Role };
+    const tenant = await ctx.db.get(session.activeTenantId);
+    if (!tenant) return null;
+    return {
+      tenantId: session.activeTenantId,
+      role: member.role as Role,
+      healthcareMode: tenant.healthcareMode,
+      dpaSignedAt: tenant.rgpd.dpaSignedAt,
+      dpiaCompletedAt: tenant.rgpd.dpiaCompletedAt,
+    };
   },
 });
 
