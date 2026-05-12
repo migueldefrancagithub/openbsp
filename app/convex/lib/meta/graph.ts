@@ -156,6 +156,161 @@ function normalizeUserType(
   }
 }
 
+// ---------- Templates ----------
+
+export type SubmitTemplateArgs = {
+  token: string;
+  wabaId: string;
+  name: string;
+  language: string;            // e.g. pt_PT
+  category: "MARKETING" | "UTILITY" | "AUTHENTICATION";
+  bodyText: string;            // with {{1}}, {{2}}, ...
+  exampleVariables: string[];  // one per placeholder, in order
+};
+
+export type SubmitTemplateResult =
+  | {
+      ok: true;
+      metaTemplateId: string;
+      status: "PENDING" | "APPROVED" | "REJECTED" | "PAUSED" | "DISABLED";
+    }
+  | { ok: false; reason: string; statusCode?: number; metaCode?: number };
+
+export async function submitTemplateToMeta(
+  args: SubmitTemplateArgs,
+): Promise<SubmitTemplateResult> {
+  const components: Array<Record<string, unknown>> = [
+    {
+      type: "BODY",
+      text: args.bodyText,
+      ...(args.exampleVariables.length > 0
+        ? { example: { body_text: [args.exampleVariables] } }
+        : {}),
+    },
+  ];
+  const res = await graphPost<{
+    id: string;
+    status: string;
+    category?: string;
+  }>(`/${args.wabaId}/message_templates`, args.token, {
+    name: args.name,
+    language: args.language,
+    category: args.category,
+    components,
+  });
+  if (!res.ok) {
+    return {
+      ok: false,
+      reason: res.message,
+      statusCode: res.status,
+      metaCode: res.code,
+    };
+  }
+  const metaStatus = String(res.data.status ?? "PENDING").toUpperCase();
+  return {
+    ok: true,
+    metaTemplateId: String(res.data.id),
+    status:
+      metaStatus === "APPROVED"
+        ? "APPROVED"
+        : metaStatus === "REJECTED"
+          ? "REJECTED"
+          : metaStatus === "PAUSED"
+            ? "PAUSED"
+            : metaStatus === "DISABLED"
+              ? "DISABLED"
+              : "PENDING",
+  };
+}
+
+export type SyncedTemplate = {
+  id: string;
+  name: string;
+  language: string;
+  status: string;
+  qualityScore?: string;
+  rejectionReason?: string;
+};
+
+export async function listMetaTemplates(args: {
+  token: string;
+  wabaId: string;
+}): Promise<{ ok: true; data: SyncedTemplate[] } | GraphError> {
+  const res = await graphGet<{
+    data: Array<{
+      id: string;
+      name: string;
+      language: string;
+      status: string;
+      quality_score?: { score?: string };
+      rejected_reason?: string;
+    }>;
+  }>(`/${args.wabaId}/message_templates`, args.token, {
+    fields: "id,name,language,status,quality_score,rejected_reason",
+    limit: "200",
+  });
+  if (!res.ok) return res;
+  return {
+    ok: true,
+    data: (res.data.data ?? []).map((t) => ({
+      id: t.id,
+      name: t.name,
+      language: t.language,
+      status: t.status,
+      qualityScore: t.quality_score?.score,
+      rejectionReason: t.rejected_reason,
+    })),
+  };
+}
+
+// ---------- Send template message ----------
+
+export async function sendWhatsAppTemplate(args: {
+  token: string;
+  phoneNumberId: string;
+  toE164WithoutPlus: string;
+  templateName: string;
+  languageCode: string;
+  bodyVariables: string[]; // ordered variables for {{1}}, {{2}}, ...
+}): Promise<SendTextResult> {
+  const components =
+    args.bodyVariables.length > 0
+      ? [
+          {
+            type: "body",
+            parameters: args.bodyVariables.map((v) => ({
+              type: "text",
+              text: v,
+            })),
+          },
+        ]
+      : [];
+  const res = await graphPost<{
+    messages?: Array<{ id: string }>;
+  }>(`/${args.phoneNumberId}/messages`, args.token, {
+    messaging_product: "whatsapp",
+    recipient_type: "individual",
+    to: args.toE164WithoutPlus,
+    type: "template",
+    template: {
+      name: args.templateName,
+      language: { code: args.languageCode },
+      ...(components.length > 0 ? { components } : {}),
+    },
+  });
+  if (!res.ok) {
+    return {
+      ok: false,
+      reason: res.message,
+      statusCode: res.status,
+      metaCode: res.code,
+    };
+  }
+  const wamid = res.data.messages?.[0]?.id;
+  if (!wamid) return { ok: false, reason: "no wamid returned" };
+  return { ok: true, wamid };
+}
+
 // ---------- Send WhatsApp message ----------
 
 export type SendTextResult =

@@ -335,11 +335,54 @@ export default defineSchema({
 
   templates: defineTable({
     tenantId: v.id("tenants"),
+    whatsappAccountId: v.id("whatsappAccounts"),
     name: v.string(),
     language: v.string(),
-    status: v.string(),
+    category: v.union(
+      v.literal("marketing"),
+      v.literal("utility"),
+      v.literal("authentication"),
+    ),
+    currentVersion: v.number(),
+    status: v.union(
+      v.literal("draft"),
+      v.literal("pending"),
+      v.literal("approved"),
+      v.literal("rejected"),
+      v.literal("paused"),
+      v.literal("disabled"),
+    ),
+    metaTemplateId: v.optional(v.string()),
+    qualityScore: v.optional(v.string()),
+    rejectionReason: v.optional(v.string()),
+    syncedAt: v.optional(v.number()),
     createdAt: v.number(),
-  }).index("by_tenant_name_lang", ["tenantId", "name", "language"]),
+    createdBy: v.id("members"),
+  })
+    .index("by_tenant_name_lang", ["tenantId", "name", "language"])
+    .index("by_tenant", ["tenantId"])
+    .index("by_meta_template_id", ["metaTemplateId"]),
+
+  templateVersions: defineTable({
+    templateId: v.id("templates"),
+    tenantId: v.id("tenants"),
+    version: v.number(),
+    bodyText: v.string(),
+    parameterSchema: v.array(
+      v.object({
+        index: v.number(),
+        name: v.string(),
+        example: v.string(),
+      }),
+    ),
+    submittedAt: v.optional(v.number()),
+    approvedAt: v.optional(v.number()),
+    rejectedAt: v.optional(v.number()),
+    rejectionReason: v.optional(v.string()),
+    isLocked: v.boolean(),
+    createdBy: v.id("members"),
+    createdAt: v.number(),
+  }).index("by_template_version", ["templateId", "version"]),
 
   // ===== Webhook idempotency =====
   webhookEvents: defineTable({

@@ -19,9 +19,10 @@ const outfit = Outfit({
 });
 
 export const metadata: Metadata = {
-  title: "OpenBSP — WhatsApp Business para empresas que respeitam regras",
+  title:
+    "OpenBSP · The compliant WhatsApp Business platform for clinics and SMB teams",
   description:
-    "Inbox real-time, broadcasts segmentados, lembretes automáticos e RGPD em primeiro lugar. Construído sobre Convex + Next.js para performance reactive.",
+    "Real-time inbox, segmented broadcasts, Meta-approved templates and 24h-window-aware replies — with healthcare-grade content guardrails, per-purpose consent, and append-only audit by default. Built on Convex + Next.js + Meta Cloud API v21.",
 };
 
 export default function RootLayout({
