@@ -1,121 +1,83 @@
 import Link from "next/link";
 import { CoreFeatures } from "@/components/CoreFeatures";
+import { Hero } from "@/components/Hero";
+import { LogoMarquee } from "@/components/LogoMarquee";
+import { GlowFeatures } from "@/components/GlowFeatures";
+import "./landing-anims.css";
 
 export default function Home() {
   return (
-    <div className="min-h-full bg-white text-slate-900 font-[var(--font-inter)]">
-      {/* Nav */}
-      <header className="sticky top-0 z-50 bg-white/80 backdrop-blur border-b border-slate-100">
-        <div className="mx-auto max-w-6xl px-6 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight">
+    <div className="min-h-full bg-[#f9fafb] text-slate-900">
+      {/* Top global nav (compact, only visible above hero) */}
+      <header className="absolute top-0 left-0 right-0 z-40 px-6 py-5">
+        <div className="mx-auto max-w-[1400px] flex items-center justify-between">
+          <Link
+            href="/"
+            className="flex items-center gap-2 font-[var(--font-outfit)] font-semibold tracking-tight text-[#0a1b33]"
+          >
             <span className="inline-block w-6 h-6 rounded-md bg-gradient-to-br from-[#F5C344] via-[#F28482] to-[#B567C2]" />
             openbsp
           </Link>
-          <nav className="hidden md:flex items-center gap-7 text-sm text-slate-600">
-            <a href="#features" className="hover:text-slate-900 transition-colors">Features</a>
-            <a href="#compliance" className="hover:text-slate-900 transition-colors">Compliance</a>
-            <a href="#pricing" className="hover:text-slate-900 transition-colors">Pricing</a>
-            <a href="#docs" className="hover:text-slate-900 transition-colors">Docs</a>
-          </nav>
-          <div className="flex items-center gap-3 text-sm">
-            <Link href="/login" className="text-slate-600 hover:text-slate-900 transition-colors">
-              Login
+          <div className="flex items-center gap-2 text-sm">
+            <Link
+              href="/login"
+              className="px-4 py-2 text-slate-600 hover:text-[#0a1b33] transition-colors"
+            >
+              Sign in
             </Link>
             <Link
               href="/signup"
-              className="px-4 py-2 rounded-full bg-slate-900 text-white hover:bg-slate-700 transition-colors"
+              className="btn-primary px-4 py-2 rounded-full bg-[#0a152d] text-white text-[13px] font-medium"
             >
-              Get started
+              Start building
             </Link>
           </div>
         </div>
       </header>
 
-      {/* Hero */}
-      <section className="relative overflow-hidden">
-        <div
-          aria-hidden
-          className="absolute inset-x-0 top-0 h-[520px] -z-10"
-          style={{
-            background:
-              "radial-gradient(ellipse 60% 50% at 50% 0%, rgba(245,195,68,0.18), transparent 60%), radial-gradient(ellipse 70% 50% at 50% 0%, rgba(181,103,194,0.12), transparent 70%)",
-          }}
-        />
-        <div className="mx-auto max-w-6xl px-6 pt-24 pb-20 text-center">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-slate-200 bg-white text-xs text-slate-600 mb-7">
-            <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500" />
-            Now compatible with WhatsApp Cloud API v21
-          </div>
-          <h1 className="text-5xl sm:text-6xl font-medium tracking-tight text-slate-900 leading-[1.05]">
-            WhatsApp Business
-            <br />
-            <span
-              style={{
-                background:
-                  "linear-gradient(90deg, #F5C344, #F28482, #B567C2)",
-                WebkitBackgroundClip: "text",
-                backgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-                color: "transparent",
-              }}
-            >
-              that respects the rules
-            </span>
-          </h1>
-          <p className="mx-auto max-w-2xl mt-6 text-lg text-slate-600 leading-relaxed">
-            Inbox real-time, broadcasts segmentados, lembretes automáticos,
-            opt-in auditável e RGPD em primeiro lugar. Construído sobre Convex
-            para reactive subscriptions e idempotência por design.
-          </p>
-          <div className="mt-9 flex items-center justify-center gap-3">
-            <Link
-              href="/signup"
-              className="inline-flex items-center gap-2 px-5 py-3 rounded-full bg-slate-900 text-white text-sm font-medium hover:bg-slate-700 transition-colors"
-            >
-              Start free
-              <span aria-hidden>→</span>
-            </Link>
-            <a
-              href="#features"
-              className="inline-flex items-center gap-2 px-5 py-3 rounded-full border border-slate-200 bg-white text-sm text-slate-700 hover:border-slate-300 transition-colors"
-            >
-              See features
-            </a>
-          </div>
+      {/* Hero with video background */}
+      <div className="px-3 md:px-6 pt-20">
+        <Hero />
+      </div>
 
-          {/* Customer logos placeholder */}
-          <div className="mt-20">
-            <p className="text-xs uppercase tracking-widest text-slate-400 mb-6">
-              Built for clinics, services, e-commerce, and developer-first teams
-            </p>
-            <div className="flex flex-wrap items-center justify-center gap-x-10 gap-y-4 opacity-60">
-              {["Convex", "Vercel", "Meta Cloud", "Next.js", "Resend"].map((name) => (
-                <span key={name} className="text-slate-500 font-medium tracking-tight">
-                  {name}
-                </span>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
+      {/* Marquee logo scroller */}
+      <div className="px-3 md:px-6">
+        <LogoMarquee />
+      </div>
 
-      {/* Core Features section (per spec) */}
-      <div id="features">
+      {/* Core Features section (per original spec — intentionally static) */}
+      <div id="features" className="mt-20">
         <CoreFeatures />
       </div>
 
-      {/* Compliance band — Clerk-style trust signals */}
-      <section id="compliance" className="border-t border-slate-100 bg-slate-50">
-        <div className="mx-auto max-w-6xl px-6 py-20">
+      {/* Dark glowing feature cards — Clerk-style dramatic break */}
+      <GlowFeatures />
+
+      {/* Compliance band — back to light, hover lift */}
+      <section
+        id="compliance"
+        className="border-t border-slate-200 bg-[#f9fafb]"
+      >
+        <div className="mx-auto max-w-6xl px-6 py-24">
           <div className="grid md:grid-cols-2 gap-12 items-start">
             <div>
-              <div className="text-xs uppercase tracking-widest text-slate-500 mb-3">
+              <div
+                className="text-xs uppercase tracking-[0.18em] mb-4"
+                style={{
+                  background:
+                    "linear-gradient(90deg, #F5C344, #F28482, #B567C2)",
+                  WebkitBackgroundClip: "text",
+                  backgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                  color: "transparent",
+                }}
+              >
                 Compliance by default
               </div>
-              <h2 className="text-3xl font-medium tracking-tight text-slate-900">
+              <h2 className="font-[var(--font-outfit)] text-[32px] md:text-[40px] font-medium tracking-tight text-[#0a1b33] leading-[1.1]">
                 Built so Meta and your DPO sleep at night
               </h2>
-              <p className="mt-4 text-slate-600 leading-relaxed">
+              <p className="mt-4 text-slate-600 leading-relaxed text-[15px]">
                 Healthcare-mode allowlist, opt-in granular por finalidade,
                 webhook idempotency state machine, append-only audit com hash
                 chain. Não é uma caixa que ticas — é como cada mutation foi
@@ -133,9 +95,9 @@ export default function Home() {
               ].map(([title, sub]) => (
                 <li
                   key={title}
-                  className="rounded-xl bg-white border border-slate-200 p-4"
+                  className="compliance-card rounded-2xl bg-white border border-slate-200 p-5 cursor-default"
                 >
-                  <div className="font-semibold text-slate-900">{title}</div>
+                  <div className="font-semibold text-[#0a1b33]">{title}</div>
                   <div className="text-slate-500 text-xs mt-1">{sub}</div>
                 </li>
               ))}
@@ -145,25 +107,52 @@ export default function Home() {
       </section>
 
       {/* CTA */}
-      <section className="border-t border-slate-100">
-        <div className="mx-auto max-w-3xl px-6 py-24 text-center">
-          <h2 className="text-3xl sm:text-4xl font-medium tracking-tight text-slate-900">
+      <section className="border-t border-slate-200 bg-white relative overflow-hidden">
+        <div aria-hidden className="absolute inset-0 -z-10">
+          <div
+            className="orb orb-b"
+            style={{
+              top: "10%",
+              left: "30%",
+              width: "320px",
+              height: "320px",
+              background:
+                "radial-gradient(circle, #F9ED96 0%, transparent 70%)",
+              opacity: 0.4,
+            }}
+          />
+          <div
+            className="orb orb-c"
+            style={{
+              top: "20%",
+              right: "25%",
+              width: "280px",
+              height: "280px",
+              background:
+                "radial-gradient(circle, #B567C2 0%, transparent 70%)",
+              opacity: 0.3,
+            }}
+          />
+        </div>
+        <div className="mx-auto max-w-3xl px-6 py-28 text-center relative">
+          <h2 className="font-[var(--font-outfit)] text-[36px] md:text-[44px] font-medium tracking-tight text-[#0a1b33] leading-[1.1]">
             Ready to ship WhatsApp the right way?
           </h2>
-          <p className="mt-4 text-slate-600">
+          <p className="mt-5 text-slate-600 text-[15px]">
             8 weeks from setup to first patient reminder. Solo dev, Convex
             backed, fully open under Unlicense upstream.
           </p>
           <div className="mt-8 flex justify-center gap-3">
             <Link
               href="/signup"
-              className="inline-flex items-center gap-2 px-5 py-3 rounded-full bg-slate-900 text-white text-sm font-medium hover:bg-slate-700 transition-colors"
+              className="btn-primary inline-flex items-center gap-2 px-6 py-3 rounded-full bg-[#0a152d] text-white text-[13px] font-medium"
             >
               Start free
+              <span aria-hidden>→</span>
             </Link>
             <a
               href="https://github.com/migueldefrancagithub/openbsp"
-              className="inline-flex items-center gap-2 px-5 py-3 rounded-full border border-slate-200 bg-white text-sm text-slate-700 hover:border-slate-300 transition-colors"
+              className="btn-secondary inline-flex items-center gap-2 px-6 py-3 rounded-full border border-slate-200 bg-white text-[13px] text-slate-700 hover:border-slate-300"
             >
               View on GitHub
             </a>
@@ -171,16 +160,22 @@ export default function Home() {
         </div>
       </section>
 
-      <footer className="border-t border-slate-100">
+      <footer className="border-t border-slate-200 bg-white">
         <div className="mx-auto max-w-6xl px-6 py-10 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-slate-500">
           <div className="flex items-center gap-2">
             <span className="inline-block w-5 h-5 rounded-md bg-gradient-to-br from-[#F5C344] via-[#F28482] to-[#B567C2]" />
             <span>openbsp · 2026</span>
           </div>
           <div className="flex items-center gap-5">
-            <a href="#" className="hover:text-slate-900 transition-colors">Privacy</a>
-            <a href="#" className="hover:text-slate-900 transition-colors">Terms</a>
-            <a href="#" className="hover:text-slate-900 transition-colors">DPA</a>
+            <a href="#" className="hover:text-[#0a1b33] transition-colors">
+              Privacy
+            </a>
+            <a href="#" className="hover:text-[#0a1b33] transition-colors">
+              Terms
+            </a>
+            <a href="#" className="hover:text-[#0a1b33] transition-colors">
+              DPA
+            </a>
           </div>
         </div>
       </footer>
