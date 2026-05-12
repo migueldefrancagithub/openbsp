@@ -1,6 +1,17 @@
-import { v } from "convex/values";
-import { internalMutation } from "./_generated/server";
-import { tenantQuery, loadByIdInTenant } from "./lib/customFunctions";
+import { v, ConvexError } from "convex/values";
+import {
+  internalAction,
+  internalMutation,
+  internalQuery,
+} from "./_generated/server";
+import { internal } from "./_generated/api";
+import {
+  tenantMutation,
+  tenantQuery,
+  loadByIdInTenant,
+} from "./lib/customFunctions";
+import { sendWhatsAppText } from "./lib/meta/graph";
+import { requireConsent } from "./lib/consent";
 import type { Id } from "./_generated/dataModel";
 
 const messageTypeValidator = v.union(
@@ -160,5 +171,310 @@ export const listForConversation = tenantQuery({
         status: m.status,
         createdAt: m.createdAt,
       }));
+  },
+});
+
+// ---------- Outbound text ----------
+
+/**
+ * Send a free-text message in an existing conversation. Performs all
+ * pre-dispatch gates atomically:
+ *   1. tenant fence on conversation
+ *   2. capability check (agent role+)
+ *   3. 24h service window check (free-text only allowed within window)
+ *   4. requireConsent transactional
+ *   5. derive businessKey from (conversationId, agent, content, clientNonce)
+ *   6. dedup by businessKey (no duplicate row for the same intent)
+ *   7. insert message status=queued
+ *   8. schedule dispatchOne action
+ */
+export const sendText = tenantMutation({
+  args: {
+    conversationId: v.id("conversations"),
+    text: v.string(),
+    clientNonce: v.string(),
+  },
+  returns: v.id("messages"),
+  handler: async (ctx, args): Promise<Id<"messages">> => {
+    const trimmed = args.text.trim();
+    if (trimmed.length === 0) {
+      throw new ConvexError({ code: "EMPTY_TEXT" });
+    }
+    if (trimmed.length > 4096) {
+      throw new ConvexError({ code: "TEXT_TOO_LONG", limit: 4096 });
+    }
+
+    const conv = await loadByIdInTenant(
+      ctx as Parameters<typeof loadByIdInTenant>[0],
+      "conversations",
+      args.conversationId,
+    );
+
+    // 24h service window check (free-text outside template requires it).
+    const now = Date.now();
+    if (
+      !conv.serviceWindowExpiresAt ||
+      conv.serviceWindowExpiresAt <= now
+    ) {
+      throw new ConvexError({
+        code: "SERVICE_WINDOW_EXPIRED",
+        message:
+          "24h service window is closed. Use a template message instead.",
+      });
+    }
+
+    // Consent: free-text within window relies on transactional consent
+    // (recorded automatically when contact sent us a message).
+    await requireConsent(ctx, {
+      tenantId: ctx.tenantId,
+      contactId: conv.contactId,
+      purpose: "transactional",
+    });
+
+    // businessKey derived from stable inputs + client nonce (PLAN section
+    // 5.4): if user clicks Send twice with same nonce we don't double-send.
+    const businessKey = `text:${args.conversationId}:${ctx.memberId}:${args.clientNonce}`;
+    const existing = await ctx.db
+      .query("messages")
+      .withIndex("by_business_key", (q) => q.eq("businessKey", businessKey))
+      .unique();
+    if (existing) return existing._id;
+
+    const messageId = await ctx.db.insert("messages", {
+      tenantId: ctx.tenantId,
+      conversationId: args.conversationId,
+      direction: "outgoing",
+      businessKey,
+      type: "text",
+      content: { text: { body: trimmed } },
+      status: "queued",
+      dispatchAttempts: 0,
+      sentByAgentId: ctx.memberId,
+      createdAt: now,
+    });
+
+    // Bump conversation lastMessageAt so it surfaces in the inbox list.
+    await ctx.db.patch(args.conversationId, { lastMessageAt: now });
+
+    await ctx.scheduler.runAfter(0, internal.messages._dispatchOne, {
+      messageId,
+    });
+
+    return messageId;
+  },
+});
+
+/**
+ * Atomic claim: queued → dispatching, sets claimedAt. If already claimed
+ * (or terminal), returns null and dispatcher aborts.
+ */
+export const _claimForDispatch = internalMutation({
+  args: { messageId: v.id("messages") },
+  returns: v.union(
+    v.object({
+      tenantId: v.id("tenants"),
+      conversationId: v.id("conversations"),
+      content: v.any(),
+    }),
+    v.null(),
+  ),
+  handler: async (ctx, args) => {
+    const msg = await ctx.db.get(args.messageId);
+    if (!msg) return null;
+    if (msg.status !== "queued") return null;
+    await ctx.db.patch(args.messageId, {
+      status: "dispatching",
+      claimedAt: Date.now(),
+      dispatchAttempts: msg.dispatchAttempts + 1,
+    });
+    return {
+      tenantId: msg.tenantId,
+      conversationId: msg.conversationId,
+      content: msg.content,
+    };
+  },
+});
+
+/**
+ * After Meta accepts and returns wamid, persist it and flip to "sent".
+ */
+export const _markSentFromAction = internalMutation({
+  args: {
+    messageId: v.id("messages"),
+    metaMessageId: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.messageId, {
+      status: "sent",
+      metaMessageId: args.metaMessageId,
+    });
+    return null;
+  },
+});
+
+export const _markFailedFromAction = internalMutation({
+  args: {
+    messageId: v.id("messages"),
+    failureReason: v.string(),
+    failureCode: v.optional(v.string()),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.messageId, {
+      status: "failed",
+      failureReason: args.failureReason.slice(0, 500),
+      failureCode: args.failureCode,
+    });
+    return null;
+  },
+});
+
+export const _markUnknownFromAction = internalMutation({
+  args: {
+    messageId: v.id("messages"),
+    reason: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.messageId, {
+      status: "unknown",
+      unknownSince: Date.now(),
+      failureReason: args.reason.slice(0, 500),
+    });
+    return null;
+  },
+});
+
+/**
+ * Internal query: load everything an action needs to dispatch.
+ */
+export const _loadDispatchPayload = internalQuery({
+  args: { messageId: v.id("messages") },
+  returns: v.union(
+    v.object({
+      tenantId: v.id("tenants"),
+      content: v.any(),
+      whatsappAccountId: v.id("whatsappAccounts"),
+      phoneNumberId: v.string(),
+      contactE164: v.string(),
+    }),
+    v.null(),
+  ),
+  handler: async (ctx, args) => {
+    const msg = await ctx.db.get(args.messageId);
+    if (!msg) return null;
+    const conv = await ctx.db.get(msg.conversationId);
+    if (!conv) return null;
+    const phone = await ctx.db.get(conv.phoneNumberId);
+    if (!phone) return null;
+    const contact = await ctx.db.get(conv.contactId);
+    if (!contact) return null;
+    return {
+      tenantId: msg.tenantId,
+      content: msg.content,
+      whatsappAccountId: phone.whatsappAccountId,
+      phoneNumberId: phone.phoneNumberId,
+      contactE164: contact.e164,
+    };
+  },
+});
+
+/**
+ * Outbox dispatcher. Crash-safe model:
+ *  - claim atomically (queued → dispatching). Return null if already claimed.
+ *  - load payload + decrypt token.
+ *  - POST Meta. Outcomes:
+ *      ok + wamid          → markSent
+ *      4xx pre-accept      → markFailed (no retry)
+ *      5xx / network / die → markUnknown (NO auto-retry; reconcile manually)
+ */
+export const _dispatchOne = internalAction({
+  args: { messageId: v.id("messages") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const claim = (await ctx.runMutation(internal.messages._claimForDispatch, {
+      messageId: args.messageId,
+    })) as { tenantId: Id<"tenants"> } | null;
+    if (!claim) return null;
+
+    const payload = (await ctx.runQuery(
+      internal.messages._loadDispatchPayload,
+      { messageId: args.messageId },
+    )) as {
+      whatsappAccountId: Id<"whatsappAccounts">;
+      phoneNumberId: string;
+      contactE164: string;
+      content: { text?: { body?: string } };
+    } | null;
+    if (!payload) {
+      await ctx.runMutation(internal.messages._markFailedFromAction, {
+        messageId: args.messageId,
+        failureReason: "payload not loadable",
+      });
+      return null;
+    }
+
+    const token = (await ctx.runAction(
+      internal.whatsappAccounts.decryptWabaToken,
+      { whatsappAccountId: payload.whatsappAccountId },
+    )) as string | null;
+    if (!token) {
+      await ctx.runMutation(internal.messages._markFailedFromAction, {
+        messageId: args.messageId,
+        failureReason: "no decryptable WABA token",
+      });
+      return null;
+    }
+
+    const text = payload.content?.text?.body ?? "";
+    if (!text) {
+      await ctx.runMutation(internal.messages._markFailedFromAction, {
+        messageId: args.messageId,
+        failureReason: "empty text content",
+      });
+      return null;
+    }
+
+    const toWithoutPlus = payload.contactE164.replace(/^\+/, "");
+
+    let result: Awaited<ReturnType<typeof sendWhatsAppText>>;
+    try {
+      result = await sendWhatsAppText({
+        token,
+        phoneNumberId: payload.phoneNumberId,
+        toE164WithoutPlus: toWithoutPlus,
+        text,
+      });
+    } catch (err) {
+      await ctx.runMutation(internal.messages._markUnknownFromAction, {
+        messageId: args.messageId,
+        reason: err instanceof Error ? err.message : "network error",
+      });
+      return null;
+    }
+
+    if (result.ok) {
+      await ctx.runMutation(internal.messages._markSentFromAction, {
+        messageId: args.messageId,
+        metaMessageId: result.wamid,
+      });
+      return null;
+    }
+
+    // 5xx or unknown → unknown. 4xx (pre-accept) → failed.
+    if (result.statusCode && result.statusCode >= 500) {
+      await ctx.runMutation(internal.messages._markUnknownFromAction, {
+        messageId: args.messageId,
+        reason: `Meta ${result.statusCode}: ${result.reason}`,
+      });
+    } else {
+      await ctx.runMutation(internal.messages._markFailedFromAction, {
+        messageId: args.messageId,
+        failureReason: result.reason,
+        failureCode: result.metaCode ? String(result.metaCode) : undefined,
+      });
+    }
+    return null;
   },
 });

@@ -100,7 +100,10 @@ export function ConversationThread({ conversationId }: Props) {
         )}
       </div>
 
-      <Composer serviceWindowExpiresAt={conversation.serviceWindowExpiresAt} />
+      <Composer
+        conversationId={conversationId}
+        serviceWindowExpiresAt={conversation.serviceWindowExpiresAt}
+      />
     </div>
   );
 }
