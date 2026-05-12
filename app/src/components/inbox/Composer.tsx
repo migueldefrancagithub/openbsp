@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, FormEvent, useRef } from "react";
-import { useMutation } from "convex/react";
-import { Send, Lock, Loader2, AlertCircle } from "lucide-react";
+import { useMutation, useQuery } from "convex/react";
+import { Send, Lock, Loader2, AlertCircle, FileText } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { cn } from "@/lib/cn";
@@ -14,13 +14,54 @@ type ComposerProps = {
 
 export function Composer({ conversationId, serviceWindowExpiresAt }: ComposerProps) {
   const sendText = useMutation(api.messages.sendText);
+  const sendTemplate = useMutation(api.messages.sendTemplate);
+  const templates = useQuery(api.templates.list);
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
   const nonceRef = useRef<string>(crypto.randomUUID());
 
   const within24h =
     serviceWindowExpiresAt && serviceWindowExpiresAt > Date.now();
+  const approvedTemplates = (templates ?? []).filter(
+    (t) => t.status === "approved",
+  );
+
+  async function onSendTemplate(templateId: Id<"templates">) {
+    if (busy) return;
+    setError(null);
+    setBusy(true);
+    try {
+      await sendTemplate({
+        conversationId,
+        templateId,
+        variables: {}, // V1: simple templates with no variables; var picker UI comes next
+        clientNonce: nonceRef.current,
+      });
+      nonceRef.current = crypto.randomUUID();
+      setShowTemplates(false);
+    } catch (err: unknown) {
+      const data =
+        err && typeof err === "object" && "data" in err
+          ? (err as { data: unknown }).data
+          : null;
+      let msg = "Failed to send template";
+      if (data && typeof data === "object") {
+        const d = data as Record<string, unknown>;
+        if (d.code === "MISSING_TEMPLATE_VARIABLE")
+          msg = `Template requires variables (index ${d.index}). Variable picker UI ships next.`;
+        else if (d.code === "CONSENT_REQUIRED")
+          msg = "Recipient has not granted consent for this template category.";
+        else if (typeof d.message === "string") msg = d.message;
+      } else if (err instanceof Error) {
+        msg = err.message;
+      }
+      setError(msg);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -62,13 +103,64 @@ export function Composer({ conversationId, serviceWindowExpiresAt }: ComposerPro
 
   return (
     <div className="border-t border-slate-200 bg-white p-4">
-      {!within24h && (
-        <div className="flex items-center gap-2 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 px-3 py-2 rounded-lg mb-3">
-          <Lock size={12} strokeWidth={2.5} />
-          <span>
-            24h service window expired — only template messages can be sent
-            until the contact replies.
-          </span>
+      {!within24h && !showTemplates && (
+        <div className="flex items-start gap-2 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 px-3 py-2 rounded-lg mb-3">
+          <Lock size={12} strokeWidth={2.5} className="flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            24h service window expired — send an approved template instead.
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowTemplates(true)}
+            className="text-amber-900 font-semibold hover:underline"
+          >
+            Pick template
+          </button>
+        </div>
+      )}
+      {showTemplates && (
+        <div className="mb-3 border border-slate-200 rounded-lg bg-white max-h-48 overflow-y-auto">
+          <div className="px-3 py-2 border-b border-slate-100 flex items-center justify-between">
+            <span className="text-[11px] font-semibold text-slate-700">
+              Approved templates
+            </span>
+            <button
+              type="button"
+              onClick={() => setShowTemplates(false)}
+              className="text-[11px] text-slate-500 hover:text-slate-900"
+            >
+              Cancel
+            </button>
+          </div>
+          {approvedTemplates.length === 0 ? (
+            <div className="px-3 py-4 text-[12px] text-slate-500 text-center">
+              No approved templates yet.
+            </div>
+          ) : (
+            <ul className="divide-y divide-slate-100">
+              {approvedTemplates.map((t) => (
+                <li key={t._id}>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => onSendTemplate(t._id)}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-slate-50 disabled:opacity-50 transition-colors"
+                  >
+                    <FileText
+                      size={12}
+                      className="text-slate-400 flex-shrink-0"
+                    />
+                    <span className="text-[12px] font-medium text-[#0a1b33] flex-1 truncate">
+                      {t.name}
+                    </span>
+                    <span className="text-[10px] text-slate-400">
+                      {t.category} · {t.language}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
       {error && (

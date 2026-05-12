@@ -327,11 +327,65 @@ export default defineSchema({
     createdAt: v.number(),
   }).index("by_tenant", ["tenantId"]),
 
+  appointments: defineTable({
+    tenantId: v.id("tenants"),
+    contactId: v.id("contacts"),
+    scheduledFor: v.number(),
+    durationMinutes: v.number(),
+    status: v.union(
+      v.literal("scheduled"),
+      v.literal("confirmed"),
+      v.literal("cancelled"),
+      v.literal("no_show"),
+      v.literal("completed"),
+    ),
+    professionalName: v.optional(v.string()),
+    location: v.optional(v.string()),
+    sourceSystem: v.optional(v.string()),
+    externalId: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_tenant_when", ["tenantId", "scheduledFor"])
+    .index("by_tenant_external", ["tenantId", "sourceSystem", "externalId"]),
+
   scheduledMessages: defineTable({
     tenantId: v.id("tenants"),
+    contactId: v.id("contacts"),
+    phoneNumberId: v.id("phoneNumbers"),
+    templateId: v.id("templates"),
+    templateVersion: v.number(),
+    variables: v.record(v.string(), v.string()),
     sendAt: v.number(),
-    status: v.string(),
-  }).index("by_tenant_status_sendat", ["tenantId", "status", "sendAt"]),
+    sourceType: v.union(
+      v.literal("appointment_reminder"),
+      v.literal("appointment_confirmation"),
+      v.literal("noshow_recovery"),
+      v.literal("recall_campaign"),
+      v.literal("manual"),
+      v.literal("api"),
+    ),
+    sourceRef: v.optional(v.string()),
+    status: v.union(
+      v.literal("scheduled"),
+      v.literal("claiming"),
+      v.literal("dispatching"),
+      v.literal("sent"),
+      v.literal("cancelled"),
+      v.literal("failed"),
+      v.literal("skipped_consent"),
+      v.literal("skipped_quality"),
+      v.literal("skipped_appointment_invalid"),
+    ),
+    claimedAt: v.optional(v.number()),
+    convexSchedulerJobId: v.optional(v.string()),
+    resultMessageId: v.optional(v.id("messages")),
+    attempts: v.number(),
+    failureReason: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_tenant_status_sendat", ["tenantId", "status", "sendAt"])
+    .index("by_tenant_source", ["tenantId", "sourceType", "sourceRef"]),
 
   templates: defineTable({
     tenantId: v.id("tenants"),

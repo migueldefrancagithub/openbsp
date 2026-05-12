@@ -10,7 +10,7 @@ import {
   tenantQuery,
   loadByIdInTenant,
 } from "./lib/customFunctions";
-import { sendWhatsAppText } from "./lib/meta/graph";
+import { sendWhatsAppText, sendWhatsAppTemplate } from "./lib/meta/graph";
 import { requireConsent } from "./lib/consent";
 import { validateHealthcareContent } from "./lib/dlp/healthcare";
 import type { Id } from "./_generated/dataModel";
@@ -432,6 +432,123 @@ export const _loadDispatchPayload = internalQuery({
   },
 });
 
+// ---------- Outbound template ----------
+
+/**
+ * Send an approved template message. Bypasses the 24h service-window
+ * gate (templates exist precisely to re-open conversations). Requires
+ *   - template.status === "approved"
+ *   - all template variables provided
+ *   - consent matching the template category (marketing/transactional/auth)
+ */
+export const sendTemplate = tenantMutation({
+  args: {
+    conversationId: v.id("conversations"),
+    templateId: v.id("templates"),
+    variables: v.record(v.string(), v.string()),
+    clientNonce: v.string(),
+  },
+  returns: v.id("messages"),
+  handler: async (ctx, args): Promise<Id<"messages">> => {
+    const conv = await loadByIdInTenant(
+      ctx as Parameters<typeof loadByIdInTenant>[0],
+      "conversations",
+      args.conversationId,
+    );
+    const tpl = await loadByIdInTenant(
+      ctx as Parameters<typeof loadByIdInTenant>[0],
+      "templates",
+      args.templateId,
+    );
+    if (tpl.status !== "approved") {
+      throw new ConvexError({
+        code: "TEMPLATE_NOT_APPROVED",
+        status: tpl.status,
+      });
+    }
+    const ver = await ctx.db
+      .query("templateVersions")
+      .withIndex("by_template_version", (q) =>
+        q.eq("templateId", args.templateId).eq("version", tpl.currentVersion),
+      )
+      .unique();
+    if (!ver) throw new ConvexError({ code: "VERSION_NOT_FOUND" });
+
+    // Consent: marketing template requires marketing consent;
+    // utility/auth use transactional.
+    const purpose: "marketing" | "transactional" | "authentication" =
+      tpl.category === "marketing"
+        ? "marketing"
+        : tpl.category === "authentication"
+          ? "authentication"
+          : "transactional";
+    await requireConsent(ctx, {
+      tenantId: ctx.tenantId,
+      contactId: conv.contactId,
+      purpose,
+    });
+
+    // Validate variables present + ordered
+    const orderedParams = [...ver.parameterSchema].sort(
+      (a, b) => a.index - b.index,
+    );
+    const orderedValues: string[] = [];
+    for (const p of orderedParams) {
+      const key = String(p.index);
+      const val = args.variables[key];
+      if (!val || val.trim().length === 0) {
+        throw new ConvexError({
+          code: "MISSING_TEMPLATE_VARIABLE",
+          index: p.index,
+        });
+      }
+      orderedValues.push(val);
+    }
+
+    const businessKey = `template:${args.conversationId}:${args.templateId}:v${tpl.currentVersion}:${args.clientNonce}`;
+    const existing = await ctx.db
+      .query("messages")
+      .withIndex("by_business_key", (q) => q.eq("businessKey", businessKey))
+      .unique();
+    if (existing) return existing._id;
+
+    const now = Date.now();
+    const messageId = await ctx.db.insert("messages", {
+      tenantId: ctx.tenantId,
+      conversationId: args.conversationId,
+      direction: "outgoing",
+      businessKey,
+      type: "template",
+      content: {
+        template: {
+          name: tpl.name,
+          language: tpl.language,
+          version: tpl.currentVersion,
+          variables: orderedValues,
+        },
+      },
+      status: "queued",
+      dispatchAttempts: 0,
+      sentByAgentId: ctx.memberId,
+      templateId: args.templateId,
+      templateVersion: tpl.currentVersion,
+      pricingCategory:
+        tpl.category === "marketing"
+          ? "marketing"
+          : tpl.category === "authentication"
+            ? "authentication"
+            : "utility",
+      createdAt: now,
+    });
+
+    await ctx.db.patch(args.conversationId, { lastMessageAt: now });
+    await ctx.scheduler.runAfter(0, internal.messages._dispatchOne, {
+      messageId,
+    });
+    return messageId;
+  },
+});
+
 /**
  * Outbox dispatcher. Crash-safe model:
  *  - claim atomically (queued → dispatching). Return null if already claimed.
@@ -479,25 +596,46 @@ export const _dispatchOne = internalAction({
       return null;
     }
 
-    const text = payload.content?.text?.body ?? "";
-    if (!text) {
-      await ctx.runMutation(internal.messages._markFailedFromAction, {
-        messageId: args.messageId,
-        failureReason: "empty text content",
-      });
-      return null;
-    }
-
     const toWithoutPlus = payload.contactE164.replace(/^\+/, "");
+    const isTemplate = !!(payload.content as { template?: unknown })?.template;
 
     let result: Awaited<ReturnType<typeof sendWhatsAppText>>;
     try {
-      result = await sendWhatsAppText({
-        token,
-        phoneNumberId: payload.phoneNumberId,
-        toE164WithoutPlus: toWithoutPlus,
-        text,
-      });
+      if (isTemplate) {
+        const tpl = (
+          payload.content as {
+            template: {
+              name: string;
+              language: string;
+              variables: string[];
+            };
+          }
+        ).template;
+        result = await sendWhatsAppTemplate({
+          token,
+          phoneNumberId: payload.phoneNumberId,
+          toE164WithoutPlus: toWithoutPlus,
+          templateName: tpl.name,
+          languageCode: tpl.language,
+          bodyVariables: tpl.variables,
+        });
+      } else {
+        const text =
+          (payload.content as { text?: { body?: string } })?.text?.body ?? "";
+        if (!text) {
+          await ctx.runMutation(internal.messages._markFailedFromAction, {
+            messageId: args.messageId,
+            failureReason: "empty text content",
+          });
+          return null;
+        }
+        result = await sendWhatsAppText({
+          token,
+          phoneNumberId: payload.phoneNumberId,
+          toE164WithoutPlus: toWithoutPlus,
+          text,
+        });
+      }
     } catch (err) {
       await ctx.runMutation(internal.messages._markUnknownFromAction, {
         messageId: args.messageId,
