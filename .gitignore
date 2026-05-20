@@ -14,9 +14,18 @@ dist/
 convex/_generated/
 
 # Env
-.env
-.env.local
-.env.*.local
+.env*
+!.env.example
+!**/.env.example
+
+# Local browser/research audit artifacts.
+# These can contain cookies, auth headers, request bodies, or screenshots of API tokens.
+acto-1/myleadflow-audit/
+**/myleadflow-audit/
+playwright/.auth/
+playwright-report/
+test-results/
+*.har
 
 # Reference clones (read-only, not part of fork)
 reference/

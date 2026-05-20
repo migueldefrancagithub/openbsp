@@ -1,35 +1,39 @@
 import { convexTest } from "convex-test";
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import schema from "../schema";
 import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 
-beforeEach(() => {
-  vi.useFakeTimers();
-});
-afterEach(() => {
-  vi.useRealTimers();
-});
+async function processPendingWebhookEvents(t: ReturnType<typeof convexTest>) {
+  const pendingEventIds = await t.run(async (ctx) => {
+    const rows = await ctx.db.query("webhookEvents").collect();
+    return rows
+      .filter((row) => row.status === "pending")
+      .map((row) => row._id);
+  });
+  for (const eventId of pendingEventIds) {
+    await t.action(internal.webhooks.processOne, { eventId });
+  }
+}
 
 async function seedTenantAndPhone(t: ReturnType<typeof convexTest>) {
   return await t.run(async (ctx) => {
     const tenantId = await ctx.db.insert("tenants", {
       name: "Test Clinic",
       vertical: "clinic",
-      healthcareMode: true,
       plan: "starter",
       settings: {
         defaultLocale: "pt-PT",
         timezone: "Europe/Lisbon",
         retentionDays: 730,
       },
-      rgpd: { controllerName: "Test", controllerEmail: "test@example.pt" },
       createdAt: Date.now(),
     });
     const wabaAccountId = await ctx.db.insert("whatsappAccounts", {
       tenantId,
       metaAppId: "TEST_APP",
       wabaId: "TEST_WABA",
+      accessToken: "test-token",
       status: "active",
       tokenStatus: "ok",
       createdAt: Date.now(),
@@ -51,6 +55,7 @@ function makeMessagePayload(opts?: {
   from?: string;
   text?: string;
   ts?: number;
+  referral?: Record<string, unknown>;
 }) {
   return {
     object: "whatsapp_business_account",
@@ -73,6 +78,7 @@ function makeMessagePayload(opts?: {
                   timestamp: String(opts?.ts ?? 1700000000),
                   type: "text",
                   text: { body: opts?.text ?? "Olá clínica" },
+                  referral: opts?.referral,
                 },
               ],
             },
@@ -94,8 +100,7 @@ describe("webhook E2E", () => {
       rawBodySha256: "test-sha256",
     });
 
-    // Wait for scheduled actions to run.
-    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    await processPendingWebhookEvents(t);
 
     // Webhook event marked processed
     const events = await t.run(async (ctx) =>
@@ -181,14 +186,14 @@ describe("webhook E2E", () => {
       rawPayload: raw,
       rawBodySha256: "sha-A",
     });
-    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    await processPendingWebhookEvents(t);
 
     // Meta retries the exact same message
     await t.mutation(internal.webhooks.enqueue, {
       rawPayload: raw,
       rawBodySha256: "sha-A",
     });
-    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    await processPendingWebhookEvents(t);
 
     const events = await t.run(async (ctx) =>
       ctx.db.query("webhookEvents").collect(),
@@ -209,7 +214,7 @@ describe("webhook E2E", () => {
       rawPayload: JSON.stringify(payload),
       rawBodySha256: "sha-X",
     });
-    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    await processPendingWebhookEvents(t);
 
     const events = await t.run(async (ctx) =>
       ctx.db.query("webhookEvents").collect(),
@@ -274,5 +279,47 @@ describe("webhook E2E", () => {
     });
     const after2 = await t.run(async (ctx) => ctx.db.get(messageId));
     expect(after2?.status).toBe("read");
+  });
+
+  it("persists CTWA referral context and marks the conversation AI eligible", async () => {
+    const t = convexTest(schema);
+    const { tenantId } = await seedTenantAndPhone(t);
+
+    await t.mutation(internal.webhooks.enqueue, {
+      rawPayload: JSON.stringify(
+        makeMessagePayload({
+          wamid: "wamid.CTWA.1",
+          ts: 1700001000,
+          referral: {
+            source_type: "ad",
+            source_id: "238555111",
+            source_url: "https://fb.me/example",
+            headline: "Promo Botox",
+            body: "Clique para WhatsApp",
+            media_type: "image",
+          },
+        }),
+      ),
+      rawBodySha256: "sha-ctwa",
+    });
+    await processPendingWebhookEvents(t);
+
+    const referrals = await t.run(async (ctx) =>
+      ctx.db.query("ctwaReferrals").collect(),
+    );
+    expect(referrals).toHaveLength(1);
+    expect(referrals[0].tenantId).toBe(tenantId);
+    expect(referrals[0].sourceId).toBe("238555111");
+    expect(referrals[0].headline).toBe("Promo Botox");
+    expect(referrals[0].freeEntryWindowExpiresAt).toBe(
+      1700001000 * 1000 + 72 * 60 * 60 * 1000,
+    );
+
+    const conversations = await t.run(async (ctx) =>
+      ctx.db.query("conversations").collect(),
+    );
+    expect(conversations[0].leadSource).toBe("ctwa");
+    expect(conversations[0].aiState).toBe("eligible");
+    expect(conversations[0].opportunityStatus).toBe("new");
   });
 });
