@@ -27,6 +27,9 @@ playwright-report/
 test-results/
 *.har
 
+# Large/raw research transcripts stay local; commit synthesized notes instead.
+acto-1/LIVE_AQUI_TRANSCRIPT*.md
+
 # Reference clones (read-only, not part of fork)
 reference/
 
