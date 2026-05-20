@@ -107,6 +107,58 @@ const webhookStatusValidator = v.union(
   v.literal("failed"),
 );
 
+const leadSourceValidator = v.union(
+  v.literal("ctwa"),
+  v.literal("organic"),
+  v.literal("campaign_reply"),
+  v.literal("unknown"),
+);
+
+const opportunityStatusValidator = v.union(
+  v.literal("new"),
+  v.literal("contacted"),
+  v.literal("replied"),
+  v.literal("opportunity"),
+  v.literal("booked"),
+  v.literal("lost"),
+);
+
+const campaignStatusValidator = v.union(
+  v.literal("draft"),
+  v.literal("scheduled"),
+  v.literal("running"),
+  v.literal("paused"),
+  v.literal("completed"),
+  v.literal("failed"),
+  v.literal("cancelled"),
+);
+
+const campaignRecipientStatusValidator = v.union(
+  v.literal("pending"),
+  v.literal("queued"),
+  v.literal("dispatching"),
+  v.literal("sent"),
+  v.literal("delivered"),
+  v.literal("read"),
+  v.literal("replied"),
+  v.literal("clicked"),
+  v.literal("failed"),
+  v.literal("skipped"),
+);
+
+const chatbotStatusValidator = v.union(
+  v.literal("draft"),
+  v.literal("active"),
+  v.literal("paused"),
+);
+
+const chatbotTriggerValidator = v.union(
+  v.literal("inbound"),
+  v.literal("keyword"),
+  v.literal("ctwa"),
+  v.literal("handoff"),
+);
+
 // ---------- Schema ----------
 
 export default defineSchema({
@@ -116,18 +168,11 @@ export default defineSchema({
   tenants: defineTable({
     name: v.string(),
     vertical: verticalValidator,
-    healthcareMode: v.boolean(),
     plan: planValidator,
     settings: v.object({
       defaultLocale: v.string(),
       timezone: v.string(),
       retentionDays: v.number(),
-    }),
-    rgpd: v.object({
-      controllerName: v.string(),
-      controllerEmail: v.string(),
-      dpaSignedAt: v.optional(v.number()),
-      dpiaCompletedAt: v.optional(v.number()),
     }),
     createdAt: v.number(),
   }),
@@ -149,6 +194,27 @@ export default defineSchema({
     updatedAt: v.number(),
   }).index("by_user", ["userId"]),
 
+  teams: defineTable({
+    tenantId: v.id("tenants"),
+    name: v.string(),
+    createdBy: v.id("members"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_tenant", ["tenantId"])
+    .index("by_tenant_name", ["tenantId", "name"]),
+
+  teamMembers: defineTable({
+    tenantId: v.id("tenants"),
+    teamId: v.id("teams"),
+    memberId: v.id("members"),
+    teamRole: v.union(v.literal("lead"), v.literal("member")),
+    createdAt: v.number(),
+  })
+    .index("by_team", ["teamId"])
+    .index("by_member", ["tenantId", "memberId"])
+    .index("by_team_member", ["teamId", "memberId"]),
+
   // ===== Meta App (platform-controlled, single row in MVP) =====
   metaApps: defineTable({
     metaAppId: v.string(),
@@ -164,7 +230,17 @@ export default defineSchema({
   whatsappAccounts: defineTable({
     tenantId: v.id("tenants"),
     metaAppId: v.string(),
+    businessPortfolioId: v.optional(v.string()),
     wabaId: v.string(),
+    accessToken: v.string(),
+    onboardingSource: v.optional(
+      v.union(
+        v.literal("manual"),
+        v.literal("embedded_signup"),
+        v.literal("api"),
+      ),
+    ),
+    embeddedSignupSessionId: v.optional(v.id("embeddedSignupSessions")),
     status: wabaStatusValidator,
     qualityRating: v.optional(qualityRatingValidator),
     messagingTier: v.optional(v.string()),
@@ -180,17 +256,6 @@ export default defineSchema({
     .index("by_tenant", ["tenantId"])
     .index("by_app_waba", ["metaAppId", "wabaId"]),
 
-  wabaSecrets: defineTable({
-    whatsappAccountId: v.id("whatsappAccounts"),
-    ciphertext: v.string(),
-    iv: v.string(),
-    keyVersion: v.number(),
-    encryptedAt: v.number(),
-    rotatedAt: v.optional(v.number()),
-    lastAccessedAt: v.optional(v.number()),
-    accessCountSinceLastReset: v.number(),
-  }).index("by_account", ["whatsappAccountId"]),
-
   phoneNumbers: defineTable({
     tenantId: v.id("tenants"),
     whatsappAccountId: v.id("whatsappAccounts"),
@@ -203,15 +268,36 @@ export default defineSchema({
     circuitBreakerUntil: v.optional(v.number()),
     circuitBreakerReason: v.optional(v.string()),
     circuitBreakerOpenedAt: v.optional(v.number()),
+    /** Public WhatsApp business username adopted for this number (Meta GA
+     *  June 2026). Updated via the `business_username_update` webhook. */
+    businessUsername: v.optional(v.string()),
+    businessUsernameStatus: v.optional(v.string()),
+    businessUsernameUpdatedAt: v.optional(v.number()),
     createdAt: v.number(),
   })
     .index("by_phone_number_id", ["phoneNumberId"])
-    .index("by_tenant", ["tenantId"]),
+    .index("by_tenant", ["tenantId"])
+    .index("by_business_username", ["businessUsername"]),
 
   // ===== Contacts =====
+  // A contact MUST have at least one of (e164, bsuid). Username is a public
+  // display alias the user can set on their side; it can change.
+  // BSUID = Meta's stable per-business-account identity for this WhatsApp
+  // user. Mandatory in webhooks from 2026-03-31; phone number becomes opt-in
+  // when the user enables WhatsApp usernames (June 2026 rollout).
   contacts: defineTable({
     tenantId: v.id("tenants"),
-    e164: v.string(),
+    e164: v.optional(v.string()),
+    /** Business-Scoped User ID (Meta). Stable per WABA; survives username
+     *  enrollment. Format: `<COUNTRY>.<digits>` (e.g. `US.13491208655302741918`).
+     *  Required by Meta from 2026-03-31 onward in inbound webhooks. */
+    bsuid: v.optional(v.string()),
+    /** Parent BSUID — only present when the business has enabled parent
+     *  BSUIDs (lets the same end-user share identity across multiple
+     *  Business Portfolios). Format: `<COUNTRY>.ENT.<digits>`. */
+    parentBsuid: v.optional(v.string()),
+    /** Public WhatsApp username chosen by the user (e.g. `@pablomorales`). */
+    whatsappUsername: v.optional(v.string()),
     name: v.optional(v.string()),
     locale: v.optional(v.string()),
     tags: v.array(v.string()),
@@ -221,6 +307,8 @@ export default defineSchema({
     erasedAt: v.optional(v.number()),
   })
     .index("by_tenant_phone", ["tenantId", "e164"])
+    .index("by_tenant_bsuid", ["tenantId", "bsuid"])
+    .index("by_tenant_username", ["tenantId", "whatsappUsername"])
     .index("by_tenant", ["tenantId"]),
 
   // Current consent state — single row per (tenant, contact, purpose, channel).
@@ -265,12 +353,27 @@ export default defineSchema({
     phoneNumberId: v.id("phoneNumbers"),
     contactId: v.id("contacts"),
     status: conversationStatusValidator,
+    assignedTeamId: v.optional(v.id("teams")),
     assignedAgentId: v.optional(v.id("members")),
     lastMessageAt: v.number(),
     lastIncomingAt: v.optional(v.number()),
     serviceWindowExpiresAt: v.optional(v.number()),
     unreadCount: v.number(),
     tags: v.array(v.string()),
+    leadSource: v.optional(leadSourceValidator),
+    opportunityStatus: v.optional(opportunityStatusValidator),
+    aiState: v.optional(
+      v.union(
+        v.literal("eligible"),
+        v.literal("paused"),
+        v.literal("disabled"),
+      ),
+    ),
+    aiPausedReason: v.optional(v.string()),
+    lastHumanMessageAt: v.optional(v.number()),
+    lastCtwaClickAt: v.optional(v.number()),
+    opportunityValueMinor: v.optional(v.number()),
+    opportunityCurrency: v.optional(v.string()),
   })
     .index("by_tenant_status", ["tenantId", "status"])
     .index("by_tenant_phone_contact", [
@@ -279,6 +382,48 @@ export default defineSchema({
       "contactId",
     ])
     .index("by_tenant_lastmsg", ["tenantId", "lastMessageAt"]),
+
+  ctwaReferrals: defineTable({
+    tenantId: v.id("tenants"),
+    conversationId: v.id("conversations"),
+    contactId: v.id("contacts"),
+    phoneNumberId: v.id("phoneNumbers"),
+    metaMessageId: v.string(),
+    sourceType: v.optional(v.string()),
+    sourceId: v.optional(v.string()),
+    sourceUrl: v.optional(v.string()),
+    headline: v.optional(v.string()),
+    body: v.optional(v.string()),
+    mediaType: v.optional(v.string()),
+    imageUrl: v.optional(v.string()),
+    videoUrl: v.optional(v.string()),
+    thumbnailUrl: v.optional(v.string()),
+    clickedAt: v.number(),
+    freeEntryWindowExpiresAt: v.number(),
+    createdAt: v.number(),
+  })
+    .index("by_conversation", ["conversationId", "clickedAt"])
+    .index("by_contact", ["tenantId", "contactId", "clickedAt"])
+    .index("by_source", ["tenantId", "sourceId"]),
+
+  aiAuditEvents: defineTable({
+    tenantId: v.id("tenants"),
+    conversationId: v.id("conversations"),
+    contactId: v.id("contacts"),
+    kind: v.union(
+      v.literal("eligible"),
+      v.literal("paused"),
+      v.literal("blocked"),
+      v.literal("drafted"),
+      v.literal("approved"),
+    ),
+    reason: v.optional(v.string()),
+    payload: v.optional(v.any()),
+    createdBy: v.optional(v.id("members")),
+    createdAt: v.number(),
+  })
+    .index("by_conversation", ["conversationId", "createdAt"])
+    .index("by_tenant", ["tenantId", "createdAt"]),
 
   messages: defineTable({
     tenantId: v.id("tenants"),
@@ -297,20 +442,11 @@ export default defineSchema({
     unknownSince: v.optional(v.number()),
     sentByAgentId: v.optional(v.id("members")),
     sentByCampaignId: v.optional(v.id("campaigns")),
-    sentByScheduledMessageId: v.optional(v.id("scheduledMessages")),
     templateId: v.optional(v.id("templates")),
     templateVersion: v.optional(v.number()),
     pricingCategory: v.optional(pricingCategoryValidator),
     costMinor: v.optional(v.number()),
     costCurrency: v.optional(v.string()),
-    contentValidationResult: v.optional(
-      v.object({
-        passed: v.boolean(),
-        blockedReasons: v.optional(v.array(v.string())),
-        overrideByMemberId: v.optional(v.id("members")),
-        overrideJustification: v.optional(v.string()),
-      }),
-    ),
     createdAt: v.number(),
   })
     .index("by_meta_id", ["metaMessageId"])
@@ -320,72 +456,223 @@ export default defineSchema({
     .index("by_status_unknown", ["status", "unknownSince"])
     .index("by_tenant_created", ["tenantId", "createdAt"]),
 
-  // Forward-declared empty tables (filled in later chunks).
-  campaigns: defineTable({
+  contactLists: defineTable({
     tenantId: v.id("tenants"),
     name: v.string(),
-    createdAt: v.number(),
-  }).index("by_tenant", ["tenantId"]),
-
-  appointments: defineTable({
-    tenantId: v.id("tenants"),
-    contactId: v.id("contacts"),
-    scheduledFor: v.number(),
-    durationMinutes: v.number(),
-    status: v.union(
-      v.literal("scheduled"),
-      v.literal("confirmed"),
-      v.literal("cancelled"),
-      v.literal("no_show"),
-      v.literal("completed"),
-    ),
-    professionalName: v.optional(v.string()),
-    location: v.optional(v.string()),
-    sourceSystem: v.optional(v.string()),
-    externalId: v.optional(v.string()),
+    description: v.optional(v.string()),
+    audienceCriteria: v.optional(v.any()),
+    audienceSnapshotAt: v.optional(v.number()),
+    audienceMatchedCount: v.optional(v.number()),
+    audienceExcludedMarketingRevoked: v.optional(v.number()),
+    createdBy: v.id("members"),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
-    .index("by_tenant_when", ["tenantId", "scheduledFor"])
-    .index("by_tenant_external", ["tenantId", "sourceSystem", "externalId"]),
+    .index("by_tenant", ["tenantId"])
+    .index("by_tenant_name", ["tenantId", "name"]),
 
-  scheduledMessages: defineTable({
+  contactListMembers: defineTable({
     tenantId: v.id("tenants"),
+    listId: v.id("contactLists"),
     contactId: v.id("contacts"),
-    phoneNumberId: v.id("phoneNumbers"),
-    templateId: v.id("templates"),
-    templateVersion: v.number(),
-    variables: v.record(v.string(), v.string()),
-    sendAt: v.number(),
-    sourceType: v.union(
-      v.literal("appointment_reminder"),
-      v.literal("appointment_confirmation"),
-      v.literal("noshow_recovery"),
-      v.literal("recall_campaign"),
+    source: v.union(
       v.literal("manual"),
-      v.literal("api"),
+      v.literal("csv_import"),
+      v.literal("segment"),
+      v.literal("audience_builder"),
     ),
-    sourceRef: v.optional(v.string()),
+    addedBy: v.id("members"),
+    addedAt: v.number(),
+  })
+    .index("by_list", ["listId"])
+    .index("by_list_contact", ["listId", "contactId"])
+    .index("by_contact", ["tenantId", "contactId"]),
+
+  csvImportJobs: defineTable({
+    tenantId: v.id("tenants"),
+    listId: v.optional(v.id("contactLists")),
+    fileName: v.optional(v.string()),
     status: v.union(
-      v.literal("scheduled"),
-      v.literal("claiming"),
-      v.literal("dispatching"),
-      v.literal("sent"),
-      v.literal("cancelled"),
+      v.literal("pending"),
+      v.literal("processing"),
+      v.literal("completed"),
       v.literal("failed"),
-      v.literal("skipped_consent"),
-      v.literal("skipped_quality"),
-      v.literal("skipped_appointment_invalid"),
     ),
-    claimedAt: v.optional(v.number()),
-    convexSchedulerJobId: v.optional(v.string()),
-    resultMessageId: v.optional(v.id("messages")),
-    attempts: v.number(),
+    totalRows: v.number(),
+    createdRows: v.number(),
+    updatedRows: v.number(),
+    skippedRows: v.number(),
+    errorSummary: v.optional(v.any()),
+    createdBy: v.id("members"),
+    createdAt: v.number(),
+    completedAt: v.optional(v.number()),
+  })
+    .index("by_tenant", ["tenantId"])
+    .index("by_list", ["listId"]),
+
+  campaigns: defineTable({
+    tenantId: v.id("tenants"),
+    name: v.string(),
+    listId: v.optional(v.id("contactLists")),
+    templateId: v.optional(v.id("templates")),
+    templateVersion: v.optional(v.number()),
+    status: v.optional(campaignStatusValidator),
+    createdBy: v.optional(v.id("members")),
+    scheduledAt: v.optional(v.number()),
+    startedAt: v.optional(v.number()),
+    completedAt: v.optional(v.number()),
+    pausedAt: v.optional(v.number()),
+    pauseReason: v.optional(v.string()),
+    failureRatePausedAt: v.optional(v.number()),
+    failureRateThreshold: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.optional(v.number()),
+  })
+    .index("by_tenant", ["tenantId"])
+    .index("by_tenant_status", ["tenantId", "status"]),
+
+  campaignRecipients: defineTable({
+    tenantId: v.id("tenants"),
+    campaignId: v.id("campaigns"),
+    contactId: v.id("contacts"),
+    messageId: v.optional(v.id("messages")),
+    identityKind: v.union(v.literal("phone"), v.literal("bsuid")),
+    identityValue: v.string(),
+    status: campaignRecipientStatusValidator,
+    failureCode: v.optional(v.string()),
     failureReason: v.optional(v.string()),
+    metaErrorCategory: v.optional(v.string()),
+    clickedButtonPayload: v.optional(v.string()),
+    repliedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_campaign", ["campaignId"])
+    .index("by_campaign_status", ["campaignId", "status"])
+    .index("by_message", ["messageId"])
+    .index("by_contact", ["tenantId", "contactId"]),
+
+  campaignEvents: defineTable({
+    tenantId: v.id("tenants"),
+    campaignId: v.id("campaigns"),
+    campaignRecipientId: v.optional(v.id("campaignRecipients")),
+    type: v.string(),
+    messageId: v.optional(v.id("messages")),
+    payload: v.optional(v.any()),
     createdAt: v.number(),
   })
-    .index("by_tenant_status_sendat", ["tenantId", "status", "sendAt"])
-    .index("by_tenant_source", ["tenantId", "sourceType", "sourceRef"]),
+    .index("by_campaign", ["campaignId", "createdAt"])
+    .index("by_recipient", ["campaignRecipientId", "createdAt"]),
+
+  // ===== Quick replies (canned messages) — wakit-api parity =====
+  quickReplies: defineTable({
+    tenantId: v.id("tenants"),
+    name: v.string(),
+    content: v.string(),
+    createdBy: v.id("members"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_tenant", ["tenantId"])
+    .index("by_tenant_name", ["tenantId", "name"]),
+
+  // ===== Chatbots — automation studio folders and bot definitions =====
+  chatbotFolders: defineTable({
+    tenantId: v.id("tenants"),
+    name: v.string(),
+    createdBy: v.id("members"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_tenant", ["tenantId"])
+    .index("by_tenant_name", ["tenantId", "name"]),
+
+  chatbots: defineTable({
+    tenantId: v.id("tenants"),
+    folderId: v.optional(v.id("chatbotFolders")),
+    name: v.string(),
+    description: v.optional(v.string()),
+    status: chatbotStatusValidator,
+    triggerKind: chatbotTriggerValidator,
+    model: v.optional(v.string()),
+    channel: v.literal("whatsapp"),
+    createdBy: v.id("members"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_tenant", ["tenantId"])
+    .index("by_tenant_status", ["tenantId", "status"])
+    .index("by_tenant_folder", ["tenantId", "folderId"]),
+
+  // ===== API keys — external API auth, wakit-api parity =====
+  apiKeys: defineTable({
+    tenantId: v.id("tenants"),
+    name: v.string(),
+    keyHash: v.string(),
+    keyPreview: v.string(),
+    role: v.union(
+      v.literal("owner"),
+      v.literal("admin"),
+      v.literal("agent"),
+      v.literal("marketing"),
+    ),
+    createdBy: v.id("members"),
+    createdAt: v.number(),
+    revokedAt: v.optional(v.number()),
+    lastUsedAt: v.optional(v.number()),
+  })
+    .index("by_tenant", ["tenantId"])
+    .index("by_hash", ["keyHash"]),
+
+  // ===== Member invites — wakit-api onboarding_tokens parity =====
+  memberInvites: defineTable({
+    tenantId: v.id("tenants"),
+    email: v.string(),
+    role: v.union(
+      v.literal("admin"),
+      v.literal("agent"),
+      v.literal("marketing"),
+    ),
+    tokenHash: v.string(),
+    invitedBy: v.id("members"),
+    status: v.union(
+      v.literal("active"),
+      v.literal("used"),
+      v.literal("revoked"),
+      v.literal("expired"),
+    ),
+    createdAt: v.number(),
+    expiresAt: v.number(),
+    usedAt: v.optional(v.number()),
+    usedByUserId: v.optional(v.id("users")),
+  })
+    .index("by_tenant", ["tenantId"])
+    .index("by_token_hash", ["tokenHash"])
+    .index("by_tenant_email", ["tenantId", "email"]),
+
+  embeddedSignupSessions: defineTable({
+    tenantId: v.id("tenants"),
+    createdBy: v.id("members"),
+    state: v.string(),
+    status: v.union(
+      v.literal("created"),
+      v.literal("callback_received"),
+      v.literal("assets_received"),
+      v.literal("connected"),
+      v.literal("failed"),
+    ),
+    callbackCode: v.optional(v.string()),
+    businessId: v.optional(v.string()),
+    wabaId: v.optional(v.string()),
+    phoneNumberId: v.optional(v.string()),
+    phoneE164: v.optional(v.string()),
+    phoneDisplayName: v.optional(v.string()),
+    error: v.optional(v.string()),
+    createdAt: v.number(),
+    completedAt: v.optional(v.number()),
+  })
+    .index("by_tenant", ["tenantId"])
+    .index("by_state", ["state"]),
 
   templates: defineTable({
     tenantId: v.id("tenants"),

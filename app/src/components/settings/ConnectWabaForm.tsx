@@ -1,11 +1,9 @@
 "use client";
 
 import { useState, FormEvent } from "react";
-import { useMutation, useAction } from "convex/react";
+import { useAction } from "convex/react";
 import { Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
-
-void useMutation;
 
 type Result =
   | { kind: "idle" }

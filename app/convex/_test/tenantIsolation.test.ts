@@ -15,10 +15,8 @@ describe("tenant isolation", () => {
       const tid = await ctx.db.insert("tenants", {
         name: "Clinic Alice",
         vertical: "clinic",
-        healthcareMode: true,
         plan: "starter",
         settings: { defaultLocale: "pt-PT", timezone: "Europe/Lisbon", retentionDays: 730 },
-        rgpd: { controllerName: "Alice", controllerEmail: "alice@example.pt" },
         createdAt: Date.now(),
       });
       await ctx.db.insert("members", {
@@ -44,10 +42,8 @@ describe("tenant isolation", () => {
       const tid = await ctx.db.insert("tenants", {
         name: "Clinic Bob",
         vertical: "clinic",
-        healthcareMode: true,
         plan: "starter",
         settings: { defaultLocale: "pt-PT", timezone: "Europe/Lisbon", retentionDays: 730 },
-        rgpd: { controllerName: "Bob", controllerEmail: "bob@example.pt" },
         createdAt: Date.now(),
       });
       await ctx.db.insert("members", {
@@ -103,10 +99,8 @@ describe("tenant isolation", () => {
       const tid = await ctx.db.insert("tenants", {
         name: "Suspended Clinic",
         vertical: "clinic",
-        healthcareMode: true,
         plan: "starter",
         settings: { defaultLocale: "pt-PT", timezone: "Europe/Lisbon", retentionDays: 730 },
-        rgpd: { controllerName: "Dave", controllerEmail: "dave@example.pt" },
         createdAt: Date.now(),
       });
       await ctx.db.insert("members", {
@@ -126,5 +120,63 @@ describe("tenant isolation", () => {
     await expect(
       daveCtx.query(api.tenantsQueries.getActive, {}),
     ).rejects.toThrow(/FORBIDDEN/);
+  });
+
+  it("lists all companies for the current user and marks the active workspace", async () => {
+    const t = convexTest(schema);
+    const user = await t.run(async (ctx) => {
+      return await ctx.db.insert("users", { name: "Multi Owner" });
+    });
+    const seeded = await t.run(async (ctx) => {
+      const tenantA = await ctx.db.insert("tenants", {
+        name: "Marisa Clinic",
+        vertical: "clinic",
+        plan: "growth",
+        settings: { defaultLocale: "pt-PT", timezone: "Africa/Maputo", retentionDays: 730 },
+        createdAt: Date.now(),
+      });
+      const tenantB = await ctx.db.insert("tenants", {
+        name: "Smart Business",
+        vertical: "services",
+        plan: "starter",
+        settings: { defaultLocale: "pt-PT", timezone: "Africa/Maputo", retentionDays: 730 },
+        createdAt: Date.now(),
+      });
+      await ctx.db.insert("members", {
+        tenantId: tenantA,
+        userId: user,
+        role: "owner",
+        status: "active",
+        createdAt: Date.now(),
+      });
+      await ctx.db.insert("members", {
+        tenantId: tenantB,
+        userId: user,
+        role: "admin",
+        status: "active",
+        createdAt: Date.now(),
+      });
+      await ctx.db.insert("sessions", {
+        userId: user,
+        activeTenantId: tenantA,
+        updatedAt: Date.now(),
+      });
+      return { tenantA, tenantB };
+    });
+    const authed = t.withIdentity({ subject: user });
+
+    const before = await authed.query((api as any).tenantsQueries.listMine, {});
+    expect(before.map((tenant: { name: string }) => tenant.name)).toEqual([
+      "Marisa Clinic",
+      "Smart Business",
+    ]);
+    expect(before.find((tenant: { tenantId: string }) => tenant.tenantId === seeded.tenantA)?.active).toBe(true);
+    expect(before.find((tenant: { tenantId: string }) => tenant.tenantId === seeded.tenantB)?.role).toBe("admin");
+
+    await authed.mutation(api.tenants.switchActive, { tenantId: seeded.tenantB });
+
+    const after = await authed.query((api as any).tenantsQueries.listMine, {});
+    expect(after.find((tenant: { tenantId: string }) => tenant.tenantId === seeded.tenantA)?.active).toBe(false);
+    expect(after.find((tenant: { tenantId: string }) => tenant.tenantId === seeded.tenantB)?.active).toBe(true);
   });
 });

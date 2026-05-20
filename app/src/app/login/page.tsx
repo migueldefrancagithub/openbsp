@@ -4,6 +4,7 @@ import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuthActions } from "@convex-dev/auth/react";
+import { BrandLogo } from "@/components/Brand";
 
 export default function LoginPage() {
   const { signIn } = useAuthActions();
@@ -34,10 +35,9 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         <Link
           href="/"
-          className="flex items-center gap-2 font-[var(--font-outfit)] font-semibold tracking-tight text-[#0a1b33] mb-10 justify-center"
+          className="mb-10 flex justify-center text-[#0a1b33]"
         >
-          <span className="inline-block w-7 h-7 rounded-md bg-gradient-to-br from-[#F5C344] via-[#F28482] to-[#B567C2]" />
-          openbsp
+          <BrandLogo />
         </Link>
 
         <div className="bg-white rounded-2xl border border-slate-200 shadow-[0_20px_60px_-30px_rgba(0,0,0,0.15)] p-8">

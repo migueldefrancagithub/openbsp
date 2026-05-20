@@ -151,6 +151,53 @@ describe("parseMetaPayload", () => {
     expect(items[0].kind).toBe("message");
     expect(items[1].kind).toBe("status");
   });
+
+  it("extracts click-to-whatsapp referral context from inbound messages", () => {
+    const payload = {
+      object: "whatsapp_business_account",
+      entry: [
+        {
+          id: "WABA_ID_123",
+          changes: [
+            {
+              field: "messages",
+              value: {
+                metadata: { phone_number_id: "PHONE_ID_1" },
+                contacts: [
+                  { profile: { name: "Maria" }, wa_id: "351912345678" },
+                ],
+                messages: [
+                  {
+                    from: "351912345678",
+                    id: "wamid.CTWA",
+                    timestamp: "1700000020",
+                    type: "text",
+                    text: { body: "Quero marcar" },
+                    referral: {
+                      source_type: "ad",
+                      source_id: "238555111",
+                      source_url: "https://fb.me/example",
+                      headline: "Promo Botox",
+                      body: "Clique para WhatsApp",
+                      media_type: "image",
+                      image_url: "https://example.com/ad.jpg",
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    };
+    const [item] = parseMetaPayload(payload);
+    expect(item.kind).toBe("message");
+    if (item.kind === "message") {
+      expect(item.referral?.source).toBe("ctwa");
+      expect(item.referral?.sourceId).toBe("238555111");
+      expect(item.referral?.headline).toBe("Promo Botox");
+    }
+  });
 });
 
 describe("normalizeWaIdToE164", () => {

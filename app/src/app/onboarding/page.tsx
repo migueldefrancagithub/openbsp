@@ -4,9 +4,10 @@ import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
+import { BrandLogo } from "@/components/Brand";
 
 const VERTICALS = [
-  { value: "clinic", label: "Clínica / Saúde", note: "Healthcare-mode obrigatório" },
+  { value: "clinic", label: "Clínica / Saúde" },
   { value: "services", label: "Serviços B2C" },
   { value: "ecommerce", label: "E-commerce" },
   { value: "other", label: "Outro" },
@@ -19,9 +20,7 @@ export default function OnboardingPage() {
   const createTenant = useMutation(api.tenants.createForCurrentUser);
 
   const [name, setName] = useState("");
-  const [vertical, setVertical] = useState<Vertical>("clinic");
-  const [controllerName, setControllerName] = useState("");
-  const [controllerEmail, setControllerEmail] = useState("");
+  const [vertical, setVertical] = useState<Vertical>("services");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -30,12 +29,7 @@ export default function OnboardingPage() {
     setError(null);
     setBusy(true);
     try {
-      await createTenant({
-        name,
-        vertical,
-        controllerName,
-        controllerEmail,
-      });
+      await createTenant({ name, vertical });
       router.push("/app");
     } catch (err: unknown) {
       const msg =
@@ -49,9 +43,8 @@ export default function OnboardingPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#f9fafb] px-4 py-12">
       <div className="w-full max-w-md">
-        <div className="flex items-center gap-2 font-[var(--font-outfit)] font-semibold tracking-tight text-[#0a1b33] mb-10 justify-center">
-          <span className="inline-block w-7 h-7 rounded-md bg-gradient-to-br from-[#F5C344] via-[#F28482] to-[#B567C2]" />
-          openbsp
+        <div className="mb-10 flex justify-center text-[#0a1b33]">
+          <BrandLogo />
         </div>
 
         <div className="bg-white rounded-2xl border border-slate-200 shadow-[0_20px_60px_-30px_rgba(0,0,0,0.15)] p-8">
@@ -98,50 +91,9 @@ export default function OnboardingPage() {
                     }`}
                   >
                     <div>{v.label}</div>
-                    {"note" in v && (
-                      <div className="text-[10px] text-slate-400 mt-0.5">
-                        {v.note}
-                      </div>
-                    )}
                   </button>
                 ))}
               </div>
-            </div>
-
-            <div>
-              <label
-                htmlFor="controllerName"
-                className="block text-xs font-medium text-slate-700 mb-1.5"
-              >
-                Data controller (RGPD)
-              </label>
-              <input
-                id="controllerName"
-                type="text"
-                required
-                value={controllerName}
-                onChange={(e) => setControllerName(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm text-[#0a1b33] focus:outline-none focus:ring-2 focus:ring-[#0a152d]/10 focus:border-[#0a152d] transition-all"
-                placeholder="Nome legal da entidade"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="controllerEmail"
-                className="block text-xs font-medium text-slate-700 mb-1.5"
-              >
-                Controller email
-              </label>
-              <input
-                id="controllerEmail"
-                type="email"
-                required
-                value={controllerEmail}
-                onChange={(e) => setControllerEmail(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm text-[#0a1b33] focus:outline-none focus:ring-2 focus:ring-[#0a152d]/10 focus:border-[#0a152d] transition-all"
-                placeholder="dpo@clinic.pt"
-              />
             </div>
 
             {error && (

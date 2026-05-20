@@ -27,9 +27,17 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title:
-    "OpenBSP · The compliant WhatsApp Business platform for clinics and SMB teams",
+    "CXCast · WhatsApp operations for coexistence, campaigns, and CTWA leads",
   description:
-    "Real-time inbox, segmented broadcasts, Meta-approved templates and 24h-window-aware replies — with healthcare-grade content guardrails, per-purpose consent, and append-only audit by default. Built on Convex + Next.js + Meta Cloud API v21.",
+    "Real-time inbox, segmented broadcasts, Meta-approved templates and 24h-window-aware replies with compliance guardrails, per-purpose consent, and append-only audit by default.",
+  manifest: "/site.webmanifest",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/favicon.svg", type: "image/svg+xml" },
+    ],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180" }],
+  },
 };
 
 export default function RootLayout({

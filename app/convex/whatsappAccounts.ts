@@ -7,13 +7,11 @@ import {
 } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { tenantQuery } from "./lib/customFunctions";
-import { encryptSecret, decryptSecret } from "./lib/meta/secrets";
 import { validateMetaToken } from "./lib/meta/graph";
+import { classifyMetaFailure } from "./lib/meta/errorClassifier";
 import { getAuthUserId } from "@convex-dev/auth/server";
-import type { Id } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import type { Role } from "./lib/roles";
-
-const SECRET_PREVIEW_LEN = 6;
 
 /**
  * tenantQuery list of WhatsApp accounts for the active tenant. Used in
@@ -36,6 +34,9 @@ export const listForTenant = tenantQuery({
           phoneNumberId: v.string(),
           e164: v.string(),
           displayName: v.string(),
+          qualityRating: v.optional(v.string()),
+          circuitBreakerUntil: v.optional(v.number()),
+          circuitBreakerReason: v.optional(v.string()),
         }),
       ),
     }),
@@ -65,6 +66,9 @@ export const listForTenant = tenantQuery({
           phoneNumberId: p.phoneNumberId,
           e164: p.e164,
           displayName: p.displayName,
+          qualityRating: p.qualityRating,
+          circuitBreakerUntil: p.circuitBreakerUntil,
+          circuitBreakerReason: p.circuitBreakerReason,
         })),
       });
     }
@@ -78,11 +82,18 @@ export const insertConnection = internalMutation({
   args: {
     tenantId: v.id("tenants"),
     metaAppId: v.string(),
+    businessPortfolioId: v.optional(v.string()),
     wabaId: v.string(),
+    onboardingSource: v.optional(
+      v.union(
+        v.literal("manual"),
+        v.literal("embedded_signup"),
+        v.literal("api"),
+      ),
+    ),
+    embeddedSignupSessionId: v.optional(v.id("embeddedSignupSessions")),
     validatedScopes: v.array(v.string()),
-    secretCiphertext: v.string(),
-    secretIv: v.string(),
-    secretKeyVersion: v.number(),
+    accessToken: v.string(),
     phoneNumberId: v.string(),
     phoneE164: v.string(),
     phoneDisplayName: v.string(),
@@ -110,20 +121,16 @@ export const insertConnection = internalMutation({
     const wabaAccountId = await ctx.db.insert("whatsappAccounts", {
       tenantId: args.tenantId,
       metaAppId: args.metaAppId,
+      businessPortfolioId: args.businessPortfolioId,
       wabaId: args.wabaId,
+      accessToken: args.accessToken,
+      onboardingSource: args.onboardingSource ?? "manual",
+      embeddedSignupSessionId: args.embeddedSignupSessionId,
       status: "active",
       tokenStatus: "ok",
       validatedAt: Date.now(),
       validatedScopes: args.validatedScopes,
       createdAt: Date.now(),
-    });
-    await ctx.db.insert("wabaSecrets", {
-      whatsappAccountId: wabaAccountId,
-      ciphertext: args.secretCiphertext,
-      iv: args.secretIv,
-      keyVersion: args.secretKeyVersion,
-      encryptedAt: Date.now(),
-      accessCountSinceLastReset: 0,
     });
     const pnId = await ctx.db.insert("phoneNumbers", {
       tenantId: args.tenantId,
@@ -137,61 +144,145 @@ export const insertConnection = internalMutation({
   },
 });
 
-export const loadSecretForDispatch = internalQuery({
+export const loadTokenForDispatch = internalQuery({
   args: { whatsappAccountId: v.id("whatsappAccounts") },
-  returns: v.union(
-    v.object({
-      ciphertext: v.string(),
-      iv: v.string(),
-      keyVersion: v.number(),
-    }),
-    v.null(),
-  ),
+  returns: v.union(v.string(), v.null()),
   handler: async (ctx, args) => {
-    const s = await ctx.db
-      .query("wabaSecrets")
-      .withIndex("by_account", (q) =>
-        q.eq("whatsappAccountId", args.whatsappAccountId),
-      )
-      .unique();
-    if (!s) return null;
-    return {
-      ciphertext: s.ciphertext,
-      iv: s.iv,
-      keyVersion: s.keyVersion,
-    };
+    const acc = await ctx.db.get(args.whatsappAccountId);
+    return acc?.accessToken ?? null;
   },
 });
 
-export const recordSecretAccess = internalMutation({
-  args: { whatsappAccountId: v.id("whatsappAccounts") },
-  returns: v.null(),
+export const openCircuitBreakerForMessageFailure = internalMutation({
+  args: {
+    messageId: v.id("messages"),
+    failureCode: v.optional(v.string()),
+    failureReason: v.optional(v.string()),
+  },
+  returns: v.object({ opened: v.boolean(), reason: v.optional(v.string()) }),
   handler: async (ctx, args) => {
-    const s = await ctx.db
-      .query("wabaSecrets")
-      .withIndex("by_account", (q) =>
-        q.eq("whatsappAccountId", args.whatsappAccountId),
-      )
-      .unique();
-    if (!s) return null;
-    await ctx.db.patch(s._id, {
-      lastAccessedAt: Date.now(),
-      accessCountSinceLastReset: s.accessCountSinceLastReset + 1,
+    const category = classifyMetaFailure({
+      code: args.failureCode,
+      reason: args.failureReason,
     });
-    return null;
+    if (category !== "quality_limit_or_pacing") {
+      return { opened: false };
+    }
+    const msg = await ctx.db.get(args.messageId);
+    if (!msg) return { opened: false };
+    return await openPhoneCircuitBreaker(ctx, {
+      conversationId: msg.conversationId,
+      campaignId: msg.sentByCampaignId,
+      failureCode: args.failureCode,
+      failureReason: args.failureReason,
+    });
   },
 });
+
+export const openCircuitBreakerForMetaMessageFailure = internalMutation({
+  args: {
+    metaMessageId: v.string(),
+    failureCode: v.optional(v.string()),
+    failureReason: v.optional(v.string()),
+  },
+  returns: v.object({ opened: v.boolean(), reason: v.optional(v.string()) }),
+  handler: async (ctx, args) => {
+    const msg = await ctx.db
+      .query("messages")
+      .withIndex("by_meta_id", (q) => q.eq("metaMessageId", args.metaMessageId))
+      .unique();
+    if (!msg) return { opened: false };
+    const category = classifyMetaFailure({
+      code: args.failureCode,
+      reason: args.failureReason,
+    });
+    if (category !== "quality_limit_or_pacing") {
+      return { opened: false };
+    }
+    return await openPhoneCircuitBreaker(ctx, {
+      conversationId: msg.conversationId,
+      campaignId: msg.sentByCampaignId,
+      failureCode: args.failureCode,
+      failureReason: args.failureReason,
+    });
+  },
+});
+
+async function openPhoneCircuitBreaker(
+  ctx: { db: any },
+  args: {
+    conversationId: Id<"conversations">;
+    campaignId?: Id<"campaigns">;
+    failureCode?: string;
+    failureReason?: string;
+  },
+): Promise<{ opened: boolean; reason?: string }> {
+  const conversation = await ctx.db.get(args.conversationId);
+  if (!conversation) return { opened: false };
+  const phone = (await ctx.db.get(
+    conversation.phoneNumberId,
+  )) as Doc<"phoneNumbers"> | null;
+  if (!phone) return { opened: false };
+
+  const now = Date.now();
+  const until = now + 3 * 60 * 60 * 1000;
+  const reason =
+    args.failureReason ??
+    (args.failureCode
+      ? `Meta quality/pacing failure ${args.failureCode}`
+      : "Meta quality or pacing failure");
+
+  await ctx.db.patch(phone._id, {
+    qualityRating: "yellow",
+    qualityLastErrorAt: now,
+    qualityLastErrorCode: args.failureCode,
+    circuitBreakerUntil: until,
+    circuitBreakerReason: reason,
+    circuitBreakerOpenedAt: now,
+  });
+
+  if (args.campaignId) {
+    const campaign = (await ctx.db.get(
+      args.campaignId,
+    )) as Doc<"campaigns"> | null;
+    if (
+      campaign &&
+      campaign.tenantId === phone.tenantId &&
+      campaign.status === "running"
+    ) {
+      await ctx.db.patch(campaign._id, {
+        status: "paused",
+        pausedAt: now,
+        pauseReason: `Paused because ${phone.displayName} hit a Meta quality or pacing limit. Circuit breaker active until ${new Date(
+          until,
+        ).toISOString()}.`,
+        updatedAt: now,
+      });
+      await ctx.db.insert("campaignEvents", {
+        tenantId: phone.tenantId,
+        campaignId: campaign._id,
+        type: "campaign.auto_paused.phone_quality",
+        payload: {
+          phoneNumberId: phone._id,
+          failureCode: args.failureCode,
+          failureReason: args.failureReason,
+          circuitBreakerUntil: until,
+        },
+        createdAt: now,
+      });
+    }
+  }
+
+  return { opened: true, reason };
+}
 
 // ---------- Public action: connect a WABA ----------
 
 /**
- * Validate a Meta system user token via Graph API, then store an encrypted
- * envelope and create the whatsappAccount + phoneNumber rows. Per PLAN
- * sections 5.2 + 7.1 step 8 + Codex round2 #6.
- *
- * Action (not mutation) because it makes external HTTP calls.
- *
- * Caller must be authenticated; we resolve their active tenant inside.
+ * Validate a Meta system user token via Graph API, then store the token and
+ * create the whatsappAccount + phoneNumber rows. Action (not mutation)
+ * because it makes external HTTP calls. Caller must be authenticated; we
+ * resolve their active tenant inside.
  */
 export const connectManual = action({
   args: {
@@ -215,17 +306,10 @@ export const connectManual = action({
     phoneNumberId: Id<"phoneNumbers">;
     validatedScopes: string[];
   }> => {
-    // Resolve tenant + role inline (action ctx — must use runQuery).
     const me: {
       tenantId: Id<"tenants">;
       role: string;
-      healthcareMode: boolean;
-      dpaSignedAt?: number;
-      dpiaCompletedAt?: number;
-    } | null = await ctx.runQuery(
-      internal.whatsappAccounts._meTenant,
-      {},
-    );
+    } | null = await ctx.runQuery(internal.whatsappAccounts._meTenant, {});
     if (!me) throw new ConvexError({ code: "UNAUTHENTICATED" });
     if (me.role !== "owner" && me.role !== "admin") {
       throw new ConvexError({
@@ -234,23 +318,6 @@ export const connectManual = action({
       });
     }
 
-    // RGPD compliance gate (PLAN section 7.1, Codex round2 #6)
-    if (!me.dpaSignedAt) {
-      throw new ConvexError({
-        code: "DPA_REQUIRED",
-        message:
-          "Sign the Data Processing Agreement before connecting WhatsApp.",
-      });
-    }
-    if (me.healthcareMode && !me.dpiaCompletedAt) {
-      throw new ConvexError({
-        code: "DPIA_REQUIRED",
-        message:
-          "Complete the DPIA before connecting WhatsApp in a healthcare workspace.",
-      });
-    }
-
-    // Validate token
     const validation = await validateMetaToken(args.systemUserToken);
     if (!validation.ok) {
       throw new ConvexError({
@@ -259,8 +326,6 @@ export const connectManual = action({
       });
     }
 
-    // Encrypt and persist
-    const envelope = await encryptSecret(args.systemUserToken);
     const result: {
       whatsappAccountId: Id<"whatsappAccounts">;
       phoneNumberId: Id<"phoneNumbers">;
@@ -269,11 +334,10 @@ export const connectManual = action({
       {
         tenantId: me.tenantId,
         metaAppId: args.metaAppId,
+        onboardingSource: "manual",
         wabaId: args.wabaId,
         validatedScopes: validation.scopes,
-        secretCiphertext: envelope.ciphertext,
-        secretIv: envelope.iv,
-        secretKeyVersion: envelope.keyVersion,
+        accessToken: args.systemUserToken,
         phoneNumberId: args.phoneNumberId,
         phoneE164: args.phoneE164,
         phoneDisplayName: args.phoneDisplayName,
@@ -298,9 +362,6 @@ export const _meTenant = internalQuery({
     v.object({
       tenantId: v.id("tenants"),
       role: v.string(),
-      healthcareMode: v.boolean(),
-      dpaSignedAt: v.optional(v.number()),
-      dpiaCompletedAt: v.optional(v.number()),
     }),
     v.null(),
   ),
@@ -319,36 +380,24 @@ export const _meTenant = internalQuery({
       )
       .unique();
     if (!member || member.status !== "active") return null;
-    const tenant = await ctx.db.get(session.activeTenantId);
-    if (!tenant) return null;
     return {
       tenantId: session.activeTenantId,
       role: member.role as Role,
-      healthcareMode: tenant.healthcareMode,
-      dpaSignedAt: tenant.rgpd.dpaSignedAt,
-      dpiaCompletedAt: tenant.rgpd.dpiaCompletedAt,
     };
   },
 });
 
 /**
- * Decrypt a WABA token. Internal action only — never expose to clients.
- * Records access in audit-style counter on wabaSecrets.
+ * Fetch the stored WABA access token. Internal only — never expose to
+ * clients. Kept as an internalAction to preserve existing callsites.
  */
 export const decryptWabaToken = internalAction({
   args: { whatsappAccountId: v.id("whatsappAccounts") },
   returns: v.union(v.string(), v.null()),
   handler: async (ctx, args): Promise<string | null> => {
-    const env = await ctx.runQuery(
-      internal.whatsappAccounts.loadSecretForDispatch,
+    return await ctx.runQuery(
+      internal.whatsappAccounts.loadTokenForDispatch,
       { whatsappAccountId: args.whatsappAccountId },
     );
-    if (!env) return null;
-    await ctx.runMutation(internal.whatsappAccounts.recordSecretAccess, {
-      whatsappAccountId: args.whatsappAccountId,
-    });
-    return await decryptSecret(env);
   },
 });
-
-void SECRET_PREVIEW_LEN; // reserved for UI preview later

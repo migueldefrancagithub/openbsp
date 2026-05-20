@@ -2,50 +2,49 @@
 
 type Logo = {
   name: string;
-  src: string;
+  mark: string;
   gradient: string;
 };
 
-// SVGs from svgl.app — all confirmed CDN paths
 const LOGOS: Logo[] = [
   {
     name: "Convex",
-    src: "https://svgl.app/library/convex.svg",
+    mark: "Cx",
     gradient: "linear-gradient(135deg, #F3B01C 0%, #EE342F 100%)",
   },
   {
     name: "Next.js",
-    src: "https://svgl.app/library/nextjs_icon_dark.svg",
+    mark: "N",
     gradient: "linear-gradient(135deg, #000000 0%, #444444 100%)",
   },
   {
     name: "Vercel",
-    src: "https://svgl.app/library/vercel.svg",
+    mark: "▲",
     gradient: "linear-gradient(135deg, #000000 0%, #555555 100%)",
   },
   {
     name: "Meta",
-    src: "https://svgl.app/library/meta.svg",
+    mark: "∞",
     gradient: "linear-gradient(135deg, #0467DF 0%, #45B0FF 100%)",
   },
   {
     name: "OpenAI",
-    src: "https://svgl.app/library/openai.svg",
+    mark: "AI",
     gradient: "linear-gradient(135deg, #10A37F 0%, #74E0BE 100%)",
   },
   {
     name: "Anthropic",
-    src: "https://svgl.app/library/anthropic.svg",
+    mark: "A",
     gradient: "linear-gradient(135deg, #D97757 0%, #FFB390 100%)",
   },
   {
     name: "Stripe",
-    src: "https://svgl.app/library/stripe.svg",
+    mark: "S",
     gradient: "linear-gradient(135deg, #635BFF 0%, #A29BFF 100%)",
   },
   {
     name: "Resend",
-    src: "https://svgl.app/library/resend_dark.svg",
+    mark: "R",
     gradient: "linear-gradient(135deg, #000000 0%, #6B7280 100%)",
   },
 ];
@@ -73,12 +72,17 @@ export function LogoMarquee() {
                 style={{ background: logo.gradient }}
                 aria-hidden
               />
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={logo.src}
-                alt={logo.name}
-                className="relative h-9 w-auto max-w-[60%] object-contain transition-all duration-300 group-hover:brightness-0 group-hover:invert"
-              />
+              <span className="relative flex items-center gap-2 text-[#0a1b33] transition-colors duration-300 group-hover:text-white">
+                <span
+                  className="flex h-9 w-9 items-center justify-center rounded-full text-[15px] font-semibold text-white shadow-sm"
+                  style={{ background: logo.gradient }}
+                >
+                  {logo.mark}
+                </span>
+                <span className="text-[14px] font-semibold tracking-tight">
+                  {logo.name}
+                </span>
+              </span>
             </div>
           ))}
         </div>

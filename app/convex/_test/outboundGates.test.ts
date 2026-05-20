@@ -17,14 +17,12 @@ async function seed(t: ReturnType<typeof convexTest>) {
     const tenantId = await ctx.db.insert("tenants", {
       name: "Test Clinic",
       vertical: "clinic",
-      healthcareMode: true,
       plan: "starter",
       settings: {
         defaultLocale: "pt-PT",
         timezone: "Europe/Lisbon",
         retentionDays: 730,
       },
-      rgpd: { controllerName: "T", controllerEmail: "t@e.pt" },
       createdAt: Date.now(),
     });
     const memberId = await ctx.db.insert("members", {
@@ -43,6 +41,7 @@ async function seed(t: ReturnType<typeof convexTest>) {
       tenantId,
       metaAppId: "APP",
       wabaId: "WABA",
+      accessToken: "test-token",
       status: "active",
       tokenStatus: "ok",
       createdAt: Date.now(),
@@ -237,6 +236,72 @@ describe("outbound sendText gates", () => {
       ctx.db.query("messages").collect(),
     );
     expect(all.length).toBe(1);
+  });
+
+  it("pauses AI on human reply in a CTWA conversation", async () => {
+    const t = convexTest(schema);
+    const seeded = await seed(t);
+    await grantTransactional(t, {
+      tenantId: seeded.tenantId,
+      contactId: seeded.contactId,
+    });
+    const conversationId = await makeConversation(t, {
+      tenantId: seeded.tenantId,
+      phoneNumberId: seeded.phoneNumberId,
+      contactId: seeded.contactId,
+      windowOpen: true,
+    });
+    await t.run(async (ctx) => {
+      await ctx.db.patch(conversationId, {
+        leadSource: "ctwa",
+        aiState: "eligible",
+        opportunityStatus: "new",
+        lastCtwaClickAt: Date.now(),
+      });
+    });
+
+    const asUser = t.withIdentity({ subject: seeded.userId });
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const api = require("../_generated/api").api;
+    await asUser.mutation(api.messages.sendText, {
+      conversationId,
+      text: "Olá, sou o Miguel. Vou acompanhar por aqui.",
+      clientNonce: "human-takeover",
+    });
+
+    const conversation = await t.run(async (ctx) => ctx.db.get(conversationId));
+    expect(conversation?.aiState).toBe("paused");
+    expect(conversation?.aiPausedReason).toBe("human_reply");
+    expect(conversation?.lastHumanMessageAt).toBeTruthy();
+  });
+
+  it("lets agents update opportunity and AI override state", async () => {
+    const t = convexTest(schema);
+    const seeded = await seed(t);
+    const conversationId = await makeConversation(t, {
+      tenantId: seeded.tenantId,
+      phoneNumberId: seeded.phoneNumberId,
+      contactId: seeded.contactId,
+      windowOpen: true,
+    });
+    const asUser = t.withIdentity({ subject: seeded.userId });
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const api = require("../_generated/api").api;
+
+    await asUser.mutation(api.conversations.setOpportunityStatus, {
+      conversationId,
+      status: "booked",
+    });
+    await asUser.mutation(api.conversations.setAiState, {
+      conversationId,
+      state: "paused",
+      reason: "booked",
+    });
+
+    const conversation = await t.run(async (ctx) => ctx.db.get(conversationId));
+    expect(conversation?.opportunityStatus).toBe("booked");
+    expect(conversation?.aiState).toBe("paused");
+    expect(conversation?.aiPausedReason).toBe("booked");
   });
 
   it("rejects empty + over-length text", async () => {

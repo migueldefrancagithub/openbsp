@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useQuery } from "convex/react";
-import { Inbox } from "lucide-react";
+import { Inbox, Megaphone, UserRound, Users } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import { cn } from "@/lib/cn";
 import { relativeTime } from "@/lib/relativeTime";
@@ -111,6 +111,28 @@ export function ConversationList() {
                         )}
                       </div>
                     </div>
+                    {c.leadSource === "ctwa" && (
+                      <div className="mt-1.5 inline-flex items-center gap-1 rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700">
+                        <Megaphone size={10} />
+                        CTWA lead
+                      </div>
+                    )}
+                    {(c.assignedTeamName || c.assignedAgentName) && (
+                      <div className="mt-1.5 flex flex-wrap gap-1">
+                        {c.assignedTeamName && (
+                          <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">
+                            <Users size={10} />
+                            {c.assignedTeamName}
+                          </span>
+                        )}
+                        {c.assignedAgentName && (
+                          <span className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700">
+                            <UserRound size={10} />
+                            {c.assignedAgentName}
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </Link>
               </li>

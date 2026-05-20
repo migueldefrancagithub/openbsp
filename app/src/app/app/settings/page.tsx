@@ -1,29 +1,68 @@
 "use client";
 
-import { useQuery } from "convex/react";
-import { Smartphone, Shield, CheckCircle2, AlertTriangle } from "lucide-react";
+import { useState, type ReactNode } from "react";
+import { useMutation, useQuery } from "convex/react";
+import {
+  Ban,
+  Bot,
+  CheckCircle2,
+  ClipboardCheck,
+  Loader2,
+  LogIn,
+  MessageSquare,
+  ShoppingBag,
+  Smartphone,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { PageHeader } from "@/components/app/EmptyState";
 import { ConnectWabaForm } from "@/components/settings/ConnectWabaForm";
-import { DpaCard, DpiaCard } from "@/components/settings/ComplianceWizards";
+import { ApiKeysSection } from "@/components/settings/ApiKeysSection";
+import { MembersSection } from "@/components/settings/MembersSection";
+import { TeamsSection } from "@/components/settings/TeamsSection";
 import { api } from "../../../../convex/_generated/api";
 
 export default function SettingsPage() {
   const tenant = useQuery(api.tenantsQueries.getActive);
   const wabaAccounts = useQuery(api.whatsappAccounts.listForTenant);
+  const signupSessions = useQuery(api.embeddedSignup.listSessions);
+  const quickReplies = useQuery(api.quickReplies.list);
+  const beginEmbeddedSignup = useMutation(api.embeddedSignup.begin);
+  const [signupBusy, setSignupBusy] = useState(false);
+  const [signupNotice, setSignupNotice] = useState<string | null>(null);
+  const [autoReplyEnabled, setAutoReplyEnabled] = useState(false);
+  const [botEnabled, setBotEnabled] = useState(true);
+  const [ecommerceEnabled, setEcommerceEnabled] = useState(false);
+  const [autoReplyPeriod, setAutoReplyPeriod] = useState(3);
+  const [autoReplyCode, setAutoReplyCode] = useState("");
+  const [dndOnCode, setDndOnCode] = useState("");
+  const [dndOffCode, setDndOffCode] = useState("");
   if (!tenant) return null;
 
   const hasConnection = (wabaAccounts?.length ?? 0) > 0;
-  const dpaSigned = !!tenant.dpaSignedAt;
-  const dpiaCompleted = !!tenant.dpiaCompletedAt;
-  const dpiaRequired = tenant.healthcareMode;
-  const canConnect = dpaSigned && (!dpiaRequired || dpiaCompleted);
+
+  async function handleEmbeddedSignup() {
+    setSignupBusy(true);
+    setSignupNotice(null);
+    try {
+      const result = await beginEmbeddedSignup({});
+      if (result.url) {
+        window.location.href = result.url;
+      } else {
+        setSignupNotice(
+          "Embedded Signup session created. Add META_EMBEDDED_SIGNUP_APP_ID, META_EMBEDDED_SIGNUP_CONFIG_ID, and META_EMBEDDED_SIGNUP_REDIRECT_URI to enable the Meta redirect.",
+        );
+      }
+    } finally {
+      setSignupBusy(false);
+    }
+  }
 
   return (
     <>
       <PageHeader
         eyebrow="Workspace"
         title="Settings"
-        description="Workspace, WhatsApp connection, members, and compliance documents."
+        description="Workspace and WhatsApp connection."
       />
 
       <div className="px-8 py-8 max-w-4xl space-y-6">
@@ -37,23 +76,109 @@ export default function SettingsPage() {
           <dl className="divide-y divide-slate-100">
             <Row label="Name" value={tenant.name} />
             <Row label="Vertical" value={tenant.vertical} />
-            <div className="px-6 py-3.5 grid grid-cols-3 gap-4 text-sm">
-              <dt className="text-slate-500">Healthcare mode</dt>
-              <dd className="col-span-2">
-                {tenant.healthcareMode ? (
-                  <span className="inline-flex items-center gap-1.5 text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md text-xs font-medium">
-                    <Shield size={12} /> Active
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1.5 text-slate-500 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md text-xs font-medium">
-                    Off
-                  </span>
-                )}
-              </dd>
-            </div>
             <Row label="Tenant ID" value={tenant.tenantId} mono />
             <Row label="Your role" value={tenant.role} />
           </dl>
+        </section>
+
+        {/* WhatsApp connection */}
+        <section className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-100">
+            <h2 className="font-semibold text-[#0a1b33] text-[15px]">
+              Coexistence readiness
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Assumption: until Embedded Signup is wired, this checklist keeps manual WABA setup aligned with Meta Tech Provider requirements.
+            </p>
+          </div>
+          <div className="grid gap-3 p-6 md:grid-cols-2">
+            {[
+              ["Business Manager exists", "Client owns or can access the BM."],
+              ["BM verification ready", "Legal name, website, and docs match."],
+              ["Billing configured", "Card or billing method is active before campaigns."],
+              ["Privacy and terms URLs", "Use /privacy and /terms for app review."],
+              ["Advanced access scopes", "business_management + WhatsApp scopes."],
+              ["Webhook verified", "HMAC and retry idempotency active."],
+              ["Business App continuity", "Client understands coexistence rules."],
+              ["Support path", "Blocked number/card/quality issue escalation ready."],
+            ].map(([title, note]) => (
+              <div key={title} className="flex gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <div className="mt-0.5 h-7 w-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-emerald-600">
+                  <ClipboardCheck size={14} />
+                </div>
+                <div>
+                  <div className="text-[13px] font-medium text-[#0a1b33]">
+                    {title}
+                  </div>
+                  <div className="text-[11px] text-slate-500 mt-0.5">
+                    {note}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="border-t border-slate-100 px-6 py-4">
+            {signupNotice && (
+              <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                {signupNotice}
+              </div>
+            )}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="text-[13px] font-medium text-[#0a1b33]">
+                  Embedded Signup
+                </div>
+                <div className="text-[11px] text-slate-500">
+                  Start a state-tracked Meta onboarding session when app config is present.
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleEmbeddedSignup}
+                disabled={signupBusy}
+                className="inline-flex items-center gap-2 rounded-lg bg-[#0a152d] px-3 py-2 text-[12px] font-medium text-white transition-all hover:bg-[#0a1b33] disabled:opacity-50"
+              >
+                {signupBusy ? <Loader2 size={13} className="animate-spin" /> : <LogIn size={13} />}
+                Start signup
+              </button>
+            </div>
+            {(signupSessions ?? []).length > 0 && (
+              <div className="mt-3 space-y-1.5">
+                {signupSessions!.slice(0, 3).map((session) => (
+                  <div
+                    key={session._id}
+                    className="rounded-lg bg-slate-50 px-3 py-2 text-[11px]"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="font-mono text-slate-400">
+                        {session.state.slice(0, 8)}
+                      </span>
+                      <span className="font-medium text-slate-600">
+                        {session.status}
+                      </span>
+                    </div>
+                    {(session.businessId ||
+                      session.wabaId ||
+                      session.phoneNumberId) && (
+                      <div className="mt-2 grid gap-1 text-slate-500">
+                        {session.businessId && (
+                          <span>BM {session.businessId}</span>
+                        )}
+                        {session.wabaId && (
+                          <span>WABA {session.wabaId}</span>
+                        )}
+                        {session.phoneNumberId && (
+                          <span>
+                            Phone {session.phoneDisplayName ?? session.phoneE164 ?? session.phoneNumberId}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </section>
 
         {/* WhatsApp connection */}
@@ -74,15 +199,6 @@ export default function SettingsPage() {
           </div>
 
           <div className="px-6 py-6">
-            {!hasConnection && !canConnect && (
-              <div className="flex items-start gap-2 text-[12px] text-amber-700 bg-amber-50 border border-amber-200 px-3 py-2.5 rounded-lg mb-5">
-                <AlertTriangle size={14} className="flex-shrink-0 mt-0.5" />
-                <span>
-                  Sign DPA{dpiaRequired ? " and complete DPIA" : ""} below
-                  before you can connect WhatsApp.
-                </span>
-              </div>
-            )}
             {hasConnection ? (
               <div className="space-y-4">
                 {wabaAccounts!.map((acc) => (
@@ -118,6 +234,22 @@ export default function SettingsPage() {
                                 {p.displayName}
                               </span>
                               <span className="text-slate-500 ml-2">{p.e164}</span>
+                              {p.qualityRating && (
+                                <span className="ml-2 rounded-md bg-white px-1.5 py-0.5 text-[10px] font-medium uppercase text-slate-500">
+                                  {p.qualityRating}
+                                </span>
+                              )}
+                              {p.circuitBreakerUntil &&
+                                p.circuitBreakerUntil > Date.now() && (
+                                  <span className="ml-2 rounded-md border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+                                    Circuit breaker active
+                                  </span>
+                                )}
+                              {p.circuitBreakerReason && (
+                                <div className="mt-1 text-[11px] text-amber-700">
+                                  {p.circuitBreakerReason}
+                                </div>
+                              )}
                             </div>
                             <span className="text-slate-400 font-mono text-[10px]">
                               {p.phoneNumberId}
@@ -149,33 +281,110 @@ export default function SettingsPage() {
                       We call Graph API to validate scopes (
                       <code>whatsapp_business_messaging</code>,{" "}
                       <code>whatsapp_business_management</code>,{" "}
-                      <code>business_management</code>) and bind the token
-                      to your WABA. Tokens are encrypted at rest with AES-256
-                      envelope encryption.
+                      <code>business_management</code>) and bind the token to
+                      your WABA.
                     </p>
                   </div>
                 </div>
-                {canConnect ? (
-                  <ConnectWabaForm />
-                ) : (
-                  <p className="text-xs text-slate-500 mt-3">
-                    Connect form unlocks once compliance docs below are
-                    signed.
-                  </p>
-                )}
+                <ConnectWabaForm />
               </div>
             )}
           </div>
         </section>
 
-        {/* Compliance — DPA + DPIA wizards */}
-        <section className="space-y-4">
-          <div className="text-xs uppercase tracking-[0.18em] text-slate-400 font-medium">
-            Compliance documents
+        <section className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-100">
+            <h2 className="font-semibold text-[#0a1b33] text-[15px]">
+              Communication automation
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Company-wide controls for DND, delayed auto replies, bots, and ecommerce flows.
+            </p>
           </div>
-          <DpaCard signedAt={tenant.dpaSignedAt} />
-          {dpiaRequired && <DpiaCard completedAt={tenant.dpiaCompletedAt} />}
+          <div className="grid gap-4 p-6 xl:grid-cols-2">
+            <SettingsCard
+              icon={MessageSquare}
+              title="Auto Reply"
+              body="Use a quick reply when the customer has waited longer than the selected period. When enabled, the bot should not answer that same contact automatically."
+            >
+              <ToggleRow
+                label="Enable"
+                checked={autoReplyEnabled}
+                onChange={setAutoReplyEnabled}
+              />
+              <label className="block">
+                <span className="mb-1 block text-[12px] font-medium text-slate-500">
+                  Period in days
+                </span>
+                <input
+                  type="number"
+                  min={1}
+                  max={30}
+                  value={autoReplyPeriod}
+                  onChange={(event) =>
+                    setAutoReplyPeriod(Number(event.target.value))
+                  }
+                  className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm text-[#0a1b33] outline-none focus:border-slate-400"
+                />
+              </label>
+              <QuickReplySelect
+                label="Quick Message Code"
+                value={autoReplyCode}
+                onChange={setAutoReplyCode}
+                options={quickReplies ?? []}
+              />
+            </SettingsCard>
+
+            <SettingsCard
+              icon={Ban}
+              title="DND"
+              body='When a customer sends "STOP", pause marketing sends. "START" removes the pause and lets the system continue safely.'
+            >
+              <QuickReplySelect
+                label="DND enabled Message Code"
+                value={dndOnCode}
+                onChange={setDndOnCode}
+                options={quickReplies ?? []}
+              />
+              <QuickReplySelect
+                label="DND disabled Message Code"
+                value={dndOffCode}
+                onChange={setDndOffCode}
+                options={quickReplies ?? []}
+              />
+            </SettingsCard>
+
+            <SettingsCard
+              icon={Bot}
+              title="Bot"
+              body="Company-wide bot switch. Channel-specific rules can override this when a connected number needs human-only handling."
+            >
+              <ToggleRow
+                label="Enable Chat Bot"
+                checked={botEnabled}
+                onChange={setBotEnabled}
+              />
+            </SettingsCard>
+
+            <SettingsCard
+              icon={ShoppingBag}
+              title="Ecommerce"
+              body="Prepare catalog, cart recovery, and order-status conversations for shops that sell through WhatsApp."
+            >
+              <ToggleRow
+                label="Enable Ecommerce"
+                checked={ecommerceEnabled}
+                onChange={setEcommerceEnabled}
+              />
+            </SettingsCard>
+          </div>
         </section>
+
+        <MembersSection />
+
+        <TeamsSection />
+
+        <ApiKeysSection />
       </div>
     </>
   );
@@ -203,5 +412,88 @@ function Row({
         {value}
       </dd>
     </div>
+  );
+}
+
+function SettingsCard({
+  icon: Icon,
+  title,
+  body,
+  children,
+}: {
+  icon: LucideIcon;
+  title: string;
+  body: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white p-5">
+      <div className="mb-4 flex items-start gap-3">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-[#0a1b33]">
+          <Icon size={16} />
+        </span>
+        <div>
+          <h3 className="font-[var(--font-outfit)] text-xl font-semibold text-[#0a1b33]">
+            {title}
+          </h3>
+          <p className="mt-1 text-sm leading-6 text-slate-500">{body}</p>
+        </div>
+      </div>
+      <div className="space-y-3">{children}</div>
+    </section>
+  );
+}
+
+function ToggleRow({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <label className="flex min-h-12 items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-[#0a1b33]">
+      {label}
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+        className="h-4 w-4 accent-violet-600"
+      />
+    </label>
+  );
+}
+
+function QuickReplySelect({
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: Array<{ _id: string; name: string }>;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-1 block text-[12px] font-medium text-slate-500">
+        {label}
+      </span>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-[#0a1b33] outline-none focus:border-slate-400"
+      >
+        <option value="">Select Quick Message Code</option>
+        {options.map((reply) => (
+          <option key={reply._id} value={reply.name}>
+            {reply.name}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }

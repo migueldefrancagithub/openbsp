@@ -1,17 +1,31 @@
 "use client";
 
-import { useState, FormEvent } from "react";
-import { useRouter } from "next/navigation";
+import { useState, FormEvent, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useAuthActions } from "@convex-dev/auth/react";
+import { useMutation } from "convex/react";
+import { api } from "../../../convex/_generated/api";
+import { BrandLogo } from "@/components/Brand";
 
 export default function SignupPage() {
   const { signIn } = useAuthActions();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const acceptInvite = useMutation(api.memberInvites.accept);
+  const inviteToken = searchParams.get("invite");
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // Persist invite token so the post-auth flow can redeem it.
+  useEffect(() => {
+    if (inviteToken) {
+      sessionStorage.setItem("openbsp_invite_token", inviteToken);
+    }
+  }, [inviteToken]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -19,6 +33,17 @@ export default function SignupPage() {
     setBusy(true);
     try {
       await signIn("password", { email, password, flow: "signUp" });
+      const pendingToken = sessionStorage.getItem("openbsp_invite_token");
+      if (pendingToken) {
+        try {
+          await acceptInvite({ token: pendingToken });
+          sessionStorage.removeItem("openbsp_invite_token");
+          router.push("/app");
+          return;
+        } catch {
+          // Fall through to onboarding if invite redemption fails.
+        }
+      }
       router.push("/onboarding");
     } catch (err: unknown) {
       const msg =
@@ -34,18 +59,19 @@ export default function SignupPage() {
       <div className="w-full max-w-sm">
         <Link
           href="/"
-          className="flex items-center gap-2 font-[var(--font-outfit)] font-semibold tracking-tight text-[#0a1b33] mb-10 justify-center"
+          className="mb-10 flex justify-center text-[#0a1b33]"
         >
-          <span className="inline-block w-7 h-7 rounded-md bg-gradient-to-br from-[#F5C344] via-[#F28482] to-[#B567C2]" />
-          openbsp
+          <BrandLogo />
         </Link>
 
         <div className="bg-white rounded-2xl border border-slate-200 shadow-[0_20px_60px_-30px_rgba(0,0,0,0.15)] p-8">
           <h1 className="font-[var(--font-outfit)] text-[26px] font-medium tracking-tight text-[#0a1b33]">
-            Create your workspace
+            {inviteToken ? "Accept invite" : "Create your workspace"}
           </h1>
           <p className="text-slate-500 text-sm mt-1">
-            Free during MVP. No credit card required.
+            {inviteToken
+              ? "Create an account to join the workspace you were invited to."
+              : "Free during MVP. No credit card required."}
           </p>
 
           <form onSubmit={onSubmit} className="mt-6 space-y-4">
@@ -107,7 +133,6 @@ export default function SignupPage() {
 
           <p className="text-[11px] text-slate-400 mt-4 leading-relaxed">
             Ao criar conta concordas com os Termos e a Política de Privacidade.
-            DPA assinado no onboarding (obrigatório para healthcare).
           </p>
 
           <p className="text-center text-sm text-slate-500 mt-6">

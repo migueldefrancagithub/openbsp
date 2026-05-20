@@ -2,6 +2,7 @@
 
 import { use, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useQuery, useAction } from "convex/react";
 import {
   ChevronLeft,
@@ -38,6 +39,7 @@ function StatusIcon({ status }: { status: string }) {
 
 export default function TemplateDetailPage({ params }: Props) {
   const { id } = use(params);
+  const searchParams = useSearchParams();
   const templateId = id as Id<"templates">;
   const tpl = useQuery(api.templates.getById, { templateId });
   const submit = useAction(api.templates.submitForApproval);
@@ -82,6 +84,8 @@ export default function TemplateDetailPage({ params }: Props) {
 
   const currentVersion = tpl.versions.find((v) => v.version === tpl.currentVersion);
   const isDraft = tpl.status === "draft";
+  const submissionNotice = searchParams.get("submission");
+  const submissionReason = searchParams.get("reason");
 
   return (
     <>
@@ -103,6 +107,21 @@ export default function TemplateDetailPage({ params }: Props) {
       <div className="px-8 py-8 max-w-3xl space-y-6">
         {/* Status card */}
         <section className="bg-white rounded-2xl border border-slate-200 p-5">
+          {submissionNotice === "submitted" && (
+            <div className="mb-4 flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[12px] text-emerald-700">
+              <CheckCircle2 size={12} className="mt-0.5 flex-shrink-0" />
+              <span>Template created and submitted to Meta.</span>
+            </div>
+          )}
+          {submissionNotice === "draft_saved" && (
+            <div className="mb-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-800">
+              <AlertCircle size={12} className="mt-0.5 flex-shrink-0" />
+              <span>
+                Draft saved, but Meta did not accept the submission
+                {submissionReason ? `: ${submissionReason}` : "."}
+              </span>
+            </div>
+          )}
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <StatusIcon status={tpl.status} />

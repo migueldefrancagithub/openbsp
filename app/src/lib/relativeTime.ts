@@ -30,12 +30,3 @@ export function formatTime(timestamp: number): string {
     minute: "2-digit",
   });
 }
-
-export function formatFullDateTime(timestamp: number): string {
-  return new Date(timestamp).toLocaleString("pt-PT", {
-    day: "2-digit",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}

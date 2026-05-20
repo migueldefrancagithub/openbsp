@@ -10,9 +10,14 @@ import {
   tenantQuery,
   loadByIdInTenant,
 } from "./lib/customFunctions";
-import { sendWhatsAppText, sendWhatsAppTemplate } from "./lib/meta/graph";
+import {
+  sendWhatsAppText,
+  sendWhatsAppTemplate,
+  sendWhatsAppMarketingTemplate,
+} from "./lib/meta/graph";
+import { recordAiAuditEvent } from "./lib/aiControl";
+import { classifyMetaFailure } from "./lib/meta/errorClassifier";
 import { requireConsent } from "./lib/consent";
-import { validateHealthcareContent } from "./lib/dlp/healthcare";
 import type { Id } from "./_generated/dataModel";
 
 const messageTypeValidator = v.union(
@@ -123,6 +128,16 @@ export const markStatusFromWebhook = internalMutation({
       failureReason: args.failureReason ?? msg.failureReason,
       pricingCategory: args.pricingCategory ?? msg.pricingCategory,
     });
+    await syncCampaignRecipientFromMessage(ctx, msg._id, {
+      status: args.newStatus,
+      failureCode: args.failureCode,
+      failureReason: args.failureReason,
+    });
+    if (msg.sentByCampaignId && args.newStatus === "failed") {
+      await ctx.scheduler.runAfter(0, internal.campaigns._evaluateSafetyPause, {
+        campaignId: msg.sentByCampaignId,
+      });
+    }
     return "updated";
   },
 });
@@ -194,16 +209,6 @@ export const sendText = tenantMutation({
     conversationId: v.id("conversations"),
     text: v.string(),
     clientNonce: v.string(),
-    /**
-     * Optional override when healthcare DLP soft-blocked the content.
-     * Required when DLP returns matched categories that aren't hardBlocked.
-     * Always audited.
-     */
-    healthcareOverride: v.optional(
-      v.object({
-        justification: v.string(),
-      }),
-    ),
   },
   returns: v.id("messages"),
   handler: async (ctx, args): Promise<Id<"messages">> => {
@@ -220,37 +225,6 @@ export const sendText = tenantMutation({
       "conversations",
       args.conversationId,
     );
-
-    // Healthcare DLP gate (Codex round2 #5)
-    const tenant = await ctx.db.get(ctx.tenantId);
-    let dlpResult: ReturnType<typeof validateHealthcareContent> | null = null;
-    if (tenant?.healthcareMode) {
-      dlpResult = validateHealthcareContent(trimmed);
-      if (!dlpResult.passed) {
-        if (dlpResult.hardBlocked) {
-          throw new ConvexError({
-            code: "HEALTHCARE_HARD_BLOCKED",
-            categories: dlpResult.matched,
-            message:
-              "Content includes terms that cannot be sent via WhatsApp in healthcare mode (diagnosis claims or controlled medication names). Use a portal link or in-person communication.",
-          });
-        }
-        if (!args.healthcareOverride) {
-          throw new ConvexError({
-            code: "HEALTHCARE_OVERRIDE_REQUIRED",
-            categories: dlpResult.matched,
-            message:
-              "Content includes sensitive terms (dose / frequency). Provide a written justification to send.",
-          });
-        }
-        if (args.healthcareOverride.justification.trim().length < 10) {
-          throw new ConvexError({
-            code: "HEALTHCARE_OVERRIDE_JUSTIFICATION_TOO_SHORT",
-            minLength: 10,
-          });
-        }
-      }
-    }
 
     // 24h service window check (free-text outside template requires it).
     const now = Date.now();
@@ -292,21 +266,28 @@ export const sendText = tenantMutation({
       status: "queued",
       dispatchAttempts: 0,
       sentByAgentId: ctx.memberId,
-      contentValidationResult: dlpResult
-        ? {
-            passed: dlpResult.passed,
-            blockedReasons: dlpResult.matched,
-            overrideByMemberId: args.healthcareOverride
-              ? ctx.memberId
-              : undefined,
-            overrideJustification: args.healthcareOverride?.justification,
-          }
-        : undefined,
       createdAt: now,
     });
 
     // Bump conversation lastMessageAt so it surfaces in the inbox list.
-    await ctx.db.patch(args.conversationId, { lastMessageAt: now });
+    await ctx.db.patch(args.conversationId, {
+      lastMessageAt: now,
+      lastHumanMessageAt: now,
+      aiState: conv.aiState === "eligible" ? "paused" : conv.aiState,
+      aiPausedReason:
+        conv.aiState === "eligible" ? "human_reply" : conv.aiPausedReason,
+    });
+    if (conv.aiState === "eligible") {
+      await recordAiAuditEvent(ctx, {
+        tenantId: ctx.tenantId,
+        conversation: conv,
+        kind: "paused",
+        reason: "human_reply",
+        payload: { messageId, type: "text" },
+        createdBy: ctx.memberId,
+        at: now,
+      });
+    }
 
     await ctx.scheduler.runAfter(0, internal.messages._dispatchOne, {
       messageId,
@@ -339,6 +320,9 @@ export const _claimForDispatch = internalMutation({
       claimedAt: Date.now(),
       dispatchAttempts: msg.dispatchAttempts + 1,
     });
+    await syncCampaignRecipientFromMessage(ctx, args.messageId, {
+      status: "dispatching",
+    });
     return {
       tenantId: msg.tenantId,
       conversationId: msg.conversationId,
@@ -361,6 +345,9 @@ export const _markSentFromAction = internalMutation({
       status: "sent",
       metaMessageId: args.metaMessageId,
     });
+    await syncCampaignRecipientFromMessage(ctx, args.messageId, {
+      status: "sent",
+    });
     return null;
   },
 });
@@ -378,6 +365,26 @@ export const _markFailedFromAction = internalMutation({
       failureReason: args.failureReason.slice(0, 500),
       failureCode: args.failureCode,
     });
+    await syncCampaignRecipientFromMessage(ctx, args.messageId, {
+      status: "failed",
+      failureReason: args.failureReason.slice(0, 500),
+      failureCode: args.failureCode,
+    });
+    const msg = await ctx.db.get(args.messageId);
+    if (msg?.sentByCampaignId) {
+      await ctx.scheduler.runAfter(0, internal.campaigns._evaluateSafetyPause, {
+        campaignId: msg.sentByCampaignId,
+      });
+      await ctx.scheduler.runAfter(
+        0,
+        internal.whatsappAccounts.openCircuitBreakerForMessageFailure,
+        {
+          messageId: args.messageId,
+          failureReason: args.failureReason.slice(0, 500),
+          failureCode: args.failureCode,
+        },
+      );
+    }
     return null;
   },
 });
@@ -392,6 +399,10 @@ export const _markUnknownFromAction = internalMutation({
     await ctx.db.patch(args.messageId, {
       status: "unknown",
       unknownSince: Date.now(),
+      failureReason: args.reason.slice(0, 500),
+    });
+    await syncCampaignRecipientFromMessage(ctx, args.messageId, {
+      status: "failed",
       failureReason: args.reason.slice(0, 500),
     });
     return null;
@@ -409,7 +420,16 @@ export const _loadDispatchPayload = internalQuery({
       content: v.any(),
       whatsappAccountId: v.id("whatsappAccounts"),
       phoneNumberId: v.string(),
-      contactE164: v.string(),
+      contactE164: v.optional(v.string()),
+      contactBsuid: v.optional(v.string()),
+      pricingCategory: v.optional(
+        v.union(
+          v.literal("marketing"),
+          v.literal("utility"),
+          v.literal("authentication"),
+          v.literal("service"),
+        ),
+      ),
     }),
     v.null(),
   ),
@@ -428,6 +448,8 @@ export const _loadDispatchPayload = internalQuery({
       whatsappAccountId: phone.whatsappAccountId,
       phoneNumberId: phone.phoneNumberId,
       contactE164: contact.e164,
+      contactBsuid: contact.bsuid,
+      pricingCategory: msg.pricingCategory,
     };
   },
 });
@@ -541,7 +563,28 @@ export const sendTemplate = tenantMutation({
       createdAt: now,
     });
 
-    await ctx.db.patch(args.conversationId, { lastMessageAt: now });
+    await ctx.db.patch(args.conversationId, {
+      lastMessageAt: now,
+      lastHumanMessageAt: now,
+      aiState: conv.aiState === "eligible" ? "paused" : conv.aiState,
+      aiPausedReason:
+        conv.aiState === "eligible" ? "human_reply" : conv.aiPausedReason,
+    });
+    if (conv.aiState === "eligible") {
+      await recordAiAuditEvent(ctx, {
+        tenantId: ctx.tenantId,
+        conversation: conv,
+        kind: "paused",
+        reason: "human_reply",
+        payload: {
+          messageId,
+          type: "template",
+          templateId: args.templateId,
+        },
+        createdBy: ctx.memberId,
+        at: now,
+      });
+    }
     await ctx.scheduler.runAfter(0, internal.messages._dispatchOne, {
       messageId,
     });
@@ -573,8 +616,14 @@ export const _dispatchOne = internalAction({
     )) as {
       whatsappAccountId: Id<"whatsappAccounts">;
       phoneNumberId: string;
-      contactE164: string;
+      contactE164?: string;
+      contactBsuid?: string;
       content: { text?: { body?: string } };
+      pricingCategory?:
+        | "marketing"
+        | "utility"
+        | "authentication"
+        | "service";
     } | null;
     if (!payload) {
       await ctx.runMutation(internal.messages._markFailedFromAction, {
@@ -596,7 +645,24 @@ export const _dispatchOne = internalAction({
       return null;
     }
 
-    const toWithoutPlus = payload.contactE164.replace(/^\+/, "");
+    // Prefer BSUID over phone: it's the only identifier guaranteed to keep
+    // working once the user adopts a WhatsApp username (Meta June-2026 GA).
+    const recipient: import("./lib/meta/graph").WhatsAppRecipient | null =
+      payload.contactBsuid
+        ? { kind: "bsuid", bsuid: payload.contactBsuid }
+        : payload.contactE164
+          ? {
+              kind: "phone",
+              e164WithoutPlus: payload.contactE164.replace(/^\+/, ""),
+            }
+          : null;
+    if (!recipient) {
+      await ctx.runMutation(internal.messages._markFailedFromAction, {
+        messageId: args.messageId,
+        failureReason: "contact has neither phone nor bsuid",
+      });
+      return null;
+    }
     const isTemplate = !!(payload.content as { template?: unknown })?.template;
 
     let result: Awaited<ReturnType<typeof sendWhatsAppText>>;
@@ -611,10 +677,17 @@ export const _dispatchOne = internalAction({
             };
           }
         ).template;
-        result = await sendWhatsAppTemplate({
+        // Meta routes marketing-category templates to the dedicated
+        // /marketing_messages endpoint for pacing. All other categories
+        // (utility/authentication/service) go through /messages.
+        const sendFn =
+          payload.pricingCategory === "marketing"
+            ? sendWhatsAppMarketingTemplate
+            : sendWhatsAppTemplate;
+        result = await sendFn({
           token,
           phoneNumberId: payload.phoneNumberId,
-          toE164WithoutPlus: toWithoutPlus,
+          recipient,
           templateName: tpl.name,
           languageCode: tpl.language,
           bodyVariables: tpl.variables,
@@ -632,7 +705,7 @@ export const _dispatchOne = internalAction({
         result = await sendWhatsAppText({
           token,
           phoneNumberId: payload.phoneNumberId,
-          toE164WithoutPlus: toWithoutPlus,
+          recipient,
           text,
         });
       }
@@ -668,3 +741,43 @@ export const _dispatchOne = internalAction({
     return null;
   },
 });
+
+async function syncCampaignRecipientFromMessage(
+  ctx: {
+    db: {
+      query: any;
+      patch: any;
+    };
+  },
+  messageId: Id<"messages">,
+  patch: {
+    status:
+      | "queued"
+      | "dispatching"
+      | "sent"
+      | "delivered"
+      | "read"
+      | "failed";
+    failureCode?: string;
+    failureReason?: string;
+  },
+): Promise<void> {
+  const recipient = await ctx.db
+    .query("campaignRecipients")
+    .withIndex("by_message", (q: any) => q.eq("messageId", messageId))
+    .unique();
+  if (!recipient) return;
+  await ctx.db.patch(recipient._id, {
+    status: patch.status,
+    failureCode: patch.failureCode ?? recipient.failureCode,
+    failureReason: patch.failureReason ?? recipient.failureReason,
+    metaErrorCategory:
+      patch.status === "failed"
+        ? classifyMetaFailure({
+            code: patch.failureCode ?? recipient.failureCode,
+            reason: patch.failureReason ?? recipient.failureReason,
+          })
+        : recipient.metaErrorCategory,
+    updatedAt: Date.now(),
+  });
+}

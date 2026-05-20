@@ -31,6 +31,14 @@ const statusValidator = v.union(
   v.literal("disabled"),
 );
 
+const parameterSchemaValidator = v.array(
+  v.object({
+    index: v.number(),
+    name: v.string(),
+    example: v.string(),
+  }),
+);
+
 /** Detects {{1}}, {{2}}, ... placeholders in the body and returns indices. */
 export function extractParameterIndices(body: string): number[] {
   const indices = new Set<number>();
@@ -58,6 +66,15 @@ export const list = tenantQuery({
       rejectionReason: v.optional(v.string()),
       syncedAt: v.optional(v.number()),
       createdAt: v.number(),
+      parameterCount: v.number(),
+      bodyText: v.optional(v.string()),
+      parameterSchema: v.array(
+        v.object({
+          index: v.number(),
+          name: v.string(),
+          example: v.string(),
+        }),
+      ),
     }),
   ),
   handler: async (ctx) => {
@@ -66,18 +83,31 @@ export const list = tenantQuery({
       .withIndex("by_tenant", (q) => q.eq("tenantId", ctx.tenantId))
       .order("desc")
       .collect();
-    return rows.map((t) => ({
-      _id: t._id,
-      name: t.name,
-      language: t.language,
-      category: t.category,
-      status: t.status,
-      currentVersion: t.currentVersion,
-      qualityScore: t.qualityScore,
-      rejectionReason: t.rejectionReason,
-      syncedAt: t.syncedAt,
-      createdAt: t.createdAt,
-    }));
+    const out = [];
+    for (const t of rows) {
+      const ver = await ctx.db
+        .query("templateVersions")
+        .withIndex("by_template_version", (q) =>
+          q.eq("templateId", t._id).eq("version", t.currentVersion),
+        )
+        .unique();
+      out.push({
+        _id: t._id,
+        name: t.name,
+        language: t.language,
+        category: t.category,
+        status: t.status,
+        currentVersion: t.currentVersion,
+        qualityScore: t.qualityScore,
+        rejectionReason: t.rejectionReason,
+        syncedAt: t.syncedAt,
+        createdAt: t.createdAt,
+        parameterCount: ver?.parameterSchema.length ?? 0,
+        bodyText: ver?.bodyText,
+        parameterSchema: ver?.parameterSchema ?? [],
+      });
+    }
+    return out;
   },
 });
 
@@ -159,6 +189,96 @@ export const getById = tenantQuery({
 
 const NAME_REGEX = /^[a-z0-9_]{3,40}$/;
 
+type DraftTemplateArgs = {
+  whatsappAccountId: Id<"whatsappAccounts">;
+  name: string;
+  language: string;
+  category: "marketing" | "utility" | "authentication";
+  bodyText: string;
+  parameterSchema: Array<{ index: number; name: string; example: string }>;
+};
+
+async function createDraftRow(
+  ctx: {
+    db: any;
+    tenantId: Id<"tenants">;
+    memberId: Id<"members">;
+  },
+  args: DraftTemplateArgs,
+): Promise<Id<"templates">> {
+  if (!NAME_REGEX.test(args.name)) {
+    throw new ConvexError({
+      code: "INVALID_NAME",
+      message: "Name must be 3-40 chars, lowercase alphanumeric or underscore.",
+    });
+  }
+  if (args.bodyText.trim().length === 0) {
+    throw new ConvexError({ code: "EMPTY_BODY" });
+  }
+  if (args.bodyText.length > 1024) {
+    throw new ConvexError({ code: "BODY_TOO_LONG", limit: 1024 });
+  }
+
+  await loadByIdInTenant(
+    ctx as Parameters<typeof loadByIdInTenant>[0],
+    "whatsappAccounts",
+    args.whatsappAccountId,
+  );
+
+  const detected = extractParameterIndices(args.bodyText);
+  const declared = args.parameterSchema.map((p) => p.index).sort((a, b) => a - b);
+  if (
+    detected.length !== declared.length ||
+    !detected.every((d, i) => d === declared[i])
+  ) {
+    throw new ConvexError({
+      code: "PARAM_SCHEMA_MISMATCH",
+      detected,
+      declared,
+    });
+  }
+
+  const existing = await ctx.db
+    .query("templates")
+    .withIndex("by_tenant_name_lang", (q: any) =>
+      q
+        .eq("tenantId", ctx.tenantId)
+        .eq("name", args.name)
+        .eq("language", args.language),
+    )
+    .unique();
+  if (existing) {
+    throw new ConvexError({
+      code: "TEMPLATE_NAME_EXISTS",
+      message: "A template with this name+language already exists.",
+    });
+  }
+
+  const now = Date.now();
+  const templateId = await ctx.db.insert("templates", {
+    tenantId: ctx.tenantId,
+    whatsappAccountId: args.whatsappAccountId,
+    name: args.name,
+    language: args.language,
+    category: args.category,
+    currentVersion: 1,
+    status: "draft",
+    createdAt: now,
+    createdBy: ctx.memberId,
+  });
+  await ctx.db.insert("templateVersions", {
+    templateId,
+    tenantId: ctx.tenantId,
+    version: 1,
+    bodyText: args.bodyText,
+    parameterSchema: args.parameterSchema,
+    isLocked: false,
+    createdBy: ctx.memberId,
+    createdAt: now,
+  });
+  return templateId;
+}
+
 export const createDraft = tenantMutation({
   args: {
     whatsappAccountId: v.id("whatsappAccounts"),
@@ -166,89 +286,35 @@ export const createDraft = tenantMutation({
     language: v.string(),
     category: categoryValidator,
     bodyText: v.string(),
-    parameterSchema: v.array(
-      v.object({
-        index: v.number(),
-        name: v.string(),
-        example: v.string(),
-      }),
-    ),
+    parameterSchema: parameterSchemaValidator,
   },
   returns: v.id("templates"),
   handler: async (ctx, args): Promise<Id<"templates">> => {
-    if (!NAME_REGEX.test(args.name)) {
-      throw new ConvexError({
-        code: "INVALID_NAME",
-        message: "Name must be 3-40 chars, lowercase alphanumeric or underscore.",
-      });
-    }
-    if (args.bodyText.trim().length === 0) {
-      throw new ConvexError({ code: "EMPTY_BODY" });
-    }
-    if (args.bodyText.length > 1024) {
-      throw new ConvexError({ code: "BODY_TOO_LONG", limit: 1024 });
-    }
+    return await createDraftRow(ctx, args);
+  },
+});
 
-    // Verify the whatsappAccount belongs to this tenant
-    await loadByIdInTenant(
-      ctx as Parameters<typeof loadByIdInTenant>[0],
-      "whatsappAccounts",
-      args.whatsappAccountId,
+export const _createDraftForAction = internalMutation({
+  args: {
+    tenantId: v.id("tenants"),
+    memberId: v.id("members"),
+    whatsappAccountId: v.id("whatsappAccounts"),
+    name: v.string(),
+    language: v.string(),
+    category: categoryValidator,
+    bodyText: v.string(),
+    parameterSchema: parameterSchemaValidator,
+  },
+  returns: v.id("templates"),
+  handler: async (ctx, args): Promise<Id<"templates">> => {
+    return await createDraftRow(
+      {
+        db: ctx.db,
+        tenantId: args.tenantId,
+        memberId: args.memberId,
+      },
+      args,
     );
-
-    // Verify placeholder schema matches body
-    const detected = extractParameterIndices(args.bodyText);
-    const declared = args.parameterSchema.map((p) => p.index).sort((a, b) => a - b);
-    if (
-      detected.length !== declared.length ||
-      !detected.every((d, i) => d === declared[i])
-    ) {
-      throw new ConvexError({
-        code: "PARAM_SCHEMA_MISMATCH",
-        detected,
-        declared,
-      });
-    }
-
-    // Reject if a template with same name+language already exists
-    const existing = await ctx.db
-      .query("templates")
-      .withIndex("by_tenant_name_lang", (q) =>
-        q
-          .eq("tenantId", ctx.tenantId)
-          .eq("name", args.name)
-          .eq("language", args.language),
-      )
-      .unique();
-    if (existing) {
-      throw new ConvexError({
-        code: "TEMPLATE_NAME_EXISTS",
-        message: "A template with this name+language already exists.",
-      });
-    }
-
-    const templateId = await ctx.db.insert("templates", {
-      tenantId: ctx.tenantId,
-      whatsappAccountId: args.whatsappAccountId,
-      name: args.name,
-      language: args.language,
-      category: args.category,
-      currentVersion: 1,
-      status: "draft",
-      createdAt: Date.now(),
-      createdBy: ctx.memberId,
-    });
-    await ctx.db.insert("templateVersions", {
-      templateId,
-      tenantId: ctx.tenantId,
-      version: 1,
-      bodyText: args.bodyText,
-      parameterSchema: args.parameterSchema,
-      isLocked: false,
-      createdBy: ctx.memberId,
-      createdAt: Date.now(),
-    });
-    return templateId;
   },
 });
 
@@ -332,7 +398,11 @@ export const _markSubmitted = internalMutation({
 export const _meTenantWithRole = internalQuery({
   args: {},
   returns: v.union(
-    v.object({ tenantId: v.id("tenants"), role: v.string() }),
+    v.object({
+      tenantId: v.id("tenants"),
+      memberId: v.id("members"),
+      role: v.string(),
+    }),
     v.null(),
   ),
   handler: async (ctx) => {
@@ -354,7 +424,11 @@ export const _meTenantWithRole = internalQuery({
       )
       .unique();
     if (!member || member.status !== "active") return null;
-    return { tenantId: session.activeTenantId, role: member.role };
+    return {
+      tenantId: session.activeTenantId,
+      memberId: member._id,
+      role: member.role,
+    };
   },
 });
 
@@ -429,6 +503,123 @@ export const submitForApproval = action({
     return {
       status: result.status.toLowerCase(),
       metaTemplateId: result.metaTemplateId,
+    };
+  },
+});
+
+export const createAndSubmitForApproval = action({
+  args: {
+    whatsappAccountId: v.id("whatsappAccounts"),
+    name: v.string(),
+    language: v.string(),
+    category: categoryValidator,
+    bodyText: v.string(),
+    parameterSchema: parameterSchemaValidator,
+  },
+  returns: v.object({
+    templateId: v.id("templates"),
+    submissionState: v.union(
+      v.literal("submitted"),
+      v.literal("draft_saved"),
+    ),
+    metaTemplateId: v.optional(v.string()),
+    metaStatus: v.optional(v.string()),
+    submissionError: v.optional(v.string()),
+  }),
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{
+    templateId: Id<"templates">;
+    submissionState: "submitted" | "draft_saved";
+    metaTemplateId?: string;
+    metaStatus?: string;
+    submissionError?: string;
+  }> => {
+    const me: {
+      tenantId: Id<"tenants">;
+      memberId: Id<"members">;
+      role: string;
+    } | null = await ctx.runQuery(internal.templates._meTenantWithRole, {});
+    if (!me) throw new ConvexError({ code: "UNAUTHENTICATED" });
+    if (me.role !== "owner" && me.role !== "admin" && me.role !== "marketing") {
+      throw new ConvexError({ code: "FORBIDDEN" });
+    }
+
+    const templateId: Id<"templates"> = await ctx.runMutation(
+      internal.templates._createDraftForAction,
+      {
+        tenantId: me.tenantId,
+        memberId: me.memberId,
+        ...args,
+      },
+    );
+
+    const data = await ctx.runQuery(internal.templates._loadForSubmit, {
+      templateId,
+      tenantId: me.tenantId,
+    });
+    if (!data) {
+      return {
+        templateId,
+        submissionState: "draft_saved",
+        submissionError: "Template draft saved, but it could not be loaded for Meta submission.",
+      };
+    }
+
+    const token: string | null = await ctx.runAction(
+      internal.whatsappAccounts.decryptWabaToken,
+      { whatsappAccountId: data.whatsappAccountId },
+    );
+    if (!token) {
+      return {
+        templateId,
+        submissionState: "draft_saved",
+        submissionError:
+          "Template draft saved, but this WABA has no usable access token.",
+      };
+    }
+
+    const result = await submitTemplateToMeta({
+      token,
+      wabaId: data.wabaId,
+      name: data.name,
+      language: data.language,
+      category: data.category.toUpperCase() as
+        | "MARKETING"
+        | "UTILITY"
+        | "AUTHENTICATION",
+      bodyText: data.bodyText,
+      exampleVariables: data.parameterSchema
+        .sort((a, b) => a.index - b.index)
+        .map((p) => p.example),
+    });
+
+    if (!result.ok) {
+      return {
+        templateId,
+        submissionState: "draft_saved",
+        submissionError: result.reason,
+      };
+    }
+
+    await ctx.runMutation(internal.templates._markSubmitted, {
+      templateId,
+      versionId: data.currentVersionId,
+      metaTemplateId: result.metaTemplateId,
+      metaStatus: result.status.toLowerCase() as
+        | "pending"
+        | "approved"
+        | "rejected"
+        | "paused"
+        | "disabled",
+    });
+
+    return {
+      templateId,
+      submissionState: "submitted",
+      metaTemplateId: result.metaTemplateId,
+      metaStatus: result.status.toLowerCase(),
     };
   },
 });

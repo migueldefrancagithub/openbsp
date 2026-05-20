@@ -80,23 +80,23 @@ export function CoreFeatures() {
             </div>
           </div>
 
-          {/* Card 3 — Compliance feed */}
+          {/* Card 3 — Consent + audit feed */}
           <div className="c1-card c1-card-3">
             <div className="c1-compliance">
               <div className="c1-comp-row">
                 <span className="c1-comp-icon">✓</span>
-                <span className="c1-comp-text">DPA signed</span>
-                <span className="c1-comp-meta">RGPD art. 28</span>
-              </div>
-              <div className="c1-comp-row">
-                <span className="c1-comp-icon">✓</span>
-                <span className="c1-comp-text">DPIA completed</span>
-                <span className="c1-comp-meta">Healthcare</span>
-              </div>
-              <div className="c1-comp-row">
-                <span className="c1-comp-icon">✓</span>
                 <span className="c1-comp-text">Marketing consent granted</span>
                 <span className="c1-comp-meta">form_web_v3</span>
+              </div>
+              <div className="c1-comp-row">
+                <span className="c1-comp-icon">✓</span>
+                <span className="c1-comp-text">Transactional auto-recorded</span>
+                <span className="c1-comp-meta">inbound msg</span>
+              </div>
+              <div className="c1-comp-row">
+                <span className="c1-comp-icon">✓</span>
+                <span className="c1-comp-text">STOP keyword → revoke</span>
+                <span className="c1-comp-meta">webhook</span>
               </div>
               <div className="c1-comp-row">
                 <span className="c1-comp-icon c1-comp-icon-shield">⛨</span>
@@ -105,9 +105,9 @@ export function CoreFeatures() {
               </div>
             </div>
             <div className="c1-card-meta">
-              <h3>Compliance built-in</h3>
+              <h3>Consent + audit</h3>
               <p className="c1-card-desc">
-                Append-only audit. DPA, DPIA, per-purpose consent vector.
+                Append-only audit log. Per-purpose, per-channel consent vector.
               </p>
             </div>
           </div>

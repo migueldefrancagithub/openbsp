@@ -6,13 +6,29 @@ import type { MutationCtx } from "../_generated/server";
  * same event. Same key for same event ensures dedup across retries.
  */
 export function deriveEventKey(parts: {
-  kind: "msg" | "status" | "account";
+  kind:
+    | "msg"
+    | "status"
+    | "account"
+    | "user_id_update"
+    | "user_pref"
+    | "biz_username";
   phoneNumberId?: string;
   wabaId?: string;
   wamid?: string;
   statusValue?: string;
   changeField?: string;
   changeValueHash?: string;
+  // user_id_update + user_pref + biz_username extras
+  previous?: string;
+  current?: string;
+  waId?: string;
+  bsuid?: string;
+  category?: string;
+  value?: string;
+  username?: string;
+  status?: string;
+  ts?: number;
 }): string {
   if (parts.kind === "msg") {
     if (!parts.phoneNumberId || !parts.wamid) {
@@ -35,6 +51,32 @@ export function deriveEventKey(parts: {
       );
     }
     return `account:${parts.wabaId}:${parts.changeField}:${parts.changeValueHash}`;
+  }
+  if (parts.kind === "user_id_update") {
+    if (!parts.phoneNumberId || !parts.previous || !parts.current) {
+      throw new Error(
+        "user_id_update eventKey requires phoneNumberId + previous + current",
+      );
+    }
+    return `uidupd:${parts.phoneNumberId}:${parts.previous}:${parts.current}`;
+  }
+  if (parts.kind === "user_pref") {
+    if (!parts.phoneNumberId || !parts.category || !parts.value) {
+      throw new Error(
+        "user_pref eventKey requires phoneNumberId + category + value",
+      );
+    }
+    // Include identity + ts so we don't dedup repeated opt-outs across time.
+    const who = parts.bsuid || parts.waId || "";
+    return `pref:${parts.phoneNumberId}:${who}:${parts.category}:${parts.value}:${parts.ts ?? 0}`;
+  }
+  if (parts.kind === "biz_username") {
+    if (!parts.wabaId || !parts.username || !parts.status) {
+      throw new Error(
+        "biz_username eventKey requires wabaId + username + status",
+      );
+    }
+    return `bizuser:${parts.wabaId}:${parts.username}:${parts.status}:${parts.ts ?? 0}`;
   }
   throw new Error("unknown eventKey kind");
 }

@@ -14,16 +14,11 @@ async function seedTenantAndContact(t: ReturnType<typeof convexTest>) {
     const tenantId = await ctx.db.insert("tenants", {
       name: "Test Clinic",
       vertical: "clinic",
-      healthcareMode: true,
       plan: "starter",
       settings: {
         defaultLocale: "pt-PT",
         timezone: "Europe/Lisbon",
         retentionDays: 730,
-      },
-      rgpd: {
-        controllerName: "Test",
-        controllerEmail: "test@example.pt",
       },
       createdAt: Date.now(),
     });
@@ -193,6 +188,7 @@ describe("consent vector", () => {
         tenantId,
         metaAppId: "test-app",
         wabaId: "test-waba",
+        accessToken: "test-token",
         status: "active",
         tokenStatus: "ok",
         createdAt: Date.now(),

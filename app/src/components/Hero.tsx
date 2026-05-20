@@ -51,6 +51,7 @@ export function Hero() {
           <source src={HERO_VIDEO_URL} type="video/mp4" />
         </video>
       </div>
+      <div className="absolute inset-0 z-10 bg-gradient-to-r from-white via-white/92 to-white/55 sm:from-white/80 sm:via-white/45 sm:to-transparent pointer-events-none" />
 
       {/* Hero content (text + CTA) */}
       <motion.div
@@ -61,11 +62,11 @@ export function Hero() {
       >
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-slate-200/70 bg-white/80 backdrop-blur text-[11px] text-slate-600 mb-7">
           <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-          Built on Meta Cloud API v21 · DPA &amp; DPIA included
+          Built on Meta Cloud API v21
         </div>
 
         <h1
-          className="font-[var(--font-outfit)] text-[42px] md:text-[56px] font-medium leading-[1.05] tracking-tight max-w-3xl"
+          className="font-[var(--font-outfit)] text-[38px] sm:text-[42px] md:text-[56px] font-medium leading-[1.05] tracking-tight max-w-3xl"
           style={{ color: "#0a1b33" }}
         >
           The WhatsApp inbox
@@ -94,7 +95,7 @@ export function Hero() {
       </motion.div>
 
       {/* Floating glass navbar — WhatsApp icon native in the leftmost key */}
-      <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-30">
+      <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-30 hidden sm:block">
         <motion.nav
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}

@@ -10,9 +10,12 @@ import {
   FileText,
   Settings,
   LayoutDashboard,
+  BarChart3,
   MessageSquare,
   Search,
   ArrowRight,
+  MousePointerClick,
+  LifeBuoy,
 } from "lucide-react";
 import { api } from "../../convex/_generated/api";
 import { cn } from "@/lib/cn";
@@ -31,15 +34,16 @@ const NAV_ITEMS: Item[] = [
   { id: "nav-overview", label: "Overview", href: "/app", icon: LayoutDashboard, group: "Navigate" },
   { id: "nav-inbox", label: "Inbox", href: "/app/inbox", icon: Inbox, group: "Navigate" },
   { id: "nav-contacts", label: "Contacts", href: "/app/contacts", icon: Users, group: "Navigate" },
+  { id: "nav-leads", label: "Ad leads", href: "/app/leads", icon: MousePointerClick, group: "Navigate" },
   { id: "nav-campaigns", label: "Campaigns", href: "/app/campaigns", icon: Send, group: "Navigate" },
+  { id: "nav-analytics", label: "Analytics", href: "/app/analytics", icon: BarChart3, group: "Navigate" },
   { id: "nav-templates", label: "Templates", href: "/app/templates", icon: FileText, group: "Navigate" },
+  { id: "nav-support", label: "Support", href: "/app/support", icon: LifeBuoy, group: "Navigate" },
 ];
 
 const SETTINGS_ITEMS: Item[] = [
   { id: "set-workspace", label: "Workspace settings", href: "/app/settings", icon: Settings, group: "Settings" },
   { id: "set-waba", label: "Connect WhatsApp Business Account", href: "/app/settings", icon: Settings, group: "Settings" },
-  { id: "set-dpa", label: "Sign DPA", href: "/app/settings", icon: Settings, group: "Settings" },
-  { id: "set-dpia", label: "Complete DPIA", href: "/app/settings", icon: Settings, group: "Settings" },
 ];
 
 export function CommandPalette() {

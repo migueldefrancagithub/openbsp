@@ -3,7 +3,9 @@
  * upgrade (PLAN section 13.4.10).
  */
 
-export const META_GRAPH_VERSION = "v21.0";
+export const DEFAULT_META_GRAPH_VERSION = "v21.0";
+export const META_GRAPH_VERSION =
+  process.env.META_GRAPH_VERSION ?? DEFAULT_META_GRAPH_VERSION;
 export const META_GRAPH_BASE = `https://graph.facebook.com/${META_GRAPH_VERSION}`;
 
 export type GraphError = {
@@ -15,6 +17,10 @@ export type GraphError = {
 };
 export type GraphSuccess<T> = { ok: true; data: T };
 export type GraphResult<T> = GraphSuccess<T> | GraphError;
+
+export type EmbeddedSignupCodeExchange =
+  | { ok: true; accessToken: string }
+  | { ok: false; reason: string; statusCode?: number; metaCode?: number };
 
 export async function graphGet<T>(
   path: string,
@@ -66,6 +72,60 @@ async function parseResult<T>(res: Response): Promise<GraphResult<T>> {
     };
   }
   return { ok: true, data: json as T };
+}
+
+// ---------- Embedded Signup ----------
+
+export async function exchangeEmbeddedSignupCode(args: {
+  appId: string;
+  appSecret: string;
+  redirectUri: string;
+  code: string;
+}): Promise<EmbeddedSignupCodeExchange> {
+  const url = new URL(`${META_GRAPH_BASE}/oauth/access_token`);
+  url.searchParams.set("client_id", args.appId);
+  url.searchParams.set("client_secret", args.appSecret);
+  url.searchParams.set("redirect_uri", args.redirectUri);
+  url.searchParams.set("code", args.code);
+  const res = await fetch(url.toString(), { method: "GET" });
+  const parsed = await parseResult<{ access_token?: string }>(res);
+  if (!parsed.ok) {
+    return {
+      ok: false,
+      reason: parsed.message,
+      statusCode: parsed.status,
+      metaCode: parsed.code,
+    };
+  }
+  if (!parsed.data.access_token) {
+    return { ok: false, reason: "no access_token returned" };
+  }
+  return { ok: true, accessToken: parsed.data.access_token };
+}
+
+export async function subscribeAppToWaba(args: {
+  token: string;
+  wabaId: string;
+}): Promise<
+  { ok: true } | { ok: false; reason: string; statusCode?: number; metaCode?: number }
+> {
+  const res = await graphPost<{ success?: boolean }>(
+    `/${args.wabaId}/subscribed_apps`,
+    args.token,
+    {},
+  );
+  if (!res.ok) {
+    return {
+      ok: false,
+      reason: res.message,
+      statusCode: res.status,
+      metaCode: res.code,
+    };
+  }
+  if (res.data.success === false) {
+    return { ok: false, reason: "Meta returned success=false" };
+  }
+  return { ok: true };
 }
 
 // ---------- Token validation ----------
@@ -265,10 +325,32 @@ export async function listMetaTemplates(args: {
 
 // ---------- Send template message ----------
 
+/**
+ * Recipient address for Meta Cloud API sends. Per Meta docs:
+ *   - Phone send: include `to: "<USER_PHONE_NUMBER>"` (digits, no leading `+`).
+ *   - BSUID send: include `recipient: "<BSUID>"` (e.g. `US.13491208655302741918`).
+ * `to` and `recipient` are DISTINCT fields. Caller picks one. Prefer BSUID
+ * when available — it survives the user enabling WhatsApp usernames
+ * (June 2026 GA per Meta) and stays stable across phone changes.
+ *
+ * Spec: https://developers.facebook.com/documentation/business-messaging/whatsapp/business-scoped-user-ids
+ */
+export type WhatsAppRecipient =
+  | { kind: "phone"; e164WithoutPlus: string }
+  | { kind: "bsuid"; bsuid: string };
+
+function recipientFields(
+  r: WhatsAppRecipient,
+): { to: string } | { recipient: string } {
+  return r.kind === "phone"
+    ? { to: r.e164WithoutPlus }
+    : { recipient: r.bsuid };
+}
+
 export async function sendWhatsAppTemplate(args: {
   token: string;
   phoneNumberId: string;
-  toE164WithoutPlus: string;
+  recipient: WhatsAppRecipient;
   templateName: string;
   languageCode: string;
   bodyVariables: string[]; // ordered variables for {{1}}, {{2}}, ...
@@ -290,7 +372,7 @@ export async function sendWhatsAppTemplate(args: {
   }>(`/${args.phoneNumberId}/messages`, args.token, {
     messaging_product: "whatsapp",
     recipient_type: "individual",
-    to: args.toE164WithoutPlus,
+    ...recipientFields(args.recipient),
     type: "template",
     template: {
       name: args.templateName,
@@ -311,6 +393,139 @@ export async function sendWhatsAppTemplate(args: {
   return { ok: true, wamid };
 }
 
+/**
+ * Marketing-category templates moved to a dedicated endpoint per Meta's
+ * Marketing Messages API: `/<PHONE_NUMBER_ID>/marketing_messages`. Same
+ * request shape as `/messages` but Meta applies marketing-specific pacing
+ * (response includes `messages[].message_status` with the pacing state).
+ *
+ * Spec: https://developers.facebook.com/documentation/business-messaging/whatsapp/business-scoped-user-ids
+ */
+export async function sendWhatsAppMarketingTemplate(args: {
+  token: string;
+  phoneNumberId: string;
+  recipient: WhatsAppRecipient;
+  templateName: string;
+  languageCode: string;
+  bodyVariables: string[];
+}): Promise<SendTextResult> {
+  const components =
+    args.bodyVariables.length > 0
+      ? [
+          {
+            type: "body",
+            parameters: args.bodyVariables.map((v) => ({
+              type: "text",
+              text: v,
+            })),
+          },
+        ]
+      : [];
+  const res = await graphPost<{
+    messages?: Array<{ id: string; message_status?: string }>;
+  }>(`/${args.phoneNumberId}/marketing_messages`, args.token, {
+    messaging_product: "whatsapp",
+    recipient_type: "individual",
+    ...recipientFields(args.recipient),
+    type: "template",
+    template: {
+      name: args.templateName,
+      language: { code: args.languageCode },
+      ...(components.length > 0 ? { components } : {}),
+    },
+  });
+  if (!res.ok) {
+    return {
+      ok: false,
+      reason: res.message,
+      statusCode: res.status,
+      metaCode: res.code,
+    };
+  }
+  const wamid = res.data.messages?.[0]?.id;
+  if (!wamid) return { ok: false, reason: "no wamid returned" };
+  return { ok: true, wamid };
+}
+
+// ---------- Request contact info (BSUID-era phone discovery) ----------
+
+/**
+ * Send an interactive `contact_request` prompt — used to ask a BSUID-only
+ * user to share their phone number. When they tap Share, Meta delivers an
+ * inbound message that includes `wa_id` for them.
+ */
+export async function sendContactRequest(args: {
+  token: string;
+  phoneNumberId: string;
+  recipient: WhatsAppRecipient;
+  bodyText: string;
+}): Promise<SendTextResult> {
+  const res = await graphPost<{
+    messages?: Array<{ id: string }>;
+  }>(`/${args.phoneNumberId}/messages`, args.token, {
+    messaging_product: "whatsapp",
+    recipient_type: "individual",
+    ...recipientFields(args.recipient),
+    type: "interactive",
+    interactive: {
+      type: "contact_request",
+      body: { text: args.bodyText },
+      action: { name: "request_contact_info" },
+    },
+  });
+  if (!res.ok) {
+    return {
+      ok: false,
+      reason: res.message,
+      statusCode: res.status,
+      metaCode: res.code,
+    };
+  }
+  const wamid = res.data.messages?.[0]?.id;
+  if (!wamid) return { ok: false, reason: "no wamid returned" };
+  return { ok: true, wamid };
+}
+
+// ---------- Parent BSUID accounts ----------
+
+export type ParentBsuidAccount = {
+  parentBsuidAccountId: string;
+  enrolledBusinessPortfolios: string[];
+};
+
+/**
+ * GET /{business_id}/parent-bsuid-accounts — list the parent BSUID account
+ * for a business plus every business portfolio enrolled in it. Used at WABA
+ * onboarding to discover whether the business uses parent BSUIDs.
+ */
+export async function getParentBsuidAccounts(args: {
+  token: string;
+  businessId: string;
+}): Promise<
+  | { ok: true; data: ParentBsuidAccount }
+  | { ok: false; reason: string; statusCode?: number; metaCode?: number }
+> {
+  const res = await graphGet<{
+    parent_bsuid_account_id?: string;
+    enrolled_business_portfolios?: string[];
+  }>(`/${args.businessId}/parent-bsuid-accounts`, args.token);
+  if (!res.ok) {
+    return {
+      ok: false,
+      reason: res.message,
+      statusCode: res.status,
+      metaCode: res.code,
+    };
+  }
+  return {
+    ok: true,
+    data: {
+      parentBsuidAccountId: res.data.parent_bsuid_account_id ?? "",
+      enrolledBusinessPortfolios: res.data.enrolled_business_portfolios ?? [],
+    },
+  };
+}
+
 // ---------- Send WhatsApp message ----------
 
 export type SendTextResult =
@@ -320,7 +535,7 @@ export type SendTextResult =
 export async function sendWhatsAppText(args: {
   token: string;
   phoneNumberId: string;
-  toE164WithoutPlus: string;
+  recipient: WhatsAppRecipient;
   text: string;
 }): Promise<SendTextResult> {
   const res = await graphPost<{
@@ -331,7 +546,7 @@ export async function sendWhatsAppText(args: {
     {
       messaging_product: "whatsapp",
       recipient_type: "individual",
-      to: args.toE164WithoutPlus,
+      ...recipientFields(args.recipient),
       type: "text",
       text: { preview_url: false, body: args.text },
     },

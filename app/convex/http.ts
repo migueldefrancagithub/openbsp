@@ -3,6 +3,15 @@ import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { auth } from "./auth";
 import { verifyMetaHmac } from "./lib/meta/verify";
+import {
+  authenticateRequest,
+  badRequestJson,
+  forbiddenJson,
+  jsonOk,
+  unauthorizedJson,
+} from "./lib/apiAuth";
+import { ConvexError } from "convex/values";
+import type { Id } from "./_generated/dataModel";
 
 const http = httpRouter();
 
@@ -68,6 +77,243 @@ http.route({
     });
 
     return new Response("ok", { status: 200 });
+  }),
+});
+
+// ===== External REST API (Bearer obsp_*) =====
+// All routes return JSON. Auth via `Authorization: Bearer <token>` header.
+
+/** Read JSON body; returns null on parse failure. */
+async function parseJsonBody(request: Request): Promise<unknown> {
+  try {
+    return await request.json();
+  } catch {
+    return null;
+  }
+}
+
+function convexErrorToResponse(err: unknown): Response {
+  if (err instanceof ConvexError) {
+    const data = err.data as Record<string, unknown> | undefined;
+    const code =
+      data && typeof data === "object" && typeof data.code === "string"
+        ? data.code
+        : "INTERNAL";
+    const message =
+      data && typeof data === "object" && typeof data.message === "string"
+        ? data.message
+        : err.message;
+    const status =
+      code === "INVALID_E164" ||
+      code === "EMPTY_TEXT" ||
+      code === "TEXT_TOO_LONG" ||
+      code === "MISSING_TEMPLATE_VARIABLE"
+        ? 400
+        : code === "CONSENT_REQUIRED"
+          ? 403
+          : code === "CONVERSATION_NOT_FOUND" ||
+              code === "TEMPLATE_NOT_FOUND" ||
+              code === "PHONE_NUMBER_NOT_FOUND" ||
+              code === "NO_PHONE_NUMBER_CONNECTED"
+            ? 404
+            : code === "TEMPLATE_NOT_APPROVED" || code === "SERVICE_WINDOW_EXPIRED"
+              ? 409
+              : 400;
+    return new Response(JSON.stringify({ error: code, message, ...data }), {
+      status,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+  return new Response(JSON.stringify({ error: "INTERNAL" }), {
+    status: 500,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+/** GET /api/v1/contacts — list tenant contacts (most recent first). */
+http.route({
+  path: "/api/v1/contacts",
+  method: "GET",
+  handler: httpAction(async (ctx, request) => {
+    const caller = await authenticateRequest(ctx, request);
+    if (!caller) return unauthorizedJson();
+    const url = new URL(request.url);
+    const limitRaw = url.searchParams.get("limit");
+    const limit = limitRaw ? Math.min(Number(limitRaw), 500) : 100;
+    const rows = await ctx.runQuery(internal.api.listContacts, {
+      tenantId: caller.tenantId,
+      limit: Number.isFinite(limit) ? limit : 100,
+    });
+    return jsonOk({ data: rows });
+  }),
+});
+
+/** POST /api/v1/contacts — upsert contact by phone. */
+http.route({
+  path: "/api/v1/contacts",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const caller = await authenticateRequest(ctx, request);
+    if (!caller) return unauthorizedJson();
+    const body = (await parseJsonBody(request)) as
+      | { phone?: string; bsuid?: string; name?: string }
+      | null;
+    if (!body || (typeof body.phone !== "string" && typeof body.bsuid !== "string")) {
+      return badRequestJson("missing 'phone' or 'bsuid'");
+    }
+    try {
+      const r = await ctx.runMutation(internal.api.upsertContact, {
+        tenantId: caller.tenantId,
+        e164: typeof body.phone === "string" ? body.phone : undefined,
+        bsuid: typeof body.bsuid === "string" ? body.bsuid : undefined,
+        name: typeof body.name === "string" ? body.name : undefined,
+      });
+      return jsonOk(
+        { contact_id: r.contactId, created: r.created },
+        r.created ? 201 : 200,
+      );
+    } catch (err) {
+      return convexErrorToResponse(err);
+    }
+  }),
+});
+
+/** GET /api/v1/templates — list approved templates. */
+http.route({
+  path: "/api/v1/templates",
+  method: "GET",
+  handler: httpAction(async (ctx, request) => {
+    const caller = await authenticateRequest(ctx, request);
+    if (!caller) return unauthorizedJson();
+    const rows = await ctx.runQuery(internal.api.listApprovedTemplates, {
+      tenantId: caller.tenantId,
+    });
+    return jsonOk({ data: rows });
+  }),
+});
+
+/**
+ * POST /api/v1/messages — unified send endpoint.
+ *
+ * Body shape (one of):
+ *   { phone: "+351...", text: "...", client_nonce?: "..." }
+ *   { phone: "+351...", template: { name, language, variables }, client_nonce?: "..." }
+ *
+ * Optional `phone_number_id` (string) selects the sending number when the
+ * tenant has more than one connected. Optional `conversation_id` overrides
+ * phone lookup if you already have a conversation id.
+ */
+http.route({
+  path: "/api/v1/messages",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const caller = await authenticateRequest(ctx, request);
+    if (!caller) return unauthorizedJson();
+    if (
+      caller.role !== "owner" &&
+      caller.role !== "admin" &&
+      caller.role !== "agent" &&
+      caller.role !== "marketing"
+    ) {
+      return forbiddenJson();
+    }
+
+    const body = (await parseJsonBody(request)) as
+      | {
+          phone?: string;
+          bsuid?: string;
+          conversation_id?: string;
+          phone_number_id?: string;
+          text?: string;
+          template?: {
+            name?: string;
+            language?: string;
+            variables?: Record<string, string>;
+          };
+          client_nonce?: string;
+        }
+      | null;
+    if (!body) return badRequestJson("invalid JSON body");
+
+    const clientNonce =
+      typeof body.client_nonce === "string"
+        ? body.client_nonce
+        : crypto.randomUUID();
+
+    let conversationId: Id<"conversations">;
+    try {
+      if (body.conversation_id) {
+        conversationId = body.conversation_id as Id<"conversations">;
+      } else {
+        if (
+          typeof body.phone !== "string" &&
+          typeof body.bsuid !== "string"
+        ) {
+          return badRequestJson(
+            "missing 'phone' or 'bsuid' (or 'conversation_id')",
+          );
+        }
+        const r = await ctx.runMutation(internal.api.findOrCreateConversation, {
+          tenantId: caller.tenantId,
+          e164: typeof body.phone === "string" ? body.phone : undefined,
+          bsuid: typeof body.bsuid === "string" ? body.bsuid : undefined,
+          phoneNumberId: body.phone_number_id
+            ? (body.phone_number_id as Id<"phoneNumbers">)
+            : undefined,
+        });
+        conversationId = r.conversationId;
+      }
+    } catch (err) {
+      return convexErrorToResponse(err);
+    }
+
+    try {
+      if (body.template && typeof body.template === "object") {
+        const tpl = body.template;
+        if (!tpl.name || !tpl.language) {
+          return badRequestJson(
+            "template requires 'name' and 'language'",
+          );
+        }
+        const result = await ctx.runMutation(internal.api.sendTemplateAsApi, {
+          tenantId: caller.tenantId,
+          conversationId,
+          templateName: tpl.name,
+          language: tpl.language,
+          variables: tpl.variables ?? {},
+          clientNonce,
+          apiKeyId: caller.apiKeyId,
+        });
+        return jsonOk(
+          {
+            message_id: result.messageId,
+            conversation_id: conversationId,
+            status: result.status,
+          },
+          202,
+        );
+      }
+      if (typeof body.text === "string") {
+        const result = await ctx.runMutation(internal.api.sendTextAsApi, {
+          tenantId: caller.tenantId,
+          conversationId,
+          text: body.text,
+          clientNonce,
+          apiKeyId: caller.apiKeyId,
+        });
+        return jsonOk(
+          {
+            message_id: result.messageId,
+            conversation_id: conversationId,
+            status: result.status,
+          },
+          202,
+        );
+      }
+      return badRequestJson("provide 'text' or 'template'");
+    } catch (err) {
+      return convexErrorToResponse(err);
+    }
   }),
 });
 

@@ -8,10 +8,16 @@ const ActiveTenantValidator = v.object({
   tenantId: v.id("tenants"),
   name: v.string(),
   vertical: v.string(),
-  healthcareMode: v.boolean(),
   role: v.string(),
-  dpaSignedAt: v.optional(v.number()),
-  dpiaCompletedAt: v.optional(v.number()),
+});
+
+const TenantMembershipValidator = v.object({
+  tenantId: v.id("tenants"),
+  name: v.string(),
+  vertical: v.string(),
+  plan: v.string(),
+  role: v.string(),
+  active: v.boolean(),
 });
 
 // Strict: throws if not authenticated or no active tenant. Use inside the app.
@@ -25,10 +31,7 @@ export const getActive = tenantQuery({
       tenantId: ctx.tenantId,
       name: tenant.name,
       vertical: tenant.vertical,
-      healthcareMode: tenant.healthcareMode,
       role: ctx.role,
-      dpaSignedAt: tenant.rgpd.dpaSignedAt,
-      dpiaCompletedAt: tenant.rgpd.dpiaCompletedAt,
     };
   },
 });
@@ -59,10 +62,45 @@ export const getActiveOptional = query({
       tenantId: session.activeTenantId,
       name: tenant.name,
       vertical: tenant.vertical,
-      healthcareMode: tenant.healthcareMode,
       role: member.role,
-      dpaSignedAt: tenant.rgpd.dpaSignedAt,
-      dpiaCompletedAt: tenant.rgpd.dpiaCompletedAt,
     };
+  },
+});
+
+export const listMine = query({
+  args: {},
+  returns: v.array(TenantMembershipValidator),
+  handler: async (ctx) => {
+    const userId = (await getAuthUserId(ctx)) as Id<"users"> | null;
+    if (!userId) throw new ConvexError({ code: "UNAUTHENTICATED" });
+
+    const session = await ctx.db
+      .query("sessions")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .unique();
+    const memberships = await ctx.db
+      .query("members")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+
+    const rows = [];
+    for (const member of memberships) {
+      if (member.status !== "active") continue;
+      const tenant = await ctx.db.get(member.tenantId);
+      if (!tenant) continue;
+      rows.push({
+        tenantId: member.tenantId,
+        name: tenant.name,
+        vertical: tenant.vertical,
+        plan: tenant.plan,
+        role: member.role,
+        active: session?.activeTenantId === member.tenantId,
+      });
+    }
+
+    return rows.sort((a, b) => {
+      if (a.active !== b.active) return a.active ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    });
   },
 });

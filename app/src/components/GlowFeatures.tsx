@@ -2,6 +2,7 @@
 
 import { motion } from "motion/react";
 import { Inbox, Send, ShieldCheck, type LucideIcon } from "lucide-react";
+import { BRAND_NAME } from "@/components/Brand";
 
 type FeatureCardProps = {
   title: string;
@@ -20,7 +21,7 @@ function FeatureCard({
 }: FeatureCardProps) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 30 }}
+      initial={false}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "-80px" }}
       transition={{ duration: 0.8, ease: "easeOut", delay }}
@@ -78,7 +79,7 @@ export function GlowFeatures() {
       />
 
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
+        initial={false}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, margin: "-80px" }}
         transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
@@ -102,7 +103,7 @@ export function GlowFeatures() {
         </h2>
         <p className="text-gray-400 mt-5 max-w-2xl mx-auto text-[15px] leading-relaxed">
           Each card is a pillar that another platform sells separately. With
-          OpenBSP, they ship together and were designed to compose.
+          {BRAND_NAME}, they ship together and were designed to compose.
         </p>
       </motion.div>
 

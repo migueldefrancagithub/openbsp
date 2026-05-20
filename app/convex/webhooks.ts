@@ -8,6 +8,7 @@ import {
 import { tryRegisterWebhookEvent } from "./lib/idempotency";
 import { parseMetaPayload } from "./lib/meta/parsePayload";
 import { recordConsentTransition } from "./lib/consent";
+import { recordAiAuditEvent } from "./lib/aiControl";
 import type { Id } from "./_generated/dataModel";
 
 /**
@@ -176,16 +177,33 @@ export const resolvePhoneNumber = internalQuery({
 });
 
 /**
- * Detect STOP-style opt-out keyword in inbound text. Per PLAN section 7.5.
- * Per Meta policy + RGPD best practice: revoke marketing consent on these.
- * Transactional stays granted (appointment reminders are a separate
- * legitimate basis once the contact has an active relationship).
+ * Detect STOP-style opt-out keyword in inbound text.
+ * Per Meta policy + RGPD: revoke marketing consent. Transactional stays
+ * granted (it has a separate legitimate basis).
  */
 const STOP_KEYWORD_REGEX =
   /^\s*(stop|parar|cancelar|sair|unsubscribe|cancel|baja|chega|chega disso)[\s.!?]*$/i;
 
 export function isStopKeyword(text: string): boolean {
   return STOP_KEYWORD_REGEX.test(text);
+}
+
+function extractInboundButtonPayload(raw: unknown): string | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const message = raw as {
+    button?: { payload?: string; text?: string };
+    interactive?: {
+      type?: string;
+      button_reply?: { id?: string; title?: string };
+      list_reply?: { id?: string; title?: string };
+    };
+  };
+  return (
+    message.interactive?.button_reply?.id ??
+    message.interactive?.list_reply?.id ??
+    message.button?.payload ??
+    message.button?.text
+  );
 }
 
 export const handleStopKeyword = internalMutation({
@@ -301,6 +319,176 @@ export const recordInboundTransactionalConsent = internalMutation({
 });
 
 /**
+ * Apply a Meta `user_preferences` webhook entry. Today we honour only
+ * `category=marketing_messages`: `value=stop` revokes marketing consent
+ * (cascade-cancels any queued marketing outbound). All other values keep
+ * the current consent state untouched — Meta is the source of truth for
+ * "is this user willing to receive marketing right now", and an explicit
+ * opt-in from this webhook only matters once we already had a grant.
+ *
+ * Spec: https://developers.facebook.com/documentation/business-messaging/whatsapp/business-scoped-user-ids
+ */
+export const applyUserPreference = internalMutation({
+  args: {
+    tenantId: v.id("tenants"),
+    waId: v.optional(v.string()),
+    bsuid: v.optional(v.string()),
+    category: v.string(),
+    value: v.string(),
+    detail: v.optional(v.string()),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    if (args.category !== "marketing_messages") return null;
+    if (args.value !== "stop") return null;
+
+    const contactId = await ctx.runQuery(internal.contacts._findByIdentifier, {
+      tenantId: args.tenantId,
+      bsuid: args.bsuid,
+      waId: args.waId,
+    });
+    if (!contactId) return null;
+
+    const current = await ctx.db
+      .query("currentConsents")
+      .withIndex("by_tenant_contact_purpose_channel", (q) =>
+        q
+          .eq("tenantId", args.tenantId)
+          .eq("contactId", contactId)
+          .eq("purpose", "marketing")
+          .eq("channel", "whatsapp"),
+      )
+      .unique();
+    if (current?.status === "revoked") return null;
+
+    await recordConsentTransition(ctx, {
+      tenantId: args.tenantId,
+      contactId,
+      purpose: "marketing",
+      newStatus: "revoked",
+      source: "meta_user_preference",
+      proofText: args.detail,
+    });
+    return null;
+  },
+});
+
+/**
+ * Apply a Meta `business_username_update` webhook. Patches the phoneNumber
+ * row that matches the `display_phone_number` so the UI can show the
+ * current adopted username + status.
+ */
+export const applyBusinessUsername = internalMutation({
+  args: {
+    wabaId: v.string(),
+    displayPhoneNumber: v.optional(v.string()),
+    username: v.string(),
+    status: v.string(),
+    updatedAt: v.number(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    // Match the phone by display number. Meta normalizes with `+` but we
+    // store it without, so accept both shapes.
+    const display = args.displayPhoneNumber ?? "";
+    const normalized = display.startsWith("+") ? display : `+${display}`;
+    const candidates = await ctx.db.query("phoneNumbers").collect();
+    const phone = candidates.find(
+      (p) => p.e164 === normalized || p.e164 === display,
+    );
+    if (!phone) return null;
+    await ctx.db.patch(phone._id, {
+      businessUsername: args.username,
+      businessUsernameStatus: args.status,
+      businessUsernameUpdatedAt: args.updatedAt,
+    });
+    return null;
+  },
+});
+
+export const recordCtwaReferral = internalMutation({
+  args: {
+    tenantId: v.id("tenants"),
+    conversationId: v.id("conversations"),
+    contactId: v.id("contacts"),
+    phoneNumberId: v.id("phoneNumbers"),
+    metaMessageId: v.string(),
+    clickedAt: v.number(),
+    referral: v.object({
+      sourceType: v.optional(v.string()),
+      sourceId: v.optional(v.string()),
+      sourceUrl: v.optional(v.string()),
+      headline: v.optional(v.string()),
+      body: v.optional(v.string()),
+      mediaType: v.optional(v.string()),
+      imageUrl: v.optional(v.string()),
+      videoUrl: v.optional(v.string()),
+      thumbnailUrl: v.optional(v.string()),
+    }),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("ctwaReferrals")
+      .withIndex("by_conversation", (q) =>
+        q.eq("conversationId", args.conversationId),
+      )
+      .filter((q) => q.eq(q.field("metaMessageId"), args.metaMessageId))
+      .unique();
+    if (existing) return null;
+    const freeEntryWindowExpiresAt = args.clickedAt + 72 * 60 * 60 * 1000;
+    await ctx.db.insert("ctwaReferrals", {
+      tenantId: args.tenantId,
+      conversationId: args.conversationId,
+      contactId: args.contactId,
+      phoneNumberId: args.phoneNumberId,
+      metaMessageId: args.metaMessageId,
+      sourceType: args.referral.sourceType,
+      sourceId: args.referral.sourceId,
+      sourceUrl: args.referral.sourceUrl,
+      headline: args.referral.headline,
+      body: args.referral.body,
+      mediaType: args.referral.mediaType,
+      imageUrl: args.referral.imageUrl,
+      videoUrl: args.referral.videoUrl,
+      thumbnailUrl: args.referral.thumbnailUrl,
+      clickedAt: args.clickedAt,
+      freeEntryWindowExpiresAt,
+      createdAt: Date.now(),
+    });
+    const conversation = await ctx.db.get(args.conversationId);
+    await ctx.db.patch(args.conversationId, {
+      leadSource: "ctwa",
+      opportunityStatus: "new",
+      aiState: "eligible",
+      aiPausedReason: undefined,
+      lastCtwaClickAt: args.clickedAt,
+    });
+    if (conversation) {
+      await recordAiAuditEvent(ctx, {
+        tenantId: args.tenantId,
+        conversation: {
+          ...conversation,
+          leadSource: "ctwa",
+          opportunityStatus: "new",
+          aiState: "eligible",
+          aiPausedReason: undefined,
+        },
+        kind: "eligible",
+        reason: "new_ctwa_click",
+        payload: {
+          metaMessageId: args.metaMessageId,
+          sourceId: args.referral.sourceId,
+          freeEntryWindowExpiresAt,
+        },
+        at: args.clickedAt,
+      });
+    }
+    return null;
+  },
+});
+
+/**
  * Process one webhook event:
  *  - load + claim (status=processing)
  *  - parse the per-item JSON payload
@@ -326,7 +514,10 @@ export const processOne = internalAction({
     try {
       const item = JSON.parse(event.rawPayload) as
         | { kind: "message"; [k: string]: unknown }
-        | { kind: "status"; [k: string]: unknown };
+        | { kind: "status"; [k: string]: unknown }
+        | { kind: "user_id_update"; [k: string]: unknown }
+        | { kind: "user_preference"; [k: string]: unknown }
+        | { kind: "business_username_update"; [k: string]: unknown };
 
       if (item.kind === "message") {
         const phone = await ctx.runQuery(
@@ -341,11 +532,22 @@ export const processOne = internalAction({
           return null;
         }
 
+        const fromE164 = item.fromE164 ? String(item.fromE164) : "";
+        const fromBsuid = item.fromBsuid ? String(item.fromBsuid) : undefined;
+        const fromParentBsuid = item.fromParentBsuid
+          ? String(item.fromParentBsuid)
+          : undefined;
+        const fromUsername = item.fromUsername
+          ? String(item.fromUsername)
+          : undefined;
         const contactId = await ctx.runMutation(
-          internal.contacts.upsertByE164,
+          internal.contacts.upsertFromInbound,
           {
             tenantId: phone.tenantId,
-            e164: String(item.fromE164),
+            e164: fromE164 || undefined,
+            bsuid: fromBsuid,
+            parentBsuid: fromParentBsuid,
+            username: fromUsername,
             name: item.contactName ? String(item.contactName) : undefined,
           },
         );
@@ -382,6 +584,49 @@ export const processOne = internalAction({
           metaTimestamp: Number(item.metaTimestamp),
         });
 
+        await ctx.runMutation(internal.campaigns._markInboundEngagement, {
+          tenantId: phone.tenantId,
+          contactId,
+          receivedAt: Number(item.metaTimestamp),
+          buttonPayload: extractInboundButtonPayload(item.raw),
+        });
+
+        const referral = item.referral as
+          | {
+              source?: string;
+              sourceType?: string;
+              sourceId?: string;
+              sourceUrl?: string;
+              headline?: string;
+              body?: string;
+              mediaType?: string;
+              imageUrl?: string;
+              videoUrl?: string;
+              thumbnailUrl?: string;
+            }
+          | undefined;
+        if (referral?.source === "ctwa") {
+          await ctx.runMutation(internal.webhooks.recordCtwaReferral, {
+            tenantId: phone.tenantId,
+            conversationId,
+            contactId,
+            phoneNumberId: phone._id,
+            metaMessageId: String(item.wamid),
+            clickedAt: Number(item.metaTimestamp),
+            referral: {
+              sourceType: referral.sourceType,
+              sourceId: referral.sourceId,
+              sourceUrl: referral.sourceUrl,
+              headline: referral.headline,
+              body: referral.body,
+              mediaType: referral.mediaType,
+              imageUrl: referral.imageUrl,
+              videoUrl: referral.videoUrl,
+              thumbnailUrl: referral.thumbnailUrl,
+            },
+          });
+        }
+
         await ctx.runMutation(
           internal.webhooks.recordInboundTransactionalConsent,
           {
@@ -402,6 +647,50 @@ export const processOne = internalAction({
             });
           }
         }
+      } else if (item.kind === "user_id_update") {
+        const phone = await ctx.runQuery(
+          internal.webhooks.resolvePhoneNumber,
+          { phoneNumberId: String(item.phoneNumberId) },
+        );
+        if (phone) {
+          await ctx.runMutation(internal.contacts.rotateBsuid, {
+            tenantId: phone.tenantId,
+            previousBsuid: String(item.previousBsuid),
+            currentBsuid: String(item.currentBsuid),
+            previousParentBsuid: item.previousParentBsuid
+              ? String(item.previousParentBsuid)
+              : undefined,
+            currentParentBsuid: item.currentParentBsuid
+              ? String(item.currentParentBsuid)
+              : undefined,
+            waId: item.waId ? String(item.waId) : undefined,
+          });
+        }
+      } else if (item.kind === "user_preference") {
+        const phone = await ctx.runQuery(
+          internal.webhooks.resolvePhoneNumber,
+          { phoneNumberId: String(item.phoneNumberId) },
+        );
+        if (phone) {
+          await ctx.runMutation(internal.webhooks.applyUserPreference, {
+            tenantId: phone.tenantId,
+            waId: item.waId ? String(item.waId) : undefined,
+            bsuid: item.bsuid ? String(item.bsuid) : undefined,
+            category: String(item.category),
+            value: String(item.value),
+            detail: item.detail ? String(item.detail) : undefined,
+          });
+        }
+      } else if (item.kind === "business_username_update") {
+        await ctx.runMutation(internal.webhooks.applyBusinessUsername, {
+          wabaId: String(item.wabaId),
+          displayPhoneNumber: item.displayPhoneNumber
+            ? String(item.displayPhoneNumber)
+            : undefined,
+          username: String(item.username),
+          status: String(item.status),
+          updatedAt: Number(item.metaTimestamp),
+        });
       } else if (item.kind === "status") {
         const pricing = item.pricing as
           | { category?: string; pricing_model?: string }
@@ -425,6 +714,16 @@ export const processOne = internalAction({
           failureReason: firstError?.title,
           pricingCategory,
         });
+        if (item.status === "failed") {
+          await ctx.runMutation(
+            internal.whatsappAccounts.openCircuitBreakerForMetaMessageFailure,
+            {
+              metaMessageId: String(item.wamid),
+              failureCode: firstError ? String(firstError.code) : undefined,
+              failureReason: firstError?.title,
+            },
+          );
+        }
       }
 
       await ctx.runMutation(internal.webhooks.markProcessed, {
