@@ -63,7 +63,9 @@ describe("chatbot studio", () => {
       status: "draft",
       triggerKind: "ctwa",
       folderName: "Campanhas",
+      nodeCount: 7,
     });
+    expect(studio.bots[0].flowValidationIssues).toEqual([]);
     expect(studio.stats).toMatchObject({ total: 1, draft: 1, active: 0 });
 
     await owner.mutation(chatbotsApi.updateStatus, {
@@ -74,5 +76,87 @@ describe("chatbot studio", () => {
     studio = await owner.query(chatbotsApi.list, {});
     expect(studio.bots[0].status).toBe("active");
     expect(studio.stats).toMatchObject({ total: 1, draft: 0, active: 1 });
+  });
+
+  it("blocks activation when the flow builder has invalid edges", async () => {
+    const t = convexTest(schema);
+    const owner = await seedTenant(t);
+    const chatbotsApi = (api as any).chatbots;
+
+    const botId = await owner.mutation(chatbotsApi.createBot, {
+      name: "Broken flow",
+      triggerKind: "keyword",
+      triggerKeywords: ["menu"],
+      templateSlug: "welcome_menu",
+    });
+
+    const issues = await owner.mutation(chatbotsApi.updateFlow, {
+      chatbotId: botId,
+      triggerKind: "keyword",
+      triggerKeywords: ["menu"],
+      entryNodeKey: "start",
+      nodes: [
+        {
+          key: "start",
+          type: "start",
+          title: "Start",
+          nextKey: "missing",
+        },
+      ],
+    });
+
+    expect(issues.some((issue: { severity: string }) => issue.severity === "error")).toBe(true);
+    await expect(
+      owner.mutation(chatbotsApi.updateStatus, {
+        chatbotId: botId,
+        status: "active",
+      }),
+    ).rejects.toThrow(/FLOW_INVALID|Fix the flow builder issues/);
+  });
+
+  it("persists canvas node positions while old nodes remain valid", async () => {
+    const t = convexTest(schema);
+    const owner = await seedTenant(t);
+    const chatbotsApi = (api as any).chatbots;
+
+    const botId = await owner.mutation(chatbotsApi.createBot, {
+      name: "Canvas flow",
+      triggerKind: "inbound",
+      templateSlug: "faq_handoff",
+    });
+
+    const issues = await owner.mutation(chatbotsApi.updateFlow, {
+      chatbotId: botId,
+      triggerKind: "inbound",
+      entryNodeKey: "start",
+      nodes: [
+        {
+          key: "start",
+          type: "start",
+          title: "Start",
+          nextKey: "hello",
+          position: { x: 12.4, y: 22.6 },
+        },
+        {
+          key: "hello",
+          type: "send_message",
+          title: "Hello",
+          body: "Olá! Vamos continuar.",
+          nextKey: "end",
+          position: { x: 360, y: 24 },
+        },
+        {
+          key: "end",
+          type: "end",
+          title: "End",
+        },
+      ],
+    });
+
+    expect(issues).toEqual([]);
+    const studio = await owner.query(chatbotsApi.list, {});
+    const bot = studio.bots.find((item: { _id: string }) => item._id === botId);
+    expect(bot?.flowNodes[0].position).toEqual({ x: 12, y: 23 });
+    expect(bot?.flowNodes[2].position).toBeUndefined();
   });
 });

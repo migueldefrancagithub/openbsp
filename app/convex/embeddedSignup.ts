@@ -139,43 +139,54 @@ export const completeCallback = action({
       appSecret &&
       redirectUri
     ) {
-      const exchange = await exchangeEmbeddedSignupCode({
-        appId,
-        appSecret,
-        redirectUri,
-        code: args.code,
-      });
-      if (!exchange.ok) {
+      const compliance = (await ctx.runQuery(
+        internal.whatsappAccounts.checkConnectionCompliance,
+        { tenantId: session.tenantId },
+      )) as
+        | { allowed: true }
+        | { allowed: false; code: string; message: string };
+      if (!compliance.allowed) {
         status = "failed";
-        callbackError = `token exchange failed: ${exchange.reason}`;
+        callbackError = `${compliance.code}: ${compliance.message}`;
       } else {
-        const validation = await validateMetaToken(exchange.accessToken);
-        if (!validation.ok) {
+        const exchange = await exchangeEmbeddedSignupCode({
+          appId,
+          appSecret,
+          redirectUri,
+          code: args.code,
+        });
+        if (!exchange.ok) {
           status = "failed";
-          callbackError = `token validation failed: ${validation.reason}`;
+          callbackError = `token exchange failed: ${exchange.reason}`;
         } else {
-          const subscribe = await subscribeAppToWaba({
-            token: exchange.accessToken,
-            wabaId,
-          });
-          if (!subscribe.ok) {
+          const validation = await validateMetaToken(exchange.accessToken);
+          if (!validation.ok) {
             status = "failed";
-            callbackError = `WABA subscribe failed: ${subscribe.reason}`;
+            callbackError = `token validation failed: ${validation.reason}`;
           } else {
-            await ctx.runMutation(internal.whatsappAccounts.insertConnection, {
-              tenantId: session.tenantId,
-              metaAppId: appId,
-              businessPortfolioId: businessId,
-              onboardingSource: "embedded_signup",
-              embeddedSignupSessionId: session._id,
+            const subscribe = await subscribeAppToWaba({
+              token: exchange.accessToken,
               wabaId,
-              validatedScopes: validation.scopes,
-              accessToken: exchange.accessToken,
-              phoneNumberId,
-              phoneE164,
-              phoneDisplayName: phoneDisplayName ?? phoneNumberId,
             });
-            status = "connected";
+            if (!subscribe.ok) {
+              status = "failed";
+              callbackError = `WABA subscribe failed: ${subscribe.reason}`;
+            } else {
+              await ctx.runMutation(internal.whatsappAccounts.insertConnection, {
+                tenantId: session.tenantId,
+                metaAppId: appId,
+                businessPortfolioId: businessId,
+                onboardingSource: "embedded_signup",
+                embeddedSignupSessionId: session._id,
+                wabaId,
+                validatedScopes: validation.scopes,
+                accessToken: exchange.accessToken,
+                phoneNumberId,
+                phoneE164,
+                phoneDisplayName: phoneDisplayName ?? phoneNumberId,
+              });
+              status = "connected";
+            }
           }
         }
       }

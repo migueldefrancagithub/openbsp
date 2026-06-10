@@ -9,6 +9,7 @@ import { MessageBubble } from "./MessageBubble";
 import { Composer } from "./Composer";
 import { relativeTime } from "@/lib/relativeTime";
 import { friendlyId } from "@/lib/friendlyId";
+import { DEFAULT_CURRENCY } from "@/lib/money";
 
 type Props = { conversationId: Id<"conversations"> };
 
@@ -221,7 +222,7 @@ export function ConversationThread({ conversationId }: Props) {
                 : "")
             }
             onChange={(event) => setValueInput(event.target.value)}
-            placeholder="Value"
+            placeholder="Value (MT)"
             className="w-24 rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[#0a1b33] outline-none"
           />
           <button
@@ -232,7 +233,7 @@ export function ConversationThread({ conversationId }: Props) {
                 void setOpportunityValue({
                   conversationId,
                   valueMinor: Math.round(parsed * 100),
-                  currency: conversation.opportunityCurrency ?? "EUR",
+                  currency: conversation.opportunityCurrency ?? DEFAULT_CURRENCY,
                 });
               }
             }}

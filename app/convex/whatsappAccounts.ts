@@ -9,9 +9,23 @@ import { internal } from "./_generated/api";
 import { tenantQuery } from "./lib/customFunctions";
 import { validateMetaToken } from "./lib/meta/graph";
 import { classifyMetaFailure } from "./lib/meta/errorClassifier";
+import {
+  allowPlaintextSecretStorageForTests,
+  decryptSecret,
+  encryptSecret,
+  getSecretEncryptionStatus,
+} from "./lib/secrets";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { Role } from "./lib/roles";
+
+type ConnectionComplianceResult =
+  | { allowed: true }
+  | {
+      allowed: false;
+      code: "TENANT_NOT_FOUND" | "DPA_REQUIRED" | "DPIA_REQUIRED";
+      message: string;
+    };
 
 /**
  * tenantQuery list of WhatsApp accounts for the active tenant. Used in
@@ -26,6 +40,11 @@ export const listForTenant = tenantQuery({
       status: v.string(),
       qualityRating: v.optional(v.string()),
       tokenStatus: v.string(),
+      tokenStorage: v.union(
+        v.literal("encrypted"),
+        v.literal("legacy_plaintext"),
+        v.literal("missing"),
+      ),
       validatedAt: v.optional(v.number()),
       tokenExpiresAt: v.optional(v.number()),
       phoneNumbers: v.array(
@@ -59,6 +78,7 @@ export const listForTenant = tenantQuery({
         status: a.status,
         qualityRating: a.qualityRating,
         tokenStatus: a.tokenStatus,
+        tokenStorage: tokenStorageForAccount(a),
         validatedAt: a.validatedAt,
         tokenExpiresAt: a.tokenExpiresAt,
         phoneNumbers: phones.map((p) => ({
@@ -75,6 +95,14 @@ export const listForTenant = tenantQuery({
     return out;
   },
 });
+
+function tokenStorageForAccount(
+  account: Doc<"whatsappAccounts">,
+): "encrypted" | "legacy_plaintext" | "missing" {
+  if (account.accessTokenCiphertext) return "encrypted";
+  if (account.accessToken) return "legacy_plaintext";
+  return "missing";
+}
 
 // ---------- Internal helpers used by connectManual + dispatcher ----------
 
@@ -103,6 +131,10 @@ export const insertConnection = internalMutation({
     phoneNumberId: v.id("phoneNumbers"),
   }),
   handler: async (ctx, args) => {
+    assertConnectionCompliance(
+      await getConnectionCompliance(ctx, args.tenantId),
+    );
+
     // Reject if a phoneNumber row already exists for this Meta phone_number_id
     // (would cause cross-tenant leak through webhook dispatch).
     const existingPhone = await ctx.db
@@ -118,12 +150,14 @@ export const insertConnection = internalMutation({
       });
     }
 
+    const accessTokenFields = await buildAccessTokenFields(args.accessToken);
+
     const wabaAccountId = await ctx.db.insert("whatsappAccounts", {
       tenantId: args.tenantId,
       metaAppId: args.metaAppId,
       businessPortfolioId: args.businessPortfolioId,
       wabaId: args.wabaId,
-      accessToken: args.accessToken,
+      ...accessTokenFields,
       onboardingSource: args.onboardingSource ?? "manual",
       embeddedSignupSessionId: args.embeddedSignupSessionId,
       status: "active",
@@ -144,12 +178,110 @@ export const insertConnection = internalMutation({
   },
 });
 
-export const loadTokenForDispatch = internalQuery({
+async function getConnectionCompliance(
+  ctx: { db: { get: (id: Id<"tenants">) => Promise<Doc<"tenants"> | null> } },
+  tenantId: Id<"tenants">,
+): Promise<ConnectionComplianceResult> {
+  const tenant = await ctx.db.get(tenantId);
+  if (!tenant) {
+    return {
+      allowed: false,
+      code: "TENANT_NOT_FOUND",
+      message: "Tenant not found.",
+    };
+  }
+  if (!tenant.rgpd?.dpaSignedAt) {
+    return {
+      allowed: false,
+      code: "DPA_REQUIRED",
+      message:
+        "Sign the Data Processing Agreement before connecting WhatsApp.",
+    };
+  }
+  if (!tenant.rgpd?.dpiaCompletedAt) {
+    return {
+      allowed: false,
+      code: "DPIA_REQUIRED",
+      message:
+        "Complete the DPIA before connecting WhatsApp to this workspace.",
+    };
+  }
+  return { allowed: true };
+}
+
+function assertConnectionCompliance(result: ConnectionComplianceResult): void {
+  if (result.allowed) return;
+  throw new ConvexError({ code: result.code, message: result.message });
+}
+
+export const checkConnectionCompliance = internalQuery({
+  args: { tenantId: v.id("tenants") },
+  returns: v.union(
+    v.object({ allowed: v.literal(true) }),
+    v.object({
+      allowed: v.literal(false),
+      code: v.union(
+        v.literal("TENANT_NOT_FOUND"),
+        v.literal("DPA_REQUIRED"),
+        v.literal("DPIA_REQUIRED"),
+      ),
+      message: v.string(),
+    }),
+  ),
+  handler: async (ctx, args): Promise<ConnectionComplianceResult> => {
+    return await getConnectionCompliance(ctx, args.tenantId);
+  },
+});
+
+async function buildAccessTokenFields(accessToken: string): Promise<{
+  accessToken?: string;
+  accessTokenCiphertext?: string;
+  accessTokenKeyVersion?: number;
+  accessTokenEncryptedAt?: number;
+  accessTokenEncryption?: "aes-256-gcm";
+}> {
+  const encryption = getSecretEncryptionStatus();
+  if (encryption.configured) {
+    const encrypted = await encryptSecret(accessToken);
+    return {
+      accessTokenCiphertext: encrypted.ciphertext,
+      accessTokenKeyVersion: encrypted.keyVersion,
+      accessTokenEncryptedAt: encrypted.encryptedAt,
+      accessTokenEncryption: "aes-256-gcm",
+    };
+  }
+
+  if (allowPlaintextSecretStorageForTests()) {
+    return { accessToken };
+  }
+
+  throw new ConvexError({
+    code:
+      encryption.reason === "invalid"
+        ? "SECRET_ENCRYPTION_KEY_INVALID"
+        : "SECRET_ENCRYPTION_KEY_MISSING",
+    message: encryption.message,
+  });
+}
+
+export const loadTokenSecretForDispatch = internalQuery({
   args: { whatsappAccountId: v.id("whatsappAccounts") },
-  returns: v.union(v.string(), v.null()),
+  returns: v.union(
+    v.object({
+      accessToken: v.optional(v.string()),
+      accessTokenCiphertext: v.optional(v.string()),
+      accessTokenKeyVersion: v.optional(v.number()),
+    }),
+    v.null(),
+  ),
   handler: async (ctx, args) => {
     const acc = await ctx.db.get(args.whatsappAccountId);
-    return acc?.accessToken ?? null;
+    if (!acc) return null;
+    return {
+      accessToken: acc.accessToken,
+      accessTokenCiphertext: acc.accessTokenCiphertext,
+      accessTokenKeyVersion: acc.accessTokenKeyVersion,
+    };
   },
 });
 
@@ -318,6 +450,12 @@ export const connectManual = action({
       });
     }
 
+    const compliance = (await ctx.runQuery(
+      internal.whatsappAccounts.checkConnectionCompliance,
+      { tenantId: me.tenantId },
+    )) as ConnectionComplianceResult;
+    assertConnectionCompliance(compliance);
+
     const validation = await validateMetaToken(args.systemUserToken);
     if (!validation.ok) {
       throw new ConvexError({
@@ -395,9 +533,31 @@ export const decryptWabaToken = internalAction({
   args: { whatsappAccountId: v.id("whatsappAccounts") },
   returns: v.union(v.string(), v.null()),
   handler: async (ctx, args): Promise<string | null> => {
-    return await ctx.runQuery(
-      internal.whatsappAccounts.loadTokenForDispatch,
+    const secret: {
+      accessToken?: string;
+      accessTokenCiphertext?: string;
+      accessTokenKeyVersion?: number;
+    } | null = await ctx.runQuery(
+      internal.whatsappAccounts.loadTokenSecretForDispatch,
       { whatsappAccountId: args.whatsappAccountId },
     );
+    if (!secret) return null;
+    if (secret.accessTokenCiphertext) {
+      try {
+        return await decryptSecret(
+          secret.accessTokenCiphertext,
+          secret.accessTokenKeyVersion,
+        );
+      } catch (error) {
+        throw new ConvexError({
+          code: "TOKEN_DECRYPTION_FAILED",
+          message:
+            error instanceof Error
+              ? error.message
+              : "Could not decrypt WABA token.",
+        });
+      }
+    }
+    return secret.accessToken ?? null;
   },
 });

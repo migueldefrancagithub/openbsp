@@ -13,6 +13,7 @@ import {
 import {
   submitTemplateToMeta,
   listMetaTemplates,
+  type TemplateButton,
 } from "./lib/meta/graph";
 import type { Id } from "./_generated/dataModel";
 
@@ -39,6 +40,25 @@ const parameterSchemaValidator = v.array(
   }),
 );
 
+const templateButtonValidator = v.union(
+  v.object({
+    type: v.literal("quick_reply"),
+    text: v.string(),
+  }),
+  v.object({
+    type: v.literal("url"),
+    text: v.string(),
+    url: v.string(),
+  }),
+  v.object({
+    type: v.literal("phone_number"),
+    text: v.string(),
+    phoneNumber: v.string(),
+  }),
+);
+
+const templateButtonsValidator = v.array(templateButtonValidator);
+
 /** Detects {{1}}, {{2}}, ... placeholders in the body and returns indices. */
 export function extractParameterIndices(body: string): number[] {
   const indices = new Set<number>();
@@ -48,6 +68,51 @@ export function extractParameterIndices(body: string): number[] {
     indices.add(Number(m[1]));
   }
   return Array.from(indices).sort((a, b) => a - b);
+}
+
+function normalizeTemplateButtons(
+  buttons?: TemplateButton[],
+): TemplateButton[] | undefined {
+  if (!buttons || buttons.length === 0) return undefined;
+  if (buttons.length > 3) {
+    throw new ConvexError({
+      code: "TOO_MANY_BUTTONS",
+      message: "Meta template buttons are limited to 3 in this builder.",
+    });
+  }
+
+  return buttons.map((button) => {
+    const text = button.text.trim();
+    if (text.length === 0 || text.length > 25) {
+      throw new ConvexError({
+        code: "INVALID_BUTTON_TEXT",
+        message: "Button text must be 1-25 characters.",
+      });
+    }
+
+    if (button.type === "quick_reply") {
+      return { type: "quick_reply", text };
+    }
+    if (button.type === "url") {
+      const url = button.url.trim();
+      if (!/^https:\/\/\S+$/i.test(url)) {
+        throw new ConvexError({
+          code: "INVALID_BUTTON_URL",
+          message: "URL buttons must use a public https:// URL.",
+        });
+      }
+      return { type: "url", text, url };
+    }
+
+    const phoneNumber = button.phoneNumber.trim();
+    if (!/^\+?[1-9]\d{6,19}$/.test(phoneNumber)) {
+      throw new ConvexError({
+        code: "INVALID_BUTTON_PHONE",
+        message: "Phone buttons require an E.164-like number.",
+      });
+    }
+    return { type: "phone_number", text, phoneNumber };
+  });
 }
 
 // ---------- Public queries ----------
@@ -68,6 +133,7 @@ export const list = tenantQuery({
       createdAt: v.number(),
       parameterCount: v.number(),
       bodyText: v.optional(v.string()),
+      buttons: v.optional(templateButtonsValidator),
       parameterSchema: v.array(
         v.object({
           index: v.number(),
@@ -104,6 +170,7 @@ export const list = tenantQuery({
         createdAt: t.createdAt,
         parameterCount: ver?.parameterSchema.length ?? 0,
         bodyText: ver?.bodyText,
+        buttons: ver?.buttons,
         parameterSchema: ver?.parameterSchema ?? [],
       });
     }
@@ -130,6 +197,7 @@ export const getById = tenantQuery({
           _id: v.id("templateVersions"),
           version: v.number(),
           bodyText: v.string(),
+          buttons: v.optional(templateButtonsValidator),
           parameterSchema: v.array(
             v.object({
               index: v.number(),
@@ -175,6 +243,7 @@ export const getById = tenantQuery({
           _id: v._id,
           version: v.version,
           bodyText: v.bodyText,
+          buttons: v.buttons,
           parameterSchema: v.parameterSchema,
           isLocked: v.isLocked,
           submittedAt: v.submittedAt,
@@ -185,7 +254,7 @@ export const getById = tenantQuery({
   },
 });
 
-// ---------- Create draft (BODY-only utility/marketing) ----------
+// ---------- Create draft (BODY + optional Meta template buttons) ----------
 
 const NAME_REGEX = /^[a-z0-9_]{3,40}$/;
 
@@ -195,6 +264,7 @@ type DraftTemplateArgs = {
   language: string;
   category: "marketing" | "utility" | "authentication";
   bodyText: string;
+  buttons?: TemplateButton[];
   parameterSchema: Array<{ index: number; name: string; example: string }>;
 };
 
@@ -218,6 +288,7 @@ async function createDraftRow(
   if (args.bodyText.length > 1024) {
     throw new ConvexError({ code: "BODY_TOO_LONG", limit: 1024 });
   }
+  const buttons = normalizeTemplateButtons(args.buttons);
 
   await loadByIdInTenant(
     ctx as Parameters<typeof loadByIdInTenant>[0],
@@ -271,6 +342,7 @@ async function createDraftRow(
     tenantId: ctx.tenantId,
     version: 1,
     bodyText: args.bodyText,
+    buttons,
     parameterSchema: args.parameterSchema,
     isLocked: false,
     createdBy: ctx.memberId,
@@ -286,6 +358,7 @@ export const createDraft = tenantMutation({
     language: v.string(),
     category: categoryValidator,
     bodyText: v.string(),
+    buttons: v.optional(templateButtonsValidator),
     parameterSchema: parameterSchemaValidator,
   },
   returns: v.id("templates"),
@@ -303,6 +376,7 @@ export const _createDraftForAction = internalMutation({
     language: v.string(),
     category: categoryValidator,
     bodyText: v.string(),
+    buttons: v.optional(templateButtonsValidator),
     parameterSchema: parameterSchemaValidator,
   },
   returns: v.id("templates"),
@@ -330,6 +404,7 @@ export const _loadForSubmit = internalQuery({
       category: v.string(),
       currentVersionId: v.id("templateVersions"),
       bodyText: v.string(),
+      buttons: v.optional(templateButtonsValidator),
       parameterSchema: v.array(
         v.object({
           index: v.number(),
@@ -361,6 +436,7 @@ export const _loadForSubmit = internalQuery({
       category: t.category,
       currentVersionId: ver._id,
       bodyText: ver.bodyText,
+      buttons: ver.buttons,
       parameterSchema: ver.parameterSchema,
       isLocked: ver.isLocked,
       wabaId: waba.wabaId,
@@ -475,6 +551,7 @@ export const submitForApproval = action({
         | "UTILITY"
         | "AUTHENTICATION",
       bodyText: data.bodyText,
+      buttons: data.buttons,
       exampleVariables: data.parameterSchema
         .sort((a, b) => a.index - b.index)
         .map((p) => p.example),
@@ -514,6 +591,7 @@ export const createAndSubmitForApproval = action({
     language: v.string(),
     category: categoryValidator,
     bodyText: v.string(),
+    buttons: v.optional(templateButtonsValidator),
     parameterSchema: parameterSchemaValidator,
   },
   returns: v.object({
@@ -590,6 +668,7 @@ export const createAndSubmitForApproval = action({
         | "UTILITY"
         | "AUTHENTICATION",
       bodyText: data.bodyText,
+      buttons: data.buttons,
       exampleVariables: data.parameterSchema
         .sort((a, b) => a.index - b.index)
         .map((p) => p.example),

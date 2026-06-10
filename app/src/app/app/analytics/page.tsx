@@ -7,7 +7,7 @@ import {
   BarChart3,
   Calendar,
   CheckCircle2,
-  CircleDollarSign,
+  Banknote,
   Download,
   MessageCircle,
   RefreshCcw,
@@ -20,6 +20,7 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { PageHeader } from "@/components/app/EmptyState";
 import { api } from "../../../../convex/_generated/api";
+import { formatMoney as formatDisplayMoney } from "@/lib/money";
 
 type RangeKey = "today" | "7d" | "30d";
 type Granularity = "hour" | "day";
@@ -189,7 +190,7 @@ export default function AnalyticsPage() {
               accent={report.health.failureRisk === "high" ? "red" : "amber"}
             />
             <MetricCard
-              icon={CircleDollarSign}
+              icon={Banknote}
               label="Total Cost"
               value={formatMoney(
                 report.summary.totalCostMinor,
@@ -220,7 +221,7 @@ export default function AnalyticsPage() {
                 risk={report.health.deliveryRisk}
               />
               <HealthCard
-                icon={CircleDollarSign}
+                icon={Banknote}
                 label="Cost per Message"
                 value={formatMoney(
                   report.summary.costPerDeliveredMinor,
@@ -735,12 +736,10 @@ function formatPercent(value: number) {
 }
 
 function formatMoney(valueMinor: number, currency: string) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency,
+  return formatDisplayMoney(valueMinor, currency, {
     minimumFractionDigits: valueMinor === 0 ? 2 : 4,
     maximumFractionDigits: 4,
-  }).format(valueMinor / 100);
+  });
 }
 
 async function copyRows(rows: ReportRow[]) {

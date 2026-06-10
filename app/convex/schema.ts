@@ -88,6 +88,31 @@ const tokenStatusValidator = v.union(
   v.literal("revoked"),
 );
 
+const metaAdmissionStatusValidator = v.union(
+  v.literal("todo"),
+  v.literal("in_progress"),
+  v.literal("done"),
+  v.literal("blocked"),
+  v.literal("waived"),
+);
+
+const templateButtonValidator = v.union(
+  v.object({
+    type: v.literal("quick_reply"),
+    text: v.string(),
+  }),
+  v.object({
+    type: v.literal("url"),
+    text: v.string(),
+    url: v.string(),
+  }),
+  v.object({
+    type: v.literal("phone_number"),
+    text: v.string(),
+    phoneNumber: v.string(),
+  }),
+);
+
 const qualityRatingValidator = v.union(
   v.literal("green"),
   v.literal("yellow"),
@@ -159,6 +184,86 @@ const chatbotTriggerValidator = v.union(
   v.literal("handoff"),
 );
 
+const chatbotFlowNodeTypeValidator = v.union(
+  v.literal("start"),
+  v.literal("send_message"),
+  v.literal("send_buttons"),
+  v.literal("send_list"),
+  v.literal("collect_input"),
+  v.literal("condition"),
+  v.literal("set_tag"),
+  v.literal("handoff"),
+  v.literal("end"),
+);
+
+const chatbotFlowRunStatusValidator = v.union(
+  v.literal("active"),
+  v.literal("completed"),
+  v.literal("handed_off"),
+  v.literal("timed_out"),
+  v.literal("failed"),
+);
+
+const chatbotFlowEventTypeValidator = v.union(
+  v.literal("started"),
+  v.literal("node_entered"),
+  v.literal("message_sent"),
+  v.literal("reply_received"),
+  v.literal("fallback_fired"),
+  v.literal("tag_set"),
+  v.literal("handoff"),
+  v.literal("completed"),
+  v.literal("timeout"),
+  v.literal("error"),
+);
+
+const chatbotFlowIssueValidator = v.object({
+  severity: v.union(v.literal("error"), v.literal("warning")),
+  scope: v.union(v.literal("flow"), v.literal("trigger"), v.literal("node")),
+  nodeKey: v.optional(v.string()),
+  field: v.optional(v.string()),
+  message: v.string(),
+});
+
+const chatbotFlowNodeValidator = v.object({
+  key: v.string(),
+  type: chatbotFlowNodeTypeValidator,
+  title: v.string(),
+  body: v.optional(v.string()),
+  nextKey: v.optional(v.string()),
+  position: v.optional(
+    v.object({
+      x: v.number(),
+      y: v.number(),
+    }),
+  ),
+  variableKey: v.optional(v.string()),
+  tag: v.optional(v.string()),
+  condition: v.optional(
+    v.object({
+      variableKey: v.string(),
+      operator: v.union(
+        v.literal("equals"),
+        v.literal("contains"),
+        v.literal("present"),
+        v.literal("absent"),
+      ),
+      value: v.optional(v.string()),
+      trueNextKey: v.string(),
+      falseNextKey: v.string(),
+    }),
+  ),
+  buttons: v.optional(
+    v.array(
+      v.object({
+        replyId: v.string(),
+        label: v.string(),
+        nextKey: v.string(),
+      }),
+    ),
+  ),
+});
+
 // ---------- Schema ----------
 
 export default defineSchema({
@@ -168,12 +273,21 @@ export default defineSchema({
   tenants: defineTable({
     name: v.string(),
     vertical: verticalValidator,
+    healthcareMode: v.optional(v.boolean()),
     plan: planValidator,
     settings: v.object({
       defaultLocale: v.string(),
       timezone: v.string(),
       retentionDays: v.number(),
     }),
+    rgpd: v.optional(
+      v.object({
+        controllerName: v.string(),
+        controllerEmail: v.string(),
+        dpaSignedAt: v.optional(v.number()),
+        dpiaCompletedAt: v.optional(v.number()),
+      }),
+    ),
     createdAt: v.number(),
   }),
 
@@ -232,7 +346,12 @@ export default defineSchema({
     metaAppId: v.string(),
     businessPortfolioId: v.optional(v.string()),
     wabaId: v.string(),
-    accessToken: v.string(),
+    /** Legacy fallback only. New connections use encrypted token fields. */
+    accessToken: v.optional(v.string()),
+    accessTokenCiphertext: v.optional(v.string()),
+    accessTokenKeyVersion: v.optional(v.number()),
+    accessTokenEncryptedAt: v.optional(v.number()),
+    accessTokenEncryption: v.optional(v.literal("aes-256-gcm")),
     onboardingSource: v.optional(
       v.union(
         v.literal("manual"),
@@ -276,6 +395,7 @@ export default defineSchema({
     createdAt: v.number(),
   })
     .index("by_phone_number_id", ["phoneNumberId"])
+    .index("by_account", ["whatsappAccountId"])
     .index("by_tenant", ["tenantId"])
     .index("by_business_username", ["businessUsername"]),
 
@@ -442,6 +562,8 @@ export default defineSchema({
     unknownSince: v.optional(v.number()),
     sentByAgentId: v.optional(v.id("members")),
     sentByCampaignId: v.optional(v.id("campaigns")),
+    sentByChatbotId: v.optional(v.id("chatbots")),
+    sentByFlowRunId: v.optional(v.id("chatbotFlowRuns")),
     templateId: v.optional(v.id("templates")),
     templateVersion: v.optional(v.number()),
     pricingCategory: v.optional(pricingCategoryValidator),
@@ -594,7 +716,11 @@ export default defineSchema({
     description: v.optional(v.string()),
     status: chatbotStatusValidator,
     triggerKind: chatbotTriggerValidator,
+    triggerKeywords: v.optional(v.array(v.string())),
     model: v.optional(v.string()),
+    entryNodeKey: v.optional(v.string()),
+    flowNodes: v.optional(v.array(chatbotFlowNodeValidator)),
+    flowValidationIssues: v.optional(v.array(chatbotFlowIssueValidator)),
     channel: v.literal("whatsapp"),
     createdBy: v.id("members"),
     createdAt: v.number(),
@@ -603,6 +729,43 @@ export default defineSchema({
     .index("by_tenant", ["tenantId"])
     .index("by_tenant_status", ["tenantId", "status"])
     .index("by_tenant_folder", ["tenantId", "folderId"]),
+
+  chatbotFlowRuns: defineTable({
+    tenantId: v.id("tenants"),
+    chatbotId: v.id("chatbots"),
+    conversationId: v.id("conversations"),
+    contactId: v.id("contacts"),
+    status: chatbotFlowRunStatusValidator,
+    currentNodeKey: v.optional(v.string()),
+    vars: v.optional(v.record(v.string(), v.string())),
+    repromptCount: v.number(),
+    startedAt: v.number(),
+    lastAdvancedAt: v.number(),
+    endedAt: v.optional(v.number()),
+    endReason: v.optional(v.string()),
+    lastInboundMessageId: v.optional(v.id("messages")),
+  })
+    .index("by_tenant", ["tenantId"])
+    .index("by_contact_status", ["tenantId", "contactId", "status"])
+    .index("by_conversation_status", ["tenantId", "conversationId", "status"])
+    .index("by_chatbot_started", ["chatbotId", "startedAt"])
+    .index("by_status_last_advanced", ["status", "lastAdvancedAt"]),
+
+  chatbotFlowEvents: defineTable({
+    tenantId: v.id("tenants"),
+    chatbotId: v.id("chatbots"),
+    flowRunId: v.id("chatbotFlowRuns"),
+    conversationId: v.id("conversations"),
+    contactId: v.id("contacts"),
+    eventType: chatbotFlowEventTypeValidator,
+    nodeKey: v.optional(v.string()),
+    metaMessageId: v.optional(v.string()),
+    payload: v.optional(v.any()),
+    createdAt: v.number(),
+  })
+    .index("by_run", ["flowRunId", "createdAt"])
+    .index("by_tenant_meta_message", ["tenantId", "metaMessageId"])
+    .index("by_chatbot_time", ["chatbotId", "createdAt"]),
 
   // ===== API keys — external API auth, wakit-api parity =====
   apiKeys: defineTable({
@@ -674,6 +837,17 @@ export default defineSchema({
     .index("by_tenant", ["tenantId"])
     .index("by_state", ["state"]),
 
+  metaAdmissionChecks: defineTable({
+    tenantId: v.id("tenants"),
+    key: v.string(),
+    status: metaAdmissionStatusValidator,
+    notes: v.optional(v.string()),
+    updatedAt: v.number(),
+    updatedBy: v.id("members"),
+  })
+    .index("by_tenant", ["tenantId"])
+    .index("by_tenant_key", ["tenantId", "key"]),
+
   templates: defineTable({
     tenantId: v.id("tenants"),
     whatsappAccountId: v.id("whatsappAccounts"),
@@ -709,6 +883,7 @@ export default defineSchema({
     tenantId: v.id("tenants"),
     version: v.number(),
     bodyText: v.string(),
+    buttons: v.optional(v.array(templateButtonValidator)),
     parameterSchema: v.array(
       v.object({
         index: v.number(),

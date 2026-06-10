@@ -206,6 +206,25 @@ function extractInboundButtonPayload(raw: unknown): string | undefined {
   );
 }
 
+function extractInboundText(raw: unknown): string | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const message = raw as {
+    text?: { body?: string };
+    button?: { payload?: string; text?: string };
+    interactive?: {
+      button_reply?: { id?: string; title?: string };
+      list_reply?: { id?: string; title?: string };
+    };
+  };
+  return (
+    message.text?.body ??
+    message.interactive?.button_reply?.title ??
+    message.interactive?.list_reply?.title ??
+    message.button?.text ??
+    message.button?.payload
+  );
+}
+
 export const handleStopKeyword = internalMutation({
   args: {
     tenantId: v.id("tenants"),
@@ -388,15 +407,32 @@ export const applyBusinessUsername = internalMutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    // Match the phone by display number. Meta normalizes with `+` but we
-    // store it without, so accept both shapes.
-    const display = args.displayPhoneNumber ?? "";
-    const normalized = display.startsWith("+") ? display : `+${display}`;
-    const candidates = await ctx.db.query("phoneNumbers").collect();
-    const phone = candidates.find(
-      (p) => p.e164 === normalized || p.e164 === display,
-    );
-    if (!phone) return null;
+    const account = await ctx.db
+      .query("whatsappAccounts")
+      .withIndex("by_waba", (q) => q.eq("wabaId", args.wabaId))
+      .first();
+    if (!account) return null;
+
+    const phones = await ctx.db
+      .query("phoneNumbers")
+      .withIndex("by_account", (q) => q.eq("whatsappAccountId", account._id))
+      .collect();
+
+    // Match the phone by display number when Meta sends it. If Meta omits the
+    // display number, only update when the WABA has a single phone row.
+    const display = args.displayPhoneNumber?.trim();
+    const normalized = display
+      ? display.startsWith("+")
+        ? display
+        : `+${display}`
+      : undefined;
+    const phone = display
+      ? phones.find((p) => p.e164 === normalized || p.e164 === display)
+      : phones.length === 1
+        ? phones[0]
+        : undefined;
+    if (!phone || phone.tenantId !== account.tenantId) return null;
+
     await ctx.db.patch(phone._id, {
       businessUsername: args.username,
       businessUsernameStatus: args.status,
@@ -575,7 +611,7 @@ export const processOne = internalAction({
           | "reaction"
           | "system";
 
-        await ctx.runMutation(internal.messages.appendIncoming, {
+        const inboundMessageId = await ctx.runMutation(internal.messages.appendIncoming, {
           tenantId: phone.tenantId,
           conversationId,
           metaMessageId: String(item.wamid),
@@ -583,12 +619,14 @@ export const processOne = internalAction({
           content: item.raw,
           metaTimestamp: Number(item.metaTimestamp),
         });
+        const buttonPayload = extractInboundButtonPayload(item.raw);
+        const inboundText = extractInboundText(item.raw);
 
         await ctx.runMutation(internal.campaigns._markInboundEngagement, {
           tenantId: phone.tenantId,
           contactId,
           receivedAt: Number(item.metaTimestamp),
-          buttonPayload: extractInboundButtonPayload(item.raw),
+          buttonPayload,
         });
 
         const referral = item.referral as
@@ -636,16 +674,26 @@ export const processOne = internalAction({
         );
 
         // STOP keyword auto-revoke (Meta policy + RGPD). Only for text msgs.
-        if (messageType === "text") {
-          const rawAny = item.raw as { text?: { body?: string } } | undefined;
-          const body = rawAny?.text?.body ?? "";
-          if (body && isStopKeyword(body)) {
-            await ctx.runMutation(internal.webhooks.handleStopKeyword, {
-              tenantId: phone.tenantId,
-              contactId,
-              triggeredByText: body,
-            });
-          }
+        const isStop =
+          messageType === "text" && inboundText ? isStopKeyword(inboundText) : false;
+        if (isStop && inboundText) {
+          await ctx.runMutation(internal.webhooks.handleStopKeyword, {
+            tenantId: phone.tenantId,
+            contactId,
+            triggeredByText: inboundText,
+          });
+        } else {
+          await ctx.runMutation(internal.chatbotFlows.dispatchInbound, {
+            tenantId: phone.tenantId,
+            conversationId,
+            contactId,
+            phoneNumberId: phone._id,
+            inboundMessageId,
+            metaMessageId: String(item.wamid),
+            text: inboundText,
+            replyId: buttonPayload,
+            receivedAt: Number(item.metaTimestamp),
+          });
         }
       } else if (item.kind === "user_id_update") {
         const phone = await ctx.runQuery(

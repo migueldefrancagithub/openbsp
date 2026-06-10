@@ -10,18 +10,33 @@ afterEach(() => {
   delete process.env.META_EMBEDDED_SIGNUP_REDIRECT_URI;
 });
 
-async function seedSignupSession(t: ReturnType<typeof convexTest>) {
+async function seedSignupSession(
+  t: ReturnType<typeof convexTest>,
+  opts?: { signedCompliance?: boolean },
+) {
   return await t.run(async (ctx) => {
     const userId = await ctx.db.insert("users", { name: "Coex Owner" });
     const tenantId = await ctx.db.insert("tenants", {
       name: "Coex Clinic",
       vertical: "clinic",
+      healthcareMode: true,
       plan: "growth",
       settings: {
         defaultLocale: "pt-BR",
         timezone: "America/Sao_Paulo",
         retentionDays: 730,
       },
+      rgpd: opts?.signedCompliance === false
+        ? {
+            controllerName: "Coex Clinic",
+            controllerEmail: "privacy@example.test",
+          }
+        : {
+            controllerName: "Coex Clinic",
+            controllerEmail: "privacy@example.test",
+            dpaSignedAt: Date.now(),
+            dpiaCompletedAt: Date.now(),
+          },
       createdAt: Date.now(),
     });
     const memberId = await ctx.db.insert("members", {
@@ -192,5 +207,40 @@ describe("embedded signup", () => {
       e164: "+5511999999999",
       displayName: "WT Connect",
     });
+  });
+
+  it("fails before Meta token exchange when DPA/DPIA gates are incomplete", async () => {
+    const t = convexTest(schema);
+    const { sessionId } = await seedSignupSession(t, {
+      signedCompliance: false,
+    });
+    process.env.META_EMBEDDED_SIGNUP_APP_ID = "APP_1";
+    process.env.META_EMBEDDED_SIGNUP_APP_SECRET = "APP_SECRET";
+    process.env.META_EMBEDDED_SIGNUP_REDIRECT_URI =
+      "https://cxcast.example/embedded-signup/callback";
+    const calls: string[] = [];
+    vi.stubGlobal("fetch", async (input: string | URL | Request) => {
+      calls.push(input.toString());
+      return Response.json({ access_token: "should-not-be-used" });
+    });
+
+    const result = await t.action((api as any).embeddedSignup.completeCallback, {
+      state: "state-coex-1",
+      code: "oauth-code",
+      business_id: "BM_123",
+      waba_id: "WABA_456",
+      phone_number_id: "PHONE_789",
+      phone_e164: "+5511999999999",
+      phone_display_name: "WT Connect",
+    });
+
+    expect(result).toEqual({ ok: false, status: "failed" });
+    expect(calls).toHaveLength(0);
+    const rows = await t.run(async (ctx) => ({
+      session: await ctx.db.get(sessionId),
+      accounts: await ctx.db.query("whatsappAccounts").collect(),
+    }));
+    expect(rows.session?.error).toContain("DPA_REQUIRED");
+    expect(rows.accounts).toHaveLength(0);
   });
 });

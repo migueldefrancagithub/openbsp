@@ -2,7 +2,15 @@
 
 import { useState, FormEvent, useRef } from "react";
 import { useMutation, useQuery } from "convex/react";
-import { Send, Lock, Loader2, AlertCircle, FileText, Zap } from "lucide-react";
+import {
+  Send,
+  Lock,
+  Loader2,
+  AlertCircle,
+  FileText,
+  Zap,
+  Search,
+} from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { cn } from "@/lib/cn";
@@ -22,6 +30,7 @@ export function Composer({ conversationId, serviceWindowExpiresAt }: ComposerPro
   const [busy, setBusy] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
   const [showQuickReplies, setShowQuickReplies] = useState(false);
+  const [quickReplySearch, setQuickReplySearch] = useState("");
   const [selectedTemplateId, setSelectedTemplateId] =
     useState<Id<"templates"> | null>(null);
   const [templateVariables, setTemplateVariables] = useState<
@@ -39,6 +48,14 @@ export function Composer({ conversationId, serviceWindowExpiresAt }: ComposerPro
   const approvedTemplates = (templates ?? []).filter(
     (t) => t.status === "approved",
   );
+  const filteredQuickReplies = (quickReplies ?? []).filter((reply) => {
+    const needle = quickReplySearch.trim().toLowerCase();
+    if (!needle) return true;
+    return (
+      reply.name.toLowerCase().includes(needle) ||
+      reply.content.toLowerCase().includes(needle)
+    );
+  });
   const selectedTemplate = approvedTemplates.find(
     (template) => template._id === selectedTemplateId,
   );
@@ -238,18 +255,35 @@ export function Composer({ conversationId, serviceWindowExpiresAt }: ComposerPro
         </div>
       )}
       {showQuickReplies && (
-        <div className="mb-3 border border-slate-200 rounded-lg bg-white max-h-48 overflow-y-auto">
-          <div className="px-3 py-2 border-b border-slate-100 flex items-center justify-between">
-            <span className="text-[11px] font-semibold text-slate-700">
+        <div className="mb-3 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_18px_60px_-44px_rgba(15,23,42,0.65)]">
+          <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
               Quick replies
             </span>
             <button
               type="button"
-              onClick={() => setShowQuickReplies(false)}
+              onClick={() => {
+                setShowQuickReplies(false);
+                setQuickReplySearch("");
+              }}
               className="text-[11px] text-slate-500 hover:text-slate-900"
             >
               Cancel
             </button>
+          </div>
+          <div className="border-b border-slate-100 p-2">
+            <label className="relative block">
+              <Search
+                size={13}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+              />
+              <input
+                value={quickReplySearch}
+                onChange={(event) => setQuickReplySearch(event.target.value)}
+                placeholder="Search shortcut..."
+                className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50 pl-8 pr-3 text-[12px] text-[#0a1b33] outline-none focus:border-slate-400 focus:bg-white"
+              />
+            </label>
           </div>
           {(quickReplies ?? []).length === 0 ? (
             <div className="px-3 py-4 text-[12px] text-slate-500 text-center">
@@ -262,29 +296,34 @@ export function Composer({ conversationId, serviceWindowExpiresAt }: ComposerPro
               </a>
             </div>
           ) : (
-            <ul className="divide-y divide-slate-100">
-              {(quickReplies ?? []).map((q) => (
+            <ul className="max-h-72 divide-y divide-slate-100 overflow-y-auto">
+              {filteredQuickReplies.map((q) => (
                 <li key={q._id}>
                   <button
                     type="button"
                     onClick={() => insertQuickReply(q.content)}
-                    className="w-full flex items-start gap-2 px-3 py-2 text-left hover:bg-slate-50 transition-colors"
+                    className="flex w-full items-start gap-2 px-3 py-2.5 text-left transition-colors hover:bg-slate-50"
                   >
                     <Zap
                       size={12}
                       className="text-amber-500 flex-shrink-0 mt-0.5"
                     />
                     <div className="flex-1 min-w-0">
-                      <div className="text-[12px] font-medium text-[#0a1b33]">
+                      <div className="font-[var(--font-mono)] text-[12px] font-semibold text-[#0a1b33]">
                         /{q.name}
                       </div>
-                      <div className="text-[11px] text-slate-500 truncate">
+                      <div className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-slate-500">
                         {q.content}
                       </div>
                     </div>
                   </button>
                 </li>
               ))}
+              {filteredQuickReplies.length === 0 && (
+                <li className="px-3 py-4 text-center text-[12px] text-slate-500">
+                  No match
+                </li>
+              )}
             </ul>
           )}
         </div>

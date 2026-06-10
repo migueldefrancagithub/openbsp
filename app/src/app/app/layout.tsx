@@ -20,7 +20,7 @@ import {
   MousePointerClick,
   Zap,
   LifeBuoy,
-  Bot,
+  Workflow,
   Network,
   Plus,
 } from "lucide-react";
@@ -38,7 +38,7 @@ const NAV = [
   { href: "/app/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/app/channels", label: "Channels", icon: Network },
   { href: "/app/templates", label: "Templates", icon: FileText },
-  { href: "/app/chatbots", label: "Chatbots", icon: Bot },
+  { href: "/app/chatbots", label: "Flow builder", icon: Workflow },
   { href: "/app/quick-replies", label: "Quick replies", icon: Zap },
   { href: "/app/support", label: "Support", icon: LifeBuoy },
 ];

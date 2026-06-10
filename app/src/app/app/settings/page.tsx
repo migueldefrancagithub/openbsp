@@ -3,32 +3,59 @@
 import { useState, type ReactNode } from "react";
 import { useMutation, useQuery } from "convex/react";
 import {
+  AlertTriangle,
   Ban,
   Bot,
+  Building2,
   CheckCircle2,
-  ClipboardCheck,
+  Circle,
   Loader2,
   LogIn,
   MessageSquare,
+  ShieldCheck,
   ShoppingBag,
   Smartphone,
+  Users,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { PageHeader } from "@/components/app/EmptyState";
+import { SegmentedTabs } from "@/components/app/SegmentedTabs";
 import { ConnectWabaForm } from "@/components/settings/ConnectWabaForm";
 import { ApiKeysSection } from "@/components/settings/ApiKeysSection";
 import { MembersSection } from "@/components/settings/MembersSection";
 import { TeamsSection } from "@/components/settings/TeamsSection";
 import { api } from "../../../../convex/_generated/api";
 
+type AdmissionStatus =
+  | "todo"
+  | "in_progress"
+  | "done"
+  | "blocked"
+  | "waived";
+
+type AdmissionCheck = {
+  key: string;
+  title: string;
+  group: string;
+  source: "manual" | "auto" | "hybrid";
+  status: AdmissionStatus;
+  blocking: boolean;
+  description: string;
+  action: string;
+  notes?: string;
+};
+
 export default function SettingsPage() {
   const tenant = useQuery(api.tenantsQueries.getActive);
   const wabaAccounts = useQuery(api.whatsappAccounts.listForTenant);
+  const admission = useQuery(api.metaAdmission.readiness);
   const signupSessions = useQuery(api.embeddedSignup.listSessions);
   const quickReplies = useQuery(api.quickReplies.list);
+  const setAdmissionCheck = useMutation(api.metaAdmission.setManualCheck);
   const beginEmbeddedSignup = useMutation(api.embeddedSignup.begin);
   const [signupBusy, setSignupBusy] = useState(false);
   const [signupNotice, setSignupNotice] = useState<string | null>(null);
+  const [admissionBusy, setAdmissionBusy] = useState<string | null>(null);
   const [autoReplyEnabled, setAutoReplyEnabled] = useState(false);
   const [botEnabled, setBotEnabled] = useState(true);
   const [ecommerceEnabled, setEcommerceEnabled] = useState(false);
@@ -36,9 +63,17 @@ export default function SettingsPage() {
   const [autoReplyCode, setAutoReplyCode] = useState("");
   const [dndOnCode, setDndOnCode] = useState("");
   const [dndOffCode, setDndOffCode] = useState("");
+  const [settingsTab, setSettingsTab] = useState("meta");
   if (!tenant) return null;
 
   const hasConnection = (wabaAccounts?.length ?? 0) > 0;
+  const settingsTabs = [
+    { key: "meta", label: "Meta", value: admission ? `${admission.score}% ready` : "Checking", icon: ShieldCheck },
+    { key: "whatsapp", label: "WhatsApp", value: hasConnection ? "Connected" : "Setup", icon: Smartphone },
+    { key: "automation", label: "Automation", value: "Rules", icon: Bot },
+    { key: "team", label: "Team", value: "Members/API", icon: Users },
+    { key: "workspace", label: "Workspace", value: tenant.role, icon: Building2 },
+  ];
 
   async function handleEmbeddedSignup() {
     setSignupBusy(true);
@@ -49,11 +84,23 @@ export default function SettingsPage() {
         window.location.href = result.url;
       } else {
         setSignupNotice(
-          "Embedded Signup session created. Add META_EMBEDDED_SIGNUP_APP_ID, META_EMBEDDED_SIGNUP_CONFIG_ID, and META_EMBEDDED_SIGNUP_REDIRECT_URI to enable the Meta redirect.",
+          "Embedded Signup session created. Add META_EMBEDDED_SIGNUP_APP_ID, META_EMBEDDED_SIGNUP_CONFIG_ID, META_EMBEDDED_SIGNUP_REDIRECT_URI, and META_EMBEDDED_SIGNUP_APP_SECRET to enable the Meta redirect.",
         );
       }
     } finally {
       setSignupBusy(false);
+    }
+  }
+
+  async function handleAdmissionStatus(
+    key: string,
+    status: AdmissionStatus,
+  ) {
+    setAdmissionBusy(`${key}:${status}`);
+    try {
+      await setAdmissionCheck({ key, status });
+    } finally {
+      setAdmissionBusy(null);
     }
   }
 
@@ -65,8 +112,15 @@ export default function SettingsPage() {
         description="Workspace and WhatsApp connection."
       />
 
-      <div className="px-8 py-8 max-w-4xl space-y-6">
+      <div className="px-8 py-8 max-w-6xl space-y-6">
+        <SegmentedTabs
+          items={settingsTabs}
+          selected={settingsTab}
+          onChange={setSettingsTab}
+        />
+
         {/* Workspace card */}
+        {settingsTab === "workspace" && (
         <section className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-100">
             <h2 className="font-semibold text-[#0a1b33] text-[15px]">
@@ -80,42 +134,77 @@ export default function SettingsPage() {
             <Row label="Your role" value={tenant.role} />
           </dl>
         </section>
+        )}
 
         {/* WhatsApp connection */}
+        {settingsTab === "meta" && (
         <section className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-100">
             <h2 className="font-semibold text-[#0a1b33] text-[15px]">
               Coexistence readiness
             </h2>
             <p className="text-xs text-slate-500 mt-0.5">
-              Assumption: until Embedded Signup is wired, this checklist keeps manual WABA setup aligned with Meta Tech Provider requirements.
+              Provider-grade Meta admission, Embedded Signup, security, webhook, and COEX checks.
             </p>
           </div>
-          <div className="grid gap-3 p-6 md:grid-cols-2">
-            {[
-              ["Business Manager exists", "Client owns or can access the BM."],
-              ["BM verification ready", "Legal name, website, and docs match."],
-              ["Billing configured", "Card or billing method is active before campaigns."],
-              ["Privacy and terms URLs", "Use /privacy and /terms for app review."],
-              ["Advanced access scopes", "business_management + WhatsApp scopes."],
-              ["Webhook verified", "HMAC and retry idempotency active."],
-              ["Business App continuity", "Client understands coexistence rules."],
-              ["Support path", "Blocked number/card/quality issue escalation ready."],
-            ].map(([title, note]) => (
-              <div key={title} className="flex gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
-                <div className="mt-0.5 h-7 w-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-emerald-600">
-                  <ClipboardCheck size={14} />
-                </div>
-                <div>
-                  <div className="text-[13px] font-medium text-[#0a1b33]">
-                    {title}
-                  </div>
-                  <div className="text-[11px] text-slate-500 mt-0.5">
-                    {note}
-                  </div>
-                </div>
+          <div className="p-6">
+            {!admission ? (
+              <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-5 text-sm text-slate-500">
+                <Loader2 size={15} className="animate-spin" />
+                Loading provider readiness...
               </div>
-            ))}
+            ) : (
+              <>
+                <div className="mb-5 grid gap-3 md:grid-cols-[180px_1fr]">
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="flex items-center gap-2 text-[12px] font-semibold uppercase text-slate-500">
+                      <ShieldCheck size={14} />
+                      Meta readiness
+                    </div>
+                    <div className="mt-3 text-4xl font-semibold text-[#0a1b33]">
+                      {admission.score}%
+                    </div>
+                    <div className={`mt-2 inline-flex rounded-md border px-2 py-1 text-[11px] font-semibold ${readinessTone(admission.readinessLabel)}`}>
+                      {admission.readinessLabel.replace(/_/g, " ")}
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-slate-200 bg-white p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="mt-0.5 flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-[#0a1b33]">
+                        {admission.blockers.length > 0 ? (
+                          <AlertTriangle size={15} />
+                        ) : (
+                          <CheckCircle2 size={15} />
+                        )}
+                      </div>
+                      <div>
+                        <div className="text-[13px] font-semibold text-[#0a1b33]">
+                          Next move
+                        </div>
+                        <p className="mt-1 text-sm leading-6 text-slate-500">
+                          {admission.suggestedPath}
+                        </p>
+                        {admission.blockers.length > 0 && (
+                          <div className="mt-2 text-[11px] font-mono text-slate-400">
+                            Blocking: {admission.blockers.join(", ")}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="grid gap-3 md:grid-cols-2">
+                  {admission.checks.map((check) => (
+                    <AdmissionCheckCard
+                      key={check.key}
+                      check={check}
+                      busy={admissionBusy}
+                      onSetStatus={handleAdmissionStatus}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
           </div>
           <div className="border-t border-slate-100 px-6 py-4">
             {signupNotice && (
@@ -180,8 +269,10 @@ export default function SettingsPage() {
             )}
           </div>
         </section>
+        )}
 
         {/* WhatsApp connection */}
+        {settingsTab === "whatsapp" && (
         <section className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
             <h2 className="font-semibold text-[#0a1b33] text-[15px]">
@@ -217,6 +308,7 @@ export default function SettingsPage() {
                           </div>
                           <div className="text-xs text-slate-500">
                             Status: {acc.status} · Token: {acc.tokenStatus}
+                            {` · Storage: ${acc.tokenStorage}`}
                             {acc.qualityRating && ` · Quality: ${acc.qualityRating}`}
                           </div>
                         </div>
@@ -291,7 +383,9 @@ export default function SettingsPage() {
             )}
           </div>
         </section>
+        )}
 
+        {settingsTab === "automation" && (
         <section className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-100">
             <h2 className="font-semibold text-[#0a1b33] text-[15px]">
@@ -379,15 +473,159 @@ export default function SettingsPage() {
             </SettingsCard>
           </div>
         </section>
+        )}
 
-        <MembersSection />
+        {settingsTab === "team" && (
+          <div className="space-y-6">
+            <MembersSection />
 
-        <TeamsSection />
+            <TeamsSection />
 
-        <ApiKeysSection />
+            <ApiKeysSection />
+          </div>
+        )}
       </div>
     </>
   );
+}
+
+function AdmissionCheckCard({
+  check,
+  busy,
+  onSetStatus,
+}: {
+  check: AdmissionCheck;
+  busy: string | null;
+  onSetStatus: (key: string, status: AdmissionStatus) => Promise<void>;
+}) {
+  const manual = check.source !== "auto";
+  const isBusy = busy?.startsWith(`${check.key}:`) ?? false;
+  const StatusIcon =
+    check.status === "done" || check.status === "waived"
+      ? CheckCircle2
+      : check.status === "blocked"
+        ? AlertTriangle
+        : check.status === "in_progress"
+          ? Loader2
+          : Circle;
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+      <div className="flex gap-3">
+        <div className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border bg-white ${statusIconTone(check.status)}`}>
+          <StatusIcon
+            size={14}
+            className={check.status === "in_progress" ? "animate-spin" : ""}
+          />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="text-[13px] font-medium text-[#0a1b33]">
+              {check.title}
+            </div>
+            <span className={`rounded-md border px-1.5 py-0.5 text-[10px] font-semibold ${statusBadgeTone(check.status)}`}>
+              {statusLabel(check.status)}
+            </span>
+            {check.blocking && check.status !== "done" && check.status !== "waived" && (
+              <span className="rounded-md border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">
+                Required
+              </span>
+            )}
+          </div>
+          <div className="mt-0.5 text-[11px] font-medium uppercase text-slate-400">
+            {groupLabel(check.group)} · {check.source}
+          </div>
+          <p className="mt-2 text-[12px] leading-5 text-slate-600">
+            {check.description}
+          </p>
+          <p className="mt-1 text-[11px] leading-5 text-slate-500">
+            {check.notes ?? check.action}
+          </p>
+          {manual && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              <AdmissionButton
+                disabled={isBusy || check.status === "done"}
+                onClick={() => onSetStatus(check.key, "done")}
+              >
+                Done
+              </AdmissionButton>
+              <AdmissionButton
+                disabled={isBusy || check.status === "in_progress"}
+                onClick={() => onSetStatus(check.key, "in_progress")}
+              >
+                In progress
+              </AdmissionButton>
+              <AdmissionButton
+                disabled={isBusy || check.status === "blocked"}
+                onClick={() => onSetStatus(check.key, "blocked")}
+              >
+                Blocked
+              </AdmissionButton>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AdmissionButton({
+  disabled,
+  onClick,
+  children,
+}: {
+  disabled: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className="rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-600 transition-colors hover:border-slate-300 hover:text-[#0a1b33] disabled:opacity-40"
+    >
+      {children}
+    </button>
+  );
+}
+
+function readinessTone(label: string): string {
+  if (label === "live_ready" || label === "review_ready") {
+    return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  }
+  if (label === "blocked") {
+    return "border-red-200 bg-red-50 text-red-700";
+  }
+  return "border-amber-200 bg-amber-50 text-amber-700";
+}
+
+function statusIconTone(status: AdmissionStatus): string {
+  if (status === "done" || status === "waived") {
+    return "border-emerald-200 text-emerald-600";
+  }
+  if (status === "blocked") return "border-red-200 text-red-600";
+  if (status === "in_progress") return "border-sky-200 text-sky-600";
+  return "border-slate-200 text-slate-400";
+}
+
+function statusBadgeTone(status: AdmissionStatus): string {
+  if (status === "done" || status === "waived") {
+    return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  }
+  if (status === "blocked") return "border-red-200 bg-red-50 text-red-700";
+  if (status === "in_progress") {
+    return "border-sky-200 bg-sky-50 text-sky-700";
+  }
+  return "border-slate-200 bg-white text-slate-500";
+}
+
+function statusLabel(status: AdmissionStatus): string {
+  return status.replace(/_/g, " ");
+}
+
+function groupLabel(group: string): string {
+  return group.replace(/_/g, " ");
 }
 
 function Row({

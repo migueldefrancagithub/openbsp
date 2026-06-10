@@ -23,6 +23,272 @@ const triggerValidator = v.union(
   v.literal("handoff"),
 );
 
+const flowTemplateSlugValidator = v.union(
+  v.literal("welcome_menu"),
+  v.literal("clinic_lead_capture"),
+  v.literal("faq_handoff"),
+);
+
+const flowNodeTypeValidator = v.union(
+  v.literal("start"),
+  v.literal("send_message"),
+  v.literal("send_buttons"),
+  v.literal("send_list"),
+  v.literal("collect_input"),
+  v.literal("condition"),
+  v.literal("set_tag"),
+  v.literal("handoff"),
+  v.literal("end"),
+);
+
+const flowNodeValidator = v.object({
+  key: v.string(),
+  type: flowNodeTypeValidator,
+  title: v.string(),
+  body: v.optional(v.string()),
+  nextKey: v.optional(v.string()),
+  position: v.optional(
+    v.object({
+      x: v.number(),
+      y: v.number(),
+    }),
+  ),
+  variableKey: v.optional(v.string()),
+  tag: v.optional(v.string()),
+  condition: v.optional(
+    v.object({
+      variableKey: v.string(),
+      operator: v.union(
+        v.literal("equals"),
+        v.literal("contains"),
+        v.literal("present"),
+        v.literal("absent"),
+      ),
+      value: v.optional(v.string()),
+      trueNextKey: v.string(),
+      falseNextKey: v.string(),
+    }),
+  ),
+  buttons: v.optional(
+    v.array(
+      v.object({
+        replyId: v.string(),
+        label: v.string(),
+        nextKey: v.string(),
+      }),
+    ),
+  ),
+});
+
+const flowIssueValidator = v.object({
+  severity: v.union(v.literal("error"), v.literal("warning")),
+  scope: v.union(v.literal("flow"), v.literal("trigger"), v.literal("node")),
+  nodeKey: v.optional(v.string()),
+  field: v.optional(v.string()),
+  message: v.string(),
+});
+
+type FlowNodeType =
+  | "start"
+  | "send_message"
+  | "send_buttons"
+  | "send_list"
+  | "collect_input"
+  | "condition"
+  | "set_tag"
+  | "handoff"
+  | "end";
+
+type FlowNode = {
+  key: string;
+  type: FlowNodeType;
+  title: string;
+  body?: string;
+  nextKey?: string;
+  position?: { x: number; y: number };
+  variableKey?: string;
+  tag?: string;
+  condition?: {
+    variableKey: string;
+    operator: "equals" | "contains" | "present" | "absent";
+    value?: string;
+    trueNextKey: string;
+    falseNextKey: string;
+  };
+  buttons?: Array<{
+    replyId: string;
+    label: string;
+    nextKey: string;
+  }>;
+};
+
+type FlowIssue = {
+  severity: "error" | "warning";
+  scope: "flow" | "trigger" | "node";
+  nodeKey?: string;
+  field?: string;
+  message: string;
+};
+
+type FlowTemplate = {
+  slug: "welcome_menu" | "clinic_lead_capture" | "faq_handoff";
+  name: string;
+  description: string;
+  triggerKind: "inbound" | "keyword" | "ctwa" | "handoff";
+  triggerKeywords?: string[];
+  entryNodeKey: string;
+  nodes: FlowNode[];
+};
+
+const FLOW_TEMPLATES: FlowTemplate[] = [
+  {
+    slug: "clinic_lead_capture",
+    name: "Clinic lead capture",
+    description:
+      "Captures name, service interest, budget, then hands off to the clinic team.",
+    triggerKind: "ctwa",
+    entryNodeKey: "start",
+    nodes: [
+      {
+        key: "start",
+        type: "start",
+        title: "Start",
+        nextKey: "welcome",
+      },
+      {
+        key: "welcome",
+        type: "send_message",
+        title: "Welcome",
+        body:
+          "Olá! Sou o assistente da clínica. Vou fazer 3 perguntas rápidas para encaminhar bem o teu pedido.",
+        nextKey: "ask_name",
+      },
+      {
+        key: "ask_name",
+        type: "collect_input",
+        title: "Collect name",
+        body: "Qual é o teu nome?",
+        variableKey: "name",
+        nextKey: "ask_service",
+      },
+      {
+        key: "ask_service",
+        type: "send_buttons",
+        title: "Service menu",
+        body: "Que tipo de serviço procuras?",
+        buttons: [
+          { replyId: "skin", label: "Pele", nextKey: "ask_budget" },
+          { replyId: "body", label: "Corpo", nextKey: "ask_budget" },
+          { replyId: "other", label: "Outro", nextKey: "ask_budget" },
+        ],
+      },
+      {
+        key: "ask_budget",
+        type: "collect_input",
+        title: "Collect budget",
+        body: "Qual é o orçamento aproximado em MT?",
+        variableKey: "budget_mt",
+        nextKey: "tag_qualified",
+      },
+      {
+        key: "tag_qualified",
+        type: "set_tag",
+        title: "Tag qualified lead",
+        tag: "qualified_lead",
+        nextKey: "handoff",
+      },
+      {
+        key: "handoff",
+        type: "handoff",
+        title: "Human handoff",
+        body:
+          "Lead qualificado pelo bot. Rever nome, serviço e orçamento antes de responder.",
+      },
+    ],
+  },
+  {
+    slug: "welcome_menu",
+    name: "Welcome menu",
+    description:
+      "A button menu for support/sales routing, inspired by wacrm flows.",
+    triggerKind: "keyword",
+    triggerKeywords: ["ola", "olá", "menu", "ajuda"],
+    entryNodeKey: "start",
+    nodes: [
+      { key: "start", type: "start", title: "Start", nextKey: "menu" },
+      {
+        key: "menu",
+        type: "send_buttons",
+        title: "Welcome menu",
+        body: "Olá! Como podemos ajudar?",
+        buttons: [
+          { replyId: "book", label: "Marcar", nextKey: "book" },
+          { replyId: "prices", label: "Preços", nextKey: "prices" },
+          { replyId: "human", label: "Humano", nextKey: "handoff" },
+        ],
+      },
+      {
+        key: "book",
+        type: "send_message",
+        title: "Booking reply",
+        body: "Perfeito. Diz-nos o serviço e o horário preferido.",
+        nextKey: "handoff",
+      },
+      {
+        key: "prices",
+        type: "send_message",
+        title: "Pricing reply",
+        body: "Os preços variam por serviço. Um consultor vai confirmar contigo em MT.",
+        nextKey: "handoff",
+      },
+      {
+        key: "handoff",
+        type: "handoff",
+        title: "Human handoff",
+        body: "Cliente pediu atendimento humano pelo menu.",
+      },
+    ],
+  },
+  {
+    slug: "faq_handoff",
+    name: "FAQ + handoff",
+    description:
+      "Answers common questions, then routes complex cases to a human.",
+    triggerKind: "inbound",
+    entryNodeKey: "start",
+    nodes: [
+      { key: "start", type: "start", title: "Start", nextKey: "faq" },
+      {
+        key: "faq",
+        type: "send_list",
+        title: "FAQ menu",
+        body: "Escolhe uma opção:",
+        buttons: [
+          { replyId: "hours", label: "Horários", nextKey: "hours" },
+          { replyId: "location", label: "Local", nextKey: "location" },
+          { replyId: "human", label: "Humano", nextKey: "handoff" },
+        ],
+      },
+      {
+        key: "hours",
+        type: "send_message",
+        title: "Hours",
+        body: "Atendemos de segunda a sexta, das 9h às 18h.",
+        nextKey: "end",
+      },
+      {
+        key: "location",
+        type: "send_message",
+        title: "Location",
+        body: "Enviaremos a localização assim que um agente confirmar a unidade certa.",
+        nextKey: "handoff",
+      },
+      { key: "handoff", type: "handoff", title: "Human handoff" },
+      { key: "end", type: "end", title: "End" },
+    ],
+  },
+];
+
 function cleanName(name: string): string {
   return name.trim().replace(/\s+/g, " ");
 }
@@ -59,7 +325,12 @@ export const list = tenantQuery({
         description: v.optional(v.string()),
         status: statusValidator,
         triggerKind: triggerValidator,
+        triggerKeywords: v.optional(v.array(v.string())),
         model: v.optional(v.string()),
+        entryNodeKey: v.optional(v.string()),
+        flowNodes: v.optional(v.array(flowNodeValidator)),
+        nodeCount: v.number(),
+        flowValidationIssues: v.array(flowIssueValidator),
         channel: v.literal("whatsapp"),
         createdAt: v.number(),
         updatedAt: v.number(),
@@ -70,7 +341,18 @@ export const list = tenantQuery({
       active: v.number(),
       draft: v.number(),
       paused: v.number(),
+      flowReady: v.number(),
+      flowIssues: v.number(),
     }),
+    templates: v.array(
+      v.object({
+        slug: flowTemplateSlugValidator,
+        name: v.string(),
+        description: v.string(),
+        triggerKind: triggerValidator,
+        nodeCount: v.number(),
+      }),
+    ),
   }),
   handler: async (ctx) => {
     const [folders, bots] = await Promise.all([
@@ -88,10 +370,33 @@ export const list = tenantQuery({
 
     const folderById = new Map(folders.map((folder) => [folder._id, folder]));
     const botCountByFolder = new Map<Id<"chatbotFolders">, number>();
-    const stats = { total: bots.length, active: 0, draft: 0, paused: 0 };
+    const stats = {
+      total: bots.length,
+      active: 0,
+      draft: 0,
+      paused: 0,
+      flowReady: 0,
+      flowIssues: 0,
+    };
+    const botIssues = new Map<Id<"chatbots">, FlowIssue[]>();
 
     for (const bot of bots) {
       stats[bot.status] += 1;
+      const issues =
+        bot.flowValidationIssues ??
+        validateFlow({
+          name: bot.name,
+          triggerKind: bot.triggerKind,
+          triggerKeywords: bot.triggerKeywords,
+          entryNodeKey: bot.entryNodeKey,
+          nodes: bot.flowNodes,
+        });
+      botIssues.set(bot._id, issues);
+      if (issues.some((issue) => issue.severity === "error")) {
+        stats.flowIssues += 1;
+      } else {
+        stats.flowReady += 1;
+      }
       if (bot.folderId) {
         botCountByFolder.set(
           bot.folderId,
@@ -116,12 +421,24 @@ export const list = tenantQuery({
         description: bot.description,
         status: bot.status,
         triggerKind: bot.triggerKind,
+        triggerKeywords: bot.triggerKeywords,
         model: bot.model,
+        entryNodeKey: bot.entryNodeKey,
+        flowNodes: bot.flowNodes,
+        nodeCount: bot.flowNodes?.length ?? 0,
+        flowValidationIssues: botIssues.get(bot._id) ?? [],
         channel: bot.channel,
         createdAt: bot.createdAt,
         updatedAt: bot.updatedAt,
       })),
       stats,
+      templates: FLOW_TEMPLATES.map((template) => ({
+        slug: template.slug,
+        name: template.name,
+        description: template.description,
+        triggerKind: template.triggerKind,
+        nodeCount: template.nodes.length,
+      })),
     };
   },
 });
@@ -156,7 +473,9 @@ export const createBot = tenantMutation({
     description: v.optional(v.string()),
     folderId: v.optional(v.id("chatbotFolders")),
     triggerKind: triggerValidator,
+    triggerKeywords: v.optional(v.array(v.string())),
     model: v.optional(v.string()),
+    templateSlug: v.optional(flowTemplateSlugValidator),
   },
   returns: v.id("chatbots"),
   handler: async (ctx, args) => {
@@ -170,6 +489,18 @@ export const createBot = tenantMutation({
       );
     }
     const now = Date.now();
+    const template =
+      findTemplate(args.templateSlug) ?? defaultTemplateForTrigger(args.triggerKind);
+    const triggerKeywords = cleanKeywords(
+      args.triggerKeywords ?? template.triggerKeywords,
+    );
+    const issues = validateFlow({
+      name,
+      triggerKind: args.triggerKind,
+      triggerKeywords,
+      entryNodeKey: template.entryNodeKey,
+      nodes: template.nodes,
+    });
     return await ctx.db.insert("chatbots", {
       tenantId: ctx.tenantId,
       name,
@@ -177,12 +508,98 @@ export const createBot = tenantMutation({
       folderId: args.folderId,
       status: "draft",
       triggerKind: args.triggerKind,
+      triggerKeywords,
       model: args.model?.trim() || "CXCast guardrail bot",
+      entryNodeKey: template.entryNodeKey,
+      flowNodes: template.nodes,
+      flowValidationIssues: issues,
       channel: "whatsapp",
       createdBy: ctx.memberId,
       createdAt: now,
       updatedAt: now,
     });
+  },
+});
+
+export const updateFlow = tenantMutation({
+  args: {
+    chatbotId: v.id("chatbots"),
+    triggerKind: triggerValidator,
+    triggerKeywords: v.optional(v.array(v.string())),
+    entryNodeKey: v.string(),
+    nodes: v.array(flowNodeValidator),
+  },
+  returns: v.array(flowIssueValidator),
+  handler: async (ctx, args) => {
+    const bot = (await loadByIdInTenant(
+      ctx as Parameters<typeof loadByIdInTenant>[0],
+      "chatbots",
+      args.chatbotId,
+    )) as Doc<"chatbots">;
+    requireCapability(
+      ctx.role,
+      bot.status === "active" ? "campaigns.start" : "campaigns.create",
+    );
+    const triggerKeywords = cleanKeywords(args.triggerKeywords);
+    const nodes = normalizeNodes(args.nodes);
+    const issues = validateFlow({
+      name: bot.name,
+      triggerKind: args.triggerKind,
+      triggerKeywords,
+      entryNodeKey: args.entryNodeKey.trim(),
+      nodes,
+    });
+    await ctx.db.patch(args.chatbotId, {
+      triggerKind: args.triggerKind,
+      triggerKeywords,
+      entryNodeKey: args.entryNodeKey.trim(),
+      flowNodes: nodes,
+      flowValidationIssues: issues,
+      status: issues.some((issue) => issue.severity === "error")
+        ? "draft"
+        : bot.status,
+      updatedAt: Date.now(),
+    });
+    return issues;
+  },
+});
+
+export const applyTemplate = tenantMutation({
+  args: {
+    chatbotId: v.id("chatbots"),
+    templateSlug: flowTemplateSlugValidator,
+  },
+  returns: v.array(flowIssueValidator),
+  handler: async (ctx, args) => {
+    const bot = (await loadByIdInTenant(
+      ctx as Parameters<typeof loadByIdInTenant>[0],
+      "chatbots",
+      args.chatbotId,
+    )) as Doc<"chatbots">;
+    requireCapability(
+      ctx.role,
+      bot.status === "active" ? "campaigns.start" : "campaigns.create",
+    );
+    const template = findTemplate(args.templateSlug);
+    if (!template) throw new ConvexError({ code: "UNKNOWN_FLOW_TEMPLATE" });
+    const triggerKeywords = cleanKeywords(template.triggerKeywords);
+    const issues = validateFlow({
+      name: bot.name,
+      triggerKind: template.triggerKind,
+      triggerKeywords,
+      entryNodeKey: template.entryNodeKey,
+      nodes: template.nodes,
+    });
+    await ctx.db.patch(args.chatbotId, {
+      triggerKind: template.triggerKind,
+      triggerKeywords,
+      entryNodeKey: template.entryNodeKey,
+      flowNodes: template.nodes,
+      flowValidationIssues: issues,
+      status: "draft",
+      updatedAt: Date.now(),
+    });
+    return issues;
   },
 });
 
@@ -204,10 +621,358 @@ export const updateStatus = tenantMutation({
         ? "campaigns.start"
         : "campaigns.create",
     );
+    const template = defaultTemplateForTrigger(bot.triggerKind);
+    const triggerKeywords = cleanKeywords(
+      bot.triggerKeywords ?? template.triggerKeywords,
+    );
+    const nodes = bot.flowNodes ?? template.nodes;
+    const entryNodeKey = bot.entryNodeKey ?? template.entryNodeKey;
+    const issues = validateFlow({
+      name: bot.name,
+      triggerKind: bot.triggerKind,
+      triggerKeywords,
+      entryNodeKey,
+      nodes,
+    });
+    if (
+      args.status === "active" &&
+      issues.some((issue) => issue.severity === "error")
+    ) {
+      await ctx.db.patch(args.chatbotId, {
+        triggerKeywords,
+        entryNodeKey,
+        flowNodes: nodes,
+        flowValidationIssues: issues,
+        updatedAt: Date.now(),
+      });
+      throw new ConvexError({
+        code: "FLOW_INVALID",
+        message: "Fix the flow builder issues before activating this bot.",
+        issues,
+      });
+    }
     await ctx.db.patch(args.chatbotId, {
       status: args.status,
+      triggerKeywords,
+      entryNodeKey,
+      flowNodes: nodes,
+      flowValidationIssues: issues,
       updatedAt: Date.now(),
     });
     return null;
   },
 });
+
+function findTemplate(slug?: FlowTemplate["slug"]): FlowTemplate | undefined {
+  return slug ? FLOW_TEMPLATES.find((template) => template.slug === slug) : undefined;
+}
+
+function defaultTemplateForTrigger(triggerKind: FlowTemplate["triggerKind"]): FlowTemplate {
+  return (
+    FLOW_TEMPLATES.find((template) => template.triggerKind === triggerKind) ??
+    FLOW_TEMPLATES[0]
+  );
+}
+
+function cleanKeywords(keywords?: string[]): string[] | undefined {
+  const cleaned = (keywords ?? [])
+    .map((keyword) => keyword.trim().toLowerCase())
+    .filter(Boolean);
+  return cleaned.length > 0 ? Array.from(new Set(cleaned)) : undefined;
+}
+
+function normalizeNodes(nodes: FlowNode[]): FlowNode[] {
+  return nodes.map((node) => ({
+    key: cleanKey(node.key),
+    type: node.type,
+    title: cleanName(node.title || node.key || node.type),
+    body: node.body?.trim() || undefined,
+    nextKey: node.nextKey?.trim() || undefined,
+    position:
+      node.position &&
+      Number.isFinite(node.position.x) &&
+      Number.isFinite(node.position.y)
+        ? {
+            x: Math.round(node.position.x),
+            y: Math.round(node.position.y),
+          }
+        : undefined,
+    variableKey: node.variableKey?.trim() || undefined,
+    tag: node.tag?.trim() || undefined,
+    condition: node.condition
+      ? {
+          variableKey: node.condition.variableKey.trim(),
+          operator: node.condition.operator,
+          value: node.condition.value?.trim() || undefined,
+          trueNextKey: node.condition.trueNextKey.trim(),
+          falseNextKey: node.condition.falseNextKey.trim(),
+        }
+      : undefined,
+    buttons:
+      node.buttons
+        ?.map((button) => ({
+          replyId: cleanKey(button.replyId),
+          label: button.label.trim(),
+          nextKey: button.nextKey.trim(),
+        }))
+        .filter((button) => button.replyId || button.label || button.nextKey) ??
+      undefined,
+  }));
+}
+
+function cleanKey(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 48);
+}
+
+function validateFlow(args: {
+  name: string;
+  triggerKind: "inbound" | "keyword" | "ctwa" | "handoff";
+  triggerKeywords?: string[];
+  entryNodeKey?: string;
+  nodes?: FlowNode[];
+}): FlowIssue[] {
+  const issues: FlowIssue[] = [];
+  const nodes = normalizeNodes(args.nodes ?? []);
+  const keys = new Set(nodes.map((node) => node.key));
+
+  if (!args.name.trim()) {
+    issues.push({
+      severity: "error",
+      scope: "flow",
+      field: "name",
+      message: "Bot name is required.",
+    });
+  }
+  if (args.triggerKind === "keyword" && cleanKeywords(args.triggerKeywords)?.length === undefined) {
+    issues.push({
+      severity: "error",
+      scope: "trigger",
+      field: "triggerKeywords",
+      message: "Keyword-triggered flows need at least one keyword.",
+    });
+  }
+  if (nodes.length === 0) {
+    issues.push({
+      severity: "error",
+      scope: "flow",
+      field: "nodes",
+      message: "Add at least one node before activation.",
+    });
+  }
+  if (!args.entryNodeKey?.trim()) {
+    issues.push({
+      severity: "error",
+      scope: "flow",
+      field: "entryNodeKey",
+      message: "Pick an entry node.",
+    });
+  } else if (!keys.has(args.entryNodeKey.trim())) {
+    issues.push({
+      severity: "error",
+      scope: "flow",
+      field: "entryNodeKey",
+      message: `Entry node "${args.entryNodeKey}" does not exist.`,
+    });
+  }
+
+  const seen = new Set<string>();
+  for (const node of nodes) {
+    if (!node.key) {
+      issues.push({
+        severity: "error",
+        scope: "node",
+        field: "key",
+        message: "Each node needs a stable key.",
+      });
+    } else if (seen.has(node.key)) {
+      issues.push({
+        severity: "error",
+        scope: "node",
+        nodeKey: node.key,
+        field: "key",
+        message: `Duplicate node key "${node.key}".`,
+      });
+    }
+    seen.add(node.key);
+    issues.push(...validateNode(node, keys));
+  }
+
+  if (args.entryNodeKey && keys.has(args.entryNodeKey)) {
+    const reached = reachableFrom(args.entryNodeKey, nodes);
+    for (const node of nodes) {
+      if (!reached.has(node.key)) {
+        issues.push({
+          severity: "warning",
+          scope: "node",
+          nodeKey: node.key,
+          message: `Node "${node.title}" is not reachable from the entry node.`,
+        });
+      }
+    }
+  }
+
+  return issues;
+}
+
+function validateNode(node: FlowNode, keys: Set<string>): FlowIssue[] {
+  const issues: FlowIssue[] = [];
+  const checkTarget = (target: string | undefined, field: string) => {
+    if (!target) {
+      issues.push({
+        severity: "error",
+        scope: "node",
+        nodeKey: node.key,
+        field,
+        message: `${node.title} needs a next node.`,
+      });
+    } else if (!keys.has(target)) {
+      issues.push({
+        severity: "error",
+        scope: "node",
+        nodeKey: node.key,
+        field,
+        message: `${node.title} points to missing node "${target}".`,
+      });
+    }
+  };
+
+  if (node.type === "start") {
+    checkTarget(node.nextKey, "nextKey");
+  }
+  if (node.type === "send_message") {
+    if (!node.body?.trim()) {
+      issues.push({
+        severity: "error",
+        scope: "node",
+        nodeKey: node.key,
+        field: "body",
+        message: `${node.title} needs message text.`,
+      });
+    }
+    checkTarget(node.nextKey, "nextKey");
+  }
+  if (node.type === "collect_input") {
+    if (!node.body?.trim()) {
+      issues.push({
+        severity: "error",
+        scope: "node",
+        nodeKey: node.key,
+        field: "body",
+        message: `${node.title} needs a prompt.`,
+      });
+    }
+    if (!node.variableKey?.trim()) {
+      issues.push({
+        severity: "error",
+        scope: "node",
+        nodeKey: node.key,
+        field: "variableKey",
+        message: `${node.title} needs a variable key.`,
+      });
+    }
+    checkTarget(node.nextKey, "nextKey");
+  }
+  if (node.type === "send_buttons" || node.type === "send_list") {
+    if (!node.body?.trim()) {
+      issues.push({
+        severity: "error",
+        scope: "node",
+        nodeKey: node.key,
+        field: "body",
+        message: `${node.title} needs menu message text.`,
+      });
+    }
+    const buttons = node.buttons ?? [];
+    const maxChoices = node.type === "send_buttons" ? 3 : 10;
+    if (buttons.length === 0 || buttons.length > maxChoices) {
+      issues.push({
+        severity: "error",
+        scope: "node",
+        nodeKey: node.key,
+        field: "buttons",
+        message:
+          node.type === "send_buttons"
+            ? "Button nodes need 1-3 buttons for Meta."
+            : "List nodes need 1-10 rows.",
+      });
+    }
+    buttons.forEach((button, index) => {
+      if (!button.replyId.trim()) {
+        issues.push({
+          severity: "error",
+          scope: "node",
+          nodeKey: node.key,
+          field: `buttons.${index}.replyId`,
+          message: "Each button needs a reply id.",
+        });
+      }
+      const maxLabelLength = node.type === "send_buttons" ? 20 : 24;
+      if (!button.label.trim() || button.label.length > maxLabelLength) {
+        issues.push({
+          severity: "error",
+          scope: "node",
+          nodeKey: node.key,
+          field: `buttons.${index}.label`,
+          message: `Choice labels must be 1-${maxLabelLength} characters.`,
+        });
+      }
+      checkTarget(button.nextKey, `buttons.${index}.nextKey`);
+    });
+  }
+  if (node.type === "set_tag") {
+    if (!node.tag?.trim() && !node.body?.trim()) {
+      issues.push({
+        severity: "error",
+        scope: "node",
+        nodeKey: node.key,
+        field: "tag",
+        message: `${node.title} needs a tag value.`,
+      });
+    }
+    checkTarget(node.nextKey, "nextKey");
+  }
+  if (node.type === "condition") {
+    if (!node.condition?.variableKey.trim()) {
+      issues.push({
+        severity: "error",
+        scope: "node",
+        nodeKey: node.key,
+        field: "condition.variableKey",
+        message: "Condition nodes need a variable key.",
+      });
+    }
+    checkTarget(node.condition?.trueNextKey, "condition.trueNextKey");
+    checkTarget(node.condition?.falseNextKey, "condition.falseNextKey");
+  }
+  return issues;
+}
+
+function reachableFrom(entryKey: string, nodes: FlowNode[]): Set<string> {
+  const byKey = new Map(nodes.map((node) => [node.key, node]));
+  const reached = new Set<string>();
+  const visit = (key: string) => {
+    if (reached.has(key)) return;
+    const node = byKey.get(key);
+    if (!node) return;
+    reached.add(key);
+    for (const next of outgoingKeys(node)) visit(next);
+  };
+  visit(entryKey);
+  return reached;
+}
+
+function outgoingKeys(node: FlowNode): string[] {
+  const keys = [];
+  if (node.nextKey) keys.push(node.nextKey);
+  for (const button of node.buttons ?? []) {
+    if (button.nextKey) keys.push(button.nextKey);
+  }
+  if (node.condition?.trueNextKey) keys.push(node.condition.trueNextKey);
+  if (node.condition?.falseNextKey) keys.push(node.condition.falseNextKey);
+  return keys;
+}

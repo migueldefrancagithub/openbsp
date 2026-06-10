@@ -226,7 +226,13 @@ export type SubmitTemplateArgs = {
   category: "MARKETING" | "UTILITY" | "AUTHENTICATION";
   bodyText: string;            // with {{1}}, {{2}}, ...
   exampleVariables: string[];  // one per placeholder, in order
+  buttons?: TemplateButton[];
 };
+
+export type TemplateButton =
+  | { type: "quick_reply"; text: string }
+  | { type: "url"; text: string; url: string }
+  | { type: "phone_number"; text: string; phoneNumber: string };
 
 export type SubmitTemplateResult =
   | {
@@ -248,6 +254,12 @@ export async function submitTemplateToMeta(
         : {}),
     },
   ];
+  const buttons = buildTemplateButtonComponent(args.buttons);
+  if (!buttons.ok) {
+    return { ok: false, reason: buttons.reason };
+  }
+  if (buttons.component) components.push(buttons.component);
+
   const res = await graphPost<{
     id: string;
     status: string;
@@ -281,6 +293,58 @@ export async function submitTemplateToMeta(
               ? "DISABLED"
               : "PENDING",
   };
+}
+
+function buildTemplateButtonComponent(
+  buttons?: TemplateButton[],
+):
+  | { ok: true; component?: Record<string, unknown> }
+  | { ok: false; reason: string } {
+  if (!buttons || buttons.length === 0) return { ok: true };
+  if (buttons.length > 3) {
+    return {
+      ok: false,
+      reason: "WhatsApp templates support up to 3 buttons in this builder.",
+    };
+  }
+
+  const mapped = [];
+  for (const button of buttons) {
+    const text = button.text.trim();
+    if (text.length === 0 || text.length > 25) {
+      return {
+        ok: false,
+        reason: "Template button text must be 1-25 characters.",
+      };
+    }
+    if (button.type === "quick_reply") {
+      mapped.push({ type: "QUICK_REPLY", text });
+    } else if (button.type === "url") {
+      const url = button.url.trim();
+      if (!/^https:\/\/\S+$/i.test(url)) {
+        return {
+          ok: false,
+          reason: "Template URL buttons must use a public https:// URL.",
+        };
+      }
+      mapped.push({ type: "URL", text, url });
+    } else {
+      const phoneNumber = button.phoneNumber.trim();
+      if (!/^\+?[1-9]\d{6,19}$/.test(phoneNumber)) {
+        return {
+          ok: false,
+          reason: "Template phone buttons require a valid E.164-like number.",
+        };
+      }
+      mapped.push({
+        type: "PHONE_NUMBER",
+        text,
+        phone_number: phoneNumber,
+      });
+    }
+  }
+
+  return { ok: true, component: { type: "BUTTONS", buttons: mapped } };
 }
 
 export type SyncedTemplate = {

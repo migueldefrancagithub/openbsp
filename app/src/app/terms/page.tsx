@@ -5,7 +5,10 @@ export default function TermsPage() {
   return (
     <main className="min-h-full bg-[#f9fafb] text-[#0a1b33]">
       <div className="mx-auto max-w-3xl px-6 py-16">
-        <Link href="/" className="text-sm text-slate-500 hover:text-[#0a1b33]">
+        <Link
+          href="/"
+          className="inline-flex min-h-10 items-center text-sm text-slate-500 hover:text-[#0a1b33]"
+        >
           Back to {BRAND_NAME}
         </Link>
         <h1 className="mt-8 font-[var(--font-outfit)] text-4xl font-medium tracking-tight">

@@ -2,9 +2,9 @@
 
 import {
   AlertTriangle,
+  Banknote,
   CheckCircle2,
   Clock3,
-  DollarSign,
   Info,
   ShieldCheck,
 } from "lucide-react";
@@ -18,6 +18,7 @@ import { BRAND_NAME, BrandMark } from "@/components/Brand";
 type Props = {
   category: TemplateCategory;
   bodyText: string;
+  buttons?: TemplateButtonPreview[];
   examples: Record<number, string>;
   hasMarketingOptIn: boolean;
   serviceWindowOpen: boolean;
@@ -25,6 +26,11 @@ type Props = {
   title?: string;
   subtitle?: string;
 };
+
+export type TemplateButtonPreview =
+  | { type: "quick_reply"; text: string }
+  | { type: "url"; text: string; url: string }
+  | { type: "phone_number"; text: string; phoneNumber: string };
 
 const CATEGORY_LABELS: Record<TemplateCategory, string> = {
   utility: "Utility",
@@ -41,6 +47,7 @@ const CATEGORY_TONES: Record<TemplateCategory, string> = {
 export function WhatsAppIosPreview({
   category,
   bodyText,
+  buttons = [],
   examples,
   hasMarketingOptIn,
   serviceWindowOpen,
@@ -97,6 +104,18 @@ export function WhatsAppIosPreview({
                   10:24 ✓✓
                 </div>
               </div>
+              {buttons.length > 0 && (
+                <div className="ml-auto mt-1.5 grid max-w-[86%] gap-1">
+                  {buttons.slice(0, 3).map((button, index) => (
+                    <div
+                      key={`${button.type}-${button.text}-${index}`}
+                      className="rounded-xl bg-white/95 px-3 py-2 text-center text-[12px] font-medium text-[#128c7e] shadow-sm"
+                    >
+                      {button.text || "Button"}
+                    </div>
+                  ))}
+                </div>
+              )}
               {category === "marketing" && (
                 <div className="mt-2 ml-auto max-w-[86%] rounded-xl bg-white/85 px-3 py-2 text-[11px] text-slate-600 shadow-sm">
                   Quick replies and CTA buttons should be tracked as campaign
@@ -111,7 +130,7 @@ export function WhatsAppIosPreview({
       <div className="rounded-2xl border border-slate-200 bg-white p-4">
         <div className="grid grid-cols-2 gap-2">
           <Signal
-            icon={DollarSign}
+            icon={Banknote}
             label="Billing"
             value={analysis.billing.chargeState === "free" ? "Likely free" : "Billable"}
             tone={analysis.billing.chargeState === "free" ? "good" : "warn"}

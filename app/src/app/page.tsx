@@ -65,7 +65,7 @@ export default function Home() {
         <div className="mx-auto max-w-[1400px] flex items-center justify-between">
           <Link
             href="/"
-            className="text-[#0a1b33]"
+            className="inline-flex min-h-10 items-center text-[#0a1b33]"
           >
             <BrandLogo markClassName="h-6 w-6" />
           </Link>
@@ -213,7 +213,7 @@ export default function Home() {
                 id="footer-email"
                 type="email"
                 placeholder="Enter your email"
-                className="h-12 min-w-0 flex-1 rounded-md border border-white/12 bg-white/[0.08] px-4 text-[14px] text-white outline-none placeholder:text-zinc-500 focus:border-white/35 sm:max-w-md"
+                className="h-12 min-h-12 min-w-0 flex-1 rounded-md border border-white/12 bg-white/[0.08] px-4 py-3 text-[14px] text-white outline-none placeholder:text-zinc-500 focus:border-white/35 sm:max-w-md"
               />
               <button
                 type="button"
@@ -234,7 +234,7 @@ export default function Home() {
                   {column.links.map(([label, href]) => {
                     const external = href.startsWith("http");
                     const className =
-                      "inline-flex items-center gap-1.5 text-[14px] text-zinc-400 transition-colors hover:text-white";
+                      "inline-flex min-h-8 items-center gap-1.5 py-1 text-[14px] text-zinc-400 transition-colors hover:text-white";
                     return (
                       <li key={`${column.title}-${label}`}>
                         {external ? (
@@ -268,14 +268,14 @@ export default function Home() {
               <div className="flex items-center gap-4">
                 <a
                   href="https://github.com/migueldefrancagithub/openbsp"
-                  className="text-[13px] font-semibold text-zinc-400 transition-colors hover:text-white"
+                  className="inline-flex h-9 min-w-9 items-center justify-center rounded-full text-[13px] font-semibold text-zinc-400 transition-colors hover:bg-white/10 hover:text-white"
                   aria-label="GitHub"
                 >
                   GH
                 </a>
                 <a
                   href="https://www.linkedin.com"
-                  className="text-[13px] font-semibold text-zinc-400 transition-colors hover:text-white"
+                  className="inline-flex h-9 min-w-9 items-center justify-center rounded-full text-[13px] font-semibold text-zinc-400 transition-colors hover:bg-white/10 hover:text-white"
                   aria-label="LinkedIn"
                 >
                   in

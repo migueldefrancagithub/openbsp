@@ -105,6 +105,7 @@ export function ConnectWabaForm() {
             <code>whatsapp_business_messaging</code>,{" "}
             <code>whatsapp_business_management</code>,{" "}
             <code>business_management</code>. Personal user tokens rejected.
+            Tokens are encrypted at rest when <code>WABA_TOKEN_ENCRYPTION_KEY_V1</code> is set.
           </p>
         </div>
       </div>

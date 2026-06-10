@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { tenantQuery } from "./lib/customFunctions";
+import { DEFAULT_CURRENCY, normalizeCurrency } from "./lib/money";
 
 const opportunityStatuses = [
   "new",
@@ -120,8 +121,10 @@ export const dashboard = tenantQuery({
       pipelineValueMinor,
       bookedValueMinor,
       currency:
-        ctwaConversations.find((conversation) => conversation.opportunityCurrency)
-          ?.opportunityCurrency ?? "EUR",
+        normalizeCurrency(
+          ctwaConversations.find((conversation) => conversation.opportunityCurrency)
+            ?.opportunityCurrency ?? DEFAULT_CURRENCY,
+        ),
       freeEntryOpen: referrals.filter(
         (referral) => referral.freeEntryWindowExpiresAt > now,
       ).length,

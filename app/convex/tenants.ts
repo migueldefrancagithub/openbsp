@@ -21,11 +21,16 @@ export const createForCurrentUser = mutation({
     const tenantId = await ctx.db.insert("tenants", {
       name: args.name,
       vertical: args.vertical,
+      healthcareMode: args.vertical === "clinic",
       plan: "starter",
       settings: {
         defaultLocale: "pt-PT",
         timezone: "Europe/Lisbon",
         retentionDays: 730,
+      },
+      rgpd: {
+        controllerName: args.name,
+        controllerEmail: "",
       },
       createdAt: Date.now(),
     });

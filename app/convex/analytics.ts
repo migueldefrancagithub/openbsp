@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { tenantQuery } from "./lib/customFunctions";
 import type { Doc, Id } from "./_generated/dataModel";
+import { DEFAULT_CURRENCY, normalizeCurrency } from "./lib/money";
 
 const granularityValidator = v.union(v.literal("hour"), v.literal("day"));
 const pricingCategoryValidator = v.union(
@@ -118,7 +119,7 @@ export const reports = tenantQuery({
     const details = new Map<string, DetailRow>();
     const categoryBreakdown = new Map<string, BreakdownRow>();
     const countryBreakdown = new Map<string, BreakdownRow>();
-    let costCurrency = "USD";
+    let costCurrency = DEFAULT_CURRENCY;
 
     for (const message of messages) {
       if (message.direction !== "outgoing") continue;
@@ -137,7 +138,7 @@ export const reports = tenantQuery({
       const bucketStart = bucketTimestamp(message.createdAt, granularity);
       const bucketLabel = formatBucket(bucketStart, granularity);
       const costMinor = message.costMinor ?? 0;
-      costCurrency = message.costCurrency ?? costCurrency;
+      costCurrency = normalizeCurrency(message.costCurrency ?? costCurrency);
       const counters = statusCounters(message.status);
       const failureSignal = `${message.failureCode ?? ""} ${
         message.failureReason ?? ""

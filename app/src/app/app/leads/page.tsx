@@ -10,13 +10,14 @@ import {
   MousePointerClick,
   Target,
   Timer,
-  CircleDollarSign,
+  Banknote,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { PageHeader } from "@/components/app/EmptyState";
 import { ConvexQueryFallback } from "@/components/app/ConvexQueryFallback";
 import { api } from "../../../../convex/_generated/api";
 import { relativeTime } from "@/lib/relativeTime";
+import { DEFAULT_CURRENCY, formatMoney } from "@/lib/money";
 
 const STATUS_LABELS: Record<string, string> = {
   new: "New",
@@ -61,7 +62,7 @@ const EMPTY_DASHBOARD: Dashboard = {
   booked: 0,
   pipelineValueMinor: 0,
   bookedValueMinor: 0,
-  currency: "EUR",
+  currency: DEFAULT_CURRENCY,
   freeEntryOpen: 0,
   freeEntryExpiringSoon: 0,
   byOpportunityStatus: [
@@ -155,7 +156,7 @@ function LeadsDashboard({
                 tone="amber"
               />
               <Kpi
-                icon={CircleDollarSign}
+                icon={Banknote}
                 label="Booked value"
                 value={formatMoney(dashboard.bookedValueMinor, dashboard.currency)}
               />
@@ -298,14 +299,6 @@ function formatShortDateTime(timestamp: number): string {
     hour: "2-digit",
     minute: "2-digit",
   });
-}
-
-function formatMoney(valueMinor: number, currency: string): string {
-  return new Intl.NumberFormat("en-GB", {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 0,
-  }).format(valueMinor / 100);
 }
 
 function Kpi({

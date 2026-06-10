@@ -83,6 +83,10 @@ describe("template create and submit", () => {
       language: "pt_PT",
       category: "utility",
       bodyText: "Ola {{1}}, confirma a consulta de {{2}}?",
+      buttons: [
+        { type: "quick_reply", text: "Confirmar" },
+        { type: "url", text: "Detalhes", url: "https://clinic.example/consulta" },
+      ],
       parameterSchema: [
         { index: 1, name: "first_name", example: "Maria" },
         { index: 2, name: "service", example: "limpeza facial" },
@@ -105,6 +109,17 @@ describe("template create and submit", () => {
           text: "Ola {{1}}, confirma a consulta de {{2}}?",
           example: { body_text: [["Maria", "limpeza facial"]] },
         },
+        {
+          type: "BUTTONS",
+          buttons: [
+            { type: "QUICK_REPLY", text: "Confirmar" },
+            {
+              type: "URL",
+              text: "Detalhes",
+              url: "https://clinic.example/consulta",
+            },
+          ],
+        },
       ],
     });
 
@@ -119,6 +134,10 @@ describe("template create and submit", () => {
     expect(rows.versions[0]).toMatchObject({
       isLocked: true,
       submittedAt: expect.any(Number),
+      buttons: [
+        { type: "quick_reply", text: "Confirmar" },
+        { type: "url", text: "Detalhes", url: "https://clinic.example/consulta" },
+      ],
     });
   });
 

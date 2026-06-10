@@ -27,6 +27,7 @@ import Link from "next/link";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { relativeTime } from "@/lib/relativeTime";
+import { formatMoney } from "@/lib/money";
 
 type CampaignStats = {
   total: number;
@@ -315,8 +316,8 @@ export default function AppOverview() {
           />
           <ModuleCard
             icon={Bot}
-            title="Chatbots"
-            body="Build guarded automations for CTWA and inbound leads."
+            title="Flow Builder"
+            body="Build branching WhatsApp bots with templates, validation, and human handoff."
             href="/app/chatbots"
           />
           <ModuleCard
@@ -537,12 +538,4 @@ function ModuleCard({
 
 function formatPercent(value: number): string {
   return `${Math.round(value * 100)}%`;
-}
-
-function formatMoney(valueMinor: number, currency: string): string {
-  return new Intl.NumberFormat("pt-PT", {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 0,
-  }).format(valueMinor / 100);
 }

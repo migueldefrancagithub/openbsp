@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import { tenantQuery } from "./lib/customFunctions";
+import { DEFAULT_CURRENCY, normalizeCurrency } from "./lib/money";
 
 const campaignStatsValidator = v.object({
   total: v.number(),
@@ -254,9 +255,11 @@ export const dashboard = tenantQuery({
         pipelineValueMinor,
         bookedValueMinor,
         currency:
-          ctwaConversations.find(
-            (conversation) => conversation.opportunityCurrency,
-          )?.opportunityCurrency ?? "EUR",
+          normalizeCurrency(
+            ctwaConversations.find(
+              (conversation) => conversation.opportunityCurrency,
+            )?.opportunityCurrency ?? DEFAULT_CURRENCY,
+          ),
       },
       campaigns: {
         total: campaigns.length,

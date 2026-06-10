@@ -13,6 +13,7 @@ import {
   shouldPauseAiForOpportunityStatus,
   type AiState,
 } from "./lib/aiControl";
+import { DEFAULT_CURRENCY, normalizeCurrency } from "./lib/money";
 import type { Id } from "./_generated/dataModel";
 
 const SERVICE_WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -377,7 +378,7 @@ export const setOpportunityValue = tenantMutation({
     );
     await ctx.db.patch(args.conversationId, {
       opportunityValueMinor: Math.max(0, Math.round(args.valueMinor)),
-      opportunityCurrency: (args.currency ?? "EUR").toUpperCase().slice(0, 3),
+      opportunityCurrency: normalizeCurrency(args.currency ?? DEFAULT_CURRENCY),
     });
     return null;
   },

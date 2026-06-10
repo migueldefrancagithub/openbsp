@@ -322,4 +322,149 @@ describe("webhook E2E", () => {
     expect(conversations[0].aiState).toBe("eligible");
     expect(conversations[0].opportunityStatus).toBe("new");
   });
+
+  it("dispatches inbound WhatsApp messages into active chatbot flows", async () => {
+    const t = convexTest(schema);
+    const { tenantId } = await seedTenantAndPhone(t);
+    await t.run(async (ctx) => {
+      const userId = await ctx.db.insert("users", { name: "Flow Owner" });
+      const memberId = await ctx.db.insert("members", {
+        tenantId,
+        userId,
+        role: "owner",
+        status: "active",
+        createdAt: Date.now(),
+      });
+      await ctx.db.insert("chatbots", {
+        tenantId,
+        name: "Webhook menu",
+        status: "active",
+        triggerKind: "keyword",
+        triggerKeywords: ["menu"],
+        entryNodeKey: "start",
+        flowNodes: [
+          { key: "start", type: "start", title: "Start", nextKey: "menu" },
+          {
+            key: "menu",
+            type: "send_buttons",
+            title: "Menu",
+            body: "Como podemos ajudar?",
+            buttons: [{ replyId: "book", label: "Marcar", nextKey: "end" }],
+          },
+          { key: "end", type: "end", title: "End" },
+        ],
+        flowValidationIssues: [],
+        channel: "whatsapp",
+        createdBy: memberId,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+    });
+
+    await t.mutation(internal.webhooks.enqueue, {
+      rawPayload: JSON.stringify(
+        makeMessagePayload({ wamid: "wamid.FLOW.1", text: "menu" }),
+      ),
+      rawBodySha256: "sha-flow",
+    });
+    await processPendingWebhookEvents(t);
+
+    const rows = await t.run(async (ctx) => ({
+      runs: await ctx.db.query("chatbotFlowRuns").collect(),
+      messages: await ctx.db.query("messages").collect(),
+    }));
+    expect(rows.runs).toHaveLength(1);
+    expect(rows.runs[0]).toMatchObject({
+      status: "active",
+      currentNodeKey: "menu",
+    });
+    expect(rows.messages.some((message) => message.direction === "outgoing")).toBe(true);
+    expect(
+      rows.messages.some((message) =>
+        message.content.text?.body.includes("Como podemos ajudar"),
+      ),
+    ).toBe(true);
+  });
+
+  it("scopes business username updates to the matching WABA", async () => {
+    const t = convexTest(schema);
+    const seeded = await t.run(async (ctx) => {
+      const tenantA = await ctx.db.insert("tenants", {
+        name: "Clinic A",
+        vertical: "clinic",
+        plan: "starter",
+        settings: {
+          defaultLocale: "pt-PT",
+          timezone: "Europe/Lisbon",
+          retentionDays: 730,
+        },
+        createdAt: Date.now(),
+      });
+      const tenantB = await ctx.db.insert("tenants", {
+        name: "Clinic B",
+        vertical: "clinic",
+        plan: "starter",
+        settings: {
+          defaultLocale: "pt-PT",
+          timezone: "Europe/Lisbon",
+          retentionDays: 730,
+        },
+        createdAt: Date.now(),
+      });
+      const accountA = await ctx.db.insert("whatsappAccounts", {
+        tenantId: tenantA,
+        metaAppId: "APP",
+        wabaId: "WABA_A",
+        accessToken: "token-a",
+        status: "active",
+        tokenStatus: "ok",
+        createdAt: Date.now(),
+      });
+      const accountB = await ctx.db.insert("whatsappAccounts", {
+        tenantId: tenantB,
+        metaAppId: "APP",
+        wabaId: "WABA_B",
+        accessToken: "token-b",
+        status: "active",
+        tokenStatus: "ok",
+        createdAt: Date.now(),
+      });
+      const phoneA = await ctx.db.insert("phoneNumbers", {
+        tenantId: tenantA,
+        whatsappAccountId: accountA,
+        phoneNumberId: "PHONE_A",
+        e164: "+351910000000",
+        displayName: "Shared Display",
+        createdAt: Date.now(),
+      });
+      const phoneB = await ctx.db.insert("phoneNumbers", {
+        tenantId: tenantB,
+        whatsappAccountId: accountB,
+        phoneNumberId: "PHONE_B",
+        e164: "+351910000000",
+        displayName: "Shared Display",
+        createdAt: Date.now(),
+      });
+      return { phoneA, phoneB };
+    });
+
+    await t.mutation(internal.webhooks.applyBusinessUsername, {
+      wabaId: "WABA_B",
+      displayPhoneNumber: "351910000000",
+      username: "clinicb",
+      status: "approved",
+      updatedAt: 1710000000000,
+    });
+
+    const phones = await t.run(async (ctx) => ({
+      a: await ctx.db.get(seeded.phoneA),
+      b: await ctx.db.get(seeded.phoneB),
+    }));
+    expect(phones.a?.businessUsername).toBeUndefined();
+    expect(phones.b).toMatchObject({
+      businessUsername: "clinicb",
+      businessUsernameStatus: "approved",
+      businessUsernameUpdatedAt: 1710000000000,
+    });
+  });
 });

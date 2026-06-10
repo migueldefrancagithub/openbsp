@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { PageHeader } from "@/components/app/EmptyState";
+import { SegmentedTabs } from "@/components/app/SegmentedTabs";
 import { WhatsAppIosPreview } from "@/components/WhatsAppIosPreview";
 import { api } from "../../../../convex/_generated/api";
 import { relativeTime } from "@/lib/relativeTime";
@@ -81,6 +82,7 @@ type CampaignOutcomeFilter =
   | "read"
   | "delivered"
   | "sent";
+type StudioTabKey = "dashboard" | "copy" | "lists" | "audience" | "launch";
 
 export default function CampaignsPage() {
   const convex = useConvex();
@@ -152,6 +154,7 @@ export default function CampaignsPage() {
   const [campaignSearch, setCampaignSearch] = useState("");
   const [campaignStatusFilter, setCampaignStatusFilter] =
     useState<BroadcastFilter>("all");
+  const [studioTab, setStudioTab] = useState<StudioTabKey>("dashboard");
   const [logCampaignId, setLogCampaignId] =
     useState<Id<"campaigns"> | null>(null);
   const [batchSize, setBatchSize] = useState(1000);
@@ -414,45 +417,45 @@ export default function CampaignsPage() {
           </div>
         )}
 
-        <section className="rounded-2xl border border-slate-200 bg-white p-2">
-          <div className="grid gap-1 md:grid-cols-5">
-            <StudioTab
-              href="#campaign-dashboard"
-              icon={BarChart3}
-              label="Dashboard"
-              value={`${campaigns?.length ?? 0} runs`}
-            />
-            <StudioTab
-              href="#campaign-copy"
-              icon={Copy}
-              label="Sua copy"
-              value={`${approvedTemplates.length} approved`}
-            />
-            <StudioTab
-              href="#campaign-lists"
-              icon={Table2}
-              label="Lista de clientes"
-              value={`${lists?.length ?? 0} folders`}
-            />
-            <StudioTab
-              href="#audience-builder"
-              icon={Filter}
-              label="Audiências"
-              value={`${audiencePreview?.count ?? 0} matched`}
-            />
-            <StudioTab
-              href="#campaign-launch"
-              icon={Rocket}
-              label="Iniciar campanha"
-              value="Safe launch"
-            />
-          </div>
-        </section>
+        <SegmentedTabs
+          selected={studioTab}
+          onChange={(key) => setStudioTab(key as StudioTabKey)}
+          items={[
+            {
+              key: "dashboard",
+              label: "Dashboard",
+              value: `${campaigns?.length ?? 0} runs`,
+              icon: BarChart3,
+            },
+            {
+              key: "copy",
+              label: "Copy",
+              value: `${approvedTemplates.length} approved`,
+              icon: Copy,
+            },
+            {
+              key: "lists",
+              label: "Lists",
+              value: `${lists?.length ?? 0} folders`,
+              icon: Table2,
+            },
+            {
+              key: "audience",
+              label: "Audiences",
+              value: `${audiencePreview?.count ?? 0} matched`,
+              icon: Filter,
+            },
+            {
+              key: "launch",
+              label: "Launch",
+              value: "Safe send",
+              icon: Rocket,
+            },
+          ]}
+        />
 
-        <div
-          id="campaign-lists"
-          className="grid scroll-mt-24 gap-4 xl:grid-cols-[1fr_1fr_1.2fr]"
-        >
+        {studioTab === "lists" && (
+        <div className="grid gap-4 xl:grid-cols-2">
           <WorkflowPanel
             icon={FolderPlus}
             title="1. Create folder"
@@ -536,11 +539,13 @@ export default function CampaignsPage() {
               </button>
             </form>
           </WorkflowPanel>
+        </div>
+        )}
 
+        {studioTab === "launch" && (
           <WorkflowPanel
-            id="campaign-launch"
             icon={Megaphone}
-            title="3. Create draft campaign"
+            title="Create draft campaign"
             subtitle="Approved templates without variables are supported in this first build."
           >
             <form className="space-y-3" onSubmit={handleCreateCampaign}>
@@ -588,12 +593,10 @@ export default function CampaignsPage() {
               </SubmitButton>
             </form>
           </WorkflowPanel>
-        </div>
+        )}
 
-        <section
-          id="campaign-copy"
-          className="grid scroll-mt-24 gap-4 xl:grid-cols-[360px_1fr]"
-        >
+        {studioTab === "copy" && (
+        <section className="grid gap-4 xl:grid-cols-[360px_1fr]">
           <WhatsAppIosPreview
             title="Campaign iOS preview"
             subtitle="See what the selected template feels like before you launch."
@@ -602,6 +605,7 @@ export default function CampaignsPage() {
               selectedTemplate?.bodyText ??
               "Choose an approved template to preview the message here."
             }
+            buttons={selectedTemplate?.buttons ?? []}
             examples={Object.fromEntries(
               (selectedTemplate?.parameterSchema ?? []).map((param) => [
                 param.index,
@@ -651,9 +655,10 @@ export default function CampaignsPage() {
             </div>
           </WorkflowPanel>
         </section>
+        )}
 
+        {studioTab === "audience" && (
         <WorkflowPanel
-          id="audience-builder"
           icon={SlidersHorizontal}
           title="Audience Builder"
           subtitle="Build reusable lead segments from consent, tags, CTWA intent, pipeline stage, and campaign behavior."
@@ -864,11 +869,10 @@ export default function CampaignsPage() {
             </div>
           </form>
         </WorkflowPanel>
+        )}
 
-        <section
-          id="campaign-dashboard"
-          className="scroll-mt-24 bg-white border border-slate-200 rounded-2xl overflow-hidden"
-        >
+        {studioTab === "dashboard" && (
+        <section className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
           <div className="px-5 py-4 border-b border-slate-100 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <h2 className="font-[var(--font-outfit)] text-[18px] font-medium text-[#0a1b33]">
@@ -879,13 +883,14 @@ export default function CampaignsPage() {
                 failure recovery, and response tracking.
               </p>
             </div>
-            <a
-              href="#campaign-launch"
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-violet-600 px-3 text-sm font-medium text-white transition-colors hover:bg-violet-700"
+            <button
+              type="button"
+              onClick={() => setStudioTab("launch")}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#0a152d] px-3 text-sm font-medium text-white transition-colors hover:bg-[#0a1b33]"
             >
               <Plus size={15} />
               Create broadcast
-            </a>
+            </button>
           </div>
 
           <div className="border-b border-slate-100 p-5">
@@ -922,7 +927,7 @@ export default function CampaignsPage() {
                     onClick={() => setCampaignStatusFilter(tab.key)}
                     className={`inline-flex h-10 items-center gap-2 rounded-lg px-3 text-sm font-semibold transition-colors ${
                       active
-                        ? "bg-violet-600 text-white"
+                        ? "bg-[#0a152d] text-white"
                         : "bg-white text-[#0a1b33] hover:bg-slate-50"
                     }`}
                   >
@@ -986,6 +991,7 @@ export default function CampaignsPage() {
             </div>
           )}
         </section>
+        )}
       </div>
 
       {logCampaign && (
@@ -1070,7 +1076,7 @@ function BroadcastCard({
       : campaign.status === "failed" || campaign.stats.failed > 0
         ? "border-l-orange-500"
         : campaign.status === "running"
-          ? "border-l-violet-500"
+        ? "border-l-[#0a152d]"
           : "border-l-slate-300";
   const statusLabel =
     campaign.status === "paused" && pendingBatch > 0
@@ -1398,8 +1404,8 @@ function ProgressRow({ label, value }: { label: string; value: number }) {
         <span className="font-semibold text-[#0a1b33]">{value.toFixed(1)}%</span>
       </div>
       <div className="h-2 overflow-hidden rounded-full bg-white">
-        <div
-          className="h-full rounded-full bg-violet-600"
+          <div
+            className="h-full rounded-full bg-[#0a152d]"
           style={{ width: `${Math.min(value, 100)}%` }}
         />
       </div>
