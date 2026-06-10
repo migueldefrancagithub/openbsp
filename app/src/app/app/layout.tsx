@@ -43,7 +43,9 @@ const NAV = [
   { href: "/app/support", label: "Support", icon: LifeBuoy },
 ];
 
-const FOOTER_NAV = [{ href: "/app/settings", label: "Settings", icon: Settings }];
+const FOOTER_NAV = [
+  { href: "/app/settings", label: "Settings", icon: Settings },
+];
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   const tenant = useQuery(api.tenantsQueries.getActiveOptional);
@@ -54,6 +56,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
   const [switchingTenant, setSwitchingTenant] = useState<string | null>(null);
+  const isFlowBuilderRoute = pathname.startsWith("/app/chatbots");
 
   useEffect(() => {
     if (tenant === null) router.replace("/onboarding");
@@ -93,9 +96,19 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen bg-[#f9fafb] flex flex-col lg:flex-row">
+    <div
+      className={cn(
+        "min-h-screen flex flex-col lg:flex-row",
+        isFlowBuilderRoute ? "bg-[#eef6ef]" : "bg-[#f9fafb]",
+      )}
+    >
       {/* Sidebar */}
-      <aside className="w-full lg:w-60 shrink-0 border-b lg:border-b-0 lg:border-r border-slate-200 bg-white flex flex-col lg:sticky top-0 lg:h-screen z-30">
+      <aside
+        className={cn(
+          "w-full shrink-0 border-b border-slate-200 bg-white flex-col lg:sticky top-0 lg:h-screen lg:border-b-0 lg:border-r",
+          "flex lg:w-60 z-30",
+        )}
+      >
         {/* Workspace switcher */}
         <div className="relative p-3 border-b border-slate-200">
           <button

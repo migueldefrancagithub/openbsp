@@ -10,8 +10,7 @@ import {
 } from "react";
 import { useMutation, useQuery } from "convex/react";
 import {
-  Background,
-  BackgroundVariant,
+  BaseEdge,
   Controls,
   Handle,
   MarkerType,
@@ -21,6 +20,7 @@ import {
   useNodesState,
   type Connection,
   type Edge,
+  type EdgeProps,
   type Node,
   type NodeProps,
   type OnEdgesDelete,
@@ -214,14 +214,15 @@ export default function ChatbotsPage() {
   const [folderName, setFolderName] = useState("");
   const [botName, setBotName] = useState("");
   const [botDescription, setBotDescription] = useState("");
-  const [selectedFolderId, setSelectedFolderId] =
-    useState<Id<"chatbotFolders"> | "">("");
+  const [selectedFolderId, setSelectedFolderId] = useState<
+    Id<"chatbotFolders"> | ""
+  >("");
   const [triggerKind, setTriggerKind] = useState<TriggerKind>("ctwa");
-  const [templateSlug, setTemplateSlug] =
-    useState<FlowTemplate["slug"]>("clinic_lead_capture");
+  const [templateSlug, setTemplateSlug] = useState<FlowTemplate["slug"]>(
+    "clinic_lead_capture",
+  );
   const [studioTab, setStudioTab] = useState<StudioTab>("flows");
-  const [selectedBotId, setSelectedBotId] =
-    useState<Id<"chatbots"> | "">("");
+  const [selectedBotId, setSelectedBotId] = useState<Id<"chatbots"> | "">("");
   const [flowEntryNodeKey, setFlowEntryNodeKey] = useState("");
   const [flowTriggerKind, setFlowTriggerKind] = useState<TriggerKind>("ctwa");
   const [flowKeywords, setFlowKeywords] = useState("");
@@ -250,7 +251,9 @@ export default function ChatbotsPage() {
   ) as FlowRunRow[] | undefined;
   const flowIssues = selectedBot?.flowValidationIssues ?? [];
   const flowErrors = flowIssues.filter((issue) => issue.severity === "error");
-  const flowWarnings = flowIssues.filter((issue) => issue.severity === "warning");
+  const flowWarnings = flowIssues.filter(
+    (issue) => issue.severity === "warning",
+  );
 
   useEffect(() => {
     if (!selectedBotId && visibleBots[0]) {
@@ -260,7 +263,9 @@ export default function ChatbotsPage() {
 
   useEffect(() => {
     if (!selectedBot) return;
-    setFlowEntryNodeKey(selectedBot.entryNodeKey ?? selectedBot.flowNodes?.[0]?.key ?? "");
+    setFlowEntryNodeKey(
+      selectedBot.entryNodeKey ?? selectedBot.flowNodes?.[0]?.key ?? "",
+    );
     setFlowTriggerKind(selectedBot.triggerKind);
     setFlowKeywords((selectedBot.triggerKeywords ?? []).join(", "));
     setFlowNodes(selectedBot.flowNodes ?? []);
@@ -394,7 +399,9 @@ export default function ChatbotsPage() {
   }
 
   function removeNode(index: number) {
-    setFlowNodes((nodes) => nodes.filter((_, itemIndex) => itemIndex !== index));
+    setFlowNodes((nodes) =>
+      nodes.filter((_, itemIndex) => itemIndex !== index),
+    );
   }
 
   async function setBotStatus(botId: Id<"chatbots">, status: ChatbotStatus) {
@@ -443,11 +450,11 @@ export default function ChatbotsPage() {
 
   if (studioTab === "flows") {
     return (
-      <div className="min-h-[calc(100vh-64px)] bg-[#f4f7fb] p-3 sm:p-4">
-        <div className="space-y-3">
+      <div className="min-h-screen bg-[#eef6ef]">
+        <div>
           {(notice || error) && (
             <div
-              className={`rounded-lg border px-4 py-3 text-sm ${
+              className={`fixed left-1/2 top-4 z-50 -translate-x-1/2 rounded-lg border px-4 py-3 text-sm shadow-lg ${
                 error
                   ? "border-red-200 bg-red-50 text-red-700"
                   : "border-emerald-200 bg-emerald-50 text-emerald-700"
@@ -495,8 +502,9 @@ export default function ChatbotsPage() {
         }
       />
 
-      <div className="min-h-[calc(100vh-105px)] bg-[#f7f9fc] px-4 py-6 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-7xl space-y-5">
+      <div className="relative min-h-[calc(100vh-105px)] overflow-hidden bg-[linear-gradient(145deg,#f4ffe8_0%,#f8fbff_42%,#ecfdf5_100%)] px-4 py-6 sm:px-6 lg:px-8">
+        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(100deg,rgba(190,242,100,0.18),transparent_30%,rgba(14,165,233,0.10)_64%,transparent)]" />
+        <div className="relative mx-auto max-w-7xl space-y-5">
           {(notice || error) && (
             <div
               className={`rounded-xl border px-4 py-3 text-sm ${
@@ -555,85 +563,90 @@ export default function ChatbotsPage() {
             />
           </section>
 
-          <section className="rounded-2xl border border-slate-200 bg-white p-4">
-            <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h2 className="font-[var(--font-outfit)] text-lg font-semibold text-[#0a1b33]">
-                  Folders
-                </h2>
-                <p className="text-sm text-slate-500">
-                  Keep campaign bots, support bots, and qualification bots
-                  separated.
-                </p>
+          <section className="relative overflow-hidden rounded-[28px] border border-white/70 bg-white/55 p-5 shadow-[0_28px_90px_-56px_rgba(15,23,42,0.48)] ring-1 ring-emerald-100/80 backdrop-blur-2xl">
+            <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.82),rgba(236,253,245,0.38)_46%,rgba(219,234,254,0.34))]" />
+            <div className="relative">
+              <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="font-[var(--font-outfit)] text-lg font-semibold text-[#0a1b33]">
+                    Folders
+                  </h2>
+                  <p className="text-sm text-slate-500">
+                    Keep campaign bots, support bots, and qualification bots
+                    separated.
+                  </p>
+                </div>
+                {selectedFolder && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedFolderId("")}
+                    className="text-sm font-medium text-violet-600"
+                  >
+                    Show all bots
+                  </button>
+                )}
               </div>
-              {selectedFolder && (
-                <button
-                  type="button"
-                  onClick={() => setSelectedFolderId("")}
-                  className="text-sm font-medium text-violet-600"
-                >
-                  Show all bots
-                </button>
+
+              {studio === undefined ? (
+                <div className="grid gap-3 md:grid-cols-3">
+                  {[0, 1, 2].map((item) => (
+                    <div
+                      key={item}
+                      className="h-20 animate-pulse rounded-xl border border-slate-100 bg-slate-50"
+                    />
+                  ))}
+                </div>
+              ) : folders.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-slate-200 p-6 text-center">
+                  <FolderPlus size={24} className="mx-auto text-slate-300" />
+                  <p className="mt-3 text-sm font-semibold text-[#0a1b33]">
+                    No folders yet
+                  </p>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Create a folder for campaigns, support, or CTWA lead flows.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid gap-3 md:grid-cols-3">
+                  {folders.map((folder) => {
+                    const active = selectedFolderId === folder._id;
+                    return (
+                      <button
+                        key={folder._id}
+                        type="button"
+                        onClick={() => setSelectedFolderId(folder._id)}
+                        className={`relative flex min-h-24 items-center gap-3 overflow-hidden rounded-2xl border px-4 py-3 text-left shadow-[0_20px_60px_-48px_rgba(15,23,42,0.7)] backdrop-blur-xl transition-all ${
+                          active
+                            ? "border-lime-300/80 bg-lime-100/60 ring-1 ring-lime-200/70"
+                            : "border-white/70 bg-white/46 hover:border-lime-200/80 hover:bg-white/66 hover:shadow-[0_24px_70px_-46px_rgba(22,101,52,0.55)]"
+                        }`}
+                      >
+                        <span className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.7),rgba(190,242,100,0.18)_52%,rgba(14,165,233,0.12))]" />
+                        <span className="relative flex h-10 w-10 items-center justify-center rounded-2xl border border-white/60 bg-white/55 text-emerald-700 shadow-inner">
+                          <FolderPlus size={17} />
+                        </span>
+                        <span className="relative min-w-0 flex-1">
+                          <span className="block truncate text-sm font-semibold text-[#0a1b33]">
+                            {folder.name}
+                          </span>
+                          <span className="mt-0.5 block text-xs text-slate-500">
+                            {folder.botCount} bot
+                            {folder.botCount === 1 ? "" : "s"}
+                          </span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
               )}
             </div>
-
-            {studio === undefined ? (
-              <div className="grid gap-3 md:grid-cols-3">
-                {[0, 1, 2].map((item) => (
-                  <div
-                    key={item}
-                    className="h-20 animate-pulse rounded-xl border border-slate-100 bg-slate-50"
-                  />
-                ))}
-              </div>
-            ) : folders.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-slate-200 p-6 text-center">
-                <FolderPlus size={24} className="mx-auto text-slate-300" />
-                <p className="mt-3 text-sm font-semibold text-[#0a1b33]">
-                  No folders yet
-                </p>
-                <p className="mt-1 text-sm text-slate-500">
-                  Create a folder for campaigns, support, or CTWA lead flows.
-                </p>
-              </div>
-            ) : (
-              <div className="grid gap-3 md:grid-cols-3">
-                {folders.map((folder) => {
-                  const active = selectedFolderId === folder._id;
-                  return (
-                    <button
-                      key={folder._id}
-                      type="button"
-                      onClick={() => setSelectedFolderId(folder._id)}
-                      className={`flex min-h-20 items-center gap-3 rounded-xl border px-4 py-3 text-left transition-all ${
-                        active
-                          ? "border-violet-200 bg-violet-50"
-                          : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
-                      }`}
-                    >
-                      <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
-                        <FolderPlus size={17} />
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-semibold text-[#0a1b33]">
-                          {folder.name}
-                        </span>
-                        <span className="mt-0.5 block text-xs text-slate-500">
-                          {folder.botCount} bot{folder.botCount === 1 ? "" : "s"}
-                        </span>
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
           </section>
 
           <div className="grid gap-5 xl:grid-cols-[380px_1fr]">
             <aside className="space-y-5">
               <section
                 id="create-folder"
-                className="scroll-mt-24 rounded-2xl border border-slate-200 bg-white p-5"
+                className="scroll-mt-24 rounded-[24px] border border-white/70 bg-white/58 p-5 shadow-[0_24px_70px_-54px_rgba(15,23,42,0.55)] ring-1 ring-white/70 backdrop-blur-2xl"
               >
                 <PanelTitle
                   icon={FolderPlus}
@@ -659,7 +672,7 @@ export default function ChatbotsPage() {
 
               <section
                 id="create-bot"
-                className="scroll-mt-24 rounded-2xl border border-slate-200 bg-white p-5"
+                className="scroll-mt-24 rounded-[24px] border border-white/70 bg-white/58 p-5 shadow-[0_24px_70px_-54px_rgba(15,23,42,0.55)] ring-1 ring-white/70 backdrop-blur-2xl"
               >
                 <PanelTitle
                   icon={Bot}
@@ -726,7 +739,7 @@ export default function ChatbotsPage() {
               </section>
             </aside>
 
-            <section className="rounded-2xl border border-slate-200 bg-white">
+            <section className="overflow-hidden rounded-[28px] border border-white/70 bg-white/58 shadow-[0_28px_90px_-56px_rgba(15,23,42,0.5)] ring-1 ring-white/70 backdrop-blur-2xl">
               <div className="flex flex-col gap-2 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h2 className="font-[var(--font-outfit)] text-lg font-semibold text-[#0a1b33]">
@@ -761,77 +774,92 @@ export default function ChatbotsPage() {
                   {visibleBots.map((bot) => (
                     <article
                       key={bot._id}
-                      className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_18px_60px_-44px_rgba(15,23,42,0.45)]"
+                      className="relative overflow-hidden rounded-[24px] border border-white/70 bg-white/58 p-5 shadow-[0_22px_70px_-52px_rgba(15,23,42,0.65)] backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:bg-white/72 hover:shadow-[0_28px_90px_-54px_rgba(22,101,52,0.45)]"
                     >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex min-w-0 gap-3">
-                          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-violet-50 text-violet-600">
-                            <Bot size={19} />
-                          </span>
-                          <div className="min-w-0">
-                            <h3 className="truncate text-base font-semibold text-[#0a1b33]">
-                              {bot.name}
-                            </h3>
-                            <p className="mt-1 text-sm leading-6 text-slate-500">
-                              {bot.description ??
-                                "No description yet. Add a purpose before activation."}
-                            </p>
+                      <span className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.72),rgba(236,253,245,0.22)_50%,rgba(219,234,254,0.18))]" />
+                      <div className="relative">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex min-w-0 gap-3">
+                            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/70 bg-white/62 text-emerald-700 shadow-inner">
+                              <Bot size={19} />
+                            </span>
+                            <div className="min-w-0">
+                              <h3 className="truncate text-base font-semibold text-[#0a1b33]">
+                                {bot.name}
+                              </h3>
+                              <p className="mt-1 text-sm leading-6 text-slate-500">
+                                {bot.description ??
+                                  "No description yet. Add a purpose before activation."}
+                              </p>
+                            </div>
                           </div>
+                          <span
+                            className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold capitalize ${STATUS_STYLES[bot.status]}`}
+                          >
+                            {bot.status}
+                          </span>
                         </div>
-                        <span
-                          className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold capitalize ${STATUS_STYLES[bot.status]}`}
-                        >
-                          {bot.status}
-                        </span>
-                      </div>
 
-                      <div className="mt-5 grid gap-2 sm:grid-cols-3">
-                        <BotMeta icon={Zap} label="Trigger" value={TRIGGER_COPY[bot.triggerKind]} />
-                        <BotMeta icon={BrainCircuit} label="Model" value={bot.model ?? "CXCast guardrail bot"} />
-                        <BotMeta icon={Radio} label="Updated" value={relativeTime(bot.updatedAt)} />
-                      </div>
+                        <div className="mt-5 grid gap-2 sm:grid-cols-3">
+                          <BotMeta
+                            icon={Zap}
+                            label="Trigger"
+                            value={TRIGGER_COPY[bot.triggerKind]}
+                          />
+                          <BotMeta
+                            icon={BrainCircuit}
+                            label="Model"
+                            value={bot.model ?? "CXCast guardrail bot"}
+                          />
+                          <BotMeta
+                            icon={Radio}
+                            label="Updated"
+                            value={relativeTime(bot.updatedAt)}
+                          />
+                        </div>
 
-                      <div className="mt-5 flex flex-wrap gap-2 border-t border-slate-100 pt-4">
-                        {bot.status !== "active" && (
-                          <button
-                            type="button"
-                            onClick={() => setBotStatus(bot._id, "active")}
-                            disabled={busy !== null}
-                            className="inline-flex h-9 items-center gap-2 rounded-lg bg-emerald-600 px-3 text-sm font-medium text-white transition-colors hover:bg-emerald-700 disabled:opacity-50"
-                          >
-                            {busy === `status:${bot._id}` ? (
-                              <Loader2 size={14} className="animate-spin" />
-                            ) : (
-                              <CheckCircle2 size={14} />
-                            )}
-                            Activate
-                          </button>
-                        )}
-                        {bot.status === "active" && (
-                          <button
-                            type="button"
-                            onClick={() => setBotStatus(bot._id, "paused")}
-                            disabled={busy !== null}
-                            className="inline-flex h-9 items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 text-sm font-medium text-amber-700 transition-colors hover:bg-amber-100 disabled:opacity-50"
-                          >
-                            {busy === `status:${bot._id}` ? (
-                              <Loader2 size={14} className="animate-spin" />
-                            ) : (
-                              <PauseCircle size={14} />
-                            )}
-                            Pause
-                          </button>
-                        )}
-                        {bot.status !== "draft" && (
-                          <button
-                            type="button"
-                            onClick={() => setBotStatus(bot._id, "draft")}
-                            disabled={busy !== null}
-                            className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-[#0a1b33] transition-colors hover:border-slate-300 disabled:opacity-50"
-                          >
-                            Move to draft
-                          </button>
-                        )}
+                        <div className="mt-5 flex flex-wrap gap-2 border-t border-slate-100 pt-4">
+                          {bot.status !== "active" && (
+                            <button
+                              type="button"
+                              onClick={() => setBotStatus(bot._id, "active")}
+                              disabled={busy !== null}
+                              className="inline-flex h-9 items-center gap-2 rounded-lg bg-emerald-600 px-3 text-sm font-medium text-white transition-colors hover:bg-emerald-700 disabled:opacity-50"
+                            >
+                              {busy === `status:${bot._id}` ? (
+                                <Loader2 size={14} className="animate-spin" />
+                              ) : (
+                                <CheckCircle2 size={14} />
+                              )}
+                              Activate
+                            </button>
+                          )}
+                          {bot.status === "active" && (
+                            <button
+                              type="button"
+                              onClick={() => setBotStatus(bot._id, "paused")}
+                              disabled={busy !== null}
+                              className="inline-flex h-9 items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 text-sm font-medium text-amber-700 transition-colors hover:bg-amber-100 disabled:opacity-50"
+                            >
+                              {busy === `status:${bot._id}` ? (
+                                <Loader2 size={14} className="animate-spin" />
+                              ) : (
+                                <PauseCircle size={14} />
+                              )}
+                              Pause
+                            </button>
+                          )}
+                          {bot.status !== "draft" && (
+                            <button
+                              type="button"
+                              onClick={() => setBotStatus(bot._id, "draft")}
+                              disabled={busy !== null}
+                              className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-[#0a1b33] transition-colors hover:border-slate-300 disabled:opacity-50"
+                            >
+                              Move to draft
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </article>
                   ))}
@@ -911,6 +939,16 @@ const STEP_CATALOG: Array<{
 ];
 
 const FLOW_CANVAS_NODE_TYPES = { flowStep: FlowCanvasStepNode };
+const FLOW_CANVAS_EDGE_TYPES = { whatsappCurve: WhatsAppCurveEdge };
+const FLOW_DEFAULT_EDGE_OPTIONS = {
+  type: "whatsappCurve",
+  markerEnd: { type: MarkerType.ArrowClosed },
+};
+const FLOW_LAYOUT_X_STEP = 430;
+const FLOW_LAYOUT_BASE_Y = 220;
+const FLOW_LAYOUT_BRANCH_GAP = 206;
+const FLOW_LAYOUT_SWAY = [0, -64, 64, -30, 96, -88, 38];
+const FLOW_DEFAULT_VIEWPORT = { x: 44, y: 94, zoom: 0.64 };
 
 function FlowBuilder({
   bots,
@@ -969,8 +1007,14 @@ function FlowBuilder({
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [testMode, setTestMode] = useState(true);
   const [templateMenuOpen, setTemplateMenuOpen] = useState(false);
+  const [drawerMode, setDrawerMode] = useState<"edit" | "preview" | null>(
+    "edit",
+  );
   const [canvasNodes, setCanvasNodes, onCanvasNodesChange] =
     useNodesState<FlowCanvasNode>([]);
+  const flowNodeTypes = useMemo(() => FLOW_CANVAS_NODE_TYPES, []);
+  const flowEdgeTypes = useMemo(() => FLOW_CANVAS_EDGE_TYPES, []);
+  const flowDefaultEdgeOptions = useMemo(() => FLOW_DEFAULT_EDGE_OPTIONS, []);
 
   useEffect(() => {
     if (nodes.length === 0) {
@@ -981,13 +1025,19 @@ function FlowBuilder({
       entryNodeKey && nodes.some((node) => node.key === entryNodeKey)
         ? entryNodeKey
         : nodes[0].key;
-    if (!selectedNodeKey || !nodes.some((node) => node.key === selectedNodeKey)) {
+    if (
+      !selectedNodeKey ||
+      !nodes.some((node) => node.key === selectedNodeKey)
+    ) {
       setSelectedNodeKey(preferredKey);
     }
   }, [entryNodeKey, nodes, selectedNodeKey]);
 
-  const selectedNodeIndex = nodes.findIndex((node) => node.key === selectedNodeKey);
-  const selectedNode = selectedNodeIndex >= 0 ? nodes[selectedNodeIndex] : undefined;
+  const selectedNodeIndex = nodes.findIndex(
+    (node) => node.key === selectedNodeKey,
+  );
+  const selectedNode =
+    selectedNodeIndex >= 0 ? nodes[selectedNodeIndex] : undefined;
   const issuesByNode = useMemo(() => groupIssuesByNode(issues), [issues]);
   const canvasEdges = useMemo(() => buildFlowEdges(nodes), [nodes]);
   const derivedCanvasNodes = useMemo<FlowCanvasNode[]>(() => {
@@ -997,8 +1047,7 @@ function FlowBuilder({
       return {
         id: node.key,
         type: "flowStep",
-        position:
-          node.position ??
+        position: node.position ??
           autoPositions.get(node.key) ?? {
             x: 80 + (index % 3) * 320,
             y: 90 + Math.floor(index / 3) * 190,
@@ -1019,7 +1068,11 @@ function FlowBuilder({
   }, [derivedCanvasNodes, setCanvasNodes]);
 
   const patchConnection = useCallback(
-    (sourceKey: string, sourceHandle: string | null | undefined, targetKey?: string) => {
+    (
+      sourceKey: string,
+      sourceHandle: string | null | undefined,
+      targetKey?: string,
+    ) => {
       const sourceIndex = nodes.findIndex((node) => node.key === sourceKey);
       const sourceNode = nodes[sourceIndex];
       if (!sourceNode) return;
@@ -1050,7 +1103,10 @@ function FlowBuilder({
         return;
       }
 
-      if (sourceHandle === "condition:true" || sourceHandle === "condition:false") {
+      if (
+        sourceHandle === "condition:true" ||
+        sourceHandle === "condition:false"
+      ) {
         const current = defaultCondition(sourceNode.condition);
         onUpdateNode(sourceIndex, {
           condition:
@@ -1067,7 +1123,11 @@ function FlowBuilder({
     (connection: Connection) => {
       if (!connection.source || !connection.target) return;
       if (connection.source === connection.target) return;
-      patchConnection(connection.source, connection.sourceHandle, connection.target);
+      patchConnection(
+        connection.source,
+        connection.sourceHandle,
+        connection.target,
+      );
     },
     [patchConnection],
   );
@@ -1100,6 +1160,7 @@ function FlowBuilder({
       const position = nextNodePosition(nodes, selectedNode);
       const key = onAddNode(type, position);
       setSelectedNodeKey(key);
+      setDrawerMode("edit");
       setPaletteOpen(false);
     },
     [nodes, onAddNode, selectedNode],
@@ -1107,323 +1168,513 @@ function FlowBuilder({
 
   if (!selectedBot) {
     return (
-      <section className="rounded-lg border border-dashed border-slate-200 bg-white p-10 text-center">
-        <Workflow size={32} className="mx-auto text-slate-300" />
-        <h2 className="mt-3 font-[var(--font-outfit)] text-xl font-semibold text-[#0a1b33]">
-          Create a bot to open the flow builder
-        </h2>
-        <p className="mt-1 text-sm text-slate-500">
-          Use a starter flow, then edit the nodes before activation.
-        </p>
-        <button
-          type="button"
-          onClick={onOpenBots}
-          className="mt-5 inline-flex h-10 items-center gap-2 rounded-lg bg-[#0a152d] px-4 text-sm font-semibold text-white hover:bg-[#0a1b33]"
-        >
-          <Plus size={15} />
-          Create bot
-        </button>
-      </section>
+      <main className="flex min-h-screen flex-col overflow-hidden bg-[#eef6ef] lg:h-screen">
+        <header className="flex h-14 shrink-0 items-center justify-between border-b border-white/80 bg-white/82 px-5 shadow-[0_18px_54px_-48px_rgba(15,23,42,0.7)] backdrop-blur-2xl">
+          <div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+              Automations
+            </div>
+            <h1 className="text-sm font-semibold text-[#0a1b33]">
+              Flow Builder
+            </h1>
+          </div>
+          <button
+            type="button"
+            onClick={onOpenBots}
+            className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#0a152d] px-4 text-sm font-semibold text-white shadow-[0_18px_44px_-24px_rgba(15,23,42,0.8)] hover:bg-[#0a1b33]"
+          >
+            <Plus size={15} />
+            Create bot
+          </button>
+        </header>
+        <section className="flow-builder-canvas grid flex-1 place-items-center px-4 py-8">
+          <div className="max-w-md rounded-[22px] border border-white/80 bg-white/78 p-8 text-center shadow-[0_28px_90px_-52px_rgba(15,23,42,0.72)] ring-1 ring-white/70 backdrop-blur-2xl">
+            <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#0a152d] text-white shadow-inner">
+              <Workflow size={21} />
+            </span>
+            <h2 className="mt-4 font-[var(--font-outfit)] text-xl font-semibold text-[#0a1b33]">
+              Create a bot to open the canvas
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-slate-500">
+              Pick a starter flow, then tune the blocks, branches, and WhatsApp
+              preview in one workbench.
+            </p>
+            <button
+              type="button"
+              onClick={onOpenBots}
+              className="mt-6 inline-flex h-10 items-center gap-2 rounded-lg bg-[#0a152d] px-4 text-sm font-semibold text-white hover:bg-[#0a1b33]"
+            >
+              <Plus size={15} />
+              Create bot
+            </button>
+          </div>
+        </section>
+      </main>
     );
   }
 
   return (
-    <main className="space-y-4">
-      <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-[0_24px_80px_-64px_rgba(15,23,42,0.8)]">
-        <div className="flex flex-col gap-3 border-b border-slate-200 bg-white px-4 py-3 xl:flex-row xl:items-center xl:justify-between">
-          <div className="flex min-w-0 flex-wrap items-center gap-3">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#0a152d] text-white">
-              <Workflow size={17} />
-            </span>
-            <div className="min-w-[220px] flex-1">
-              <select
-                value={selectedBotId || selectedBot._id}
-                onChange={(event) =>
-                  onSelectBot(event.target.value as Id<"chatbots">)
-                }
-                className="h-9 max-w-full rounded-md border border-slate-200 bg-white px-2 text-sm font-semibold text-[#0a1b33] outline-none focus:border-slate-400"
-                aria-label="Select bot"
-              >
-                {bots.map((bot) => (
-                  <option key={bot._id} value={bot._id}>
-                    {bot.name}
-                  </option>
-                ))}
-              </select>
-              <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                <span>{TRIGGER_COPY[triggerKind]}</span>
-                <span className="h-1 w-1 rounded-full bg-slate-300" />
-                <span>{nodes.length} blocks</span>
-                <span className="h-1 w-1 rounded-full bg-slate-300" />
-                <span>{runsLoading ? "Runs loading" : `${runs.length} runs`}</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={onOpenBots}
-              className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-sm font-semibold text-[#0a1b33] hover:bg-slate-50"
-            >
-              <Bot size={15} />
-              Bot Library
-            </button>
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setTemplateMenuOpen((open) => !open)}
-                disabled={busy !== null}
-                className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-sm font-semibold text-[#0a1b33] hover:bg-slate-50 disabled:opacity-50"
-              >
-                <CopyPlus size={15} />
-                Templates
-              </button>
-              {templateMenuOpen && (
-                <div className="absolute right-0 top-11 z-30 w-80 rounded-lg border border-slate-200 bg-white p-2 shadow-[0_20px_60px_-28px_rgba(15,23,42,0.6)]">
-                  {templates.map((template) => (
-                    <button
-                      key={template.slug}
-                      type="button"
-                      onClick={() => {
-                        onApplyTemplate(template.slug);
-                        setTemplateMenuOpen(false);
-                      }}
-                      disabled={busy !== null}
-                      className="block w-full rounded-md px-3 py-2 text-left hover:bg-slate-50 disabled:opacity-50"
-                    >
-                      <span className="block text-sm font-semibold text-[#0a1b33]">
-                        {template.name}
-                      </span>
-                      <span className="mt-0.5 block text-xs leading-5 text-slate-500">
-                        {template.description}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setTestMode((enabled) => !enabled)}
-              className={`inline-flex h-9 items-center gap-2 rounded-md px-3 text-sm font-semibold transition-colors ${
-                testMode
-                  ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"
-                  : "bg-white text-[#0a1b33] ring-1 ring-slate-200"
-              }`}
-            >
-              <PlayCircle size={15} />
-              Test Bot
-            </button>
-
-            <span
-              className={`inline-flex h-9 items-center gap-2 rounded-md px-3 text-xs font-semibold ${
-                errors.length > 0
-                  ? "bg-red-50 text-red-700 ring-1 ring-red-200"
-                  : warnings.length > 0
-                    ? "bg-amber-50 text-amber-700 ring-1 ring-amber-200"
-                    : "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"
-              }`}
-            >
-              {errors.length > 0 ? (
-                <AlertTriangle size={14} />
-              ) : (
-                <CheckCircle2 size={14} />
-              )}
-              {errors.length > 0
-                ? `${errors.length} blockers`
-                : warnings.length > 0
-                  ? `${warnings.length} warnings`
-                  : "Valid"}
-            </span>
-
-            <button
-              type="button"
-              onClick={onSave}
-              disabled={busy !== null}
-              className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-sm font-semibold text-[#0a1b33] hover:bg-slate-50 disabled:opacity-50"
-            >
-              {busy === "flow" ? (
-                <Loader2 size={15} className="animate-spin" />
-              ) : (
-                <Save size={15} />
-              )}
-              Save
-            </button>
-            <button
-              type="button"
-              onClick={onPublish}
-              disabled={busy !== null}
-              className="inline-flex h-9 items-center gap-2 rounded-md bg-emerald-600 px-3 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
-            >
-              {busy === "publish" ? (
-                <Loader2 size={15} className="animate-spin" />
-              ) : (
-                <CheckCircle2 size={15} />
-              )}
-              Validate & Publish
-            </button>
-          </div>
+    <main className="flex min-h-screen flex-col overflow-hidden bg-[#eef6ef] lg:h-screen">
+      <header className="flex h-14 shrink-0 items-center justify-between border-b border-white/80 bg-white/82 px-4 shadow-[0_18px_54px_-48px_rgba(15,23,42,0.7)] backdrop-blur-2xl">
+        <div className="flex min-w-0 items-center gap-2 text-xs text-slate-500">
+          <span className="font-medium text-slate-500">Automations</span>
+          <ArrowRight size={12} className="text-slate-300" />
+          <select
+            value={selectedBotId || selectedBot._id}
+            onChange={(event) =>
+              onSelectBot(event.target.value as Id<"chatbots">)
+            }
+            className="h-8 max-w-[260px] truncate rounded-md border border-transparent bg-transparent px-1 text-sm font-semibold text-[#0a1b33] outline-none hover:border-white/80 hover:bg-white/60"
+            aria-label="Select bot"
+          >
+            {bots.map((bot) => (
+              <option key={bot._id} value={bot._id}>
+                {bot.name}
+              </option>
+            ))}
+          </select>
+          <span className="hidden h-1 w-1 rounded-full bg-slate-300 sm:inline-block" />
+          <span className="hidden whitespace-nowrap sm:inline">
+            {nodes.length} blocks
+          </span>
+          <span className="hidden h-1 w-1 rounded-full bg-slate-300 sm:inline-block" />
+          <span className="hidden whitespace-nowrap sm:inline">
+            {runsLoading ? "Runs loading" : `${runs.length} runs`}
+          </span>
         </div>
 
-        <div className="grid min-h-[760px] bg-[#eef3f8] xl:grid-cols-[minmax(0,1fr)_320px_330px]">
-          <section className="relative min-h-[620px] min-w-0 border-b border-slate-200 bg-[#f7fafc] xl:border-b-0 xl:border-r">
-            <div className="absolute left-4 top-4 z-20 flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setPaletteOpen((open) => !open)}
-                className="inline-flex h-10 items-center gap-2 rounded-md bg-[#0a152d] px-3 text-sm font-semibold text-white shadow-[0_14px_40px_-22px_rgba(15,23,42,0.9)] hover:bg-[#0a1b33]"
-              >
-                <Plus size={16} />
-                Add step
-              </button>
-              {nodes.length === 0 && (
-                <span className="rounded-md bg-white/90 px-3 py-2 text-xs font-medium text-slate-500 ring-1 ring-slate-200">
-                  Start by adding one block.
-                </span>
-              )}
-            </div>
-
-            {paletteOpen && (
-              <div className="absolute left-4 top-16 z-30 w-[330px] rounded-lg border border-slate-200 bg-white p-2 shadow-[0_24px_90px_-40px_rgba(15,23,42,0.75)]">
-                <div className="flex items-center justify-between px-2 py-1">
-                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
-                    Add step
-                  </span>
+        <div className="flex items-center gap-2">
+          <span className="hidden items-center gap-1.5 text-xs font-medium text-slate-500 sm:inline-flex">
+            <CheckCircle2 size={13} className="text-slate-400" />
+            Saved
+          </span>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setTemplateMenuOpen((open) => !open)}
+              disabled={busy !== null}
+              className="hidden h-8 items-center gap-2 rounded-md border border-white/80 bg-white/68 px-3 text-sm font-semibold text-[#0a1b33] shadow-sm backdrop-blur-xl hover:bg-white/88 disabled:opacity-50 md:inline-flex"
+            >
+              <CopyPlus size={15} />
+              Templates
+            </button>
+            {templateMenuOpen && (
+              <div className="absolute right-0 top-11 z-30 w-80 rounded-2xl border border-white/80 bg-white/76 p-2 shadow-[0_26px_80px_-34px_rgba(15,23,42,0.62)] ring-1 ring-white/70 backdrop-blur-2xl">
+                {templates.map((template) => (
                   <button
+                    key={template.slug}
                     type="button"
-                    onClick={() => setPaletteOpen(false)}
-                    className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-slate-50 hover:text-[#0a1b33]"
-                    aria-label="Close add step palette"
+                    onClick={() => {
+                      onApplyTemplate(template.slug);
+                      setTemplateMenuOpen(false);
+                    }}
+                    disabled={busy !== null}
+                    className="block w-full rounded-xl px-3 py-2 text-left hover:bg-white/72 disabled:opacity-50"
                   >
-                    <X size={14} />
+                    <span className="block text-sm font-semibold text-[#0a1b33]">
+                      {template.name}
+                    </span>
+                    <span className="mt-0.5 block text-xs leading-5 text-slate-500">
+                      {template.description}
+                    </span>
                   </button>
-                </div>
-                <div className="mt-1 grid gap-1">
-                  {STEP_CATALOG.map((step) => {
-                    const Icon = step.icon;
-                    return (
-                      <button
-                        key={step.type}
-                        type="button"
-                        onClick={() => handleAddStep(step.type)}
-                        className="flex items-start gap-3 rounded-md px-3 py-2 text-left hover:bg-slate-50"
-                      >
-                        <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-emerald-50 text-emerald-700">
-                          <Icon size={15} />
-                        </span>
-                        <span className="min-w-0">
-                          <span className="block text-sm font-semibold text-[#0a1b33]">
-                            {step.label}
-                          </span>
-                          <span className="mt-0.5 block text-xs leading-5 text-slate-500">
-                            {step.detail}
-                          </span>
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
+                ))}
               </div>
             )}
+          </div>
 
-            <ReactFlow
-              nodes={canvasNodes}
-              edges={canvasEdges}
-              nodeTypes={FLOW_CANVAS_NODE_TYPES}
-              onNodesChange={onCanvasNodesChange}
-              onNodeClick={(_event, node) => setSelectedNodeKey(node.id)}
-              onNodeDragStop={handleNodeDragStop}
-              onConnect={handleConnect}
-              onEdgesDelete={handleEdgesDelete}
-              defaultViewport={{ x: 36, y: 172, zoom: 0.72 }}
-              minZoom={0.18}
-              maxZoom={1.35}
-              defaultEdgeOptions={{
-                type: "smoothstep",
-                markerEnd: { type: MarkerType.ArrowClosed },
-              }}
-              proOptions={{ hideAttribution: true }}
-              className="flow-builder-canvas"
-            >
-              <Background
-                variant={BackgroundVariant.Dots}
-                gap={22}
-                size={1}
-                color="#cbd5e1"
-              />
-              <Controls
-                position="bottom-left"
-                showInteractive={false}
-                className="rounded-md border border-slate-200 bg-white shadow-sm"
-              />
-              <MiniMap
-                position="bottom-right"
-                pannable
-                zoomable
-                nodeColor={(node) =>
-                  (node.data as FlowCanvasNodeData).hasError
-                    ? "#ef4444"
-                    : (node.data as FlowCanvasNodeData).isEntry
-                      ? "#10b981"
-                      : "#64748b"
-                }
-                maskColor="rgba(241,245,249,0.72)"
-                className="hidden rounded-md border border-slate-200 bg-white shadow-sm lg:block"
-              />
-            </ReactFlow>
-          </section>
-
-          <FlowInspectorPanel
-            selectedNode={selectedNode}
-            nodes={nodes}
-            issues={selectedNode ? issuesByNode.get(selectedNode.key) ?? [] : []}
-            triggerKind={triggerKind}
-            onTriggerKindChange={onTriggerKindChange}
-            keywords={keywords}
-            onKeywordsChange={onKeywordsChange}
-            entryNodeKey={entryNodeKey}
-            onEntryNodeKeyChange={onEntryNodeKeyChange}
-            onUpdate={(patch) => {
-              if (selectedNodeIndex < 0) return;
-              onUpdateNode(selectedNodeIndex, patch);
-              if (patch.key) setSelectedNodeKey(patch.key);
+          <button
+            type="button"
+            onClick={() => {
+              setTestMode(true);
+              setDrawerMode("preview");
             }}
-            onRemove={() => {
-              if (selectedNodeIndex < 0) return;
-              onRemoveNode(selectedNodeIndex);
-              const nextNode =
-                nodes[selectedNodeIndex + 1] ?? nodes[selectedNodeIndex - 1];
-              setSelectedNodeKey(nextNode?.key ?? "");
-            }}
-          />
+            className="inline-flex h-8 items-center gap-2 rounded-md border border-blue-100/90 bg-white/70 px-3 text-sm font-semibold text-blue-600 shadow-sm backdrop-blur-xl hover:bg-blue-50/82"
+          >
+            <PlayCircle size={15} />
+            Preview
+          </button>
 
-          <WhatsAppFlowPreview
-            nodes={nodes}
-            entryNodeKey={entryNodeKey}
-            selectedNodeKey={selectedNodeKey}
-            botName={selectedBot.name}
-            triggerKind={triggerKind}
-            keywords={keywords}
-            testMode={testMode}
-          />
+          <span
+            className={`hidden h-8 items-center gap-2 rounded-md px-3 text-xs font-semibold md:inline-flex ${
+              errors.length > 0
+                ? "bg-red-50 text-red-700 ring-1 ring-red-200"
+                : warnings.length > 0
+                  ? "bg-amber-50 text-amber-700 ring-1 ring-amber-200"
+                  : "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"
+            }`}
+          >
+            {errors.length > 0 ? (
+              <AlertTriangle size={14} />
+            ) : (
+              <CheckCircle2 size={14} />
+            )}
+            {errors.length > 0
+              ? `${errors.length} blockers`
+              : warnings.length > 0
+                ? `${warnings.length} warnings`
+                : "Valid"}
+          </span>
+
+          <button
+            type="button"
+            onClick={onSave}
+            disabled={busy !== null}
+            className="hidden h-8 items-center gap-2 rounded-md border border-white/80 bg-white/68 px-3 text-sm font-semibold text-[#0a1b33] shadow-sm backdrop-blur-xl hover:bg-white/88 disabled:opacity-50 sm:inline-flex"
+          >
+            {busy === "flow" ? (
+              <Loader2 size={15} className="animate-spin" />
+            ) : (
+              <Save size={15} />
+            )}
+            Save
+          </button>
+          <button
+            type="button"
+            onClick={onPublish}
+            disabled={busy !== null}
+            className="inline-flex h-8 items-center gap-2 rounded-md bg-blue-500 px-4 text-sm font-semibold text-white shadow-[0_16px_38px_-24px_rgba(37,99,235,0.9)] hover:bg-blue-600 disabled:opacity-50"
+          >
+            {busy === "publish" ? (
+              <Loader2 size={15} className="animate-spin" />
+            ) : (
+              <CheckCircle2 size={15} />
+            )}
+            Live
+          </button>
+          <button
+            type="button"
+            onClick={onOpenBots}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-white/80 bg-white/68 text-slate-500 shadow-sm backdrop-blur-xl hover:bg-white/88"
+            aria-label="Open bot library"
+          >
+            <Bot size={15} />
+          </button>
         </div>
-      </section>
+      </header>
 
-      <FlowValidationPanel
-        issues={issues}
-        errors={errors}
-        warnings={warnings}
-      />
+      <div className="min-h-0 flex-1 bg-[linear-gradient(145deg,#ecf8ee_0%,#f7fbf8_45%,#e7f5ee_100%)] p-3">
+        <section className="grid h-full min-h-[680px] min-w-0 overflow-hidden rounded-[24px] border border-white/80 bg-white/36 shadow-[0_30px_90px_-58px_rgba(15,23,42,0.72)] ring-1 ring-white/70 backdrop-blur-2xl lg:grid-cols-[minmax(0,1fr)_392px]">
+          <div className="relative min-h-[680px] min-w-0 overflow-hidden">
+          {selectedNode && drawerMode === null && (
+            <button
+              type="button"
+              onClick={() => setDrawerMode("edit")}
+              className="absolute left-1/2 top-3 z-20 inline-flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/80 bg-white/72 px-3 py-1.5 text-xs font-semibold text-slate-500 shadow-[0_16px_42px_-30px_rgba(15,23,42,0.7)] ring-1 ring-white/70 backdrop-blur-xl hover:text-[#0a1b33] lg:hidden"
+            >
+              Edit step in sidebar
+            </button>
+          )}
+
+          {paletteOpen && (
+            <div className="absolute right-20 top-16 z-30 w-[336px] overflow-hidden rounded-2xl border border-white/78 bg-white/72 shadow-[0_28px_90px_-42px_rgba(15,23,42,0.72)] ring-1 ring-white/70 backdrop-blur-2xl">
+              <div className="flex items-center justify-between px-2 py-1">
+                <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
+                  Add step
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setPaletteOpen(false)}
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-white/72 hover:text-[#0a1b33]"
+                  aria-label="Close add step palette"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+              <div className="grid gap-0.5 p-2">
+                {STEP_CATALOG.map((step) => {
+                  const Icon = step.icon;
+                  return (
+                    <button
+                      key={step.type}
+                      type="button"
+                      onClick={() => handleAddStep(step.type)}
+                      className="flex items-start gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-white/72"
+                    >
+                      <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-emerald-100/80 bg-emerald-50/88 text-emerald-700 shadow-inner">
+                        <Icon size={15} />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-sm font-semibold text-[#0a1b33]">
+                          {step.label}
+                        </span>
+                        <span className="mt-0.5 block text-xs leading-5 text-slate-500">
+                          {step.detail}
+                        </span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          <ReactFlow
+            nodes={canvasNodes}
+            edges={canvasEdges}
+            nodeTypes={flowNodeTypes}
+            edgeTypes={flowEdgeTypes}
+            onNodesChange={onCanvasNodesChange}
+            onNodeClick={(_event, node) => setSelectedNodeKey(node.id)}
+            onNodeDragStop={handleNodeDragStop}
+            onConnect={handleConnect}
+            onEdgesDelete={handleEdgesDelete}
+            defaultViewport={FLOW_DEFAULT_VIEWPORT}
+            minZoom={0.32}
+            maxZoom={1.45}
+            defaultEdgeOptions={flowDefaultEdgeOptions}
+            proOptions={{ hideAttribution: true }}
+            className="flow-builder-canvas"
+          >
+            <Controls
+              position="bottom-left"
+              showInteractive={false}
+              className="rounded-xl border border-white/80 bg-white/72 shadow-[0_18px_50px_-36px_rgba(15,23,42,0.72)] backdrop-blur-xl"
+            />
+            <MiniMap
+              position="bottom-right"
+              pannable
+              zoomable
+              nodeColor={(node) =>
+                (node.data as FlowCanvasNodeData).hasError
+                  ? "#ef4444"
+                  : (node.data as FlowCanvasNodeData).isEntry
+                    ? "#10b981"
+                    : "#64748b"
+              }
+              maskColor="rgba(236,253,245,0.68)"
+              className="hidden rounded-2xl border border-white/80 bg-white/72 shadow-[0_24px_70px_-48px_rgba(15,23,42,0.68)] backdrop-blur-xl lg:block"
+            />
+          </ReactFlow>
+          <div className="absolute right-5 top-5 z-20 flex flex-col gap-3">
+            <button
+              type="button"
+              onClick={() => setPaletteOpen((open) => !open)}
+              className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-blue-500 text-white shadow-[0_22px_48px_-22px_rgba(37,99,235,0.9)] ring-1 ring-white/60 transition-colors hover:bg-blue-600"
+              aria-label="Add step"
+            >
+              <Plus size={25} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setDrawerMode("edit")}
+              disabled={!selectedNode}
+              className={`inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/80 bg-white/72 text-slate-500 shadow-[0_16px_42px_-32px_rgba(15,23,42,0.78)] backdrop-blur-xl hover:text-[#0a1b33] disabled:opacity-40 ${
+                drawerMode === "edit" ? "ring-2 ring-[#0a152d]/10" : ""
+              }`}
+              aria-label="Edit selected step"
+            >
+              <Settings2 size={17} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setDrawerMode("preview")}
+              className={`inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/80 bg-white/72 text-slate-500 shadow-[0_16px_42px_-32px_rgba(15,23,42,0.78)] backdrop-blur-xl hover:text-[#0a1b33] ${
+                drawerMode === "preview" ? "ring-2 ring-blue-500/20" : ""
+              }`}
+              aria-label="Open preview"
+            >
+              <Smartphone size={17} />
+            </button>
+          </div>
+          <FlowIssueDock issues={issues} />
+
+          {drawerMode === "edit" && (
+            <div className="absolute bottom-4 right-4 top-4 z-40 w-[380px] overflow-hidden rounded-lg border border-slate-200 bg-white shadow-[0_26px_90px_-42px_rgba(15,23,42,0.9)] lg:hidden">
+              <button
+                type="button"
+                onClick={() => setDrawerMode(null)}
+                className="absolute right-3 top-3 z-10 inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-400 hover:bg-slate-50 hover:text-[#0a1b33]"
+                aria-label="Close editor"
+              >
+                <X size={16} />
+              </button>
+              <FlowInspectorPanel
+                selectedNode={selectedNode}
+                nodes={nodes}
+                issues={
+                  selectedNode ? (issuesByNode.get(selectedNode.key) ?? []) : []
+                }
+                triggerKind={triggerKind}
+                onTriggerKindChange={onTriggerKindChange}
+                keywords={keywords}
+                onKeywordsChange={onKeywordsChange}
+                entryNodeKey={entryNodeKey}
+                onEntryNodeKeyChange={onEntryNodeKeyChange}
+                onUpdate={(patch) => {
+                  if (selectedNodeIndex < 0) return;
+                  onUpdateNode(selectedNodeIndex, patch);
+                  if (patch.key) setSelectedNodeKey(patch.key);
+                }}
+                onRemove={() => {
+                  if (selectedNodeIndex < 0) return;
+                  onRemoveNode(selectedNodeIndex);
+                  const nextNode =
+                    nodes[selectedNodeIndex + 1] ??
+                    nodes[selectedNodeIndex - 1];
+                  setSelectedNodeKey(nextNode?.key ?? "");
+                }}
+              />
+            </div>
+          )}
+
+          {drawerMode === "preview" && (
+            <div className="absolute bottom-4 right-4 top-4 z-40 w-[380px] overflow-y-auto rounded-lg border border-slate-200 bg-[#eef3f8] shadow-[0_26px_90px_-42px_rgba(15,23,42,0.9)] lg:hidden">
+              <button
+                type="button"
+                onClick={() => setDrawerMode(null)}
+                className="absolute right-3 top-3 z-10 inline-flex h-8 w-8 items-center justify-center rounded-md bg-white/90 text-slate-400 hover:bg-white hover:text-[#0a1b33]"
+                aria-label="Close preview"
+              >
+                <X size={16} />
+              </button>
+              <WhatsAppFlowPreview
+                nodes={nodes}
+                entryNodeKey={entryNodeKey}
+                selectedNodeKey={selectedNodeKey}
+                botName={selectedBot.name}
+                triggerKind={triggerKind}
+                keywords={keywords}
+                testMode={testMode}
+              />
+            </div>
+          )}
+          </div>
+
+          <aside className="hidden min-h-0 border-l border-white/80 bg-white/70 backdrop-blur-2xl lg:block">
+            <div className="flex h-12 items-center gap-2 border-b border-slate-100 bg-white/72 px-3">
+              <button
+                type="button"
+                onClick={() => setDrawerMode("edit")}
+                className={`inline-flex h-8 flex-1 items-center justify-center gap-2 rounded-lg text-xs font-semibold transition-colors ${
+                  drawerMode !== "preview"
+                    ? "bg-[#0a152d] text-white"
+                    : "bg-white text-slate-500 ring-1 ring-slate-200 hover:text-[#0a1b33]"
+                }`}
+              >
+                <Settings2 size={14} />
+                Inspector
+              </button>
+              <button
+                type="button"
+                onClick={() => setDrawerMode("preview")}
+                className={`inline-flex h-8 flex-1 items-center justify-center gap-2 rounded-lg text-xs font-semibold transition-colors ${
+                  drawerMode === "preview"
+                    ? "bg-[#0a152d] text-white"
+                    : "bg-white text-slate-500 ring-1 ring-slate-200 hover:text-[#0a1b33]"
+                }`}
+              >
+                <Smartphone size={14} />
+                Preview
+              </button>
+            </div>
+            <div className="h-[calc(100%-48px)] min-h-0 overflow-y-auto">
+              {drawerMode === "preview" ? (
+                <WhatsAppFlowPreview
+                  nodes={nodes}
+                  entryNodeKey={entryNodeKey}
+                  selectedNodeKey={selectedNodeKey}
+                  botName={selectedBot.name}
+                  triggerKind={triggerKind}
+                  keywords={keywords}
+                  testMode={testMode}
+                />
+              ) : (
+                <FlowInspectorPanel
+                  selectedNode={selectedNode}
+                  nodes={nodes}
+                  issues={
+                    selectedNode ? (issuesByNode.get(selectedNode.key) ?? []) : []
+                  }
+                  triggerKind={triggerKind}
+                  onTriggerKindChange={onTriggerKindChange}
+                  keywords={keywords}
+                  onKeywordsChange={onKeywordsChange}
+                  entryNodeKey={entryNodeKey}
+                  onEntryNodeKeyChange={onEntryNodeKeyChange}
+                  onUpdate={(patch) => {
+                    if (selectedNodeIndex < 0) return;
+                    onUpdateNode(selectedNodeIndex, patch);
+                    if (patch.key) setSelectedNodeKey(patch.key);
+                  }}
+                  onRemove={() => {
+                    if (selectedNodeIndex < 0) return;
+                    onRemoveNode(selectedNodeIndex);
+                    const nextNode =
+                      nodes[selectedNodeIndex + 1] ??
+                      nodes[selectedNodeIndex - 1];
+                    setSelectedNodeKey(nextNode?.key ?? "");
+                  }}
+                />
+              )}
+            </div>
+          </aside>
+        </section>
+      </div>
     </main>
   );
 }
 
-function FlowCanvasStepNode({
-  data,
-  selected,
-}: NodeProps<FlowCanvasNode>) {
+function WhatsAppCurveEdge({
+  id,
+  sourceX,
+  sourceY,
+  targetX,
+  targetY,
+  sourcePosition,
+  targetPosition,
+  markerStart,
+  markerEnd,
+  style,
+  label,
+  labelStyle,
+  labelShowBg,
+  labelBgStyle,
+  labelBgPadding,
+  labelBgBorderRadius,
+  interactionWidth,
+}: EdgeProps) {
+  const direction = sourceX <= targetX ? 1 : -1;
+  const distanceX = Math.max(Math.abs(targetX - sourceX), 1);
+  const distanceY = targetY - sourceY;
+  const control =
+    distanceX < 80
+      ? Math.max(4, distanceX * 0.42)
+      : Math.max(72, Math.min(220, distanceX * 0.48));
+  const lift = Math.max(-38, Math.min(38, distanceY * 0.12));
+  const c1x = sourceX + control * direction;
+  const c2x = targetX - control * direction;
+  const c1y = sourceY + lift;
+  const c2y = targetY - lift;
+  const edgePath = `M ${sourceX},${sourceY} C ${c1x},${c1y} ${c2x},${c2y} ${targetX},${targetY}`;
+  const labelX = sourceX + (targetX - sourceX) * 0.52;
+  const labelY = sourceY + distanceY * 0.5 - 14;
+
+  return (
+    <BaseEdge
+      id={id}
+      path={edgePath}
+      markerStart={markerStart}
+      markerEnd={markerEnd}
+      style={{
+        ...style,
+        strokeLinecap: "round",
+        strokeLinejoin: "round",
+      }}
+      label={label}
+      labelX={labelX}
+      labelY={labelY}
+      labelStyle={labelStyle}
+      labelShowBg={labelShowBg}
+      labelBgStyle={labelBgStyle}
+      labelBgPadding={labelBgPadding}
+      labelBgBorderRadius={labelBgBorderRadius}
+      interactionWidth={interactionWidth}
+    />
+  );
+}
+
+function FlowCanvasStepNode({ data, selected }: NodeProps<FlowCanvasNode>) {
   const { flowNode, isEntry, issueCount, hasError } = data;
   const Icon = flowNodeIcon(flowNode.type);
   const outgoingHandles = outgoingHandleLabels(flowNode);
@@ -1437,39 +1688,40 @@ function FlowCanvasStepNode({
 
   return (
     <div
-      className={`min-w-[250px] max-w-[292px] rounded-lg border bg-white shadow-[0_20px_60px_-40px_rgba(15,23,42,0.85)] ${
+      className={`relative w-[268px] overflow-hidden rounded-[18px] border bg-white/82 shadow-[0_22px_62px_-42px_rgba(15,23,42,0.86)] ring-1 ring-white/60 backdrop-blur-xl transition-[box-shadow,border-color,transform] duration-150 ${
         selected
-          ? "border-[#0a152d] ring-2 ring-[#0a152d]/12"
+          ? "border-[#0a152d]/70 shadow-[0_26px_78px_-40px_rgba(15,23,42,0.95)] ring-2 ring-[#0a152d]/10"
           : hasError
-            ? "border-red-200"
-            : "border-slate-200"
+            ? "border-red-200/90"
+            : "border-white/78"
       }`}
     >
+      <span className="pointer-events-none absolute inset-x-0 top-0 h-10 bg-[linear-gradient(180deg,rgba(255,255,255,0.82),rgba(255,255,255,0))]" />
       <Handle
         id="in"
         type="target"
         position={Position.Left}
         className="!h-3 !w-3 !border-2 !border-white !bg-slate-400"
       />
-      <div className="flex items-start gap-3 border-b border-slate-100 px-3 py-3">
+      <div className="relative flex items-start gap-3 border-b border-white/70 px-3 py-2.5">
         <span
-          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-md ${
+          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border shadow-inner ${
             isEntry
-              ? "bg-emerald-50 text-emerald-700"
+              ? "border-emerald-100/90 bg-emerald-50/92 text-emerald-700"
               : hasError
-                ? "bg-red-50 text-red-700"
-                : "bg-slate-100 text-[#0a1b33]"
+                ? "border-red-100/90 bg-red-50/92 text-red-700"
+                : "border-slate-100/90 bg-white/74 text-[#0a1b33]"
           }`}
         >
           <Icon size={16} />
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
-            <span className="truncate text-sm font-semibold text-[#0a1b33]">
+            <span className="truncate text-[13px] font-semibold text-[#0a1b33]">
               {flowNode.title}
             </span>
             {isEntry && (
-              <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-emerald-700">
+              <span className="rounded-full bg-emerald-100/90 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-emerald-700">
                 Entry
               </span>
             )}
@@ -1481,14 +1733,16 @@ function FlowCanvasStepNode({
         {issueCount > 0 && (
           <span
             className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-              hasError ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"
+              hasError
+                ? "bg-red-100 text-red-700"
+                : "bg-amber-100 text-amber-700"
             }`}
           >
             {issueCount}
           </span>
         )}
       </div>
-      <div className="px-3 py-3">
+      <div className="relative px-3 py-2.5">
         {preview ? (
           <p className="line-clamp-3 text-xs leading-5 text-slate-600">
             {preview}
@@ -1497,16 +1751,19 @@ function FlowCanvasStepNode({
           <p className="text-xs text-slate-400">No content yet</p>
         )}
         {flowNode.buttons && flowNode.buttons.length > 0 && (
-          <div className="mt-3 space-y-1.5">
+          <div className="mt-3 overflow-hidden rounded-xl border border-white/70 bg-white/58 shadow-inner">
             {flowNode.buttons.slice(0, 4).map((button) => (
               <div
                 key={button.replyId}
-                className="flex items-center justify-between gap-2 rounded-md bg-slate-50 px-2 py-1.5 text-[11px]"
+                className="flex items-center justify-between gap-2 border-b border-white/70 px-2 py-1.5 text-[11px] last:border-b-0"
               >
-                <span className="truncate font-medium text-[#0a1b33]">
-                  {button.label || button.replyId}
+                <span className="min-w-0 flex items-center gap-1.5">
+                  <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
+                  <span className="truncate font-medium text-[#0a1b33]">
+                    {button.label || button.replyId}
+                  </span>
                 </span>
-                <span className="truncate text-slate-400">
+                <span className="max-w-[92px] truncate text-slate-400">
                   {button.nextKey || "No target"}
                 </span>
               </div>
@@ -1570,14 +1827,16 @@ function FlowInspectorPanel({
 
   return (
     <aside className="min-w-0 border-b border-slate-200 bg-white xl:border-b-0 xl:border-r">
-      <div className="max-h-[760px] overflow-y-auto">
-        <section className="border-b border-slate-100 p-4">
+      <div className="h-full max-h-[780px] overflow-y-auto xl:max-h-none">
+        <section className="border-b border-slate-100 bg-[#fbfdff] p-4">
           <div className="mb-3 flex items-center gap-2">
-            <span className="flex h-8 w-8 items-center justify-center rounded-md bg-slate-100 text-[#0a1b33]">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-[#0a1b33]">
               <Settings2 size={15} />
             </span>
             <div>
-              <h3 className="text-sm font-semibold text-[#0a1b33]">Flow settings</h3>
+              <h3 className="text-sm font-semibold text-[#0a1b33]">
+                Flow settings
+              </h3>
               <p className="text-xs text-slate-500">Trigger and entry path.</p>
             </div>
           </div>
@@ -1627,7 +1886,7 @@ function FlowInspectorPanel({
           <section className="p-4">
             <div className="mb-4 flex items-start justify-between gap-3">
               <div className="flex min-w-0 items-start gap-3">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-[#0a152d] text-white">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#0a152d] text-white">
                   {(() => {
                     const Icon = flowNodeIcon(selectedNode.type);
                     return <Icon size={16} />;
@@ -1646,7 +1905,7 @@ function FlowInspectorPanel({
                 type="button"
                 onClick={onRemove}
                 disabled={selectedNode.type === "start"}
-                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-slate-200 text-slate-400 hover:bg-slate-50 disabled:opacity-40"
+                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-400 transition-colors hover:bg-slate-50 disabled:opacity-40"
                 aria-label={`Remove ${selectedNode.title}`}
               >
                 <Trash2 size={14} />
@@ -1688,7 +1947,9 @@ function FlowInspectorPanel({
                 <SelectBox
                   label="Next node"
                   value={selectedNode.nextKey ?? ""}
-                  onChange={(value) => onUpdate({ nextKey: value || undefined })}
+                  onChange={(value) =>
+                    onUpdate({ nextKey: value || undefined })
+                  }
                   options={targetOptions}
                   placeholder="Stop here"
                 />
@@ -1703,8 +1964,13 @@ function FlowInspectorPanel({
                 <textarea
                   value={selectedNode.body ?? ""}
                   onChange={(event) => onUpdate({ body: event.target.value })}
-                  rows={4}
-                  className="w-full resize-none rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-[#0a1b33] outline-none transition-colors placeholder:text-slate-300 focus:border-slate-400"
+                  rows={
+                    selectedNode.type === "send_buttons" ||
+                    selectedNode.type === "send_list"
+                      ? 3
+                      : 4
+                  }
+                  className="w-full resize-none rounded-lg border border-slate-200 bg-[#f8fafc] px-3 py-2 text-sm text-[#0a1b33] outline-none transition-colors placeholder:text-slate-300 hover:bg-white focus:border-slate-400 focus:bg-white"
                   placeholder="Mensagem enviada ao cliente..."
                 />
               </label>
@@ -1734,133 +2000,15 @@ function FlowInspectorPanel({
 
             {(selectedNode.type === "send_buttons" ||
               selectedNode.type === "send_list") && (
-              <div className="mt-4 rounded-lg border border-slate-100 bg-slate-50 p-3">
-                <div className="mb-3 flex items-center justify-between gap-2">
-                  <span className="text-xs font-semibold text-slate-500">
-                    {selectedNode.type === "send_buttons" ? "Buttons" : "List rows"}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      onUpdate({
-                        buttons: [
-                          ...(selectedNode.buttons ?? []),
-                          {
-                            replyId: `choice_${(selectedNode.buttons ?? []).length + 1}`,
-                            label:
-                              selectedNode.type === "send_buttons"
-                                ? "Option"
-                                : "Row",
-                            nextKey: targetOptions[0]?.value ?? "",
-                          },
-                        ],
-                      })
-                    }
-                    disabled={
-                      (selectedNode.buttons ?? []).length >=
-                      (selectedNode.type === "send_buttons" ? 3 : 10)
-                    }
-                    className="inline-flex h-8 items-center gap-1 rounded-md bg-white px-2 text-xs font-semibold text-[#0a1b33] ring-1 ring-slate-200 disabled:opacity-50"
-                  >
-                    <Plus size={12} />
-                    Add
-                  </button>
-                </div>
-                <TextInput
-                  label="Save reply as"
-                  value={selectedNode.variableKey ?? ""}
-                  onChange={(value) =>
-                    onUpdate({ variableKey: value || undefined })
-                  }
-                  placeholder="service_interest"
-                />
-                <div className="mt-3 space-y-2">
-                  {(selectedNode.buttons ?? []).map((button, buttonIndex) => (
-                    <div
-                      key={`${button.replyId}-${buttonIndex}`}
-                      className="grid gap-2"
-                    >
-                      <input
-                        value={button.replyId}
-                        onChange={(event) =>
-                          onUpdate({
-                            buttons: replaceButton(
-                              selectedNode.buttons,
-                              buttonIndex,
-                              {
-                                ...button,
-                                replyId: event.target.value,
-                              },
-                            ),
-                          })
-                        }
-                        className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs outline-none"
-                        placeholder="reply_id"
-                      />
-                      <input
-                        value={button.label}
-                        onChange={(event) =>
-                          onUpdate({
-                            buttons: replaceButton(
-                              selectedNode.buttons,
-                              buttonIndex,
-                              {
-                                ...button,
-                                label: event.target.value,
-                              },
-                            ),
-                          })
-                        }
-                        className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs outline-none"
-                        placeholder="Label"
-                      />
-                      <div className="grid grid-cols-[1fr_auto] gap-2">
-                        <select
-                          value={button.nextKey}
-                          onChange={(event) =>
-                            onUpdate({
-                              buttons: replaceButton(
-                                selectedNode.buttons,
-                                buttonIndex,
-                                {
-                                  ...button,
-                                  nextKey: event.target.value,
-                                },
-                              ),
-                            })
-                          }
-                          className="min-w-0 rounded-md border border-slate-200 bg-white px-3 py-2 text-xs outline-none"
-                        >
-                          <option value="">Next</option>
-                          {targetOptions.map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            onUpdate({
-                              buttons: (selectedNode.buttons ?? []).filter(
-                                (_, itemIndex) => itemIndex !== buttonIndex,
-                              ),
-                            })
-                          }
-                          className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-400"
-                          aria-label="Remove button"
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              <ChoiceRowsEditor
+                node={selectedNode}
+                targetOptions={targetOptions}
+                onUpdate={onUpdate}
+              />
             )}
 
             {selectedNode.type === "condition" && (
-              <div className="mt-4 grid gap-3 rounded-lg border border-slate-100 bg-slate-50 p-3">
+              <div className="mt-4 grid gap-3 rounded-lg border border-slate-200 bg-[#fbfdff] p-3">
                 <TextInput
                   label="Variable"
                   value={selectedNode.condition?.variableKey ?? ""}
@@ -1960,6 +2108,143 @@ function FlowInspectorPanel({
   );
 }
 
+function ChoiceRowsEditor({
+  node,
+  targetOptions,
+  onUpdate,
+}: {
+  node: FlowNode;
+  targetOptions: Array<{ value: string; label: string }>;
+  onUpdate: (patch: Partial<FlowNode>) => void;
+}) {
+  const choices = node.buttons ?? [];
+  const limit = node.type === "send_buttons" ? 3 : 10;
+
+  return (
+    <div className="mt-4 overflow-hidden rounded-lg border border-slate-200 bg-white">
+      <div className="flex items-center justify-between gap-2 border-b border-slate-100 bg-[#fbfdff] px-3 py-2.5">
+        <div>
+          <div className="text-xs font-semibold text-[#0a1b33]">
+            {node.type === "send_buttons" ? "Quick replies" : "List rows"}
+          </div>
+          <div className="mt-0.5 text-[11px] text-slate-500">
+            Each choice can branch to a different block.
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() =>
+            onUpdate({
+              buttons: [
+                ...choices,
+                {
+                  replyId: `choice_${choices.length + 1}`,
+                  label: node.type === "send_buttons" ? "Option" : "Row",
+                  nextKey: targetOptions[0]?.value ?? "",
+                },
+              ],
+            })
+          }
+          disabled={choices.length >= limit}
+          className="inline-flex h-8 items-center gap-1 rounded-lg bg-[#0a152d] px-2.5 text-xs font-semibold text-white transition-colors hover:bg-[#0a1b33] disabled:opacity-50"
+        >
+          <Plus size={12} />
+          Add
+        </button>
+      </div>
+
+      <div className="border-b border-slate-100 px-3 py-3">
+        <TextInput
+          label="Save reply as"
+          value={node.variableKey ?? ""}
+          onChange={(value) => onUpdate({ variableKey: value || undefined })}
+          placeholder="service_interest"
+        />
+      </div>
+
+      <div className="divide-y divide-slate-100">
+        {choices.length === 0 ? (
+          <div className="px-3 py-5 text-center text-xs text-slate-400">
+            Add a quick reply to branch this block.
+          </div>
+        ) : (
+          choices.map((button, buttonIndex) => (
+            <div key={`${button.replyId}-${buttonIndex}`} className="px-3 py-3">
+              <div className="flex items-center gap-2">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-[11px] font-bold text-emerald-700">
+                  {buttonIndex + 1}
+                </span>
+                <input
+                  value={button.label}
+                  onChange={(event) =>
+                    onUpdate({
+                      buttons: replaceButton(choices, buttonIndex, {
+                        ...button,
+                        label: event.target.value,
+                      }),
+                    })
+                  }
+                  className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-[#f8fafc] px-3 py-2 text-sm font-medium text-[#0a1b33] outline-none transition-colors placeholder:text-slate-300 hover:bg-white focus:border-slate-400 focus:bg-white"
+                  placeholder="Button text"
+                />
+                <button
+                  type="button"
+                  onClick={() =>
+                    onUpdate({
+                      buttons: choices.filter(
+                        (_, itemIndex) => itemIndex !== buttonIndex,
+                      ),
+                    })
+                  }
+                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                  aria-label="Remove quick reply"
+                >
+                  <Trash2 size={13} />
+                </button>
+              </div>
+
+              <div className="mt-2 grid grid-cols-[minmax(0,1fr)_minmax(116px,0.8fr)] gap-2">
+                <input
+                  value={button.replyId}
+                  onChange={(event) =>
+                    onUpdate({
+                      buttons: replaceButton(choices, buttonIndex, {
+                        ...button,
+                        replyId: event.target.value,
+                      }),
+                    })
+                  }
+                  className="min-w-0 rounded-lg border border-slate-200 bg-[#f8fafc] px-3 py-2 text-xs text-slate-600 outline-none transition-colors placeholder:text-slate-300 hover:bg-white focus:border-slate-400 focus:bg-white"
+                  placeholder="reply_id"
+                />
+                <select
+                  value={button.nextKey}
+                  onChange={(event) =>
+                    onUpdate({
+                      buttons: replaceButton(choices, buttonIndex, {
+                        ...button,
+                        nextKey: event.target.value,
+                      }),
+                    })
+                  }
+                  className="min-w-0 rounded-lg border border-slate-200 bg-[#f8fafc] px-3 py-2 text-xs font-medium text-[#0a1b33] outline-none transition-colors hover:bg-white focus:border-slate-400 focus:bg-white"
+                >
+                  <option value="">No target</option>
+                  {targetOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
 function WhatsAppFlowPreview({
   nodes,
   entryNodeKey,
@@ -1986,7 +2271,10 @@ function WhatsAppFlowPreview({
       ),
     [entryNodeKey, nodes, selectedNodeKey, testMode],
   );
-  const keyword = keywords.split(",").map((item) => item.trim()).find(Boolean);
+  const keyword = keywords
+    .split(",")
+    .map((item) => item.trim())
+    .find(Boolean);
   const startCopy =
     triggerKind === "keyword"
       ? `#${keyword ?? "menu"}`
@@ -1995,11 +2283,11 @@ function WhatsAppFlowPreview({
         : "Olá";
 
   return (
-    <aside className="min-w-0 bg-[#eef3f8] p-4">
-      <div className="mx-auto max-w-[330px]">
+    <aside className="min-w-0 bg-[#eef3f8] p-3 2xl:p-4">
+      <div className="mx-auto max-w-[300px] 2xl:max-w-[332px]">
         <div className="mb-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="flex h-8 w-8 items-center justify-center rounded-md bg-emerald-50 text-emerald-700">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
               <Smartphone size={15} />
             </span>
             <div>
@@ -2017,8 +2305,8 @@ function WhatsAppFlowPreview({
         </div>
 
         <div className="overflow-hidden rounded-lg border border-slate-300 bg-[#111827] shadow-[0_28px_90px_-48px_rgba(15,23,42,0.9)]">
-          <div className="flex items-center gap-3 border-b border-white/10 bg-[#1f2937] px-4 py-3 text-white">
-            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-600 text-sm font-bold">
+          <div className="flex items-center gap-3 border-b border-white/10 bg-[#1f2937] px-3 py-2.5 text-white 2xl:px-4 2xl:py-3">
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-600 text-sm font-bold 2xl:h-9 2xl:w-9">
               {botName.slice(0, 1).toUpperCase()}
             </span>
             <div className="min-w-0 flex-1">
@@ -2028,7 +2316,7 @@ function WhatsAppFlowPreview({
           </div>
 
           <div
-            className="min-h-[560px] space-y-3 px-3 py-4"
+            className="min-h-[500px] space-y-3 px-3 py-4 2xl:min-h-[540px]"
             style={{
               backgroundColor: "#10231f",
               backgroundImage:
@@ -2038,7 +2326,9 @@ function WhatsAppFlowPreview({
           >
             <div className="ml-auto max-w-[78%] rounded-lg bg-[#0b7a5f] px-3 py-2 text-sm leading-5 text-white">
               {startCopy}
-              <div className="mt-1 text-right text-[10px] text-white/70">9:42</div>
+              <div className="mt-1 text-right text-[10px] text-white/70">
+                9:42
+              </div>
             </div>
 
             {previewNodes.length === 0 ? (
@@ -2128,6 +2418,36 @@ function PreviewBubble({ node }: { node: FlowNode }) {
   );
 }
 
+function FlowIssueDock({ issues }: { issues: FlowIssue[] }) {
+  if (issues.length === 0) return null;
+  const first = issues[0];
+  const isError = first.severity === "error";
+
+  return (
+    <div className="pointer-events-none absolute bottom-4 left-16 z-20 max-w-[520px] rounded-lg border border-slate-200 bg-white/95 px-3 py-2 shadow-[0_20px_70px_-42px_rgba(15,23,42,0.9)] backdrop-blur">
+      <div className="flex items-center gap-2">
+        <span
+          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${
+            isError ? "bg-red-50 text-red-600" : "bg-amber-50 text-amber-600"
+          }`}
+        >
+          <AlertTriangle size={14} />
+        </span>
+        <div className="min-w-0">
+          <div className="truncate text-xs font-semibold text-[#0a1b33]">
+            {isError ? "Activation blocked" : "Flow warning"}
+          </div>
+          <div className="truncate text-[11px] text-slate-500">
+            {first.nodeKey ? `${first.nodeKey}: ` : ""}
+            {first.message}
+            {issues.length > 1 ? ` (+${issues.length - 1})` : ""}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function FlowValidationPanel({
   issues,
   errors,
@@ -2148,7 +2468,9 @@ function FlowValidationPanel({
         <div className="flex items-start gap-3">
           <span
             className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
-              clean ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"
+              clean
+                ? "bg-emerald-100 text-emerald-700"
+                : "bg-red-100 text-red-700"
             }`}
           >
             {clean ? <CheckCircle2 size={17} /> : <AlertTriangle size={17} />}
@@ -2238,7 +2560,9 @@ function FlowMapPanel({
         <div className="mt-3 grid grid-cols-[1fr_auto] gap-2">
           <select
             value={newNodeType}
-            onChange={(event) => setNewNodeType(event.target.value as FlowNodeType)}
+            onChange={(event) =>
+              setNewNodeType(event.target.value as FlowNodeType)
+            }
             className="h-10 min-w-0 rounded-lg border border-slate-200 bg-white px-2 text-xs font-medium text-[#0a1b33] outline-none focus:border-slate-400"
           >
             {FLOW_NODE_TYPES.map((type) => (
@@ -2262,7 +2586,9 @@ function FlowMapPanel({
         {nodes.map((node, index) => {
           const active = node.key === selectedNodeKey;
           const nodeIssues = issuesByNode.get(node.key) ?? [];
-          const hasError = nodeIssues.some((issue) => issue.severity === "error");
+          const hasError = nodeIssues.some(
+            (issue) => issue.severity === "error",
+          );
           const NodeIcon =
             node.type === "send_list"
               ? ListTree
@@ -2337,7 +2663,11 @@ function FlowNodeCard({
   onRemove: () => void;
 }) {
   const NodeIcon =
-    node.type === "send_list" ? ListTree : node.type === "set_tag" ? Tag : GitBranch;
+    node.type === "send_list"
+      ? ListTree
+      : node.type === "set_tag"
+        ? Tag
+        : GitBranch;
   const targetOptions = nodes
     .filter((item) => item.key !== node.key)
     .map((item) => ({ value: item.key, label: `${item.title} · ${item.key}` }));
@@ -2394,7 +2724,10 @@ function FlowNodeCard({
           label="Type"
           value={node.type}
           onChange={(value) =>
-            onUpdate({ type: value as FlowNodeType, ...defaultNodePatch(value as FlowNodeType) })
+            onUpdate({
+              type: value as FlowNodeType,
+              ...defaultNodePatch(value as FlowNodeType),
+            })
           }
           options={[
             { value: "start", label: NODE_TYPE_LABELS.start },
@@ -2487,13 +2820,18 @@ function FlowNodeCard({
             <TextInput
               label="Save reply as"
               value={node.variableKey ?? ""}
-              onChange={(value) => onUpdate({ variableKey: value || undefined })}
+              onChange={(value) =>
+                onUpdate({ variableKey: value || undefined })
+              }
               placeholder="service_interest"
             />
           </div>
           <div className="space-y-2">
             {(node.buttons ?? []).map((button, buttonIndex) => (
-              <div key={`${button.replyId}-${buttonIndex}`} className="grid gap-2 md:grid-cols-[1fr_1fr_1fr_auto]">
+              <div
+                key={`${button.replyId}-${buttonIndex}`}
+                className="grid gap-2 md:grid-cols-[1fr_1fr_1fr_auto]"
+              >
                 <input
                   value={button.replyId}
                   onChange={(event) =>
@@ -2692,7 +3030,7 @@ function FlowRuntimePanel({
                   <p className="mt-0.5 truncate text-xs text-slate-500">
                     {run.currentNodeKey
                       ? `At ${run.currentNodeKey}`
-                      : run.endReason ?? "Finished"}
+                      : (run.endReason ?? "Finished")}
                   </p>
                 </div>
                 <span
@@ -2717,7 +3055,9 @@ function FlowRuntimePanel({
                       {event.eventType.replace("_", " ")}
                       {event.nodeKey ? ` · ${event.nodeKey}` : ""}
                     </span>
-                    <span className="shrink-0">{relativeTime(event.createdAt)}</span>
+                    <span className="shrink-0">
+                      {relativeTime(event.createdAt)}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -2798,7 +3138,7 @@ function TextInput({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
-        className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-[#0a1b33] outline-none transition-colors placeholder:text-slate-300 focus:border-slate-400"
+        className="w-full rounded-lg border border-slate-200 bg-[#f8fafc] px-3 py-2 text-sm text-[#0a1b33] outline-none transition-colors placeholder:text-slate-300 hover:bg-white focus:border-slate-400 focus:bg-white"
       />
     </label>
   );
@@ -2825,7 +3165,7 @@ function SelectBox({
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-[#0a1b33] outline-none transition-colors focus:border-slate-400"
+        className="w-full rounded-lg border border-slate-200 bg-[#f8fafc] px-3 py-2 text-sm text-[#0a1b33] outline-none transition-colors hover:bg-white focus:border-slate-400 focus:bg-white"
       >
         <option value="">{placeholder}</option>
         {options.map((option) => (
@@ -2855,7 +3195,11 @@ function SubmitButton({
       disabled={disabled}
       className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#0a152d] px-4 py-2 text-sm font-medium text-white transition-all hover:bg-[#0a1b33] disabled:opacity-50"
     >
-      {loading ? <Loader2 size={14} className="animate-spin" /> : <Icon size={14} />}
+      {loading ? (
+        <Loader2 size={14} className="animate-spin" />
+      ) : (
+        <Icon size={14} />
+      )}
       {children}
     </button>
   );
@@ -3069,10 +3413,16 @@ function buildFlowEdges(nodes: FlowNode[]): Edge[] {
       target: targetKey,
       sourceHandle,
       targetHandle: "in",
-      type: "smoothstep",
-      label,
+      type: "whatsappCurve",
+      label: label === "next" ? undefined : label,
       markerEnd: { type: MarkerType.ArrowClosed, color },
-      style: { stroke: color, strokeWidth: 2 },
+      interactionWidth: 24,
+      style: {
+        stroke: color,
+        strokeWidth: 2.8,
+        strokeLinecap: "round",
+        strokeLinejoin: "round",
+      },
       labelStyle: {
         fill: "#0f172a",
         fontSize: 11,
@@ -3138,7 +3488,8 @@ function autoLayoutPositions(
   const byKey = new Map(nodes.map((node) => [node.key, node]));
   const levels = new Map<string, number>();
   const queue: Array<{ key: string; level: number }> = [];
-  const entry = entryNodeKey && byKey.has(entryNodeKey) ? entryNodeKey : nodes[0]?.key;
+  const entry =
+    entryNodeKey && byKey.has(entryNodeKey) ? entryNodeKey : nodes[0]?.key;
   if (entry) queue.push({ key: entry, level: 0 });
 
   while (queue.length > 0) {
@@ -3150,7 +3501,8 @@ function autoLayoutPositions(
     const node = byKey.get(current.key);
     if (!node) continue;
     for (const target of nodeTargets(node)) {
-      if (byKey.has(target)) queue.push({ key: target, level: current.level + 1 });
+      if (byKey.has(target))
+        queue.push({ key: target, level: current.level + 1 });
     }
   }
 
@@ -3173,9 +3525,16 @@ function autoLayoutPositions(
   for (const level of sortedLevels) {
     const bucket = buckets.get(level) ?? [];
     bucket.forEach((node, row) => {
+      const branchCenterOffset =
+        ((bucket.length - 1) * FLOW_LAYOUT_BRANCH_GAP) / 2;
+      const sway = FLOW_LAYOUT_SWAY[level % FLOW_LAYOUT_SWAY.length];
       positions.set(node.key, {
-        x: 80 + level * 275,
-        y: 90 + row * 190,
+        x: 96 + level * FLOW_LAYOUT_X_STEP,
+        y:
+          FLOW_LAYOUT_BASE_Y +
+          sway +
+          row * FLOW_LAYOUT_BRANCH_GAP -
+          branchCenterOffset,
       });
     });
   }
@@ -3188,20 +3547,25 @@ function nextNodePosition(
 ): FlowNodePosition {
   if (selectedNode?.position) {
     return {
-      x: selectedNode.position.x + 290,
-      y: selectedNode.position.y,
+      x: selectedNode.position.x + FLOW_LAYOUT_X_STEP,
+      y: selectedNode.position.y + 46,
     };
   }
   const layout = autoLayoutPositions(nodes, nodes[0]?.key ?? "");
   if (selectedNode) {
     const selectedPosition = layout.get(selectedNode.key);
     if (selectedPosition) {
-      return { x: selectedPosition.x + 290, y: selectedPosition.y };
+      return {
+        x: selectedPosition.x + FLOW_LAYOUT_X_STEP,
+        y: selectedPosition.y + 46,
+      };
     }
   }
   return {
-    x: 80 + (nodes.length % 4) * 290,
-    y: 100 + Math.floor(nodes.length / 4) * 190,
+    x: 96 + (nodes.length % 4) * FLOW_LAYOUT_X_STEP,
+    y:
+      FLOW_LAYOUT_BASE_Y +
+      Math.floor(nodes.length / 4) * FLOW_LAYOUT_BRANCH_GAP,
   };
 }
 
