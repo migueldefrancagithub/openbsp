@@ -187,6 +187,7 @@ const chatbotTriggerValidator = v.union(
 const chatbotFlowNodeTypeValidator = v.union(
   v.literal("start"),
   v.literal("send_message"),
+  v.literal("send_template"),
   v.literal("send_buttons"),
   v.literal("send_list"),
   v.literal("collect_input"),
@@ -201,6 +202,7 @@ const chatbotFlowRunStatusValidator = v.union(
   v.literal("completed"),
   v.literal("handed_off"),
   v.literal("timed_out"),
+  v.literal("stopped"),
   v.literal("failed"),
 );
 
@@ -208,12 +210,14 @@ const chatbotFlowEventTypeValidator = v.union(
   v.literal("started"),
   v.literal("node_entered"),
   v.literal("message_sent"),
+  v.literal("message_skipped"),
   v.literal("reply_received"),
   v.literal("fallback_fired"),
   v.literal("tag_set"),
   v.literal("handoff"),
   v.literal("completed"),
   v.literal("timeout"),
+  v.literal("stopped"),
   v.literal("error"),
 );
 
@@ -239,12 +243,21 @@ const chatbotFlowNodeValidator = v.object({
   ),
   variableKey: v.optional(v.string()),
   tag: v.optional(v.string()),
+  template: v.optional(
+    v.object({
+      templateId: v.id("templates"),
+      // key = String(parameterSchema.index), value = literal or "{{vars.x}}"
+      variables: v.record(v.string(), v.string()),
+    }),
+  ),
   condition: v.optional(
     v.object({
       variableKey: v.string(),
       operator: v.union(
         v.literal("equals"),
         v.literal("contains"),
+        v.literal("starts_with"),
+        v.literal("ends_with"),
         v.literal("present"),
         v.literal("absent"),
       ),

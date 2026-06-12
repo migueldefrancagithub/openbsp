@@ -324,6 +324,9 @@ describe("webhook E2E", () => {
   });
 
   it("dispatches inbound WhatsApp messages into active chatbot flows", async () => {
+    // Use a fresh inbound timestamp so the 24h service window is open
+    // (free-form flow sends are gated on conversations.lastIncomingAt).
+    const inboundTs = Math.floor(Date.now() / 1000);
     const t = convexTest(schema);
     const { tenantId } = await seedTenantAndPhone(t);
     await t.run(async (ctx) => {
@@ -363,7 +366,7 @@ describe("webhook E2E", () => {
 
     await t.mutation(internal.webhooks.enqueue, {
       rawPayload: JSON.stringify(
-        makeMessagePayload({ wamid: "wamid.FLOW.1", text: "menu" }),
+        makeMessagePayload({ wamid: "wamid.FLOW.1", text: "menu", ts: inboundTs }),
       ),
       rawBodySha256: "sha-flow",
     });

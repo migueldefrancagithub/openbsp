@@ -299,6 +299,38 @@ export const handleStopKeyword = internalMutation({
         });
       }
     }
+    // Cascade: stop active chatbot flow runs for this contact. Stopped runs
+    // never resume (findActiveRun only matches status "active") and the
+    // STOP branch in processOne never starts a new one.
+    const now = Date.now();
+    const activeRuns = await ctx.db
+      .query("chatbotFlowRuns")
+      .withIndex("by_contact_status", (q) =>
+        q
+          .eq("tenantId", args.tenantId)
+          .eq("contactId", args.contactId)
+          .eq("status", "active"),
+      )
+      .collect();
+    for (const run of activeRuns) {
+      await ctx.db.patch(run._id, {
+        status: "stopped",
+        endedAt: now,
+        endReason: "stop_keyword",
+        lastAdvancedAt: now,
+      });
+      await ctx.db.insert("chatbotFlowEvents", {
+        tenantId: args.tenantId,
+        chatbotId: run.chatbotId,
+        flowRunId: run._id,
+        conversationId: run.conversationId,
+        contactId: run.contactId,
+        eventType: "stopped",
+        nodeKey: run.currentNodeKey,
+        payload: { reason: "stop_keyword" },
+        createdAt: now,
+      });
+    }
     return null;
   },
 });
