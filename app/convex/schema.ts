@@ -388,9 +388,16 @@ export default defineSchema({
     lastQualityCheckAt: v.optional(v.number()),
     lastTokenHealthCheckAt: v.optional(v.number()),
     tokenStatus: tokenStatusValidator,
+    /** Human-readable detail for the last token health verdict. */
+    tokenHealthDetail: v.optional(v.string()),
+    dataAccessExpiresAt: v.optional(v.number()),
     validatedAt: v.optional(v.number()),
     validatedScopes: v.optional(v.array(v.string())),
     tokenExpiresAt: v.optional(v.number()),
+    /** Last account_update webhook event + ban/restriction state from Meta. */
+    accountUpdateEvent: v.optional(v.string()),
+    banState: v.optional(v.string()),
+    accountRestrictions: v.optional(v.any()),
     createdAt: v.number(),
   })
     .index("by_waba", ["wabaId"])
@@ -403,6 +410,13 @@ export default defineSchema({
     phoneNumberId: v.string(),
     e164: v.string(),
     displayName: v.string(),
+    /** Synced from Meta (GET /{phone-number-id}); never overwrites displayName. */
+    verifiedName: v.optional(v.string()),
+    messagingTier: v.optional(v.string()),
+    throughputLevel: v.optional(v.string()),
+    lastQualityEvent: v.optional(v.string()),
+    lastQualityEventAt: v.optional(v.number()),
+    lastMetaSyncAt: v.optional(v.number()),
     qualityRating: v.optional(qualityRatingValidator),
     qualityLastErrorAt: v.optional(v.number()),
     qualityLastErrorCode: v.optional(v.string()),
@@ -899,6 +913,12 @@ export default defineSchema({
     qualityScore: v.optional(v.string()),
     rejectionReason: v.optional(v.string()),
     syncedAt: v.optional(v.number()),
+    /** "imported" = pulled from the WABA via importFromMeta. */
+    source: v.optional(v.union(v.literal("local"), v.literal("imported"))),
+    /** NAMED templates need parameter_name on send; we only support POSITIONAL. */
+    parameterFormat: v.optional(
+      v.union(v.literal("positional"), v.literal("named")),
+    ),
     createdAt: v.number(),
     createdBy: v.id("members"),
   })
@@ -923,6 +943,8 @@ export default defineSchema({
     approvedAt: v.optional(v.number()),
     rejectedAt: v.optional(v.number()),
     rejectionReason: v.optional(v.string()),
+    /** Full-fidelity copy of Meta components for imported templates. */
+    metaComponents: v.optional(v.any()),
     isLocked: v.boolean(),
     createdBy: v.id("members"),
     createdAt: v.number(),

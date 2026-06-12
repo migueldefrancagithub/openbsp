@@ -1,6 +1,7 @@
 import { v, ConvexError } from "convex/values";
 import { internal } from "./_generated/api";
 import {
+  internalAction,
   internalMutation,
   internalQuery,
   action,
@@ -13,6 +14,7 @@ import {
 import {
   submitTemplateToMeta,
   listMetaTemplates,
+  listMetaTemplatesFull,
   type TemplateButton,
 } from "./lib/meta/graph";
 import type { Id } from "./_generated/dataModel";
@@ -827,5 +829,465 @@ export const syncFromMeta = action({
       }
     }
     return { updated };
+  },
+});
+
+// ---------- Webhook-driven template status sync ----------
+
+const META_TEMPLATE_EVENT_TO_STATUS: Record<
+  string,
+  "approved" | "rejected" | "paused" | "disabled" | "pending"
+> = {
+  APPROVED: "approved",
+  REJECTED: "rejected",
+  PAUSED: "paused",
+  DISABLED: "disabled",
+  PENDING_DELETION: "disabled",
+  FLAGGED: "paused",
+  IN_APPEAL: "pending",
+  PENDING: "pending",
+};
+
+/**
+ * Apply a `message_template_status_update` webhook. Resolves the template
+ * by metaTemplateId (fallback: WABA tenant + name + language), maps the
+ * Meta event to the local status, and pauses running campaigns that use a
+ * template which is no longer sendable.
+ */
+export const applyMetaStatusUpdate = internalMutation({
+  args: {
+    wabaId: v.string(),
+    metaTemplateId: v.string(),
+    name: v.string(),
+    language: v.string(),
+    event: v.string(),
+    reason: v.optional(v.string()),
+    updatedAt: v.number(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const event = args.event.toUpperCase();
+    const mapped = META_TEMPLATE_EVENT_TO_STATUS[event];
+    if (!mapped) return null;
+
+    let template = await ctx.db
+      .query("templates")
+      .withIndex("by_meta_template_id", (q) =>
+        q.eq("metaTemplateId", args.metaTemplateId),
+      )
+      .first();
+    if (!template && args.name && args.language) {
+      const account = await ctx.db
+        .query("whatsappAccounts")
+        .withIndex("by_waba", (q) => q.eq("wabaId", args.wabaId))
+        .first();
+      if (account) {
+        template = await ctx.db
+          .query("templates")
+          .withIndex("by_tenant_name_lang", (q) =>
+            q
+              .eq("tenantId", account.tenantId)
+              .eq("name", args.name)
+              .eq("language", args.language),
+          )
+          .first();
+        // Link the Meta id when we matched by name+language.
+        if (template && !template.metaTemplateId) {
+          await ctx.db.patch(template._id, {
+            metaTemplateId: args.metaTemplateId,
+          });
+        }
+      }
+    }
+    if (!template) return null;
+
+    await ctx.db.patch(template._id, {
+      status: mapped,
+      rejectionReason: mapped === "rejected" ? args.reason : template.rejectionReason,
+      syncedAt: args.updatedAt,
+    });
+    const version = await ctx.db
+      .query("templateVersions")
+      .withIndex("by_template_version", (q) =>
+        q.eq("templateId", template._id).eq("version", template.currentVersion),
+      )
+      .unique();
+    if (version) {
+      if (mapped === "approved" && !version.approvedAt) {
+        await ctx.db.patch(version._id, { approvedAt: args.updatedAt });
+      }
+      if (mapped === "rejected") {
+        await ctx.db.patch(version._id, {
+          rejectedAt: args.updatedAt,
+          rejectionReason: args.reason,
+        });
+      }
+    }
+
+    // Cascade: a template that is no longer sendable pauses running
+    // campaigns that reference it.
+    if (mapped === "rejected" || mapped === "paused" || mapped === "disabled") {
+      const running = await ctx.db
+        .query("campaigns")
+        .withIndex("by_tenant_status", (q) =>
+          q.eq("tenantId", template.tenantId).eq("status", "running"),
+        )
+        .collect();
+      const now = Date.now();
+      for (const campaign of running) {
+        if (campaign.templateId !== template._id) continue;
+        await ctx.db.patch(campaign._id, {
+          status: "paused",
+          pausedAt: now,
+          pauseReason: `template_status:${event}`,
+          updatedAt: now,
+        });
+        await ctx.db.insert("campaignEvents", {
+          tenantId: template.tenantId,
+          campaignId: campaign._id,
+          type: "campaign.auto_paused.template_status",
+          payload: { templateId: template._id, event, reason: args.reason },
+          createdAt: now,
+        });
+      }
+    }
+    return null;
+  },
+});
+
+// ---------- Template import (pull existing WABA templates into local DB) ----------
+
+type RemoteTemplateForImport = {
+  id: string;
+  name: string;
+  language: string;
+  status: string;
+  category?: string;
+  parameterFormat?: string;
+  components?: unknown[];
+  qualityScore?: string;
+  rejectionReason?: string;
+};
+
+function metaStatusToLocal(
+  status: string,
+):
+  | "draft"
+  | "pending"
+  | "approved"
+  | "rejected"
+  | "paused"
+  | "disabled" {
+  const lower = status.toLowerCase();
+  if (lower === "approved") return "approved";
+  if (lower === "rejected") return "rejected";
+  if (lower === "paused") return "paused";
+  if (lower === "disabled" || lower === "pending_deletion") return "disabled";
+  return "pending";
+}
+
+function metaCategoryToLocal(
+  category?: string,
+): "marketing" | "utility" | "authentication" {
+  const lower = category?.toLowerCase();
+  if (lower === "marketing") return "marketing";
+  if (lower === "authentication") return "authentication";
+  return "utility";
+}
+
+/**
+ * Upsert one remote template. Dedupe order:
+ *   1. metaTemplateId hit → refresh status/quality ("updated")
+ *   2. (name, language) hit without metaTemplateId → link + refresh ("linked")
+ *   3. else insert templates + locked templateVersions row ("created")
+ * Inserts directly (NOT via createDraft) — imported names/bodies may not
+ * satisfy the local builder limits, and that must not block a full sync.
+ */
+export const _importOne = internalMutation({
+  args: {
+    tenantId: v.id("tenants"),
+    memberId: v.id("members"),
+    whatsappAccountId: v.id("whatsappAccounts"),
+    remote: v.any(),
+  },
+  returns: v.union(
+    v.literal("created"),
+    v.literal("linked"),
+    v.literal("updated"),
+    v.literal("skipped_no_body"),
+  ),
+  handler: async (ctx, args) => {
+    const remote = args.remote as RemoteTemplateForImport;
+    const now = Date.now();
+    const status = metaStatusToLocal(remote.status);
+
+    const byMetaId = await ctx.db
+      .query("templates")
+      .withIndex("by_meta_template_id", (q) =>
+        q.eq("metaTemplateId", remote.id),
+      )
+      .first();
+    if (byMetaId && byMetaId.tenantId === args.tenantId) {
+      await ctx.db.patch(byMetaId._id, {
+        status,
+        qualityScore: remote.qualityScore,
+        rejectionReason: remote.rejectionReason,
+        syncedAt: now,
+      });
+      return "updated";
+    }
+
+    const byNameLang = await ctx.db
+      .query("templates")
+      .withIndex("by_tenant_name_lang", (q) =>
+        q
+          .eq("tenantId", args.tenantId)
+          .eq("name", remote.name)
+          .eq("language", remote.language),
+      )
+      .first();
+    if (byNameLang) {
+      await ctx.db.patch(byNameLang._id, {
+        metaTemplateId: byNameLang.metaTemplateId ?? remote.id,
+        status,
+        qualityScore: remote.qualityScore,
+        rejectionReason: remote.rejectionReason,
+        syncedAt: now,
+      });
+      return "linked";
+    }
+
+    const components = Array.isArray(remote.components)
+      ? (remote.components as Array<Record<string, unknown>>)
+      : [];
+    const body = components.find(
+      (c) => String(c.type).toUpperCase() === "BODY",
+    );
+    const bodyText = body?.text ? String(body.text) : "";
+    if (!bodyText) return "skipped_no_body";
+
+    const example = body?.example as
+      | { body_text?: string[][] }
+      | undefined;
+    const exampleValues = example?.body_text?.[0] ?? [];
+    const indices = extractParameterIndices(bodyText);
+    const parameterSchema = indices.map((index, i) => ({
+      index,
+      name: `param${index}`,
+      example: exampleValues[i] ?? "",
+    }));
+
+    const buttonsComponent = components.find(
+      (c) => String(c.type).toUpperCase() === "BUTTONS",
+    );
+    const rawButtons = Array.isArray(buttonsComponent?.buttons)
+      ? (buttonsComponent.buttons as Array<Record<string, unknown>>)
+      : [];
+    const buttons: Array<
+      | { type: "quick_reply"; text: string }
+      | { type: "url"; text: string; url: string }
+      | { type: "phone_number"; text: string; phoneNumber: string }
+    > = [];
+    for (const b of rawButtons) {
+      const t = String(b.type ?? "").toUpperCase();
+      const text = String(b.text ?? "");
+      if (t === "QUICK_REPLY" && text) buttons.push({ type: "quick_reply", text });
+      else if (t === "URL" && text && b.url)
+        buttons.push({ type: "url", text, url: String(b.url) });
+      else if (t === "PHONE_NUMBER" && text && b.phone_number)
+        buttons.push({
+          type: "phone_number",
+          text,
+          phoneNumber: String(b.phone_number),
+        });
+      // FLOW / OTP / COPY_CODE buttons: kept only in metaComponents.
+    }
+
+    const templateId = await ctx.db.insert("templates", {
+      tenantId: args.tenantId,
+      whatsappAccountId: args.whatsappAccountId,
+      name: remote.name,
+      language: remote.language,
+      category: metaCategoryToLocal(remote.category),
+      currentVersion: 1,
+      status,
+      metaTemplateId: remote.id,
+      qualityScore: remote.qualityScore,
+      rejectionReason: remote.rejectionReason,
+      syncedAt: now,
+      source: "imported",
+      parameterFormat:
+        remote.parameterFormat?.toUpperCase() === "NAMED"
+          ? "named"
+          : "positional",
+      createdAt: now,
+      createdBy: args.memberId,
+    });
+    await ctx.db.insert("templateVersions", {
+      templateId,
+      tenantId: args.tenantId,
+      version: 1,
+      bodyText,
+      buttons: buttons.length > 0 ? buttons : undefined,
+      parameterSchema,
+      submittedAt: now,
+      approvedAt: status === "approved" ? now : undefined,
+      metaComponents: remote.components,
+      isLocked: true,
+      createdBy: args.memberId,
+      createdAt: now,
+    });
+    return "created";
+  },
+});
+
+/**
+ * Pull every template of a connected WABA into the local DB (paginated,
+ * full components). Idempotent: re-runs refresh instead of duplicating.
+ */
+export const importFromMeta = action({
+  args: { whatsappAccountId: v.id("whatsappAccounts") },
+  returns: v.object({
+    created: v.number(),
+    linked: v.number(),
+    updated: v.number(),
+    skipped: v.number(),
+    truncated: v.boolean(),
+  }),
+  handler: async (ctx, args) => {
+    const me: {
+      tenantId: Id<"tenants">;
+      memberId: Id<"members">;
+      role: string;
+    } | null = await ctx.runQuery(internal.templates._meTenantWithRole, {});
+    if (!me) throw new ConvexError({ code: "UNAUTHENTICATED" });
+    if (!["owner", "admin", "marketing"].includes(me.role)) {
+      throw new ConvexError({ code: "FORBIDDEN" });
+    }
+    const account: { metaAppId: string; wabaId: string } | null =
+      await ctx.runQuery(internal.whatsappAccounts._getAccountBasics, {
+        whatsappAccountId: args.whatsappAccountId,
+      });
+    if (!account) throw new ConvexError({ code: "NOT_FOUND" });
+
+    const token: string | null = await ctx.runAction(
+      internal.whatsappAccounts.decryptWabaToken,
+      { whatsappAccountId: args.whatsappAccountId },
+    );
+    if (!token) throw new ConvexError({ code: "TOKEN_UNAVAILABLE" });
+
+    const res = await listMetaTemplatesFull({
+      token,
+      wabaId: account.wabaId,
+    });
+    if (!res.ok) {
+      throw new ConvexError({ code: "META_LIST_FAILED", message: res.message });
+    }
+
+    const counts = { created: 0, linked: 0, updated: 0, skipped: 0 };
+    for (const remote of res.data) {
+      const outcome: "created" | "linked" | "updated" | "skipped_no_body" =
+        await ctx.runMutation(internal.templates._importOne, {
+          tenantId: me.tenantId,
+          memberId: me.memberId,
+          whatsappAccountId: args.whatsappAccountId,
+          remote,
+        });
+      if (outcome === "created") counts.created += 1;
+      else if (outcome === "linked") counts.linked += 1;
+      else if (outcome === "updated") counts.updated += 1;
+      else counts.skipped += 1;
+    }
+    return { ...counts, truncated: res.truncated };
+  },
+});
+
+/**
+ * Cron sweep: refresh template statuses for every account. Never creates
+ * rows (creation needs a member) — webhook + importFromMeta handle that.
+ */
+export const sweepTemplateStatuses = internalAction({
+  args: {},
+  returns: v.null(),
+  handler: async (ctx): Promise<null> => {
+    const ids: Id<"whatsappAccounts">[] = await ctx.runQuery(
+      internal.whatsappAccounts._listAccountIdsForSweep,
+      {},
+    );
+    for (const accountId of ids) {
+      const account: { metaAppId: string; wabaId: string } | null =
+        await ctx.runQuery(internal.whatsappAccounts._getAccountBasics, {
+          whatsappAccountId: accountId,
+        });
+      if (!account) continue;
+      const token: string | null = await ctx.runAction(
+        internal.whatsappAccounts.decryptWabaToken,
+        { whatsappAccountId: accountId },
+      );
+      if (!token) continue;
+      const res = await listMetaTemplatesFull({
+        token,
+        wabaId: account.wabaId,
+      });
+      if (!res.ok) continue;
+      for (const remote of res.data) {
+        await ctx.runMutation(internal.templates._refreshStatusFromRemote, {
+          wabaId: account.wabaId,
+          metaTemplateId: remote.id,
+          name: remote.name,
+          language: remote.language,
+          status: remote.status,
+          qualityScore: remote.qualityScore,
+          rejectionReason: remote.rejectionReason,
+        });
+      }
+    }
+    return null;
+  },
+});
+
+export const _refreshStatusFromRemote = internalMutation({
+  args: {
+    wabaId: v.string(),
+    metaTemplateId: v.string(),
+    name: v.string(),
+    language: v.string(),
+    status: v.string(),
+    qualityScore: v.optional(v.string()),
+    rejectionReason: v.optional(v.string()),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    let template = await ctx.db
+      .query("templates")
+      .withIndex("by_meta_template_id", (q) =>
+        q.eq("metaTemplateId", args.metaTemplateId),
+      )
+      .first();
+    if (!template) {
+      const account = await ctx.db
+        .query("whatsappAccounts")
+        .withIndex("by_waba", (q) => q.eq("wabaId", args.wabaId))
+        .first();
+      if (!account) return null;
+      template = await ctx.db
+        .query("templates")
+        .withIndex("by_tenant_name_lang", (q) =>
+          q
+            .eq("tenantId", account.tenantId)
+            .eq("name", args.name)
+            .eq("language", args.language),
+        )
+        .first();
+    }
+    if (!template) return null;
+    await ctx.db.patch(template._id, {
+      metaTemplateId: template.metaTemplateId ?? args.metaTemplateId,
+      status: metaStatusToLocal(args.status),
+      qualityScore: args.qualityScore,
+      rejectionReason: args.rejectionReason,
+      syncedAt: Date.now(),
+    });
+    return null;
   },
 });

@@ -326,6 +326,30 @@ export const _claimForDispatch = internalMutation({
     const msg = await ctx.db.get(args.messageId);
     if (!msg) return null;
     if (msg.status !== "queued") return null;
+
+    // Hard stop: never dispatch against a banned/restricted WABA or a
+    // revoked token (account_update webhook / token health set these).
+    const conv = await ctx.db.get(msg.conversationId);
+    const phone = conv ? await ctx.db.get(conv.phoneNumberId) : null;
+    const account = phone
+      ? await ctx.db.get(phone.whatsappAccountId)
+      : null;
+    if (
+      !account ||
+      account.status !== "active" ||
+      account.tokenStatus === "revoked"
+    ) {
+      await ctx.db.patch(args.messageId, {
+        status: "failed",
+        failureReason: "waba_not_active",
+      });
+      await syncCampaignRecipientFromMessage(ctx, args.messageId, {
+        status: "failed",
+        failureReason: "waba_not_active",
+      });
+      return null;
+    }
+
     await ctx.db.patch(args.messageId, {
       status: "dispatching",
       claimedAt: Date.now(),

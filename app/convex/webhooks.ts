@@ -592,7 +592,10 @@ export const processOne = internalAction({
         | { kind: "status"; [k: string]: unknown }
         | { kind: "user_id_update"; [k: string]: unknown }
         | { kind: "user_preference"; [k: string]: unknown }
-        | { kind: "business_username_update"; [k: string]: unknown };
+        | { kind: "business_username_update"; [k: string]: unknown }
+        | { kind: "template_status_update"; [k: string]: unknown }
+        | { kind: "phone_quality_update"; [k: string]: unknown }
+        | { kind: "account_update"; [k: string]: unknown };
 
       if (item.kind === "message") {
         const phone = await ctx.runQuery(
@@ -784,6 +787,43 @@ export const processOne = internalAction({
             : undefined,
           username: String(item.username),
           status: String(item.status),
+          updatedAt: Number(item.metaTimestamp),
+        });
+      } else if (item.kind === "template_status_update") {
+        await ctx.runMutation(internal.templates.applyMetaStatusUpdate, {
+          wabaId: String(item.wabaId),
+          metaTemplateId: String(item.metaTemplateId),
+          name: String(item.name),
+          language: String(item.language),
+          event: String(item.event),
+          reason: item.reason ? String(item.reason) : undefined,
+          updatedAt: Number(item.metaTimestamp),
+        });
+      } else if (item.kind === "phone_quality_update") {
+        await ctx.runMutation(
+          internal.whatsappAccounts.applyPhoneQualityUpdate,
+          {
+            wabaId: String(item.wabaId),
+            displayPhoneNumber: String(item.displayPhoneNumber),
+            event: String(item.event),
+            currentLimit: item.currentLimit
+              ? String(item.currentLimit)
+              : undefined,
+            oldLimit: item.oldLimit ? String(item.oldLimit) : undefined,
+            updatedAt: Number(item.metaTimestamp),
+          },
+        );
+      } else if (item.kind === "account_update") {
+        await ctx.runMutation(internal.whatsappAccounts.applyAccountUpdate, {
+          wabaId: String(item.wabaId),
+          event: String(item.event),
+          banState: item.banState ? String(item.banState) : undefined,
+          restrictions: item.restrictions as
+            | Array<{ type: string; expiration?: number }>
+            | undefined,
+          violationType: item.violationType
+            ? String(item.violationType)
+            : undefined,
           updatedAt: Number(item.metaTimestamp),
         });
       } else if (item.kind === "status") {
