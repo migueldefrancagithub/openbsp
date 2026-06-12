@@ -62,10 +62,15 @@ export const enqueue = internalMutation({
     }
 
     for (const item of parsed) {
+      // Never truncate: processOne JSON.parses this payload — a sliced
+      // string is invalid JSON and the (HMAC-valid) message is lost.
+      // Documented payloads exceed 8KB (orders, multi-vCard contacts,
+      // 4096-char texts + referral). The 8000-char slices above are
+      // forensic-only rows that are never re-parsed.
       const itemPayload = JSON.stringify(item);
       const result = await tryRegisterWebhookEvent(ctx, {
         eventKey: item.eventKey,
-        rawPayload: itemPayload.slice(0, 8000),
+        rawPayload: itemPayload,
         rawBodySha256: args.rawBodySha256,
         metaTimestamp: item.metaTimestamp,
       });
@@ -492,6 +497,7 @@ export const recordCtwaReferral = internalMutation({
       imageUrl: v.optional(v.string()),
       videoUrl: v.optional(v.string()),
       thumbnailUrl: v.optional(v.string()),
+      ctwaClid: v.optional(v.string()),
     }),
   },
   returns: v.null(),
@@ -520,6 +526,7 @@ export const recordCtwaReferral = internalMutation({
       imageUrl: args.referral.imageUrl,
       videoUrl: args.referral.videoUrl,
       thumbnailUrl: args.referral.thumbnailUrl,
+      ctwaClid: args.referral.ctwaClid,
       clickedAt: args.clickedAt,
       freeEntryWindowExpiresAt,
       createdAt: Date.now(),
@@ -640,6 +647,12 @@ export const processOne = internalAction({
           | "interactive"
           | "location"
           | "contact"
+          | "button"
+          | "sticker"
+          | "contacts"
+          | "order"
+          | "request_welcome"
+          | "unsupported"
           | "reaction"
           | "system";
 
@@ -673,6 +686,7 @@ export const processOne = internalAction({
               imageUrl?: string;
               videoUrl?: string;
               thumbnailUrl?: string;
+              ctwaClid?: string;
             }
           | undefined;
         if (referral?.source === "ctwa") {
@@ -693,6 +707,7 @@ export const processOne = internalAction({
               imageUrl: referral.imageUrl,
               videoUrl: referral.videoUrl,
               thumbnailUrl: referral.thumbnailUrl,
+              ctwaClid: referral.ctwaClid,
             },
           });
         }
@@ -773,7 +788,12 @@ export const processOne = internalAction({
         });
       } else if (item.kind === "status") {
         const pricing = item.pricing as
-          | { category?: string; pricing_model?: string }
+          | {
+              category?: string;
+              pricing_model?: string;
+              billable?: boolean;
+              type?: string;
+            }
           | undefined;
         const pricingCategory =
           pricing?.category === "marketing" ||
@@ -793,6 +813,9 @@ export const processOne = internalAction({
           failureCode: firstError ? String(firstError.code) : undefined,
           failureReason: firstError?.title,
           pricingCategory,
+          pricingBillable:
+            typeof pricing?.billable === "boolean" ? pricing.billable : undefined,
+          pricingType: pricing?.type ? String(pricing.type) : undefined,
         });
         if (item.status === "failed") {
           await ctx.runMutation(

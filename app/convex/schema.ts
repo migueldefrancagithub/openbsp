@@ -53,6 +53,15 @@ const messageTypeValidator = v.union(
   v.literal("interactive"),
   v.literal("location"),
   v.literal("contact"),
+  // Inbound types Meta actually delivers; rejecting them loses the message
+  // permanently (event marked failed, no retry). "button" = template
+  // quick-reply responses.
+  v.literal("button"),
+  v.literal("sticker"),
+  v.literal("contacts"),
+  v.literal("order"),
+  v.literal("request_welcome"),
+  v.literal("unsupported"),
   v.literal("reaction"),
   v.literal("system"),
 );
@@ -531,6 +540,8 @@ export default defineSchema({
     imageUrl: v.optional(v.string()),
     videoUrl: v.optional(v.string()),
     thumbnailUrl: v.optional(v.string()),
+    // Click ID for Conversions API attribution — cannot be backfilled.
+    ctwaClid: v.optional(v.string()),
     clickedAt: v.number(),
     freeEntryWindowExpiresAt: v.number(),
     createdAt: v.number(),
@@ -580,6 +591,10 @@ export default defineSchema({
     templateId: v.optional(v.id("templates")),
     templateVersion: v.optional(v.number()),
     pricingCategory: v.optional(pricingCategoryValidator),
+    // Per-message pricing (PMP): whether Meta bills this message and the
+    // pricing type (regular | free_customer_service | free_entry_point).
+    pricingBillable: v.optional(v.boolean()),
+    pricingType: v.optional(v.string()),
     costMinor: v.optional(v.number()),
     costCurrency: v.optional(v.string()),
     createdAt: v.number(),

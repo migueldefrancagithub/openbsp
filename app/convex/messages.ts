@@ -30,6 +30,13 @@ const messageTypeValidator = v.union(
   v.literal("interactive"),
   v.literal("location"),
   v.literal("contact"),
+  // Inbound types Meta actually delivers (see schema.ts).
+  v.literal("button"),
+  v.literal("sticker"),
+  v.literal("contacts"),
+  v.literal("order"),
+  v.literal("request_welcome"),
+  v.literal("unsupported"),
   v.literal("reaction"),
   v.literal("system"),
 );
@@ -107,6 +114,8 @@ export const markStatusFromWebhook = internalMutation({
         v.literal("service"),
       ),
     ),
+    pricingBillable: v.optional(v.boolean()),
+    pricingType: v.optional(v.string()),
   },
   returns: v.union(v.literal("updated"), v.literal("noop"), v.literal("not_found")),
   handler: async (ctx, args) => {
@@ -127,6 +136,8 @@ export const markStatusFromWebhook = internalMutation({
       failureCode: args.failureCode ?? msg.failureCode,
       failureReason: args.failureReason ?? msg.failureReason,
       pricingCategory: args.pricingCategory ?? msg.pricingCategory,
+      pricingBillable: args.pricingBillable ?? msg.pricingBillable,
+      pricingType: args.pricingType ?? msg.pricingType,
     });
     await syncCampaignRecipientFromMessage(ctx, msg._id, {
       status: args.newStatus,

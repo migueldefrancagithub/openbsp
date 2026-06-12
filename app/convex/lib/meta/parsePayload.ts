@@ -63,6 +63,8 @@ export type ParsedReferralContext = {
   imageUrl?: string;
   videoUrl?: string;
   thumbnailUrl?: string;
+  /** Click ID required for Conversions API attribution — unrecoverable if dropped. */
+  ctwaClid?: string;
 };
 
 export type ParsedStatus = {
@@ -77,7 +79,14 @@ export type ParsedStatus = {
   recipientBsuid?: string;
   recipientParentBsuid?: string;
   errors?: Array<{ code: number; title?: string }>;
-  pricing?: { category?: string; pricing_model?: string };
+  // Per-message pricing (PMP, since July 2025): free messages carry the
+  // same category as paid — billable/type distinguish them.
+  pricing?: {
+    category?: string;
+    pricing_model?: string;
+    billable?: boolean;
+    type?: string;
+  };
   raw: Record<string, unknown>;
 };
 
@@ -436,6 +445,7 @@ function parseReferralContext(raw: unknown): ParsedReferralContext | undefined {
     imageUrl: r.image_url ? String(r.image_url) : undefined,
     videoUrl: r.video_url ? String(r.video_url) : undefined,
     thumbnailUrl: r.thumbnail_url ? String(r.thumbnail_url) : undefined,
+    ctwaClid: r.ctwa_clid ? String(r.ctwa_clid) : undefined,
   };
 }
 
