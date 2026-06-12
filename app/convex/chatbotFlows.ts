@@ -3,6 +3,7 @@ import { internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { loadByIdInTenant, tenantQuery } from "./lib/customFunctions";
 import { isServiceWindowOpen } from "./lib/flow/window";
+import type { InteractivePayload } from "./lib/meta/graph";
 import type { Doc, Id } from "./_generated/dataModel";
 
 const flowRunStatusValidator = v.union(
@@ -547,7 +548,7 @@ async function enterFlow(
     if (node.type === "send_buttons" || node.type === "send_list") {
       const sent = await enqueueFlowText(
         ctx, args, conversation, bot, state.runId, node, node.type,
-        { body: renderChoices(node, state.vars, contact) },
+        buildChoicesMessage(node, state.vars, contact),
       );
       if (sent.skipped) {
         const run = await ctx.db.get(state.runId);
@@ -647,19 +648,66 @@ async function repromptNode(
     vars: run.vars ?? {},
     repromptCount: run.repromptCount + 1,
   };
-  const body =
+  const message =
     node.type === "send_buttons" || node.type === "send_list"
-      ? renderChoices(node, nextState.vars, contact)
-      : interpolate(node.body ?? "", nextState.vars, contact);
-  const sent = await enqueueFlowText(ctx, args, conversation, bot, run._id, node, "reprompt", {
-    body,
-  });
+      ? buildChoicesMessage(node, nextState.vars, contact)
+      : { body: interpolate(node.body ?? "", nextState.vars, contact) };
+  const sent = await enqueueFlowText(
+    ctx, args, conversation, bot, run._id, node, "reprompt", message,
+  );
   if (sent.skipped) {
     await failRun(ctx, run, "service_window_closed", args.receivedAt);
     return { consumed: true, flowRunId: run._id, status: "failed" as const };
   }
   await patchActiveRun(ctx, args, nextState, node.key);
   return { consumed: true, flowRunId: run._id, status: "active" as const };
+}
+
+/**
+ * Map a choices node to the richest Meta format available: 1-3 options →
+ * real reply buttons; 4-10 → interactive list; otherwise numbered text.
+ * Inbound matching is unchanged — matchChoice already prefers
+ * button_reply/list_reply ids and falls back to text/number.
+ */
+function buildChoicesMessage(
+  node: FlowNode,
+  vars: Record<string, string>,
+  contact: Doc<"contacts"> | null,
+): { body: string; interactive?: InteractivePayload } {
+  const body = interpolate(node.body ?? "", vars, contact);
+  const choices = node.buttons ?? [];
+  if (body && choices.length >= 1 && choices.length <= 3) {
+    return {
+      body,
+      interactive: {
+        kind: "buttons",
+        bodyText: body,
+        buttons: choices.map((c) => ({
+          id: c.replyId,
+          title: c.label.slice(0, 20),
+        })),
+      },
+    };
+  }
+  if (body && choices.length >= 4 && choices.length <= 10) {
+    return {
+      body,
+      interactive: {
+        kind: "list",
+        bodyText: body,
+        buttonText: "Escolher",
+        sections: [
+          {
+            rows: choices.map((c) => ({
+              id: c.replyId,
+              title: c.label.slice(0, 24),
+            })),
+          },
+        ],
+      },
+    };
+  }
+  return { body: renderChoices(node, vars, contact) };
 }
 
 async function enqueueFlowText(
@@ -670,7 +718,7 @@ async function enqueueFlowText(
   runId: Id<"chatbotFlowRuns">,
   node: FlowNode,
   kind: string,
-  message: { body: string },
+  message: { body: string; interactive?: InteractivePayload },
 ): Promise<{ messageId: Id<"messages"> | null; skipped: boolean }> {
   const body = message.body.trim().slice(0, 4096);
   if (!body) return { messageId: null, skipped: false };
@@ -698,21 +746,28 @@ async function enqueueFlowText(
     .unique();
   if (existing) return { messageId: existing._id, skipped: false };
 
+  const flowMeta = {
+    chatbotId: bot._id,
+    flowRunId: runId,
+    nodeKey: node.key,
+    kind,
+  };
   const messageId = await ctx.db.insert("messages", {
     tenantId: args.tenantId,
     conversationId: args.conversationId,
     direction: "outgoing",
     businessKey,
-    type: "text",
-    content: {
-      text: { body },
-      flow: {
-        chatbotId: bot._id,
-        flowRunId: runId,
-        nodeKey: node.key,
-        kind,
-      },
-    },
+    type: message.interactive ? "interactive" : "text",
+    content: message.interactive
+      ? {
+          interactive: message.interactive,
+          text: { body },
+          flow: flowMeta,
+        }
+      : {
+          text: { body },
+          flow: flowMeta,
+        },
     status: "queued",
     dispatchAttempts: 0,
     sentByChatbotId: bot._id,

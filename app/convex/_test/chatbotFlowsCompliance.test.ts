@@ -657,3 +657,71 @@ describe("STOP keyword", () => {
     void result;
   });
 });
+
+describe("interactive choice sends", () => {
+  async function seedChoices(labels: string[]) {
+    const t = convexTest(schema);
+    const seeded = await seedFlow(t, [
+      { key: "start", type: "start", title: "Start", nextKey: "menu" },
+      {
+        key: "menu",
+        type: "send_buttons",
+        title: "Menu",
+        body: "Como podemos ajudar?",
+        buttons: labels.map((label, i) => ({
+          replyId: `opt_${i + 1}`,
+          label,
+          nextKey: "end",
+        })),
+      },
+      { key: "end", type: "end", title: "End" },
+    ]);
+    await t.mutation((internal as any).chatbotFlows.dispatchInbound, {
+      ...inboundArgs(seeded, { text: "olá", metaMessageId: "wamid.int.1" }),
+    });
+    const messages = await t.run(async (ctx) =>
+      ctx.db.query("messages").collect(),
+    );
+    return { t, seeded, message: messages.find((m) => m.direction === "outgoing")! };
+  }
+
+  it("1-3 choices send real reply buttons", async () => {
+    const { message } = await seedChoices(["Marcar", "Cancelar"]);
+    expect(message.type).toBe("interactive");
+    expect(message.content.interactive).toMatchObject({
+      kind: "buttons",
+      bodyText: "Como podemos ajudar?",
+    });
+    expect(message.content.interactive.buttons).toHaveLength(2);
+    expect(message.content.interactive.buttons[0]).toEqual({
+      id: "opt_1",
+      title: "Marcar",
+    });
+    // Numbered-text fallback body preserved for transcript rendering.
+    expect(message.content.text.body).toContain("Como podemos ajudar?");
+  });
+
+  it("4-10 choices send an interactive list", async () => {
+    const { message } = await seedChoices(["A", "B", "C", "D", "E"]);
+    expect(message.type).toBe("interactive");
+    expect(message.content.interactive.kind).toBe("list");
+    const rows = message.content.interactive.sections[0].rows;
+    expect(rows).toHaveLength(5);
+    expect(rows[4]).toMatchObject({ id: "opt_5", title: "E" });
+  });
+
+  it("button reply id still advances the run", async () => {
+    const { t, seeded } = await seedChoices(["Marcar", "Cancelar"]);
+    const result = await t.mutation(
+      (internal as any).chatbotFlows.dispatchInbound,
+      {
+        ...inboundArgs(seeded, {
+          replyId: "opt_2",
+          text: "Cancelar",
+          metaMessageId: "wamid.int.2",
+        }),
+      },
+    );
+    expect(result.status).toBe("completed");
+  });
+});

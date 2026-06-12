@@ -14,6 +14,7 @@ import {
   sendWhatsAppText,
   sendWhatsAppTemplate,
   sendWhatsAppMarketingTemplate,
+  sendWhatsAppInteractive,
 } from "./lib/meta/graph";
 import { recordAiAuditEvent } from "./lib/aiControl";
 import { classifyMetaFailure } from "./lib/meta/errorClassifier";
@@ -699,10 +700,22 @@ export const _dispatchOne = internalAction({
       return null;
     }
     const isTemplate = !!(payload.content as { template?: unknown })?.template;
+    const interactive = (
+      payload.content as {
+        interactive?: import("./lib/meta/graph").InteractivePayload;
+      }
+    )?.interactive;
 
     let result: Awaited<ReturnType<typeof sendWhatsAppText>>;
     try {
-      if (isTemplate) {
+      if (interactive) {
+        result = await sendWhatsAppInteractive({
+          token,
+          phoneNumberId: payload.phoneNumberId,
+          recipient,
+          interactive,
+        });
+      } else if (isTemplate) {
         const tpl = (
           payload.content as {
             template: {
