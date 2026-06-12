@@ -4,7 +4,10 @@ import { internal } from "./_generated/api";
 import { tenantMutation, tenantQuery } from "./lib/customFunctions";
 import type { Id } from "./_generated/dataModel";
 import {
+  META_GRAPH_VERSION,
+  debugToken,
   exchangeEmbeddedSignupCode,
+  listWabaPhoneNumbers,
   subscribeAppToWaba,
   validateMetaToken,
 } from "./lib/meta/graph";
@@ -38,7 +41,9 @@ export const begin = tenantMutation({
     if (!appId || !redirectUri || !configId) {
       return { sessionId, state, configured: false };
     }
-    const url = new URL("https://www.facebook.com/dialog/oauth");
+    const url = new URL(
+      `https://www.facebook.com/${META_GRAPH_VERSION}/dialog/oauth`,
+    );
     url.searchParams.set("client_id", appId);
     url.searchParams.set("redirect_uri", redirectUri);
     url.searchParams.set("state", state);
@@ -112,33 +117,28 @@ export const completeCallback = action({
       state: args.state,
     });
     if (!session) throw new ConvexError({ code: "SIGNUP_SESSION_NOT_FOUND" });
-    const businessId = args.businessId ?? args.business_id;
-    const wabaId = args.wabaId ?? args.waba_id;
-    const phoneNumberId = args.phoneNumberId ?? args.phone_number_id;
-    const phoneE164 = args.phoneE164 ?? args.phone_e164;
-    const phoneDisplayName =
-      args.phoneDisplayName ?? args.phone_display_name;
+    // Client-supplied asset ids are HINTS only — Meta's OAuth redirect
+    // carries just code+state, and URL params are user-editable. The
+    // authoritative assets are derived server-side from the token itself:
+    // debug_token granular_scopes (WABA ids the token actually grants)
+    // + GET /{waba}/phone_numbers (phone id, E.164, verified name).
+    const hintedBusinessId = args.businessId ?? args.business_id;
+    const hintedWabaId = args.wabaId ?? args.waba_id;
+    const hintedPhoneNumberId = args.phoneNumberId ?? args.phone_number_id;
     let status: SignupCallbackStatus = args.error
       ? "failed"
-      : businessId || wabaId || phoneNumberId
-        ? "assets_received"
-        : "callback_received";
+      : "callback_received";
     let callbackError = args.error;
+    let resolvedWabaId = hintedWabaId;
+    let resolvedPhoneNumberId = hintedPhoneNumberId;
+    let resolvedPhoneE164 = args.phoneE164 ?? args.phone_e164;
+    let resolvedPhoneDisplayName =
+      args.phoneDisplayName ?? args.phone_display_name;
 
     const appId = process.env.META_EMBEDDED_SIGNUP_APP_ID;
     const appSecret = process.env.META_EMBEDDED_SIGNUP_APP_SECRET;
     const redirectUri = process.env.META_EMBEDDED_SIGNUP_REDIRECT_URI;
-    if (
-      !args.error &&
-      args.code &&
-      businessId &&
-      wabaId &&
-      phoneNumberId &&
-      phoneE164 &&
-      appId &&
-      appSecret &&
-      redirectUri
-    ) {
+    if (!args.error && args.code && appId && appSecret && redirectUri) {
       const compliance = (await ctx.runQuery(
         internal.whatsappAccounts.checkConnectionCompliance,
         { tenantId: session.tenantId },
@@ -159,32 +159,59 @@ export const completeCallback = action({
           status = "failed";
           callbackError = `token exchange failed: ${exchange.reason}`;
         } else {
-          const validation = await validateMetaToken(exchange.accessToken);
-          if (!validation.ok) {
+          const resolved = await resolveSignupAssets({
+            appId,
+            appSecret,
+            accessToken: exchange.accessToken,
+            hintedWabaId,
+            hintedPhoneNumberId,
+          });
+          if (!resolved.ok) {
             status = "failed";
-            callbackError = `token validation failed: ${validation.reason}`;
+            callbackError = resolved.reason;
           } else {
+            resolvedWabaId = resolved.wabaId;
+            resolvedPhoneNumberId = resolved.phoneNumberId;
+            resolvedPhoneE164 = resolved.phoneE164;
+            resolvedPhoneDisplayName =
+              resolved.phoneDisplayName ?? resolved.phoneNumberId;
             const subscribe = await subscribeAppToWaba({
               token: exchange.accessToken,
-              wabaId,
+              wabaId: resolved.wabaId,
             });
             if (!subscribe.ok) {
               status = "failed";
               callbackError = `WABA subscribe failed: ${subscribe.reason}`;
             } else {
-              await ctx.runMutation(internal.whatsappAccounts.insertConnection, {
-                tenantId: session.tenantId,
-                metaAppId: appId,
-                businessPortfolioId: businessId,
-                onboardingSource: "embedded_signup",
-                embeddedSignupSessionId: session._id,
-                wabaId,
-                validatedScopes: validation.scopes,
-                accessToken: exchange.accessToken,
-                phoneNumberId,
-                phoneE164,
-                phoneDisplayName: phoneDisplayName ?? phoneNumberId,
-              });
+              const connection = (await ctx.runMutation(
+                internal.whatsappAccounts.insertConnection,
+                {
+                  tenantId: session.tenantId,
+                  metaAppId: appId,
+                  businessPortfolioId: hintedBusinessId,
+                  onboardingSource: "embedded_signup",
+                  embeddedSignupSessionId: session._id,
+                  wabaId: resolved.wabaId,
+                  validatedScopes: resolved.scopes,
+                  accessToken: exchange.accessToken,
+                  phoneNumberId: resolved.phoneNumberId,
+                  phoneE164: resolved.phoneE164,
+                  phoneDisplayName:
+                    resolved.phoneDisplayName ?? resolved.phoneNumberId,
+                },
+              )) as { whatsappAccountId: Id<"whatsappAccounts"> };
+              // Persist token expiry from introspection (60-day configs
+              // silently die otherwise; "never" stores no expiry).
+              await ctx.runMutation(
+                internal.whatsappAccounts._patchTokenHealth,
+                {
+                  whatsappAccountId: connection.whatsappAccountId,
+                  tokenStatus: "ok",
+                  tokenExpiresAt: resolved.tokenExpiresAt,
+                  dataAccessExpiresAt: resolved.dataAccessExpiresAt,
+                  validatedScopes: resolved.scopes,
+                },
+              );
               status = "connected";
             }
           }
@@ -197,11 +224,11 @@ export const completeCallback = action({
       status,
       code: args.code,
       error: callbackError,
-      businessId,
-      wabaId,
-      phoneNumberId,
-      phoneE164,
-      phoneDisplayName,
+      businessId: hintedBusinessId,
+      wabaId: resolvedWabaId,
+      phoneNumberId: resolvedPhoneNumberId,
+      phoneE164: resolvedPhoneE164,
+      phoneDisplayName: resolvedPhoneDisplayName,
     });
     return {
       ok: status !== "failed",
@@ -209,6 +236,126 @@ export const completeCallback = action({
     };
   },
 });
+
+type ResolvedSignupAssets =
+  | {
+      ok: true;
+      wabaId: string;
+      phoneNumberId: string;
+      phoneE164: string;
+      phoneDisplayName?: string;
+      scopes: string[];
+      tokenExpiresAt?: number;
+      dataAccessExpiresAt?: number;
+    }
+  | { ok: false; reason: string };
+
+/**
+ * Derive the connected assets from the token itself:
+ *  1. debug_token — assert validity + app match; collect granted WABA ids
+ *     from granular_scopes (rejects tampered waba hints).
+ *  2. /{waba}/phone_numbers — authoritative phone id / E.164 / name
+ *     (rejects tampered phone hints).
+ *  3. /me/permissions via validateMetaToken — required scopes present.
+ */
+async function resolveSignupAssets(args: {
+  appId: string;
+  appSecret: string;
+  accessToken: string;
+  hintedWabaId?: string;
+  hintedPhoneNumberId?: string;
+}): Promise<ResolvedSignupAssets> {
+  const introspection = await debugToken({
+    appId: args.appId,
+    appSecret: args.appSecret,
+    inputToken: args.accessToken,
+  });
+  if (!introspection.ok) {
+    return { ok: false, reason: `debug_token failed: ${introspection.message}` };
+  }
+  if (!introspection.isValid) {
+    return {
+      ok: false,
+      reason: `token invalid: ${introspection.errorMessage ?? "is_valid=false"}`,
+    };
+  }
+  if (introspection.appId && introspection.appId !== args.appId) {
+    return { ok: false, reason: "token belongs to a different Meta app" };
+  }
+
+  const validation = await validateMetaToken(args.accessToken);
+  if (!validation.ok) {
+    return { ok: false, reason: `token validation failed: ${validation.reason}` };
+  }
+
+  const grantedWabaIds = new Set<string>();
+  for (const gs of introspection.granularScopes ?? []) {
+    if (
+      gs.scope === "whatsapp_business_management" ||
+      gs.scope === "whatsapp_business_messaging"
+    ) {
+      for (const id of gs.target_ids ?? []) grantedWabaIds.add(id);
+    }
+  }
+  let wabaId: string | undefined;
+  if (args.hintedWabaId) {
+    if (grantedWabaIds.size > 0 && !grantedWabaIds.has(args.hintedWabaId)) {
+      return {
+        ok: false,
+        reason: "waba_id hint not granted to this token (possible tampering)",
+      };
+    }
+    wabaId = args.hintedWabaId;
+  } else if (grantedWabaIds.size === 1) {
+    wabaId = Array.from(grantedWabaIds)[0];
+  } else if (grantedWabaIds.size > 1) {
+    return {
+      ok: false,
+      reason: "token grants multiple WABAs — waba hint required",
+    };
+  }
+  if (!wabaId) {
+    return { ok: false, reason: "no WABA derivable from token" };
+  }
+
+  const phones = await listWabaPhoneNumbers({
+    token: args.accessToken,
+    wabaId,
+  });
+  if (!phones.ok) {
+    return { ok: false, reason: `phone_numbers failed: ${phones.message}` };
+  }
+  const phone = args.hintedPhoneNumberId
+    ? phones.data.find((p) => p.id === args.hintedPhoneNumberId)
+    : phones.data.length === 1
+      ? phones.data[0]
+      : phones.data[0];
+  if (!phone) {
+    return {
+      ok: false,
+      reason: args.hintedPhoneNumberId
+        ? "phone_number_id hint not found on the WABA (possible tampering)"
+        : "WABA has no phone numbers",
+    };
+  }
+  const digits = (phone.displayPhoneNumber ?? "").replace(/[^\d]/g, "");
+  if (!digits) {
+    return { ok: false, reason: "phone has no display number on Meta" };
+  }
+  return {
+    ok: true,
+    wabaId,
+    phoneNumberId: phone.id,
+    phoneE164: `+${digits}`,
+    phoneDisplayName: phone.verifiedName,
+    scopes: validation.scopes,
+    tokenExpiresAt:
+      introspection.expiresAt > 0 ? introspection.expiresAt * 1000 : undefined,
+    dataAccessExpiresAt: introspection.dataAccessExpiresAt
+      ? introspection.dataAccessExpiresAt * 1000
+      : undefined,
+  };
+}
 
 export const _findByState = internalQuery({
   args: { state: v.string() },

@@ -53,6 +53,15 @@ const messageTypeValidator = v.union(
   v.literal("interactive"),
   v.literal("location"),
   v.literal("contact"),
+  // Inbound types Meta actually delivers; rejecting them loses the message
+  // permanently (event marked failed, no retry). "button" = template
+  // quick-reply responses.
+  v.literal("button"),
+  v.literal("sticker"),
+  v.literal("contacts"),
+  v.literal("order"),
+  v.literal("request_welcome"),
+  v.literal("unsupported"),
   v.literal("reaction"),
   v.literal("system"),
 );
@@ -187,6 +196,7 @@ const chatbotTriggerValidator = v.union(
 const chatbotFlowNodeTypeValidator = v.union(
   v.literal("start"),
   v.literal("send_message"),
+  v.literal("send_template"),
   v.literal("send_buttons"),
   v.literal("send_list"),
   v.literal("collect_input"),
@@ -201,6 +211,7 @@ const chatbotFlowRunStatusValidator = v.union(
   v.literal("completed"),
   v.literal("handed_off"),
   v.literal("timed_out"),
+  v.literal("stopped"),
   v.literal("failed"),
 );
 
@@ -208,12 +219,14 @@ const chatbotFlowEventTypeValidator = v.union(
   v.literal("started"),
   v.literal("node_entered"),
   v.literal("message_sent"),
+  v.literal("message_skipped"),
   v.literal("reply_received"),
   v.literal("fallback_fired"),
   v.literal("tag_set"),
   v.literal("handoff"),
   v.literal("completed"),
   v.literal("timeout"),
+  v.literal("stopped"),
   v.literal("error"),
 );
 
@@ -239,12 +252,21 @@ const chatbotFlowNodeValidator = v.object({
   ),
   variableKey: v.optional(v.string()),
   tag: v.optional(v.string()),
+  template: v.optional(
+    v.object({
+      templateId: v.id("templates"),
+      // key = String(parameterSchema.index), value = literal or "{{vars.x}}"
+      variables: v.record(v.string(), v.string()),
+    }),
+  ),
   condition: v.optional(
     v.object({
       variableKey: v.string(),
       operator: v.union(
         v.literal("equals"),
         v.literal("contains"),
+        v.literal("starts_with"),
+        v.literal("ends_with"),
         v.literal("present"),
         v.literal("absent"),
       ),
@@ -366,9 +388,16 @@ export default defineSchema({
     lastQualityCheckAt: v.optional(v.number()),
     lastTokenHealthCheckAt: v.optional(v.number()),
     tokenStatus: tokenStatusValidator,
+    /** Human-readable detail for the last token health verdict. */
+    tokenHealthDetail: v.optional(v.string()),
+    dataAccessExpiresAt: v.optional(v.number()),
     validatedAt: v.optional(v.number()),
     validatedScopes: v.optional(v.array(v.string())),
     tokenExpiresAt: v.optional(v.number()),
+    /** Last account_update webhook event + ban/restriction state from Meta. */
+    accountUpdateEvent: v.optional(v.string()),
+    banState: v.optional(v.string()),
+    accountRestrictions: v.optional(v.any()),
     createdAt: v.number(),
   })
     .index("by_waba", ["wabaId"])
@@ -381,6 +410,13 @@ export default defineSchema({
     phoneNumberId: v.string(),
     e164: v.string(),
     displayName: v.string(),
+    /** Synced from Meta (GET /{phone-number-id}); never overwrites displayName. */
+    verifiedName: v.optional(v.string()),
+    messagingTier: v.optional(v.string()),
+    throughputLevel: v.optional(v.string()),
+    lastQualityEvent: v.optional(v.string()),
+    lastQualityEventAt: v.optional(v.number()),
+    lastMetaSyncAt: v.optional(v.number()),
     qualityRating: v.optional(qualityRatingValidator),
     qualityLastErrorAt: v.optional(v.number()),
     qualityLastErrorCode: v.optional(v.string()),
@@ -518,6 +554,8 @@ export default defineSchema({
     imageUrl: v.optional(v.string()),
     videoUrl: v.optional(v.string()),
     thumbnailUrl: v.optional(v.string()),
+    // Click ID for Conversions API attribution — cannot be backfilled.
+    ctwaClid: v.optional(v.string()),
     clickedAt: v.number(),
     freeEntryWindowExpiresAt: v.number(),
     createdAt: v.number(),
@@ -567,6 +605,10 @@ export default defineSchema({
     templateId: v.optional(v.id("templates")),
     templateVersion: v.optional(v.number()),
     pricingCategory: v.optional(pricingCategoryValidator),
+    // Per-message pricing (PMP): whether Meta bills this message and the
+    // pricing type (regular | free_customer_service | free_entry_point).
+    pricingBillable: v.optional(v.boolean()),
+    pricingType: v.optional(v.string()),
     costMinor: v.optional(v.number()),
     costCurrency: v.optional(v.string()),
     createdAt: v.number(),
@@ -871,6 +913,12 @@ export default defineSchema({
     qualityScore: v.optional(v.string()),
     rejectionReason: v.optional(v.string()),
     syncedAt: v.optional(v.number()),
+    /** "imported" = pulled from the WABA via importFromMeta. */
+    source: v.optional(v.union(v.literal("local"), v.literal("imported"))),
+    /** NAMED templates need parameter_name on send; we only support POSITIONAL. */
+    parameterFormat: v.optional(
+      v.union(v.literal("positional"), v.literal("named")),
+    ),
     createdAt: v.number(),
     createdBy: v.id("members"),
   })
@@ -895,6 +943,8 @@ export default defineSchema({
     approvedAt: v.optional(v.number()),
     rejectedAt: v.optional(v.number()),
     rejectionReason: v.optional(v.string()),
+    /** Full-fidelity copy of Meta components for imported templates. */
+    metaComponents: v.optional(v.any()),
     isLocked: v.boolean(),
     createdBy: v.id("members"),
     createdAt: v.number(),

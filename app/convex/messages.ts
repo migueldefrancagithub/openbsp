@@ -14,6 +14,7 @@ import {
   sendWhatsAppText,
   sendWhatsAppTemplate,
   sendWhatsAppMarketingTemplate,
+  sendWhatsAppInteractive,
 } from "./lib/meta/graph";
 import { recordAiAuditEvent } from "./lib/aiControl";
 import { classifyMetaFailure } from "./lib/meta/errorClassifier";
@@ -30,6 +31,13 @@ const messageTypeValidator = v.union(
   v.literal("interactive"),
   v.literal("location"),
   v.literal("contact"),
+  // Inbound types Meta actually delivers (see schema.ts).
+  v.literal("button"),
+  v.literal("sticker"),
+  v.literal("contacts"),
+  v.literal("order"),
+  v.literal("request_welcome"),
+  v.literal("unsupported"),
   v.literal("reaction"),
   v.literal("system"),
 );
@@ -107,6 +115,8 @@ export const markStatusFromWebhook = internalMutation({
         v.literal("service"),
       ),
     ),
+    pricingBillable: v.optional(v.boolean()),
+    pricingType: v.optional(v.string()),
   },
   returns: v.union(v.literal("updated"), v.literal("noop"), v.literal("not_found")),
   handler: async (ctx, args) => {
@@ -127,6 +137,8 @@ export const markStatusFromWebhook = internalMutation({
       failureCode: args.failureCode ?? msg.failureCode,
       failureReason: args.failureReason ?? msg.failureReason,
       pricingCategory: args.pricingCategory ?? msg.pricingCategory,
+      pricingBillable: args.pricingBillable ?? msg.pricingBillable,
+      pricingType: args.pricingType ?? msg.pricingType,
     });
     await syncCampaignRecipientFromMessage(ctx, msg._id, {
       status: args.newStatus,
@@ -315,6 +327,30 @@ export const _claimForDispatch = internalMutation({
     const msg = await ctx.db.get(args.messageId);
     if (!msg) return null;
     if (msg.status !== "queued") return null;
+
+    // Hard stop: never dispatch against a banned/restricted WABA or a
+    // revoked token (account_update webhook / token health set these).
+    const conv = await ctx.db.get(msg.conversationId);
+    const phone = conv ? await ctx.db.get(conv.phoneNumberId) : null;
+    const account = phone
+      ? await ctx.db.get(phone.whatsappAccountId)
+      : null;
+    if (
+      !account ||
+      account.status !== "active" ||
+      account.tokenStatus === "revoked"
+    ) {
+      await ctx.db.patch(args.messageId, {
+        status: "failed",
+        failureReason: "waba_not_active",
+      });
+      await syncCampaignRecipientFromMessage(ctx, args.messageId, {
+        status: "failed",
+        failureReason: "waba_not_active",
+      });
+      return null;
+    }
+
     await ctx.db.patch(args.messageId, {
       status: "dispatching",
       claimedAt: Date.now(),
@@ -664,10 +700,22 @@ export const _dispatchOne = internalAction({
       return null;
     }
     const isTemplate = !!(payload.content as { template?: unknown })?.template;
+    const interactive = (
+      payload.content as {
+        interactive?: import("./lib/meta/graph").InteractivePayload;
+      }
+    )?.interactive;
 
     let result: Awaited<ReturnType<typeof sendWhatsAppText>>;
     try {
-      if (isTemplate) {
+      if (interactive) {
+        result = await sendWhatsAppInteractive({
+          token,
+          phoneNumberId: payload.phoneNumberId,
+          recipient,
+          interactive,
+        });
+      } else if (isTemplate) {
         const tpl = (
           payload.content as {
             template: {

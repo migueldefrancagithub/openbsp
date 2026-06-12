@@ -62,10 +62,15 @@ export const enqueue = internalMutation({
     }
 
     for (const item of parsed) {
+      // Never truncate: processOne JSON.parses this payload — a sliced
+      // string is invalid JSON and the (HMAC-valid) message is lost.
+      // Documented payloads exceed 8KB (orders, multi-vCard contacts,
+      // 4096-char texts + referral). The 8000-char slices above are
+      // forensic-only rows that are never re-parsed.
       const itemPayload = JSON.stringify(item);
       const result = await tryRegisterWebhookEvent(ctx, {
         eventKey: item.eventKey,
-        rawPayload: itemPayload.slice(0, 8000),
+        rawPayload: itemPayload,
         rawBodySha256: args.rawBodySha256,
         metaTimestamp: item.metaTimestamp,
       });
@@ -299,6 +304,38 @@ export const handleStopKeyword = internalMutation({
         });
       }
     }
+    // Cascade: stop active chatbot flow runs for this contact. Stopped runs
+    // never resume (findActiveRun only matches status "active") and the
+    // STOP branch in processOne never starts a new one.
+    const now = Date.now();
+    const activeRuns = await ctx.db
+      .query("chatbotFlowRuns")
+      .withIndex("by_contact_status", (q) =>
+        q
+          .eq("tenantId", args.tenantId)
+          .eq("contactId", args.contactId)
+          .eq("status", "active"),
+      )
+      .collect();
+    for (const run of activeRuns) {
+      await ctx.db.patch(run._id, {
+        status: "stopped",
+        endedAt: now,
+        endReason: "stop_keyword",
+        lastAdvancedAt: now,
+      });
+      await ctx.db.insert("chatbotFlowEvents", {
+        tenantId: args.tenantId,
+        chatbotId: run.chatbotId,
+        flowRunId: run._id,
+        conversationId: run.conversationId,
+        contactId: run.contactId,
+        eventType: "stopped",
+        nodeKey: run.currentNodeKey,
+        payload: { reason: "stop_keyword" },
+        createdAt: now,
+      });
+    }
     return null;
   },
 });
@@ -460,6 +497,7 @@ export const recordCtwaReferral = internalMutation({
       imageUrl: v.optional(v.string()),
       videoUrl: v.optional(v.string()),
       thumbnailUrl: v.optional(v.string()),
+      ctwaClid: v.optional(v.string()),
     }),
   },
   returns: v.null(),
@@ -488,6 +526,7 @@ export const recordCtwaReferral = internalMutation({
       imageUrl: args.referral.imageUrl,
       videoUrl: args.referral.videoUrl,
       thumbnailUrl: args.referral.thumbnailUrl,
+      ctwaClid: args.referral.ctwaClid,
       clickedAt: args.clickedAt,
       freeEntryWindowExpiresAt,
       createdAt: Date.now(),
@@ -553,7 +592,10 @@ export const processOne = internalAction({
         | { kind: "status"; [k: string]: unknown }
         | { kind: "user_id_update"; [k: string]: unknown }
         | { kind: "user_preference"; [k: string]: unknown }
-        | { kind: "business_username_update"; [k: string]: unknown };
+        | { kind: "business_username_update"; [k: string]: unknown }
+        | { kind: "template_status_update"; [k: string]: unknown }
+        | { kind: "phone_quality_update"; [k: string]: unknown }
+        | { kind: "account_update"; [k: string]: unknown };
 
       if (item.kind === "message") {
         const phone = await ctx.runQuery(
@@ -608,6 +650,12 @@ export const processOne = internalAction({
           | "interactive"
           | "location"
           | "contact"
+          | "button"
+          | "sticker"
+          | "contacts"
+          | "order"
+          | "request_welcome"
+          | "unsupported"
           | "reaction"
           | "system";
 
@@ -641,6 +689,7 @@ export const processOne = internalAction({
               imageUrl?: string;
               videoUrl?: string;
               thumbnailUrl?: string;
+              ctwaClid?: string;
             }
           | undefined;
         if (referral?.source === "ctwa") {
@@ -661,6 +710,7 @@ export const processOne = internalAction({
               imageUrl: referral.imageUrl,
               videoUrl: referral.videoUrl,
               thumbnailUrl: referral.thumbnailUrl,
+              ctwaClid: referral.ctwaClid,
             },
           });
         }
@@ -739,9 +789,51 @@ export const processOne = internalAction({
           status: String(item.status),
           updatedAt: Number(item.metaTimestamp),
         });
+      } else if (item.kind === "template_status_update") {
+        await ctx.runMutation(internal.templates.applyMetaStatusUpdate, {
+          wabaId: String(item.wabaId),
+          metaTemplateId: String(item.metaTemplateId),
+          name: String(item.name),
+          language: String(item.language),
+          event: String(item.event),
+          reason: item.reason ? String(item.reason) : undefined,
+          updatedAt: Number(item.metaTimestamp),
+        });
+      } else if (item.kind === "phone_quality_update") {
+        await ctx.runMutation(
+          internal.whatsappAccounts.applyPhoneQualityUpdate,
+          {
+            wabaId: String(item.wabaId),
+            displayPhoneNumber: String(item.displayPhoneNumber),
+            event: String(item.event),
+            currentLimit: item.currentLimit
+              ? String(item.currentLimit)
+              : undefined,
+            oldLimit: item.oldLimit ? String(item.oldLimit) : undefined,
+            updatedAt: Number(item.metaTimestamp),
+          },
+        );
+      } else if (item.kind === "account_update") {
+        await ctx.runMutation(internal.whatsappAccounts.applyAccountUpdate, {
+          wabaId: String(item.wabaId),
+          event: String(item.event),
+          banState: item.banState ? String(item.banState) : undefined,
+          restrictions: item.restrictions as
+            | Array<{ type: string; expiration?: number }>
+            | undefined,
+          violationType: item.violationType
+            ? String(item.violationType)
+            : undefined,
+          updatedAt: Number(item.metaTimestamp),
+        });
       } else if (item.kind === "status") {
         const pricing = item.pricing as
-          | { category?: string; pricing_model?: string }
+          | {
+              category?: string;
+              pricing_model?: string;
+              billable?: boolean;
+              type?: string;
+            }
           | undefined;
         const pricingCategory =
           pricing?.category === "marketing" ||
@@ -761,6 +853,9 @@ export const processOne = internalAction({
           failureCode: firstError ? String(firstError.code) : undefined,
           failureReason: firstError?.title,
           pricingCategory,
+          pricingBillable:
+            typeof pricing?.billable === "boolean" ? pricing.billable : undefined,
+          pricingType: pricing?.type ? String(pricing.type) : undefined,
         });
         if (item.status === "failed") {
           await ctx.runMutation(

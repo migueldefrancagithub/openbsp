@@ -57,6 +57,7 @@ import {
   Zap,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import Link from "next/link";
 import { PageHeader } from "@/components/app/EmptyState";
 import { SegmentedTabs } from "@/components/app/SegmentedTabs";
 import { api } from "../../../../convex/_generated/api";
@@ -70,6 +71,7 @@ type BuilderTab = "design" | "settings" | "runs";
 type FlowNodeType =
   | "start"
   | "send_message"
+  | "send_template"
   | "send_buttons"
   | "send_list"
   | "collect_input"
@@ -77,7 +79,13 @@ type FlowNodeType =
   | "set_tag"
   | "handoff"
   | "end";
-type ConditionOperator = "equals" | "contains" | "present" | "absent";
+type ConditionOperator =
+  | "equals"
+  | "contains"
+  | "starts_with"
+  | "ends_with"
+  | "present"
+  | "absent";
 type FlowNodePosition = { x: number; y: number };
 
 type FlowNode = {
@@ -89,6 +97,10 @@ type FlowNode = {
   position?: FlowNodePosition;
   variableKey?: string;
   tag?: string;
+  template?: {
+    templateId: Id<"templates">;
+    variables: Record<string, string>;
+  };
   condition?: {
     variableKey: string;
     operator: ConditionOperator;
@@ -184,6 +196,7 @@ const TRIGGER_COPY: Record<TriggerKind, string> = {
 const NODE_TYPE_LABELS: Record<FlowNodeType, string> = {
   start: "Start",
   send_message: "Send message",
+  send_template: "Send template",
   send_buttons: "Button menu",
   send_list: "List menu",
   collect_input: "Collect input",
@@ -195,6 +208,7 @@ const NODE_TYPE_LABELS: Record<FlowNodeType, string> = {
 
 const FLOW_NODE_TYPES: FlowNodeType[] = [
   "send_message",
+  "send_template",
   "send_buttons",
   "send_list",
   "collect_input",
@@ -895,6 +909,12 @@ const STEP_CATALOG: Array<{
     icon: MessageSquare,
   },
   {
+    type: "send_template",
+    label: "Send Template",
+    detail: "Approved template — works outside the 24h window.",
+    icon: Sparkles,
+  },
+  {
     type: "collect_input",
     label: "Ask Question",
     detail: "Collect a reply into a variable.",
@@ -1005,7 +1025,6 @@ function FlowBuilder({
 }) {
   const [selectedNodeKey, setSelectedNodeKey] = useState("");
   const [paletteOpen, setPaletteOpen] = useState(false);
-  const [testMode, setTestMode] = useState(true);
   const [templateMenuOpen, setTemplateMenuOpen] = useState(false);
   const [drawerMode, setDrawerMode] = useState<"edit" | "preview" | null>(
     "edit",
@@ -1286,7 +1305,6 @@ function FlowBuilder({
           <button
             type="button"
             onClick={() => {
-              setTestMode(true);
               setDrawerMode("preview");
             }}
             className="inline-flex h-8 items-center gap-2 rounded-md border border-blue-100/90 bg-white/70 px-3 text-sm font-semibold text-blue-600 shadow-sm backdrop-blur-xl hover:bg-blue-50/82"
@@ -1535,7 +1553,6 @@ function FlowBuilder({
                 botName={selectedBot.name}
                 triggerKind={triggerKind}
                 keywords={keywords}
-                testMode={testMode}
               />
             </div>
           )}
@@ -1577,7 +1594,6 @@ function FlowBuilder({
                   botName={selectedBot.name}
                   triggerKind={triggerKind}
                   keywords={keywords}
-                  testMode={testMode}
                 />
               ) : (
                 <FlowInspectorPanel
@@ -1998,6 +2014,10 @@ function FlowInspectorPanel({
               </div>
             )}
 
+            {selectedNode.type === "send_template" && (
+              <SendTemplateConfig node={selectedNode} onUpdate={onUpdate} />
+            )}
+
             {(selectedNode.type === "send_buttons" ||
               selectedNode.type === "send_list") && (
               <ChoiceRowsEditor
@@ -2038,6 +2058,8 @@ function FlowInspectorPanel({
                     { value: "absent", label: "Absent" },
                     { value: "equals", label: "Equals" },
                     { value: "contains", label: "Contains" },
+                    { value: "starts_with", label: "Starts with" },
+                    { value: "ends_with", label: "Ends with" },
                   ]}
                   placeholder="Operator"
                 />
@@ -2252,7 +2274,6 @@ function WhatsAppFlowPreview({
   botName,
   triggerKind,
   keywords,
-  testMode,
 }: {
   nodes: FlowNode[];
   entryNodeKey: string;
@@ -2260,16 +2281,10 @@ function WhatsAppFlowPreview({
   botName: string;
   triggerKind: TriggerKind;
   keywords: string;
-  testMode: boolean;
 }) {
   const previewNodes = useMemo(
-    () =>
-      walkFlowPath(
-        nodes,
-        testMode ? selectedNodeKey || entryNodeKey : entryNodeKey,
-        7,
-      ),
-    [entryNodeKey, nodes, selectedNodeKey, testMode],
+    () => walkFlowPath(nodes, selectedNodeKey || entryNodeKey, 7),
+    [entryNodeKey, nodes, selectedNodeKey],
   );
   const keyword = keywords
     .split(",")
@@ -2295,7 +2310,7 @@ function WhatsAppFlowPreview({
                 WhatsApp preview
               </h3>
               <p className="text-xs text-slate-500">
-                {testMode ? "Testing selected path" : "Entry path"}
+                Testing selected path
               </p>
             </div>
           </div>
@@ -2374,6 +2389,22 @@ function PreviewBubble({ node }: { node: FlowNode }) {
     return (
       <div className="rounded-lg border border-amber-200/40 bg-amber-50/95 px-3 py-2 text-xs leading-5 text-amber-900">
         Tag set: {node.tag || "untitled_tag"}
+      </div>
+    );
+  }
+  if (node.type === "send_template") {
+    return node.template ? (
+      <div className="rounded-lg bg-white/95 px-3 py-2 text-sm leading-5 text-slate-800">
+        <span className="text-xs font-medium text-[#0b7a5f]">
+          Approved template
+        </span>
+        <p className="text-xs text-slate-500">
+          Sends outside the 24h window.
+        </p>
+      </div>
+    ) : (
+      <div className="rounded-lg border border-amber-200/40 bg-amber-50/95 px-3 py-2 text-xs leading-5 text-amber-900">
+        No template selected
       </div>
     );
   }
@@ -2928,6 +2959,8 @@ function FlowNodeCard({
               { value: "absent", label: "Absent" },
               { value: "equals", label: "Equals" },
               { value: "contains", label: "Contains" },
+              { value: "starts_with", label: "Starts with" },
+              { value: "ends_with", label: "Ends with" },
             ]}
             placeholder="Operator"
           />
@@ -3118,6 +3151,84 @@ function PanelTitle({
   );
 }
 
+function SendTemplateConfig({
+  node,
+  onUpdate,
+}: {
+  node: FlowNode;
+  onUpdate: (patch: Partial<FlowNode>) => void;
+}) {
+  const templates = useQuery(api.templates.list) as
+    | Array<{
+        _id: Id<"templates">;
+        name: string;
+        language: string;
+        status: string;
+        parameterSchema: Array<{ index: number; name: string; example: string }>;
+      }>
+    | undefined;
+  const approved = (templates ?? []).filter((t) => t.status === "approved");
+  const selected = approved.find((t) => t._id === node.template?.templateId);
+
+  if (templates && approved.length === 0) {
+    return (
+      <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-[12px] text-amber-800">
+        No approved templates yet. Create and submit one in{" "}
+        <Link href="/app/templates" className="font-medium underline">
+          Templates
+        </Link>{" "}
+        first — template sends are what work outside the 24h window.
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-4 grid gap-3 rounded-lg border border-slate-200 bg-[#fbfdff] p-3">
+      <SelectBox
+        label="Approved template"
+        value={node.template?.templateId ?? ""}
+        onChange={(value) =>
+          onUpdate({
+            template: value
+              ? { templateId: value as Id<"templates">, variables: {} }
+              : undefined,
+          })
+        }
+        options={approved.map((t) => ({
+          value: t._id,
+          label: `${t.name} (${t.language})`,
+        }))}
+        placeholder="Choose template"
+      />
+      {selected &&
+        selected.parameterSchema.map((param) => (
+          <TextInput
+            key={param.index}
+            label={`{{${param.index}}} ${param.name}`}
+            value={node.template?.variables?.[String(param.index)] ?? ""}
+            onChange={(value) =>
+              onUpdate({
+                template: {
+                  templateId: selected._id,
+                  variables: {
+                    ...(node.template?.variables ?? {}),
+                    [String(param.index)]: value,
+                  },
+                },
+              })
+            }
+            placeholder={param.example || `e.g. {{vars.name}}`}
+          />
+        ))}
+      {selected && (
+        <p className="text-[11px] text-slate-400">
+          Values support {"{{vars.x}}"} and {"{{contact.name}}"} interpolation.
+        </p>
+      )}
+    </div>
+  );
+}
+
 function TextInput({
   label,
   value,
@@ -3265,6 +3376,14 @@ function defaultNodePatch(type: FlowNodeType): Partial<FlowNode> {
   if (type === "send_message") {
     return { body: "", nextKey: undefined, buttons: undefined };
   }
+  if (type === "send_template") {
+    return {
+      template: undefined,
+      nextKey: undefined,
+      body: undefined,
+      buttons: undefined,
+    };
+  }
   if (type === "send_buttons") {
     return {
       body: "",
@@ -3329,6 +3448,7 @@ function needsNextNode(type: FlowNodeType): boolean {
   return (
     type === "start" ||
     type === "send_message" ||
+    type === "send_template" ||
     type === "collect_input" ||
     type === "set_tag"
   );
@@ -3354,6 +3474,7 @@ function groupIssuesByNode(issues: FlowIssue[]): Map<string, FlowIssue[]> {
 
 function flowNodeIcon(type: FlowNodeType): LucideIcon {
   if (type === "send_message") return MessageSquare;
+  if (type === "send_template") return Sparkles;
   if (type === "send_buttons") return GitBranch;
   if (type === "send_list") return ListTree;
   if (type === "collect_input") return Send;

@@ -7,7 +7,12 @@ import {
 } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { tenantQuery } from "./lib/customFunctions";
-import { validateMetaToken } from "./lib/meta/graph";
+import {
+  validateMetaToken,
+  debugToken,
+  getPhoneNumberDetails,
+  REQUIRED_SCOPES,
+} from "./lib/meta/graph";
 import { classifyMetaFailure } from "./lib/meta/errorClassifier";
 import {
   allowPlaintextSecretStorageForTests,
@@ -559,5 +564,468 @@ export const decryptWabaToken = internalAction({
       }
     }
     return secret.accessToken ?? null;
+  },
+});
+
+// ---------- Meta sync webhooks: phone quality / account updates ----------
+
+function normalizeDisplayPhone(display?: string): string | undefined {
+  const d = display?.trim();
+  if (!d) return undefined;
+  return d.startsWith("+") ? d : `+${d.replace(/[^\d]/g, "")}`;
+}
+
+function tierFromLimit(limit?: string): string | undefined {
+  return limit ? limit.toUpperCase() : undefined;
+}
+
+/**
+ * Apply a `phone_number_quality_update` webhook. FLAGGED opens the circuit
+ * breaker (red); UNFLAGGED clears it (green); UPGRADE/DOWNGRADE adjust the
+ * messaging tier. Webhooks are the real-time signal — the quality sweep
+ * cron is the safety net.
+ */
+export const applyPhoneQualityUpdate = internalMutation({
+  args: {
+    wabaId: v.string(),
+    displayPhoneNumber: v.string(),
+    event: v.string(),
+    currentLimit: v.optional(v.string()),
+    oldLimit: v.optional(v.string()),
+    updatedAt: v.number(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const account = await ctx.db
+      .query("whatsappAccounts")
+      .withIndex("by_waba", (q) => q.eq("wabaId", args.wabaId))
+      .first();
+    if (!account) return null;
+
+    const phones = await ctx.db
+      .query("phoneNumbers")
+      .withIndex("by_account", (q) => q.eq("whatsappAccountId", account._id))
+      .collect();
+    const normalized = normalizeDisplayPhone(args.displayPhoneNumber);
+    const phone =
+      phones.find(
+        (p) => p.e164 === normalized || p.e164 === args.displayPhoneNumber,
+      ) ?? (phones.length === 1 ? phones[0] : undefined);
+    if (!phone || phone.tenantId !== account.tenantId) return null;
+
+    const event = args.event.toUpperCase();
+    const now = Date.now();
+    const patch: Record<string, unknown> = {
+      lastQualityEvent: event,
+      lastQualityEventAt: args.updatedAt,
+      messagingTier: tierFromLimit(args.currentLimit) ?? phone.messagingTier,
+    };
+    if (event === "FLAGGED") {
+      patch.qualityRating = "red";
+      patch.circuitBreakerUntil = now + 3 * 60 * 60 * 1000;
+      patch.circuitBreakerReason = "Meta flagged phone quality";
+      patch.circuitBreakerOpenedAt = now;
+    } else if (event === "UNFLAGGED") {
+      patch.qualityRating = "green";
+      patch.circuitBreakerUntil = undefined;
+      patch.circuitBreakerReason = undefined;
+    } else if (event === "DOWNGRADE") {
+      patch.qualityRating = "yellow";
+    } else if (event === "UPGRADE" || event === "ONBOARDING") {
+      patch.qualityRating = phone.qualityRating ?? "green";
+    }
+    await ctx.db.patch(phone._id, patch);
+    await ctx.db.patch(account._id, {
+      messagingTier: tierFromLimit(args.currentLimit) ?? account.messagingTier,
+      lastQualityCheckAt: args.updatedAt,
+    });
+    return null;
+  },
+});
+
+/**
+ * Apply an `account_update` webhook (bans, restrictions, violations,
+ * reinstatement). When the account leaves "active", outbound is paused:
+ * every phone gets a circuit breaker and running campaigns are paused.
+ * The hard stop lives in messages._claimForDispatch (waba_not_active).
+ */
+export const applyAccountUpdate = internalMutation({
+  args: {
+    wabaId: v.string(),
+    event: v.string(),
+    banState: v.optional(v.string()),
+    restrictions: v.optional(
+      v.array(
+        v.object({ type: v.string(), expiration: v.optional(v.number()) }),
+      ),
+    ),
+    violationType: v.optional(v.string()),
+    updatedAt: v.number(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const account = await ctx.db
+      .query("whatsappAccounts")
+      .withIndex("by_waba", (q) => q.eq("wabaId", args.wabaId))
+      .first();
+    if (!account) return null;
+
+    const event = args.event.toUpperCase();
+    const ban = args.banState?.toUpperCase();
+    let status = account.status;
+    if (event === "DISABLED_UPDATE" || event === "ACCOUNT_DELETED") {
+      status = ban === "REINSTATE" ? "active" : "revoked";
+    } else if (ban === "DISABLE") {
+      status = "revoked";
+    } else if (ban === "SCHEDULE_FOR_DISABLE") {
+      status = "flagged";
+    } else if (event === "ACCOUNT_RESTRICTION" || event === "ACCOUNT_VIOLATION") {
+      status = "flagged";
+    } else if (ban === "REINSTATE" || event === "VERIFIED_ACCOUNT") {
+      status = "active";
+    }
+
+    await ctx.db.patch(account._id, {
+      status,
+      accountUpdateEvent: event,
+      banState: ban,
+      accountRestrictions:
+        status === "active" ? undefined : (args.restrictions ?? account.accountRestrictions),
+    });
+
+    const phones = await ctx.db
+      .query("phoneNumbers")
+      .withIndex("by_account", (q) => q.eq("whatsappAccountId", account._id))
+      .collect();
+    const now = Date.now();
+    if (status !== "active") {
+      const expiration = args.restrictions?.find((r) => r.expiration)?.expiration;
+      const until = expiration ? expiration * 1000 : now + 24 * 60 * 60 * 1000;
+      const reason =
+        args.violationType ??
+        ban ??
+        `Meta account_update ${event}`;
+      for (const phone of phones) {
+        await ctx.db.patch(phone._id, {
+          circuitBreakerUntil: until,
+          circuitBreakerReason: reason,
+          circuitBreakerOpenedAt: now,
+        });
+      }
+      // Pause running campaigns of this tenant.
+      const running = await ctx.db
+        .query("campaigns")
+        .withIndex("by_tenant_status", (q) =>
+          q.eq("tenantId", account.tenantId).eq("status", "running"),
+        )
+        .collect();
+      for (const campaign of running) {
+        await ctx.db.patch(campaign._id, {
+          status: "paused",
+          pausedAt: now,
+          pauseReason: `account_update:${event}`,
+          updatedAt: now,
+        });
+        await ctx.db.insert("campaignEvents", {
+          tenantId: account.tenantId,
+          campaignId: campaign._id,
+          type: "campaign.auto_paused.account_update",
+          payload: { event, banState: ban },
+          createdAt: now,
+        });
+      }
+    } else {
+      // Reinstated: clear account-level circuit breakers.
+      for (const phone of phones) {
+        if (phone.circuitBreakerReason?.startsWith("Meta account_update") ||
+            phone.circuitBreakerReason === ban) {
+          await ctx.db.patch(phone._id, {
+            circuitBreakerUntil: undefined,
+            circuitBreakerReason: undefined,
+          });
+        }
+      }
+    }
+    return null;
+  },
+});
+
+// ---------- Token health (debug_token introspection + cron sweep) ----------
+
+const TOKEN_EXPIRY_WARNING_MS = 14 * 24 * 60 * 60 * 1000;
+
+function appSecretForMetaApp(metaAppId: string): string | undefined {
+  if (
+    process.env.META_EMBEDDED_SIGNUP_APP_ID &&
+    metaAppId === process.env.META_EMBEDDED_SIGNUP_APP_ID
+  ) {
+    return process.env.META_EMBEDDED_SIGNUP_APP_SECRET;
+  }
+  return process.env.PLATFORM_META_APP_SECRET;
+}
+
+export const _patchTokenHealth = internalMutation({
+  args: {
+    whatsappAccountId: v.id("whatsappAccounts"),
+    tokenStatus: v.union(
+      v.literal("ok"),
+      v.literal("expiring"),
+      v.literal("revoked"),
+    ),
+    tokenExpiresAt: v.optional(v.number()),
+    dataAccessExpiresAt: v.optional(v.number()),
+    tokenHealthDetail: v.optional(v.string()),
+    validatedScopes: v.optional(v.array(v.string())),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const account = await ctx.db.get(args.whatsappAccountId);
+    if (!account) return null;
+    await ctx.db.patch(args.whatsappAccountId, {
+      tokenStatus: args.tokenStatus,
+      tokenExpiresAt: args.tokenExpiresAt,
+      dataAccessExpiresAt: args.dataAccessExpiresAt,
+      tokenHealthDetail: args.tokenHealthDetail,
+      validatedScopes: args.validatedScopes ?? account.validatedScopes,
+      lastTokenHealthCheckAt: Date.now(),
+    });
+    return null;
+  },
+});
+
+/**
+ * Introspect one account's token via debug_token. Transitions:
+ *   ok       — is_valid and (never expires or >14d away)
+ *   expiring — is_valid but expires within 14d
+ *   revoked  — is_valid=false, Graph code 190, or missing required scopes
+ * Transient network errors never flip the status (only a definitive
+ * debug_token verdict does).
+ */
+export const runTokenHealthCheck = internalAction({
+  args: { whatsappAccountId: v.id("whatsappAccounts") },
+  returns: v.null(),
+  handler: async (ctx, args): Promise<null> => {
+    const account: { metaAppId: string } | null = await ctx.runQuery(
+      internal.whatsappAccounts._getAccountBasics,
+      { whatsappAccountId: args.whatsappAccountId },
+    );
+    if (!account) return null;
+    const appSecret = appSecretForMetaApp(account.metaAppId);
+    if (!appSecret) return null; // cannot introspect without app credentials
+
+    const token: string | null = await ctx.runAction(
+      internal.whatsappAccounts.decryptWabaToken,
+      { whatsappAccountId: args.whatsappAccountId },
+    );
+    if (!token) return null;
+
+    const res = await debugToken({
+      appId: account.metaAppId,
+      appSecret,
+      inputToken: token,
+    });
+    if (!res.ok) {
+      // Graph error code 190 = invalid/expired token — definitive verdict.
+      if (res.code === 190) {
+        await ctx.runMutation(internal.whatsappAccounts._patchTokenHealth, {
+          whatsappAccountId: args.whatsappAccountId,
+          tokenStatus: "revoked",
+          tokenHealthDetail: res.message,
+        });
+      }
+      return null; // transient errors: leave status untouched
+    }
+
+    const now = Date.now();
+    const expiresAtMs = res.expiresAt > 0 ? res.expiresAt * 1000 : undefined;
+    const missingScopes = REQUIRED_SCOPES.filter(
+      (s) => !res.scopes.includes(s),
+    );
+    let tokenStatus: "ok" | "expiring" | "revoked";
+    let detail: string | undefined;
+    if (!res.isValid) {
+      tokenStatus = "revoked";
+      detail = res.errorMessage ?? "token invalid per debug_token";
+    } else if (missingScopes.length > 0) {
+      tokenStatus = "revoked";
+      detail = `missing_scopes:${missingScopes.join(",")}`;
+    } else if (expiresAtMs && expiresAtMs <= now + TOKEN_EXPIRY_WARNING_MS) {
+      tokenStatus = "expiring";
+      detail = `expires ${new Date(expiresAtMs).toISOString()}`;
+    } else {
+      tokenStatus = "ok";
+      detail = undefined;
+    }
+    await ctx.runMutation(internal.whatsappAccounts._patchTokenHealth, {
+      whatsappAccountId: args.whatsappAccountId,
+      tokenStatus,
+      tokenExpiresAt: expiresAtMs,
+      dataAccessExpiresAt: res.dataAccessExpiresAt
+        ? res.dataAccessExpiresAt * 1000
+        : undefined,
+      tokenHealthDetail: detail,
+      validatedScopes: res.scopes,
+    });
+    return null;
+  },
+});
+
+export const _getAccountBasics = internalQuery({
+  args: { whatsappAccountId: v.id("whatsappAccounts") },
+  returns: v.union(
+    v.object({ metaAppId: v.string(), wabaId: v.string() }),
+    v.null(),
+  ),
+  handler: async (ctx, args) => {
+    const account = await ctx.db.get(args.whatsappAccountId);
+    if (!account) return null;
+    return { metaAppId: account.metaAppId, wabaId: account.wabaId };
+  },
+});
+
+export const _listAccountIdsForSweep = internalQuery({
+  args: {},
+  returns: v.array(v.id("whatsappAccounts")),
+  handler: async (ctx) => {
+    const accounts = await ctx.db.query("whatsappAccounts").collect();
+    return accounts.map((a) => a._id);
+  },
+});
+
+/** Cron entry: stagger one health check per account (webhooks are the
+ * real-time signal; this is the safety net). */
+export const sweepTokenHealth = internalAction({
+  args: {},
+  returns: v.null(),
+  handler: async (ctx): Promise<null> => {
+    const ids: Id<"whatsappAccounts">[] = await ctx.runQuery(
+      internal.whatsappAccounts._listAccountIdsForSweep,
+      {},
+    );
+    for (let i = 0; i < ids.length; i += 1) {
+      await ctx.scheduler.runAfter(
+        i * 2000,
+        internal.whatsappAccounts.runTokenHealthCheck,
+        { whatsappAccountId: ids[i] },
+      );
+    }
+    return null;
+  },
+});
+
+// ---------- Phone quality / tier pull sync ----------
+
+export const _patchPhoneMetaSync = internalMutation({
+  args: {
+    phoneNumberId: v.id("phoneNumbers"),
+    qualityRating: v.optional(
+      v.union(v.literal("green"), v.literal("yellow"), v.literal("red")),
+    ),
+    messagingTier: v.optional(v.string()),
+    verifiedName: v.optional(v.string()),
+    throughputLevel: v.optional(v.string()),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const phone = await ctx.db.get(args.phoneNumberId);
+    if (!phone) return null;
+    const now = Date.now();
+    await ctx.db.patch(args.phoneNumberId, {
+      qualityRating: args.qualityRating ?? phone.qualityRating,
+      messagingTier: args.messagingTier ?? phone.messagingTier,
+      verifiedName: args.verifiedName ?? phone.verifiedName,
+      throughputLevel: args.throughputLevel ?? phone.throughputLevel,
+      lastMetaSyncAt: now,
+    });
+    const account = await ctx.db.get(phone.whatsappAccountId);
+    if (account) {
+      await ctx.db.patch(account._id, {
+        messagingTier: args.messagingTier ?? account.messagingTier,
+        lastQualityCheckAt: now,
+      });
+    }
+    return null;
+  },
+});
+
+export const syncPhoneQuality = internalAction({
+  args: { phoneNumberId: v.id("phoneNumbers") },
+  returns: v.null(),
+  handler: async (ctx, args): Promise<null> => {
+    const phone: {
+      metaPhoneNumberId: string;
+      whatsappAccountId: Id<"whatsappAccounts">;
+    } | null = await ctx.runQuery(
+      internal.whatsappAccounts._getPhoneBasics,
+      { phoneNumberId: args.phoneNumberId },
+    );
+    if (!phone) return null;
+    const token: string | null = await ctx.runAction(
+      internal.whatsappAccounts.decryptWabaToken,
+      { whatsappAccountId: phone.whatsappAccountId },
+    );
+    if (!token) return null;
+    const res = await getPhoneNumberDetails({
+      token,
+      phoneNumberId: phone.metaPhoneNumberId,
+    });
+    if (!res.ok) return null;
+    const q = res.data.qualityRating?.toUpperCase();
+    await ctx.runMutation(internal.whatsappAccounts._patchPhoneMetaSync, {
+      phoneNumberId: args.phoneNumberId,
+      qualityRating:
+        q === "GREEN" ? "green" : q === "YELLOW" ? "yellow" : q === "RED" ? "red" : undefined,
+      messagingTier: res.data.messagingLimitTier,
+      verifiedName: res.data.verifiedName,
+      throughputLevel: res.data.throughputLevel,
+    });
+    return null;
+  },
+});
+
+export const _getPhoneBasics = internalQuery({
+  args: { phoneNumberId: v.id("phoneNumbers") },
+  returns: v.union(
+    v.object({
+      metaPhoneNumberId: v.string(),
+      whatsappAccountId: v.id("whatsappAccounts"),
+    }),
+    v.null(),
+  ),
+  handler: async (ctx, args) => {
+    const phone = await ctx.db.get(args.phoneNumberId);
+    if (!phone) return null;
+    return {
+      metaPhoneNumberId: phone.phoneNumberId,
+      whatsappAccountId: phone.whatsappAccountId,
+    };
+  },
+});
+
+export const _listPhoneIdsForSweep = internalQuery({
+  args: {},
+  returns: v.array(v.id("phoneNumbers")),
+  handler: async (ctx) => {
+    const phones = await ctx.db.query("phoneNumbers").collect();
+    return phones.map((p) => p._id);
+  },
+});
+
+export const sweepPhoneQuality = internalAction({
+  args: {},
+  returns: v.null(),
+  handler: async (ctx): Promise<null> => {
+    const ids: Id<"phoneNumbers">[] = await ctx.runQuery(
+      internal.whatsappAccounts._listPhoneIdsForSweep,
+      {},
+    );
+    for (let i = 0; i < ids.length; i += 1) {
+      await ctx.scheduler.runAfter(
+        i * 2000,
+        internal.whatsappAccounts.syncPhoneQuality,
+        { phoneNumberId: ids[i] },
+      );
+    }
+    return null;
   },
 });

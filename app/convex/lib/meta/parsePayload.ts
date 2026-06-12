@@ -63,6 +63,8 @@ export type ParsedReferralContext = {
   imageUrl?: string;
   videoUrl?: string;
   thumbnailUrl?: string;
+  /** Click ID required for Conversions API attribution — unrecoverable if dropped. */
+  ctwaClid?: string;
 };
 
 export type ParsedStatus = {
@@ -77,7 +79,14 @@ export type ParsedStatus = {
   recipientBsuid?: string;
   recipientParentBsuid?: string;
   errors?: Array<{ code: number; title?: string }>;
-  pricing?: { category?: string; pricing_model?: string };
+  // Per-message pricing (PMP, since July 2025): free messages carry the
+  // same category as paid — billable/type distinguish them.
+  pricing?: {
+    category?: string;
+    pricing_model?: string;
+    billable?: boolean;
+    type?: string;
+  };
   raw: Record<string, unknown>;
 };
 
@@ -124,12 +133,58 @@ export type ParsedBusinessUsernameUpdate = {
   raw: Record<string, unknown>;
 };
 
+export type ParsedTemplateStatusUpdate = {
+  kind: "template_status_update";
+  eventKey: string;
+  wabaId: string;
+  metaTimestamp: number;
+  /** APPROVED | REJECTED | PAUSED | DISABLED | IN_APPEAL | PENDING | PENDING_DELETION | FLAGGED */
+  event: string;
+  metaTemplateId: string;
+  name: string;
+  language: string;
+  reason?: string;
+  disableDate?: string;
+  raw: Record<string, unknown>;
+};
+
+export type ParsedPhoneQualityUpdate = {
+  kind: "phone_quality_update";
+  eventKey: string;
+  wabaId: string;
+  metaTimestamp: number;
+  displayPhoneNumber: string;
+  /** ONBOARDING | UPGRADE | DOWNGRADE | FLAGGED | UNFLAGGED */
+  event: string;
+  currentLimit?: string;
+  oldLimit?: string;
+  raw: Record<string, unknown>;
+};
+
+export type ParsedAccountUpdate = {
+  kind: "account_update";
+  eventKey: string;
+  wabaId: string;
+  metaTimestamp: number;
+  phoneNumber?: string;
+  /** VERIFIED_ACCOUNT | DISABLED_UPDATE | ACCOUNT_RESTRICTION | ACCOUNT_VIOLATION | ACCOUNT_DELETED */
+  event: string;
+  banState?: string;
+  banDate?: string;
+  restrictions?: Array<{ type: string; expiration?: number }>;
+  violationType?: string;
+  raw: Record<string, unknown>;
+};
+
 export type ParsedItem =
   | ParsedIncomingMessage
   | ParsedStatus
   | ParsedUserIdUpdate
   | ParsedUserPreference
-  | ParsedBusinessUsernameUpdate;
+  | ParsedBusinessUsernameUpdate
+  | ParsedTemplateStatusUpdate
+  | ParsedPhoneQualityUpdate
+  | ParsedAccountUpdate;
 
 type RawContact = {
   wa_id?: string;
@@ -201,6 +256,120 @@ export function parseMetaPayload(payload: unknown): ParsedItem[] {
           username,
           status,
           raw: value as unknown as Record<string, unknown>,
+        });
+        continue;
+      }
+
+      // ----- message_template_status_update (WABA-level, no phone metadata) -----
+      if (change.field === "message_template_status_update") {
+        const v = value as unknown as Record<string, unknown>;
+        const event = v.event ? String(v.event) : "";
+        const metaTemplateId = v.message_template_id
+          ? String(v.message_template_id)
+          : "";
+        if (!event || !metaTemplateId) continue;
+        const ts =
+          typeof entry.time === "number" ? entry.time * 1000 : Date.now();
+        const disableInfo = v.disable_info as
+          | { disable_date?: string }
+          | undefined;
+        items.push({
+          kind: "template_status_update",
+          eventKey: deriveEventKey({
+            kind: "account",
+            wabaId,
+            changeField: "tpl_status",
+            changeValueHash: `${metaTemplateId}:${event}:${ts}`,
+          }),
+          wabaId,
+          metaTimestamp: ts,
+          event,
+          metaTemplateId,
+          name: v.message_template_name ? String(v.message_template_name) : "",
+          language: v.message_template_language
+            ? String(v.message_template_language)
+            : "",
+          reason: v.reason && v.reason !== "NONE" ? String(v.reason) : undefined,
+          disableDate: disableInfo?.disable_date
+            ? String(disableInfo.disable_date)
+            : undefined,
+          raw: v,
+        });
+        continue;
+      }
+
+      // ----- phone_number_quality_update (WABA-level) -----
+      if (change.field === "phone_number_quality_update") {
+        const v = value as unknown as Record<string, unknown>;
+        const event = v.event ? String(v.event) : "";
+        const displayPhoneNumber = v.display_phone_number
+          ? String(v.display_phone_number)
+          : "";
+        if (!event || !displayPhoneNumber) continue;
+        const ts =
+          typeof entry.time === "number" ? entry.time * 1000 : Date.now();
+        items.push({
+          kind: "phone_quality_update",
+          eventKey: deriveEventKey({
+            kind: "account",
+            wabaId,
+            changeField: "phone_quality",
+            changeValueHash: `${displayPhoneNumber}:${event}:${ts}`,
+          }),
+          wabaId,
+          metaTimestamp: ts,
+          displayPhoneNumber,
+          event,
+          currentLimit: v.current_limit ? String(v.current_limit) : undefined,
+          oldLimit: v.old_limit ? String(v.old_limit) : undefined,
+          raw: v,
+        });
+        continue;
+      }
+
+      // ----- account_update (WABA-level: bans, restrictions, violations) -----
+      if (change.field === "account_update") {
+        const v = value as unknown as Record<string, unknown>;
+        const event = v.event ? String(v.event) : "";
+        if (!event) continue;
+        const ts =
+          typeof entry.time === "number" ? entry.time * 1000 : Date.now();
+        const banInfo = v.ban_info as
+          | { waba_ban_state?: string; waba_ban_date?: string }
+          | undefined;
+        const restrictionInfo = Array.isArray(v.restriction_info)
+          ? (v.restriction_info as Array<Record<string, unknown>>)
+          : undefined;
+        const violationInfo = v.violation_info as
+          | { violation_type?: string }
+          | undefined;
+        items.push({
+          kind: "account_update",
+          eventKey: deriveEventKey({
+            kind: "account",
+            wabaId,
+            changeField: "account_update",
+            changeValueHash: `${event}:${banInfo?.waba_ban_state ?? ""}:${ts}`,
+          }),
+          wabaId,
+          metaTimestamp: ts,
+          phoneNumber: v.phone_number ? String(v.phone_number) : undefined,
+          event,
+          banState: banInfo?.waba_ban_state
+            ? String(banInfo.waba_ban_state)
+            : undefined,
+          banDate: banInfo?.waba_ban_date
+            ? String(banInfo.waba_ban_date)
+            : undefined,
+          restrictions: restrictionInfo?.map((r) => ({
+            type: String(r.restriction_type ?? ""),
+            expiration:
+              typeof r.expiration === "number" ? r.expiration : undefined,
+          })),
+          violationType: violationInfo?.violation_type
+            ? String(violationInfo.violation_type)
+            : undefined,
+          raw: v,
         });
         continue;
       }
@@ -436,6 +605,7 @@ function parseReferralContext(raw: unknown): ParsedReferralContext | undefined {
     imageUrl: r.image_url ? String(r.image_url) : undefined,
     videoUrl: r.video_url ? String(r.video_url) : undefined,
     thumbnailUrl: r.thumbnail_url ? String(r.thumbnail_url) : undefined,
+    ctwaClid: r.ctwa_clid ? String(r.ctwa_clid) : undefined,
   };
 }
 

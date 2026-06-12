@@ -32,6 +32,7 @@ const flowTemplateSlugValidator = v.union(
 const flowNodeTypeValidator = v.union(
   v.literal("start"),
   v.literal("send_message"),
+  v.literal("send_template"),
   v.literal("send_buttons"),
   v.literal("send_list"),
   v.literal("collect_input"),
@@ -55,12 +56,20 @@ const flowNodeValidator = v.object({
   ),
   variableKey: v.optional(v.string()),
   tag: v.optional(v.string()),
+  template: v.optional(
+    v.object({
+      templateId: v.id("templates"),
+      variables: v.record(v.string(), v.string()),
+    }),
+  ),
   condition: v.optional(
     v.object({
       variableKey: v.string(),
       operator: v.union(
         v.literal("equals"),
         v.literal("contains"),
+        v.literal("starts_with"),
+        v.literal("ends_with"),
         v.literal("present"),
         v.literal("absent"),
       ),
@@ -91,6 +100,7 @@ const flowIssueValidator = v.object({
 type FlowNodeType =
   | "start"
   | "send_message"
+  | "send_template"
   | "send_buttons"
   | "send_list"
   | "collect_input"
@@ -108,9 +118,19 @@ type FlowNode = {
   position?: { x: number; y: number };
   variableKey?: string;
   tag?: string;
+  template?: {
+    templateId: Id<"templates">;
+    variables: Record<string, string>;
+  };
   condition?: {
     variableKey: string;
-    operator: "equals" | "contains" | "present" | "absent";
+    operator:
+      | "equals"
+      | "contains"
+      | "starts_with"
+      | "ends_with"
+      | "present"
+      | "absent";
     value?: string;
     trueNextKey: string;
     falseNextKey: string;
@@ -549,6 +569,7 @@ export const updateFlow = tenantMutation({
       entryNodeKey: args.entryNodeKey.trim(),
       nodes,
     });
+    issues.push(...(await validateTemplateRefs(ctx, nodes)));
     await ctx.db.patch(args.chatbotId, {
       triggerKind: args.triggerKind,
       triggerKeywords,
@@ -634,6 +655,7 @@ export const updateStatus = tenantMutation({
       entryNodeKey,
       nodes,
     });
+    issues.push(...(await validateTemplateRefs(ctx, nodes)));
     if (
       args.status === "active" &&
       issues.some((issue) => issue.severity === "error")
@@ -699,6 +721,16 @@ function normalizeNodes(nodes: FlowNode[]): FlowNode[] {
         : undefined,
     variableKey: node.variableKey?.trim() || undefined,
     tag: node.tag?.trim() || undefined,
+    template: node.template
+      ? {
+          templateId: node.template.templateId,
+          variables: Object.fromEntries(
+            Object.entries(node.template.variables ?? {})
+              .map(([key, value]) => [key.trim(), value.trim()])
+              .filter(([key]) => key.length > 0),
+          ),
+        }
+      : undefined,
     condition: node.condition
       ? {
           variableKey: node.condition.variableKey.trim(),
@@ -748,7 +780,7 @@ function validateFlow(args: {
       message: "Bot name is required.",
     });
   }
-  if (args.triggerKind === "keyword" && cleanKeywords(args.triggerKeywords)?.length === undefined) {
+  if (args.triggerKind === "keyword" && !cleanKeywords(args.triggerKeywords)?.length) {
     issues.push({
       severity: "error",
       scope: "trigger",
@@ -819,6 +851,73 @@ function validateFlow(args: {
   return issues;
 }
 
+/**
+ * DB-backed validation for send_template nodes: the referenced template must
+ * exist in the tenant, be approved, and have every parameter of its current
+ * version mapped. Sync graph checks live in validateFlow; this complements
+ * them wherever persisted nodes can gain template refs (updateFlow,
+ * updateStatus).
+ */
+async function validateTemplateRefs(
+  ctx: { db: any; tenantId: Id<"tenants"> },
+  nodes: FlowNode[],
+): Promise<FlowIssue[]> {
+  const issues: FlowIssue[] = [];
+  for (const node of nodes) {
+    if (node.type !== "send_template" || !node.template?.templateId) continue;
+    const tpl = await ctx.db.get(node.template.templateId);
+    if (!tpl || tpl.tenantId !== ctx.tenantId) {
+      issues.push({
+        severity: "error",
+        scope: "node",
+        nodeKey: node.key,
+        field: "template.templateId",
+        message: `${node.title} references a template that does not exist.`,
+      });
+      continue;
+    }
+    if (tpl.status !== "approved") {
+      issues.push({
+        severity: "error",
+        scope: "node",
+        nodeKey: node.key,
+        field: "template.templateId",
+        message: `${node.title} must use an approved template (current status: ${tpl.status}).`,
+      });
+      continue;
+    }
+    const ver = await ctx.db
+      .query("templateVersions")
+      .withIndex("by_template_version", (q: any) =>
+        q.eq("templateId", tpl._id).eq("version", tpl.currentVersion),
+      )
+      .unique();
+    if (!ver) {
+      issues.push({
+        severity: "error",
+        scope: "node",
+        nodeKey: node.key,
+        field: "template.templateId",
+        message: `${node.title}: template version is missing.`,
+      });
+      continue;
+    }
+    for (const p of ver.parameterSchema as Array<{ index: number }>) {
+      const val = node.template.variables[String(p.index)];
+      if (!val || !val.trim()) {
+        issues.push({
+          severity: "error",
+          scope: "node",
+          nodeKey: node.key,
+          field: `template.variables.${p.index}`,
+          message: `${node.title} is missing a value for template variable {{${p.index}}}.`,
+        });
+      }
+    }
+  }
+  return issues;
+}
+
 function validateNode(node: FlowNode, keys: Set<string>): FlowIssue[] {
   const issues: FlowIssue[] = [];
   const checkTarget = (target: string | undefined, field: string) => {
@@ -852,6 +951,18 @@ function validateNode(node: FlowNode, keys: Set<string>): FlowIssue[] {
         nodeKey: node.key,
         field: "body",
         message: `${node.title} needs message text.`,
+      });
+    }
+    checkTarget(node.nextKey, "nextKey");
+  }
+  if (node.type === "send_template") {
+    if (!node.template?.templateId) {
+      issues.push({
+        severity: "error",
+        scope: "node",
+        nodeKey: node.key,
+        field: "template.templateId",
+        message: `${node.title} needs an approved template.`,
       });
     }
     checkTarget(node.nextKey, "nextKey");

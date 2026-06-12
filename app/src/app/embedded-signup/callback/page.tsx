@@ -45,8 +45,8 @@ export default function EmbeddedSignupCallbackPage() {
         if (!active) return;
         setStatus(result.ok ? "success" : "error");
         setMessage(
-          result.status === "assets_received"
-            ? "Meta assets received. You can finish the token exchange from Settings."
+          result.status === "connected"
+            ? "WhatsApp connected. You can close this window."
             : result.ok
               ? "Meta callback received."
               : "Meta signup failed.",

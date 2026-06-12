@@ -3,7 +3,7 @@
  * upgrade (PLAN section 13.4.10).
  */
 
-export const DEFAULT_META_GRAPH_VERSION = "v21.0";
+export const DEFAULT_META_GRAPH_VERSION = "v25.0";
 export const META_GRAPH_VERSION =
   process.env.META_GRAPH_VERSION ?? DEFAULT_META_GRAPH_VERSION;
 export const META_GRAPH_BASE = `https://graph.facebook.com/${META_GRAPH_VERSION}`;
@@ -626,4 +626,322 @@ export async function sendWhatsAppText(args: {
   const wamid = res.data.messages?.[0]?.id;
   if (!wamid) return { ok: false, reason: "no wamid returned" };
   return { ok: true, wamid };
+}
+
+// ---------- Interactive messages (reply buttons / list) ----------
+
+/** Reply buttons: max 3; title ≤20 chars; id ≤256 chars. */
+export type InteractiveButtonsPayload = {
+  kind: "buttons";
+  bodyText: string;
+  footerText?: string;
+  buttons: Array<{ id: string; title: string }>;
+};
+
+/** List: ≤10 rows total; row title ≤24, description ≤72; button ≤20. */
+export type InteractiveListPayload = {
+  kind: "list";
+  bodyText: string;
+  footerText?: string;
+  buttonText: string;
+  sections: Array<{
+    title?: string;
+    rows: Array<{ id: string; title: string; description?: string }>;
+  }>;
+};
+
+export type InteractivePayload =
+  | InteractiveButtonsPayload
+  | InteractiveListPayload;
+
+/**
+ * Send an interactive reply-buttons or list message. Session-window only
+ * (Meta rejects interactive outside the 24h window) — callers gate on it.
+ */
+export async function sendWhatsAppInteractive(args: {
+  token: string;
+  phoneNumberId: string;
+  recipient: WhatsAppRecipient;
+  interactive: InteractivePayload;
+}): Promise<SendTextResult> {
+  const p = args.interactive;
+  const bodyText = p.bodyText.trim().slice(0, 1024);
+  if (!bodyText) return { ok: false, reason: "interactive body required" };
+
+  let interactive: Record<string, unknown>;
+  if (p.kind === "buttons") {
+    if (p.buttons.length < 1 || p.buttons.length > 3) {
+      return { ok: false, reason: "reply buttons require 1-3 buttons" };
+    }
+    interactive = {
+      type: "button",
+      body: { text: bodyText },
+      ...(p.footerText ? { footer: { text: p.footerText.slice(0, 60) } } : {}),
+      action: {
+        buttons: p.buttons.map((b) => ({
+          type: "reply",
+          reply: { id: b.id.slice(0, 256), title: b.title.slice(0, 20) },
+        })),
+      },
+    };
+  } else {
+    const rowCount = p.sections.reduce((n, s) => n + s.rows.length, 0);
+    if (rowCount < 1 || rowCount > 10) {
+      return { ok: false, reason: "list messages require 1-10 rows total" };
+    }
+    interactive = {
+      type: "list",
+      body: { text: bodyText },
+      ...(p.footerText ? { footer: { text: p.footerText.slice(0, 60) } } : {}),
+      action: {
+        button: p.buttonText.trim().slice(0, 20) || "Escolher",
+        sections: p.sections.map((s) => ({
+          ...(s.title ? { title: s.title.slice(0, 24) } : {}),
+          rows: s.rows.map((r) => ({
+            id: r.id.slice(0, 200),
+            title: r.title.slice(0, 24),
+            ...(r.description
+              ? { description: r.description.slice(0, 72) }
+              : {}),
+          })),
+        })),
+      },
+    };
+  }
+
+  const res = await graphPost<{ messages?: Array<{ id: string }> }>(
+    `/${args.phoneNumberId}/messages`,
+    args.token,
+    {
+      messaging_product: "whatsapp",
+      recipient_type: "individual",
+      ...recipientFields(args.recipient),
+      type: "interactive",
+      interactive,
+    },
+  );
+  if (!res.ok) {
+    return {
+      ok: false,
+      reason: res.message,
+      statusCode: res.status,
+      metaCode: res.code,
+    };
+  }
+  const wamid = res.data.messages?.[0]?.id;
+  if (!wamid) return { ok: false, reason: "no wamid returned" };
+  return { ok: true, wamid };
+}
+
+// ---------- Token introspection (debug_token) ----------
+
+export type DebugTokenResult =
+  | {
+      ok: true;
+      isValid: boolean;
+      /** Unix seconds; 0 = never expires (Graph convention). */
+      expiresAt: number;
+      dataAccessExpiresAt?: number;
+      scopes: string[];
+      type?: string;
+      appId?: string;
+      granularScopes?: Array<{ scope: string; target_ids?: string[] }>;
+      errorMessage?: string;
+    }
+  | GraphError;
+
+/**
+ * Introspect a token via GET /debug_token authenticated with the app
+ * access token (`{app-id}|{app-secret}`). This is the only reliable way to
+ * detect revocation/expiry of business integration system user tokens —
+ * Meta can invalidate them at any time (integration removed, security
+ * events) and /me does not expose type/expiry.
+ */
+export async function debugToken(args: {
+  appId: string;
+  appSecret: string;
+  inputToken: string;
+}): Promise<DebugTokenResult> {
+  const appAccessToken = `${args.appId}|${args.appSecret}`;
+  const res = await graphGet<{
+    data?: {
+      app_id?: string;
+      is_valid?: boolean;
+      expires_at?: number;
+      data_access_expires_at?: number;
+      scopes?: string[];
+      granular_scopes?: Array<{ scope: string; target_ids?: string[] }>;
+      type?: string;
+      error?: { code?: number; message?: string };
+    };
+  }>("/debug_token", appAccessToken, { input_token: args.inputToken });
+  if (!res.ok) return res;
+  const d = res.data.data ?? {};
+  return {
+    ok: true,
+    isValid: Boolean(d.is_valid),
+    expiresAt: typeof d.expires_at === "number" ? d.expires_at : 0,
+    dataAccessExpiresAt: d.data_access_expires_at,
+    scopes: d.scopes ?? [],
+    type: d.type,
+    appId: d.app_id ? String(d.app_id) : undefined,
+    granularScopes: d.granular_scopes,
+    errorMessage: d.error?.message,
+  };
+}
+
+export { REQUIRED_SCOPES };
+
+// ---------- Phone number details (quality / tier / profile sync) ----------
+
+export type PhoneNumberDetails = {
+  id: string;
+  verifiedName?: string;
+  displayPhoneNumber?: string;
+  qualityRating?: string;
+  nameStatus?: string;
+  codeVerificationStatus?: string;
+  messagingLimitTier?: string;
+  throughputLevel?: string;
+  platformType?: string;
+};
+
+export async function getPhoneNumberDetails(args: {
+  token: string;
+  phoneNumberId: string;
+}): Promise<{ ok: true; data: PhoneNumberDetails } | GraphError> {
+  const res = await graphGet<{
+    id: string;
+    verified_name?: string;
+    display_phone_number?: string;
+    quality_rating?: string;
+    name_status?: string;
+    code_verification_status?: string;
+    messaging_limit_tier?: string;
+    throughput?: { level?: string };
+    platform_type?: string;
+  }>(`/${args.phoneNumberId}`, args.token, {
+    fields:
+      "id,verified_name,display_phone_number,quality_rating,name_status,code_verification_status,messaging_limit_tier,throughput,platform_type",
+  });
+  if (!res.ok) return res;
+  return {
+    ok: true,
+    data: {
+      id: res.data.id,
+      verifiedName: res.data.verified_name,
+      displayPhoneNumber: res.data.display_phone_number,
+      qualityRating: res.data.quality_rating,
+      nameStatus: res.data.name_status,
+      codeVerificationStatus: res.data.code_verification_status,
+      messagingLimitTier: res.data.messaging_limit_tier,
+      throughputLevel: res.data.throughput?.level,
+      platformType: res.data.platform_type,
+    },
+  };
+}
+
+/** List phone numbers of a WABA — used to verify Embedded Signup assets server-side. */
+export async function listWabaPhoneNumbers(args: {
+  token: string;
+  wabaId: string;
+}): Promise<
+  | {
+      ok: true;
+      data: Array<{
+        id: string;
+        displayPhoneNumber?: string;
+        verifiedName?: string;
+      }>;
+    }
+  | GraphError
+> {
+  const res = await graphGet<{
+    data?: Array<{
+      id: string;
+      display_phone_number?: string;
+      verified_name?: string;
+    }>;
+  }>(`/${args.wabaId}/phone_numbers`, args.token, {
+    fields: "id,display_phone_number,verified_name",
+  });
+  if (!res.ok) return res;
+  return {
+    ok: true,
+    data: (res.data.data ?? []).map((p) => ({
+      id: p.id,
+      displayPhoneNumber: p.display_phone_number,
+      verifiedName: p.verified_name,
+    })),
+  };
+}
+
+// ---------- Full template listing (paginated, with components) ----------
+
+export type MetaTemplateFull = {
+  id: string;
+  name: string;
+  language: string;
+  status: string;
+  category?: string;
+  parameterFormat?: string;
+  components?: unknown[];
+  qualityScore?: string;
+  rejectionReason?: string;
+};
+
+/**
+ * List all templates of a WABA with full components, following pagination
+ * (each language variant is a separate record; mature WABAs exceed one
+ * page). Page cap guards against runaway cursors.
+ */
+export async function listMetaTemplatesFull(args: {
+  token: string;
+  wabaId: string;
+  maxPages?: number;
+}): Promise<
+  { ok: true; data: MetaTemplateFull[]; truncated: boolean } | GraphError
+> {
+  const out: MetaTemplateFull[] = [];
+  const maxPages = args.maxPages ?? 10;
+  let after: string | undefined;
+  for (let page = 0; page < maxPages; page += 1) {
+    const res = await graphGet<{
+      data?: Array<{
+        id: string;
+        name: string;
+        language: string;
+        status: string;
+        category?: string;
+        parameter_format?: string;
+        components?: unknown[];
+        quality_score?: { score?: string };
+        rejected_reason?: string;
+      }>;
+      paging?: { cursors?: { after?: string }; next?: string };
+    }>(`/${args.wabaId}/message_templates`, args.token, {
+      fields:
+        "id,name,language,status,category,parameter_format,components,quality_score,rejected_reason",
+      limit: "100",
+      ...(after ? { after } : {}),
+    });
+    if (!res.ok) return res;
+    for (const t of res.data.data ?? []) {
+      out.push({
+        id: t.id,
+        name: t.name,
+        language: t.language,
+        status: t.status,
+        category: t.category,
+        parameterFormat: t.parameter_format,
+        components: t.components,
+        qualityScore: t.quality_score?.score,
+        rejectionReason: t.rejected_reason,
+      });
+    }
+    const next = res.data.paging?.next;
+    after = res.data.paging?.cursors?.after;
+    if (!next || !after) return { ok: true, data: out, truncated: false };
+  }
+  return { ok: true, data: out, truncated: true };
 }

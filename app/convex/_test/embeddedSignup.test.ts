@@ -58,7 +58,7 @@ async function seedSignupSession(
 }
 
 describe("embedded signup", () => {
-  it("persists v4 returned business, WABA, and phone assets", async () => {
+  it("records URL hints without trusting them when Meta env is not configured", async () => {
     const t = convexTest(schema);
     const { sessionId } = await seedSignupSession(t);
 
@@ -72,20 +72,25 @@ describe("embedded signup", () => {
       phone_display_name: "WT Connect",
     });
 
-    expect(result).toEqual({ ok: true, status: "assets_received" });
+    // URL params are hints only — without the server-side token exchange +
+    // debug_token verification no connection is created and the session
+    // stays at callback_received.
+    expect(result).toEqual({ ok: true, status: "callback_received" });
     const row = await t.run(async (ctx) => {
       return await ctx.db.get(sessionId);
     });
     expect(row).toMatchObject({
-      status: "assets_received",
+      status: "callback_received",
       callbackCode: "oauth-code",
       businessId: "BM_123",
       wabaId: "WABA_456",
       phoneNumberId: "PHONE_789",
-      phoneE164: "+5511999999999",
-      phoneDisplayName: "WT Connect",
     });
     expect(row?.completedAt).toEqual(expect.any(Number));
+    const accounts = await t.run(async (ctx) =>
+      ctx.db.query("whatsappAccounts").collect(),
+    );
+    expect(accounts).toHaveLength(0);
   });
 
   it("records embedded signup ownership metadata on connected WABAs", async () => {
@@ -144,6 +149,27 @@ describe("embedded signup", () => {
           expect(parsed.searchParams.get("code")).toBe("oauth-code");
           return Response.json({ access_token: "business-token" });
         }
+        if (url.includes("/debug_token")) {
+          return Response.json({
+            data: {
+              app_id: "APP_1",
+              is_valid: true,
+              expires_at: 0,
+              type: "SYSTEM_USER",
+              scopes: [
+                "whatsapp_business_messaging",
+                "whatsapp_business_management",
+                "business_management",
+              ],
+              granular_scopes: [
+                {
+                  scope: "whatsapp_business_management",
+                  target_ids: ["WABA_456"],
+                },
+              ],
+            },
+          });
+        }
         if (url.endsWith("/me")) {
           return Response.json({ id: "system-user-1", type: "SYSTEM_USER" });
         }
@@ -159,6 +185,17 @@ describe("embedded signup", () => {
                 status: "granted",
               },
               { permission: "business_management", status: "granted" },
+            ],
+          });
+        }
+        if (url.includes("/WABA_456/phone_numbers")) {
+          return Response.json({
+            data: [
+              {
+                id: "PHONE_789",
+                display_phone_number: "+55 11 99999-9999",
+                verified_name: "WT Connect",
+              },
             ],
           });
         }
