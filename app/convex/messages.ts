@@ -16,12 +16,6 @@ import {
   sendWhatsAppMarketingTemplate,
   sendWhatsAppInteractive,
 } from "./lib/meta/graph";
-import {
-  sendLeoHubText,
-  sendLeoHubTemplate,
-  sendLeoHubInteractive,
-  type LeoHubMessageResult,
-} from "./lib/leoHub/client";
 import { recordAiAuditEvent } from "./lib/aiControl";
 import { classifyMetaFailure } from "./lib/meta/errorClassifier";
 import { requireConsent } from "./lib/consent";
@@ -464,9 +458,6 @@ export const _loadDispatchPayload = internalQuery({
       content: v.any(),
       whatsappAccountId: v.id("whatsappAccounts"),
       phoneNumberId: v.string(),
-      transportProvider: v.optional(
-        v.union(v.literal("meta_graph"), v.literal("leo_hub")),
-      ),
       contactE164: v.optional(v.string()),
       contactBsuid: v.optional(v.string()),
       pricingCategory: v.optional(
@@ -489,13 +480,11 @@ export const _loadDispatchPayload = internalQuery({
     if (!phone) return null;
     const contact = await ctx.db.get(conv.contactId);
     if (!contact) return null;
-    const account = await ctx.db.get(phone.whatsappAccountId);
     return {
       tenantId: msg.tenantId,
       content: msg.content,
       whatsappAccountId: phone.whatsappAccountId,
       phoneNumberId: phone.phoneNumberId,
-      transportProvider: account?.transportProvider,
       contactE164: contact.e164,
       contactBsuid: contact.bsuid,
       pricingCategory: msg.pricingCategory,
@@ -665,7 +654,6 @@ export const _dispatchOne = internalAction({
     )) as {
       whatsappAccountId: Id<"whatsappAccounts">;
       phoneNumberId: string;
-      transportProvider?: "meta_graph" | "leo_hub";
       contactE164?: string;
       contactBsuid?: string;
       content: { text?: { body?: string } };
@@ -731,70 +719,9 @@ export const _dispatchOne = internalAction({
       }
     )?.interactive;
 
-    let result: NormalizedDispatchResult;
+    let result: Awaited<ReturnType<typeof sendWhatsAppText>>;
     try {
-      if (payload.transportProvider === "leo_hub") {
-        if (!payload.contactE164) {
-          await ctx.runMutation(internal.messages._markFailedFromAction, {
-            messageId: args.messageId,
-            failureReason: "leo_hub requires phone identity",
-          });
-          return null;
-        }
-        if (interactive) {
-          const hubInteractive = normalizeOpenBspInteractiveForLeo(interactive);
-          if (!hubInteractive.ok) {
-            await ctx.runMutation(internal.messages._markFailedFromAction, {
-              messageId: args.messageId,
-              failureReason: hubInteractive.reason,
-            });
-            return null;
-          }
-          result = normalizeLeoHubDispatchResult(
-            await sendLeoHubInteractive({
-              token,
-              to: payload.contactE164,
-              interactive: hubInteractive.interactive,
-            }),
-          );
-        } else if (isTemplate) {
-          const tpl = (
-            payload.content as {
-              template: {
-                name: string;
-                language: string;
-                variables: string[];
-              };
-            }
-          ).template;
-          result = normalizeLeoHubDispatchResult(
-            await sendLeoHubTemplate({
-              token,
-              to: payload.contactE164,
-              templateName: tpl.name,
-              languageCode: tpl.language,
-              bodyVariables: tpl.variables,
-            }),
-          );
-        } else {
-          const text =
-            (payload.content as { text?: { body?: string } })?.text?.body ?? "";
-          if (!text) {
-            await ctx.runMutation(internal.messages._markFailedFromAction, {
-              messageId: args.messageId,
-              failureReason: "empty text content",
-            });
-            return null;
-          }
-          result = normalizeLeoHubDispatchResult(
-            await sendLeoHubText({
-              token,
-              to: payload.contactE164,
-              text,
-            }),
-          );
-        }
-      } else if (interactive) {
+      if (interactive) {
         result = await sendWhatsAppInteractive({
           token,
           phoneNumberId: payload.phoneNumberId,
@@ -875,96 +802,6 @@ export const _dispatchOne = internalAction({
     return null;
   },
 });
-
-type NormalizedDispatchResult =
-  | { ok: true; wamid: string }
-  | { ok: false; reason: string; statusCode?: number; metaCode?: number };
-
-function normalizeLeoHubDispatchResult(
-  result: Awaited<ReturnType<typeof sendLeoHubText>>,
-): NormalizedDispatchResult {
-  if (!result.ok) {
-    return {
-      ok: false,
-      reason: result.reason,
-      statusCode: result.status,
-    };
-  }
-  const data = result.data as LeoHubMessageResult & {
-    message_id?: string;
-    messages?: Array<{ id?: string }>;
-  };
-  const wamid =
-    data.wamid ??
-    data.message_id ??
-    data.messageId ??
-    data.id ??
-    data.messages?.[0]?.id;
-  if (!wamid) {
-    return {
-      ok: false,
-      statusCode: result.status,
-      reason: "leo_hub_missing_message_id",
-    };
-  }
-  return { ok: true, wamid };
-}
-
-function normalizeOpenBspInteractiveForLeo(
-  p: import("./lib/meta/graph").InteractivePayload,
-):
-  | {
-      ok: true;
-      interactive: Parameters<typeof sendLeoHubInteractive>[0]["interactive"];
-    }
-  | { ok: false; reason: string } {
-  const bodyText = p.bodyText.trim().slice(0, 1024);
-  if (!bodyText) return { ok: false, reason: "interactive body required" };
-
-  if (p.kind === "buttons") {
-    if (p.buttons.length < 1 || p.buttons.length > 3) {
-      return { ok: false, reason: "reply buttons require 1-3 buttons" };
-    }
-    return {
-      ok: true,
-      interactive: {
-        type: "button",
-        body: { text: bodyText },
-        ...(p.footerText ? { footer: { text: p.footerText.slice(0, 60) } } : {}),
-        action: {
-          buttons: p.buttons.map((b) => ({
-            type: "reply",
-            reply: { id: b.id.slice(0, 256), title: b.title.slice(0, 20) },
-          })),
-        },
-      },
-    };
-  }
-
-  const rowCount = p.sections.reduce((n, s) => n + s.rows.length, 0);
-  if (rowCount < 1 || rowCount > 10) {
-    return { ok: false, reason: "list messages require 1-10 rows total" };
-  }
-  return {
-    ok: true,
-    interactive: {
-      type: "list",
-      body: { text: bodyText },
-      ...(p.footerText ? { footer: { text: p.footerText.slice(0, 60) } } : {}),
-      action: {
-        button: p.buttonText.trim().slice(0, 20) || "Escolher",
-        sections: p.sections.map((s) => ({
-          ...(s.title ? { title: s.title.slice(0, 24) } : {}),
-          rows: s.rows.map((r) => ({
-            id: r.id.slice(0, 200),
-            title: r.title.slice(0, 24),
-            ...(r.description ? { description: r.description.slice(0, 72) } : {}),
-          })),
-        })),
-      },
-    },
-  };
-}
 
 async function syncCampaignRecipientFromMessage(
   ctx: {

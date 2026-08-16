@@ -13,7 +13,6 @@ import {
   getPhoneNumberDetails,
   REQUIRED_SCOPES,
 } from "./lib/meta/graph";
-import { listLeoHubFlows } from "./lib/leoHub/client";
 import { classifyMetaFailure } from "./lib/meta/errorClassifier";
 import {
   allowPlaintextSecretStorageForTests,
@@ -90,10 +89,6 @@ export const listForTenant = tenantQuery({
       validatedAt: v.optional(v.number()),
       validatedScopes: v.optional(v.array(v.string())),
       tokenExpiresAt: v.optional(v.number()),
-      transportProvider: v.optional(
-        v.union(v.literal("meta_graph"), v.literal("leo_hub")),
-      ),
-      providerChannelId: v.optional(v.string()),
       accountUpdateEvent: v.optional(v.string()),
       banState: v.optional(v.string()),
       accountRestrictions: v.optional(v.any()),
@@ -158,8 +153,6 @@ export const listForTenant = tenantQuery({
         validatedAt: a.validatedAt,
         validatedScopes: a.validatedScopes,
         tokenExpiresAt: a.tokenExpiresAt,
-        transportProvider: a.transportProvider,
-        providerChannelId: a.providerChannelId,
         accountUpdateEvent: a.accountUpdateEvent,
         banState: a.banState,
         accountRestrictions: a.accountRestrictions,
@@ -458,10 +451,6 @@ export const insertConnection = internalMutation({
       ),
     ),
     embeddedSignupSessionId: v.optional(v.id("embeddedSignupSessions")),
-    transportProvider: v.optional(
-      v.union(v.literal("meta_graph"), v.literal("leo_hub")),
-    ),
-    providerChannelId: v.optional(v.string()),
     validatedScopes: v.array(v.string()),
     accessToken: v.string(),
     phoneNumberId: v.string(),
@@ -500,8 +489,6 @@ export const insertConnection = internalMutation({
       businessPortfolioId: args.businessPortfolioId,
       wabaId: args.wabaId,
       ...accessTokenFields,
-      transportProvider: args.transportProvider ?? "meta_graph",
-      providerChannelId: args.providerChannelId,
       onboardingSource: args.onboardingSource ?? "manual",
       embeddedSignupSessionId: args.embeddedSignupSessionId,
       status: "active",
@@ -519,88 +506,6 @@ export const insertConnection = internalMutation({
       createdAt: Date.now(),
     });
     return { whatsappAccountId: wabaAccountId, phoneNumberId: pnId };
-  },
-});
-
-/**
- * Connect a WABA/phone through Leo Hub as the transport provider. This keeps
- * OpenBSP as the product layer while Leo acts as the official WhatsApp pipe.
- */
-export const connectLeoHub = action({
-  args: {
-    metaAppId: v.optional(v.string()),
-    wabaId: v.string(),
-    phoneNumberId: v.string(),
-    phoneE164: v.string(),
-    phoneDisplayName: v.string(),
-    providerChannelId: v.optional(v.string()),
-    channelToken: v.string(),
-  },
-  returns: v.object({
-    whatsappAccountId: v.id("whatsappAccounts"),
-    phoneNumberId: v.id("phoneNumbers"),
-    provider: v.literal("leo_hub"),
-  }),
-  handler: async (
-    ctx,
-    args,
-  ): Promise<{
-    whatsappAccountId: Id<"whatsappAccounts">;
-    phoneNumberId: Id<"phoneNumbers">;
-    provider: "leo_hub";
-  }> => {
-    const me: {
-      tenantId: Id<"tenants">;
-      role: string;
-    } | null = await ctx.runQuery(internal.whatsappAccounts._meTenant, {});
-    if (!me) throw new ConvexError({ code: "UNAUTHENTICATED" });
-    if (me.role !== "owner" && me.role !== "admin") {
-      throw new ConvexError({
-        code: "FORBIDDEN",
-        message: "Only owner or admin can connect a WhatsApp number",
-      });
-    }
-
-    const compliance = (await ctx.runQuery(
-      internal.whatsappAccounts.checkConnectionCompliance,
-      { tenantId: me.tenantId },
-    )) as ConnectionComplianceResult;
-    assertConnectionCompliance(compliance);
-
-    const tokenCheck = await listLeoHubFlows({
-      token: args.channelToken,
-      timeoutMs: 8_000,
-    });
-    if (!tokenCheck.ok) {
-      throw new ConvexError({
-        code: "LEO_HUB_TOKEN_VALIDATION_FAILED",
-        reason: tokenCheck.reason,
-        status: tokenCheck.status,
-      });
-    }
-
-    const result: {
-      whatsappAccountId: Id<"whatsappAccounts">;
-      phoneNumberId: Id<"phoneNumbers">;
-    } = await ctx.runMutation(internal.whatsappAccounts.insertConnection, {
-      tenantId: me.tenantId,
-      metaAppId: args.metaAppId ?? "leo_hub",
-      onboardingSource: "api",
-      transportProvider: "leo_hub",
-      providerChannelId: args.providerChannelId,
-      wabaId: args.wabaId,
-      validatedScopes: ["leo_hub_channel"],
-      accessToken: args.channelToken,
-      phoneNumberId: args.phoneNumberId,
-      phoneE164: args.phoneE164,
-      phoneDisplayName: args.phoneDisplayName,
-    });
-
-    return {
-      whatsappAccountId: result.whatsappAccountId,
-      phoneNumberId: result.phoneNumberId,
-      provider: "leo_hub",
-    };
   },
 });
 
@@ -1286,42 +1191,19 @@ export const runTokenHealthCheck = internalAction({
   args: { whatsappAccountId: v.id("whatsappAccounts") },
   returns: v.null(),
   handler: async (ctx, args): Promise<null> => {
-    const account: {
-      metaAppId: string;
-      transportProvider?: "meta_graph" | "leo_hub";
-    } | null = await ctx.runQuery(
+    const account: { metaAppId: string } | null = await ctx.runQuery(
       internal.whatsappAccounts._getAccountBasics,
       { whatsappAccountId: args.whatsappAccountId },
     );
     if (!account) return null;
+    const appSecret = appSecretForMetaApp(account.metaAppId);
+    if (!appSecret) return null; // cannot introspect without app credentials
 
     const token: string | null = await ctx.runAction(
       internal.whatsappAccounts.decryptWabaToken,
       { whatsappAccountId: args.whatsappAccountId },
     );
     if (!token) return null;
-
-    if (account.transportProvider === "leo_hub") {
-      const hub = await listLeoHubFlows({ token, timeoutMs: 8_000 });
-      if (hub.ok) {
-        await ctx.runMutation(internal.whatsappAccounts._patchTokenHealth, {
-          whatsappAccountId: args.whatsappAccountId,
-          tokenStatus: "ok",
-          tokenHealthDetail: "leo_hub_channel_ok",
-          validatedScopes: ["leo_hub_channel"],
-        });
-      } else if (hub.status === 401 || hub.status === 403) {
-        await ctx.runMutation(internal.whatsappAccounts._patchTokenHealth, {
-          whatsappAccountId: args.whatsappAccountId,
-          tokenStatus: "revoked",
-          tokenHealthDetail: hub.reason,
-        });
-      }
-      return null;
-    }
-
-    const appSecret = appSecretForMetaApp(account.metaAppId);
-    if (!appSecret) return null; // cannot introspect without app credentials
 
     const res = await debugToken({
       appId: account.metaAppId,
@@ -1377,23 +1259,13 @@ export const runTokenHealthCheck = internalAction({
 export const _getAccountBasics = internalQuery({
   args: { whatsappAccountId: v.id("whatsappAccounts") },
   returns: v.union(
-    v.object({
-      metaAppId: v.string(),
-      wabaId: v.string(),
-      transportProvider: v.optional(
-        v.union(v.literal("meta_graph"), v.literal("leo_hub")),
-      ),
-    }),
+    v.object({ metaAppId: v.string(), wabaId: v.string() }),
     v.null(),
   ),
   handler: async (ctx, args) => {
     const account = await ctx.db.get(args.whatsappAccountId);
     if (!account) return null;
-    return {
-      metaAppId: account.metaAppId,
-      wabaId: account.wabaId,
-      transportProvider: account.transportProvider,
-    };
+    return { metaAppId: account.metaAppId, wabaId: account.wabaId };
   },
 });
 

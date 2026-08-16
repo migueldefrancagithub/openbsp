@@ -396,10 +396,6 @@ export default defineSchema({
     validatedAt: v.optional(v.number()),
     validatedScopes: v.optional(v.array(v.string())),
     tokenExpiresAt: v.optional(v.number()),
-    transportProvider: v.optional(
-      v.union(v.literal("meta_graph"), v.literal("leo_hub")),
-    ),
-    providerChannelId: v.optional(v.string()),
     /** Last account_update webhook event + ban/restriction state from Meta. */
     accountUpdateEvent: v.optional(v.string()),
     banState: v.optional(v.string()),
