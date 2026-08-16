@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { useMutation, useQuery } from "convex/react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import {
   AlertTriangle,
   Ban,
@@ -9,6 +9,10 @@ import {
   Building2,
   CheckCircle2,
   Circle,
+  Copy,
+  Download,
+  FileCheck2,
+  Link2,
   Loader2,
   LogIn,
   MessageSquare,
@@ -25,6 +29,42 @@ import { ApiKeysSection } from "@/components/settings/ApiKeysSection";
 import { MembersSection } from "@/components/settings/MembersSection";
 import { TeamsSection } from "@/components/settings/TeamsSection";
 import { api } from "../../../../convex/_generated/api";
+import type { Id } from "../../../../convex/_generated/dataModel";
+
+type FacebookLoginResponse = {
+  authResponse?: { code?: string };
+  status?: string;
+};
+
+type EmbeddedSignupSessionInfo = {
+  business_id?: string;
+  waba_id?: string;
+  waba_ids?: string[];
+  phone_number_id?: string;
+};
+
+declare global {
+  interface Window {
+    FB?: {
+      init: (options: {
+        appId: string;
+        autoLogAppEvents: boolean;
+        xfbml: boolean;
+        version: string;
+      }) => void;
+      login: (
+        callback: (response: FacebookLoginResponse) => void,
+        options: {
+          config_id: string;
+          response_type: "code";
+          override_default_response_type: true;
+          extras: { setup: Record<string, never> };
+        },
+      ) => void;
+    };
+    fbAsyncInit?: () => void;
+  }
+}
 
 type AdmissionStatus =
   | "todo"
@@ -45,6 +85,39 @@ type AdmissionCheck = {
   notes?: string;
 };
 
+type EvidenceResult = {
+  ok: boolean;
+  generatedAt: number;
+  filename: string;
+  summary: {
+    total: number;
+    ok: number;
+    failed: number;
+    skipped: number;
+    writesEnabled: boolean;
+  };
+  target: {
+    metaAppId: string;
+    wabaId: string;
+    whatsappAccountId: Id<"whatsappAccounts">;
+    phoneNumberId: string;
+    phoneE164: string;
+    phoneDisplayName: string;
+  };
+  records: Array<{
+    group: string;
+    label: string;
+    method: "GET" | "POST";
+    endpoint: string;
+    status: number;
+    traceId: string;
+    requestId: string;
+    ok: boolean;
+    skipped?: boolean;
+  }>;
+  doc: string;
+};
+
 export default function SettingsPage() {
   const tenant = useQuery(api.tenantsQueries.getActive);
   const wabaAccounts = useQuery(api.whatsappAccounts.listForTenant);
@@ -53,9 +126,20 @@ export default function SettingsPage() {
   const quickReplies = useQuery(api.quickReplies.list);
   const setAdmissionCheck = useMutation(api.metaAdmission.setManualCheck);
   const beginEmbeddedSignup = useMutation(api.embeddedSignup.begin);
+  const createSignupLaunchLink = useMutation(
+    api.embeddedSignup.createLaunchLink,
+  );
+  const completeEmbeddedSignup = useAction(api.embeddedSignup.completeCallback);
+  const runMetaEvidence = useAction(api.metaEvidence.runWhatsAppEvidence);
   const [signupBusy, setSignupBusy] = useState(false);
   const [signupNotice, setSignupNotice] = useState<string | null>(null);
+  const [launchLinkBusy, setLaunchLinkBusy] = useState(false);
+  const [launchLink, setLaunchLink] = useState<string | null>(null);
+  const [launchLinkNotice, setLaunchLinkNotice] = useState<string | null>(null);
   const [admissionBusy, setAdmissionBusy] = useState<string | null>(null);
+  const [evidenceBusy, setEvidenceBusy] = useState<Id<"whatsappAccounts"> | null>(null);
+  const [evidenceResult, setEvidenceResult] = useState<EvidenceResult | null>(null);
+  const [evidenceNotice, setEvidenceNotice] = useState<string | null>(null);
   const [autoReplyEnabled, setAutoReplyEnabled] = useState(false);
   const [botEnabled, setBotEnabled] = useState(true);
   const [ecommerceEnabled, setEcommerceEnabled] = useState(false);
@@ -78,17 +162,110 @@ export default function SettingsPage() {
   async function handleEmbeddedSignup() {
     setSignupBusy(true);
     setSignupNotice(null);
+    let removeMessageListener: (() => void) | undefined;
     try {
       const result = await beginEmbeddedSignup({});
-      if (result.url) {
-        window.location.href = result.url;
-      } else {
+      if (
+        !result.configured ||
+        !result.appId ||
+        !result.configId ||
+        !result.graphVersion
+      ) {
         setSignupNotice(
-          "Embedded Signup session created. Add META_EMBEDDED_SIGNUP_APP_ID, META_EMBEDDED_SIGNUP_CONFIG_ID, META_EMBEDDED_SIGNUP_REDIRECT_URI, and META_EMBEDDED_SIGNUP_APP_SECRET to enable the Meta redirect.",
+          "Embedded Signup session created. Add META_EMBEDDED_SIGNUP_APP_ID, META_EMBEDDED_SIGNUP_CONFIG_ID, and META_EMBEDDED_SIGNUP_APP_SECRET to enable Meta v4 signup.",
         );
+        return;
       }
+
+      const sessionInfo: { current?: EmbeddedSignupSessionInfo } = {};
+      const onMessage = (event: MessageEvent) => {
+        if (!event.origin.endsWith("facebook.com")) return;
+        try {
+          const data = JSON.parse(String(event.data)) as {
+            type?: string;
+            event?: string;
+            data?: EmbeddedSignupSessionInfo;
+          };
+          if (data.type === "WA_EMBEDDED_SIGNUP") {
+            sessionInfo.current = data.data;
+          }
+        } catch {
+          // Meta may also post non-JSON diagnostic strings while testing.
+        }
+      };
+      window.addEventListener("message", onMessage);
+      removeMessageListener = () =>
+        window.removeEventListener("message", onMessage);
+
+      await loadFacebookSdk(result.appId, result.graphVersion);
+      if (!window.FB) throw new Error("Facebook SDK failed to initialize.");
+
+      const response = await new Promise<FacebookLoginResponse>((resolve) => {
+        window.FB!.login(resolve, {
+          config_id: result.configId!,
+          response_type: "code",
+          override_default_response_type: true,
+          extras: { setup: {} },
+        });
+      });
+      const code = response.authResponse?.code;
+      if (!code) {
+        setSignupNotice(
+          response.status
+            ? `Meta signup did not return a code (${response.status}).`
+            : "Meta signup was closed before a code was returned.",
+        );
+        return;
+      }
+
+      const sessionData = sessionInfo.current;
+      const completion = await completeEmbeddedSignup({
+        state: result.state,
+        code,
+        flowVersion: "v4_sdk",
+        business_id: sessionData?.business_id,
+        waba_id: sessionData?.waba_id ?? sessionData?.waba_ids?.[0],
+        phone_number_id: sessionData?.phone_number_id,
+      });
+      setSignupNotice(
+        completion.status === "connected"
+          ? "WhatsApp connected via Embedded Signup v4."
+          : completion.ok
+            ? `Meta signup captured (${completion.status}).`
+            : "Meta signup failed during backend onboarding.",
+      );
+    } catch (err) {
+      setSignupNotice(
+        err instanceof Error ? err.message : "Embedded Signup failed.",
+      );
     } finally {
+      removeMessageListener?.();
       setSignupBusy(false);
+    }
+  }
+
+  async function handleCreateLaunchLink() {
+    setLaunchLinkBusy(true);
+    setLaunchLinkNotice(null);
+    try {
+      const result = await createSignupLaunchLink({
+        label: "Client WhatsApp connect link",
+        expiresInHours: 72,
+      });
+      const url = `${window.location.origin}${result.path}`;
+      setLaunchLink(url);
+      await navigator.clipboard.writeText(url);
+      setLaunchLinkNotice(
+        `Client signup link copied. It expires ${formatDate(result.expiresAt)}.`,
+      );
+    } catch (error) {
+      setLaunchLinkNotice(
+        error instanceof Error
+          ? cleanError(error.message)
+          : "Could not create signup link.",
+      );
+    } finally {
+      setLaunchLinkBusy(false);
     }
   }
 
@@ -102,6 +279,47 @@ export default function SettingsPage() {
     } finally {
       setAdmissionBusy(null);
     }
+  }
+
+  async function handleRunEvidence(
+    whatsappAccountId: Id<"whatsappAccounts">,
+    phoneNumberId?: Id<"phoneNumbers">,
+  ) {
+    setEvidenceBusy(whatsappAccountId);
+    setEvidenceNotice(null);
+    try {
+      const result = await runMetaEvidence({
+        whatsappAccountId,
+        phoneNumberId,
+      });
+      setEvidenceResult(result);
+      setEvidenceNotice(
+        result.summary.failed === 0
+          ? "Read-only evidence pack generated."
+          : "Evidence pack generated with failed checks.",
+      );
+    } catch (error) {
+      setEvidenceNotice(
+        error instanceof Error ? error.message : "Evidence run failed.",
+      );
+    } finally {
+      setEvidenceBusy(null);
+    }
+  }
+
+  function downloadEvidence() {
+    if (!evidenceResult) return;
+    const blob = new Blob([evidenceResult.doc], {
+      type: "text/plain;charset=utf-8",
+    });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = evidenceResult.filename;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
   }
 
   return (
@@ -207,6 +425,118 @@ export default function SettingsPage() {
             )}
           </div>
           <div className="border-t border-slate-100 px-6 py-4">
+            <div className="mb-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-[#0a1b33]">
+                    <FileCheck2 size={16} />
+                  </div>
+                  <div>
+                    <div className="text-[13px] font-semibold text-[#0a1b33]">
+                      Meta App Review evidence
+                    </div>
+                    <p className="mt-1 max-w-2xl text-[12px] leading-5 text-slate-500">
+                      Runs read-only Graph checks against the connected WABA and returns a token-redacted pack with HTTP status, trace IDs, request IDs, and responses.
+                    </p>
+                  </div>
+                </div>
+                {evidenceResult && (
+                  <button
+                    type="button"
+                    onClick={downloadEvidence}
+                    className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[12px] font-medium text-slate-600 transition-colors hover:border-slate-300 hover:text-[#0a1b33]"
+                  >
+                    <Download size={13} />
+                    Download .txt
+                  </button>
+                )}
+              </div>
+
+              {evidenceNotice && (
+                <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
+                  {evidenceNotice}
+                </div>
+              )}
+
+              {(wabaAccounts ?? []).length === 0 ? (
+                <div className="mt-3 rounded-lg bg-white px-3 py-2 text-xs text-slate-500">
+                  Connect a WABA before generating Meta evidence.
+                </div>
+              ) : (
+                <div className="mt-3 grid gap-2">
+                  {wabaAccounts!.map((account) => {
+                    const primaryPhone = account.phoneNumbers[0];
+                    const busy = evidenceBusy === account._id;
+                    return (
+                      <div
+                        key={account._id}
+                        className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-white px-3 py-3"
+                      >
+                        <div className="min-w-0">
+                          <div className="truncate text-[12px] font-semibold text-[#0a1b33]">
+                            WABA {account.wabaId}
+                          </div>
+                          <div className="mt-0.5 truncate text-[11px] text-slate-500">
+                            {primaryPhone
+                              ? `${primaryPhone.displayName} · ${primaryPhone.e164}`
+                              : "No phone number found"}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          disabled={busy || !primaryPhone}
+                          onClick={() =>
+                            handleRunEvidence(account._id, primaryPhone?._id)
+                          }
+                          className="inline-flex items-center gap-2 rounded-lg bg-[#0a152d] px-3 py-2 text-[12px] font-medium text-white transition-all hover:bg-[#0a1b33] disabled:opacity-50"
+                        >
+                          {busy ? (
+                            <Loader2 size={13} className="animate-spin" />
+                          ) : (
+                            <ShieldCheck size={13} />
+                          )}
+                          Run read-only evidence
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {evidenceResult && (
+                <div className="mt-4 rounded-xl border border-slate-200 bg-white p-3">
+                  <div className="grid gap-2 text-xs sm:grid-cols-4">
+                    <EvidenceMetric label="OK" value={evidenceResult.summary.ok} tone="text-emerald-700" />
+                    <EvidenceMetric label="Failed" value={evidenceResult.summary.failed} tone="text-red-700" />
+                    <EvidenceMetric label="Skipped" value={evidenceResult.summary.skipped} tone="text-amber-700" />
+                    <EvidenceMetric label="Writes" value={evidenceResult.summary.writesEnabled ? "enabled" : "off"} tone="text-slate-700" />
+                  </div>
+                  <div className="mt-3 max-h-64 space-y-1.5 overflow-auto pr-1">
+                    {evidenceResult.records.map((record, index) => (
+                      <div
+                        key={`${record.label}-${index}`}
+                        className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-[11px]"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="font-medium text-[#0a1b33]">
+                            {record.label}
+                          </span>
+                          <span className={`rounded-md border px-1.5 py-0.5 font-semibold ${evidenceRecordTone(record)}`}>
+                            {record.skipped ? "skipped" : record.ok ? `HTTP ${record.status}` : `HTTP ${record.status || "fail"}`}
+                          </span>
+                        </div>
+                        {!record.skipped && (
+                          <div className="mt-1 truncate font-mono text-[10px] text-slate-400">
+                            trace {record.traceId || "-"} · req {record.requestId || "-"}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
             {signupNotice && (
               <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
                 {signupNotice}
@@ -267,6 +597,43 @@ export default function SettingsPage() {
                 ))}
               </div>
             )}
+            <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <div className="flex items-center gap-2 text-[13px] font-medium text-[#0a1b33]">
+                    <Link2 size={14} className="text-slate-500" />
+                    Client connect link
+                  </div>
+                  <div className="mt-1 text-[11px] leading-5 text-slate-500">
+                    Create a 72-hour secure launcher for a client to complete
+                    Embedded Signup without accessing this dashboard.
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCreateLaunchLink}
+                  disabled={launchLinkBusy}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[12px] font-medium text-[#0a1b33] transition-colors hover:border-slate-300 disabled:opacity-50"
+                >
+                  {launchLinkBusy ? (
+                    <Loader2 size={13} className="animate-spin" />
+                  ) : (
+                    <Copy size={13} />
+                  )}
+                  Copy link
+                </button>
+              </div>
+              {launchLink && (
+                <div className="mt-3 break-all rounded-lg border border-slate-200 bg-white px-3 py-2 font-[var(--font-mono)] text-[11px] text-slate-600">
+                  {launchLink}
+                </div>
+              )}
+              {launchLinkNotice && (
+                <div className="mt-2 text-[11px] font-medium text-slate-600">
+                  {launchLinkNotice}
+                </div>
+              )}
+            </div>
           </div>
         </section>
         )}
@@ -569,6 +936,31 @@ function AdmissionCheckCard({
   );
 }
 
+function EvidenceMetric({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string | number;
+  tone: string;
+}) {
+  return (
+    <div className="rounded-lg bg-slate-50 px-3 py-2">
+      <div className="text-[10px] font-semibold uppercase text-slate-400">
+        {label}
+      </div>
+      <div className={`mt-1 text-sm font-semibold ${tone}`}>{value}</div>
+    </div>
+  );
+}
+
+function evidenceRecordTone(record: { ok: boolean; skipped?: boolean }): string {
+  if (record.skipped) return "border-amber-200 bg-amber-50 text-amber-700";
+  if (record.ok) return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  return "border-red-200 bg-red-50 text-red-700";
+}
+
 function AdmissionButton({
   disabled,
   onClick,
@@ -734,4 +1126,50 @@ function QuickReplySelect({
       </select>
     </label>
   );
+}
+
+function formatDate(value: number) {
+  return new Intl.DateTimeFormat("en", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
+}
+
+function cleanError(value: string) {
+  return value.replace(/^.*ConvexError:\s*/i, "").trim();
+}
+
+function loadFacebookSdk(appId: string, graphVersion: string): Promise<void> {
+  if (window.FB) {
+    window.FB.init({
+      appId,
+      autoLogAppEvents: true,
+      xfbml: true,
+      version: graphVersion,
+    });
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve, reject) => {
+    const existing = document.getElementById("facebook-jssdk");
+    window.fbAsyncInit = () => {
+      window.FB?.init({
+        appId,
+        autoLogAppEvents: true,
+        xfbml: true,
+        version: graphVersion,
+      });
+      resolve();
+    };
+    if (existing) return;
+
+    const script = document.createElement("script");
+    script.id = "facebook-jssdk";
+    script.async = true;
+    script.defer = true;
+    script.crossOrigin = "anonymous";
+    script.src = "https://connect.facebook.net/en_US/sdk.js";
+    script.onerror = () => reject(new Error("Failed to load Facebook SDK."));
+    document.body.appendChild(script);
+  });
 }

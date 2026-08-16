@@ -69,6 +69,8 @@ function StatusIcon({ status }: { status: string }) {
       return <CheckCheck size={12} />;
     case "read":
       return <CheckCheck size={12} className="text-emerald-300" />;
+    case "played":
+      return <CheckCheck size={12} className="text-sky-300" />;
     case "failed":
       return <AlertCircle size={12} className="text-red-300" />;
     case "unknown":

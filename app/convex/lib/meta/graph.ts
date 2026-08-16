@@ -13,6 +13,8 @@ export type GraphError = {
   status: number;
   code?: number;
   message: string;
+  details?: string;
+  fbtraceId?: string;
   raw?: unknown;
 };
 export type GraphSuccess<T> = { ok: true; data: T };
@@ -62,12 +64,28 @@ async function parseResult<T>(res: Response): Promise<GraphResult<T>> {
     return { ok: false, status, message: `non-JSON response (${status})` };
   }
   if (!res.ok) {
-    const err = (json as { error?: { code?: number; message?: string } })?.error;
+    const err = (
+      json as {
+        error?: {
+          code?: number;
+          message?: string;
+          error_data?: { details?: string };
+          fbtrace_id?: string;
+        };
+      }
+    )?.error;
+    const details = err?.error_data?.details?.trim();
+    const message = err?.message?.trim() ?? `HTTP ${status}`;
     return {
       ok: false,
       status,
       code: err?.code,
-      message: err?.message ?? `HTTP ${status}`,
+      message:
+        details && details !== message && !message.includes(details)
+          ? `${message}: ${details}`
+          : message,
+      details,
+      fbtraceId: err?.fbtrace_id,
       raw: json,
     };
   }
@@ -79,13 +97,13 @@ async function parseResult<T>(res: Response): Promise<GraphResult<T>> {
 export async function exchangeEmbeddedSignupCode(args: {
   appId: string;
   appSecret: string;
-  redirectUri: string;
+  redirectUri?: string;
   code: string;
 }): Promise<EmbeddedSignupCodeExchange> {
   const url = new URL(`${META_GRAPH_BASE}/oauth/access_token`);
   url.searchParams.set("client_id", args.appId);
   url.searchParams.set("client_secret", args.appSecret);
-  url.searchParams.set("redirect_uri", args.redirectUri);
+  if (args.redirectUri) url.searchParams.set("redirect_uri", args.redirectUri);
   url.searchParams.set("code", args.code);
   const res = await fetch(url.toString(), { method: "GET" });
   const parsed = await parseResult<{ access_token?: string }>(res);

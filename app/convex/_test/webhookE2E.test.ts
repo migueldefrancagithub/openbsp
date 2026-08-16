@@ -89,6 +89,56 @@ function makeMessagePayload(opts?: {
   };
 }
 
+function makeStatusPayload(opts: {
+  wamid: string;
+  status: string;
+  code?: number;
+  title?: string;
+  message?: string;
+  details?: string;
+}) {
+  return {
+    object: "whatsapp_business_account",
+    entry: [
+      {
+        id: "TEST_WABA",
+        changes: [
+          {
+            field: "messages",
+            value: {
+              messaging_product: "whatsapp",
+              metadata: {
+                phone_number_id: "PHONE_TEST_1",
+                display_phone_number: "351910000000",
+              },
+              statuses: [
+                {
+                  id: opts.wamid,
+                  status: opts.status,
+                  timestamp: "1700000100",
+                  recipient_id: "351912345678",
+                  errors: opts.code
+                    ? [
+                        {
+                          code: opts.code,
+                          title: opts.title,
+                          message: opts.message,
+                          error_data: opts.details
+                            ? { details: opts.details }
+                            : undefined,
+                        },
+                      ]
+                    : undefined,
+                },
+              ],
+            },
+          },
+        ],
+      },
+    ],
+  };
+}
+
 describe("webhook E2E", () => {
   it("processes a single inbound message: contact + conversation + message + consent", async () => {
     const t = convexTest(schema);
@@ -279,6 +329,89 @@ describe("webhook E2E", () => {
     });
     const after2 = await t.run(async (ctx) => ctx.db.get(messageId));
     expect(after2?.status).toBe("read");
+  });
+
+  it("status failure preserves Meta error_data.details for support and classification", async () => {
+    const t = convexTest(schema);
+    const { tenantId, phoneNumberId } = await seedTenantAndPhone(t);
+
+    const messageId = await t.run(async (ctx) => {
+      const contactId = await ctx.db.insert("contacts", {
+        tenantId,
+        e164: "+351912345678",
+        tags: [],
+        createdAt: Date.now(),
+      });
+      const conversationId = await ctx.db.insert("conversations", {
+        tenantId,
+        phoneNumberId,
+        contactId,
+        status: "open",
+        lastMessageAt: Date.now(),
+        unreadCount: 0,
+        tags: [],
+      });
+      const campaignId = await ctx.db.insert("campaigns", {
+        tenantId,
+        name: "Meta Failure Details",
+        status: "running",
+        createdAt: Date.now(),
+      });
+      const messageId = await ctx.db.insert("messages", {
+        tenantId,
+        conversationId,
+        direction: "outgoing",
+        businessKey: "test-bk-failed-status",
+        metaMessageId: "wamid.OUT.FAIL.1",
+        sentByCampaignId: campaignId,
+        type: "text",
+        content: { text: "test" },
+        status: "sent",
+        dispatchAttempts: 1,
+        createdAt: Date.now(),
+      });
+      await ctx.db.insert("campaignRecipients", {
+        tenantId,
+        campaignId,
+        contactId,
+        messageId,
+        identityKind: "phone",
+        identityValue: "+351912345678",
+        status: "sent",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+      return messageId;
+    });
+
+    await t.mutation(internal.webhooks.enqueue, {
+      rawPayload: JSON.stringify(
+        makeStatusPayload({
+          wamid: "wamid.OUT.FAIL.1",
+          status: "failed",
+          code: 130429,
+          title: "Rate limit hit",
+          message: "(#130429) Rate limit hit",
+          details: "Cloud API message throughput has been reached.",
+        }),
+      ),
+      rawBodySha256: "sha-status-details",
+    });
+    await processPendingWebhookEvents(t);
+
+    const rows = await t.run(async (ctx) => ({
+      message: await ctx.db.get(messageId),
+      recipient: await ctx.db
+        .query("campaignRecipients")
+        .withIndex("by_message", (q) => q.eq("messageId", messageId))
+        .unique(),
+      phone: await ctx.db.get(phoneNumberId),
+    }));
+    expect(rows.message?.status).toBe("failed");
+    expect(rows.message?.failureCode).toBe("130429");
+    expect(rows.message?.failureReason).toContain("throughput has been reached");
+    expect(rows.recipient?.metaErrorCategory).toBe("quality_limit_or_pacing");
+    expect(rows.phone?.circuitBreakerReason).toContain("throughput");
   });
 
   it("persists CTWA referral context and marks the conversation AI eligible", async () => {

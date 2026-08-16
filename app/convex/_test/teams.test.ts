@@ -178,15 +178,15 @@ describe("teams and inbox queues", () => {
     const agentRows = await seeded.agent.query(api.conversations.listOpen, { limit: 20 });
     const outsiderRows = await seeded.outsider.query(api.conversations.listOpen, { limit: 20 });
 
-    expect(ownerRows.map((row) => row.contactName).sort()).toEqual([
+    expect(ownerRows.map((row: { contactName?: string }) => row.contactName ?? "").sort()).toEqual([
       "Direct Owner",
       "Team Queue",
     ]);
-    expect(leadRows.map((row) => row.contactName).sort()).toEqual([
+    expect(leadRows.map((row: { contactName?: string }) => row.contactName ?? "").sort()).toEqual([
       "Direct Owner",
       "Team Queue",
     ]);
-    expect(agentRows.map((row) => row.contactName).sort()).toEqual([
+    expect(agentRows.map((row: { contactName?: string }) => row.contactName ?? "").sort()).toEqual([
       "Direct Owner",
       "Team Queue",
     ]);

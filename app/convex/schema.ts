@@ -66,7 +66,8 @@ const messageTypeValidator = v.union(
   v.literal("system"),
 );
 
-// queued < dispatching < unknown < failed; sent < delivered < read (terminal lanes).
+// queued < dispatching < unknown < failed; sent < delivered < read < played
+// (played is Meta's voice-message playback status).
 const messageStatusValidator = v.union(
   v.literal("queued"),
   v.literal("dispatching"),
@@ -74,6 +75,7 @@ const messageStatusValidator = v.union(
   v.literal("sent"),
   v.literal("delivered"),
   v.literal("read"),
+  v.literal("played"),
   v.literal("failed"),
 );
 
@@ -394,10 +396,18 @@ export default defineSchema({
     validatedAt: v.optional(v.number()),
     validatedScopes: v.optional(v.array(v.string())),
     tokenExpiresAt: v.optional(v.number()),
+    transportProvider: v.optional(
+      v.union(v.literal("meta_graph"), v.literal("leo_hub")),
+    ),
+    providerChannelId: v.optional(v.string()),
     /** Last account_update webhook event + ban/restriction state from Meta. */
     accountUpdateEvent: v.optional(v.string()),
     banState: v.optional(v.string()),
     accountRestrictions: v.optional(v.any()),
+    lastDisconnectionReason: v.optional(v.string()),
+    lastDisconnectionInitiatedBy: v.optional(v.string()),
+    lastDisconnectedAt: v.optional(v.number()),
+    lastReconnectedAt: v.optional(v.number()),
     createdAt: v.number(),
   })
     .index("by_waba", ["wabaId"])
@@ -536,6 +546,11 @@ export default defineSchema({
       "tenantId",
       "phoneNumberId",
       "contactId",
+    ])
+    .index("by_tenant_contact_lastmsg", [
+      "tenantId",
+      "contactId",
+      "lastMessageAt",
     ])
     .index("by_tenant_lastmsg", ["tenantId", "lastMessageAt"]),
 
@@ -858,6 +873,7 @@ export default defineSchema({
   embeddedSignupSessions: defineTable({
     tenantId: v.id("tenants"),
     createdBy: v.id("members"),
+    launchTokenId: v.optional(v.id("embeddedSignupLaunchTokens")),
     state: v.string(),
     status: v.union(
       v.literal("created"),
@@ -878,6 +894,21 @@ export default defineSchema({
   })
     .index("by_tenant", ["tenantId"])
     .index("by_state", ["state"]),
+
+  embeddedSignupLaunchTokens: defineTable({
+    tenantId: v.id("tenants"),
+    createdBy: v.id("members"),
+    label: v.optional(v.string()),
+    tokenHash: v.string(),
+    status: v.union(v.literal("active"), v.literal("revoked")),
+    createdAt: v.number(),
+    expiresAt: v.number(),
+    starts: v.number(),
+    lastStartedAt: v.optional(v.number()),
+    lastSessionId: v.optional(v.id("embeddedSignupSessions")),
+  })
+    .index("by_tenant", ["tenantId"])
+    .index("by_token_hash", ["tokenHash"]),
 
   metaAdmissionChecks: defineTable({
     tenantId: v.id("tenants"),

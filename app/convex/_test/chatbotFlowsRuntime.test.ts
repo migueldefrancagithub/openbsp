@@ -1,10 +1,11 @@
 import { convexTest } from "convex-test";
 import { describe, expect, it } from "vitest";
-import { internal } from "../_generated/api";
+import { api, internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import schema from "../schema";
 
 type SeededFlow = {
+  userId: Id<"users">;
   tenantId: Id<"tenants">;
   chatbotId: Id<"chatbots">;
   phoneNumberId: Id<"phoneNumbers">;
@@ -61,6 +62,11 @@ async function seedFlow(
       status: "active",
       createdAt: now,
     });
+    await ctx.db.insert("sessions", {
+      userId,
+      activeTenantId: tenantId,
+      updatedAt: now,
+    });
     const whatsappAccountId = await ctx.db.insert("whatsappAccounts", {
       tenantId,
       metaAppId: "META_APP",
@@ -112,7 +118,7 @@ async function seedFlow(
       createdAt: now,
       updatedAt: now,
     });
-    return { tenantId, chatbotId, phoneNumberId, contactId, conversationId };
+    return { userId, tenantId, chatbotId, phoneNumberId, contactId, conversationId };
   });
 }
 
@@ -171,6 +177,63 @@ describe("chatbot flow runtime", () => {
     expect(
       rows.events.filter((event) => event.metaMessageId === "wamid.flow.1"),
     ).toHaveLength(1);
+  });
+
+  it("lists flow runs with exact event counts and a bounded latest event window", async () => {
+    const t = convexTest(schema);
+    const seeded = await seedFlow(t, [
+      { key: "start", type: "start", title: "Start", nextKey: "menu" },
+      {
+        key: "menu",
+        type: "send_buttons",
+        title: "Menu",
+        body: "Como podemos ajudar?",
+        buttons: [{ replyId: "book", label: "Marcar", nextKey: "book" }],
+      },
+      { key: "book", type: "send_message", title: "Booking", body: "Vamos marcar." },
+    ]);
+
+    await t.mutation((internal as any).chatbotFlows.dispatchInbound, {
+      ...inboundArgs(seeded, {
+      text: "menu",
+      metaMessageId: "wamid.flow.audit",
+      receivedAt: 1_700_000_000_000,
+      }),
+    });
+
+    const totalEvents = await t.run(async (ctx) => {
+      const [run] = await ctx.db.query("chatbotFlowRuns").collect();
+      for (let i = 0; i < 14; i += 1) {
+        await ctx.db.insert("chatbotFlowEvents", {
+          tenantId: seeded.tenantId,
+          chatbotId: seeded.chatbotId,
+          flowRunId: run._id,
+          conversationId: seeded.conversationId,
+          contactId: seeded.contactId,
+          eventType: "node_entered",
+          nodeKey: `audit_${i}`,
+          payload: { sequence: i },
+          createdAt: 1_700_000_010_000 + i,
+        });
+      }
+      return (await ctx.db.query("chatbotFlowEvents").collect()).length;
+    });
+
+    const owner = t.withIdentity({ subject: seeded.userId });
+    const [run] = await owner.query(api.chatbotFlows.listRuns, {
+      chatbotId: seeded.chatbotId,
+      limit: 1,
+    });
+
+    expect(run.contactName).toBe("Marisa");
+    expect(run.contactHandle).toBe("+258841234567");
+    expect(run.eventCount).toBe(totalEvents);
+    expect(run.events).toHaveLength(12);
+    expect(run.events[0].createdAt).toBeLessThanOrEqual(
+      run.events.at(-1)?.createdAt ?? 0,
+    );
+    expect(run.events[0].nodeKey).toBe("audit_2");
+    expect(run.events.at(-1)?.nodeKey).toBe("audit_13");
   });
 
   it("advances from a reply id and hands off without duplicating the run", async () => {

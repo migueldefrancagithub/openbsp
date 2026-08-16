@@ -16,6 +16,12 @@ import {
   sendWhatsAppMarketingTemplate,
   sendWhatsAppInteractive,
 } from "./lib/meta/graph";
+import {
+  sendLeoHubText,
+  sendLeoHubTemplate,
+  sendLeoHubInteractive,
+  type LeoHubMessageResult,
+} from "./lib/leoHub/client";
 import { recordAiAuditEvent } from "./lib/aiControl";
 import { classifyMetaFailure } from "./lib/meta/errorClassifier";
 import { requireConsent } from "./lib/consent";
@@ -88,6 +94,7 @@ const STATUS_RANK: Record<string, number> = {
   sent: 4,
   delivered: 5,
   read: 6,
+  played: 7,
 };
 
 /**
@@ -103,6 +110,7 @@ export const markStatusFromWebhook = internalMutation({
       v.literal("sent"),
       v.literal("delivered"),
       v.literal("read"),
+      v.literal("played"),
       v.literal("failed"),
     ),
     failureCode: v.optional(v.string()),
@@ -141,12 +149,12 @@ export const markStatusFromWebhook = internalMutation({
       pricingType: args.pricingType ?? msg.pricingType,
     });
     await syncCampaignRecipientFromMessage(ctx, msg._id, {
-      status: args.newStatus,
+      status: args.newStatus === "played" ? "read" : args.newStatus,
       failureCode: args.failureCode,
       failureReason: args.failureReason,
     });
     if (msg.sentByCampaignId && args.newStatus === "failed") {
-      await ctx.scheduler.runAfter(0, internal.campaigns._evaluateSafetyPause, {
+      await ctx.scheduler.runAfter(1, internal.campaigns._evaluateSafetyPause, {
         campaignId: msg.sentByCampaignId,
       });
     }
@@ -301,7 +309,7 @@ export const sendText = tenantMutation({
       });
     }
 
-    await ctx.scheduler.runAfter(0, internal.messages._dispatchOne, {
+    await ctx.scheduler.runAfter(1, internal.messages._dispatchOne, {
       messageId,
     });
 
@@ -408,11 +416,11 @@ export const _markFailedFromAction = internalMutation({
     });
     const msg = await ctx.db.get(args.messageId);
     if (msg?.sentByCampaignId) {
-      await ctx.scheduler.runAfter(0, internal.campaigns._evaluateSafetyPause, {
+      await ctx.scheduler.runAfter(1, internal.campaigns._evaluateSafetyPause, {
         campaignId: msg.sentByCampaignId,
       });
       await ctx.scheduler.runAfter(
-        0,
+        1,
         internal.whatsappAccounts.openCircuitBreakerForMessageFailure,
         {
           messageId: args.messageId,
@@ -456,6 +464,9 @@ export const _loadDispatchPayload = internalQuery({
       content: v.any(),
       whatsappAccountId: v.id("whatsappAccounts"),
       phoneNumberId: v.string(),
+      transportProvider: v.optional(
+        v.union(v.literal("meta_graph"), v.literal("leo_hub")),
+      ),
       contactE164: v.optional(v.string()),
       contactBsuid: v.optional(v.string()),
       pricingCategory: v.optional(
@@ -478,11 +489,13 @@ export const _loadDispatchPayload = internalQuery({
     if (!phone) return null;
     const contact = await ctx.db.get(conv.contactId);
     if (!contact) return null;
+    const account = await ctx.db.get(phone.whatsappAccountId);
     return {
       tenantId: msg.tenantId,
       content: msg.content,
       whatsappAccountId: phone.whatsappAccountId,
       phoneNumberId: phone.phoneNumberId,
+      transportProvider: account?.transportProvider,
       contactE164: contact.e164,
       contactBsuid: contact.bsuid,
       pricingCategory: msg.pricingCategory,
@@ -621,7 +634,7 @@ export const sendTemplate = tenantMutation({
         at: now,
       });
     }
-    await ctx.scheduler.runAfter(0, internal.messages._dispatchOne, {
+    await ctx.scheduler.runAfter(1, internal.messages._dispatchOne, {
       messageId,
     });
     return messageId;
@@ -652,6 +665,7 @@ export const _dispatchOne = internalAction({
     )) as {
       whatsappAccountId: Id<"whatsappAccounts">;
       phoneNumberId: string;
+      transportProvider?: "meta_graph" | "leo_hub";
       contactE164?: string;
       contactBsuid?: string;
       content: { text?: { body?: string } };
@@ -681,10 +695,18 @@ export const _dispatchOne = internalAction({
       return null;
     }
 
-    // Prefer BSUID over phone: it's the only identifier guaranteed to keep
-    // working once the user adopts a WhatsApp username (Meta June-2026 GA).
+    // Prefer BSUID for marketing/utility because it survives WhatsApp
+    // usernames. Authentication templates are the exception: OTP-style
+    // flows still need a phone identity, so fail early with a useful reason.
     const recipient: import("./lib/meta/graph").WhatsAppRecipient | null =
-      payload.contactBsuid
+      payload.pricingCategory === "authentication"
+        ? payload.contactE164
+          ? {
+              kind: "phone",
+              e164WithoutPlus: payload.contactE164.replace(/^\+/, ""),
+            }
+          : null
+        : payload.contactBsuid
         ? { kind: "bsuid", bsuid: payload.contactBsuid }
         : payload.contactE164
           ? {
@@ -695,7 +717,10 @@ export const _dispatchOne = internalAction({
     if (!recipient) {
       await ctx.runMutation(internal.messages._markFailedFromAction, {
         messageId: args.messageId,
-        failureReason: "contact has neither phone nor bsuid",
+        failureReason:
+          payload.pricingCategory === "authentication"
+            ? "authentication template requires phone identity"
+            : "contact has neither phone nor bsuid",
       });
       return null;
     }
@@ -706,9 +731,70 @@ export const _dispatchOne = internalAction({
       }
     )?.interactive;
 
-    let result: Awaited<ReturnType<typeof sendWhatsAppText>>;
+    let result: NormalizedDispatchResult;
     try {
-      if (interactive) {
+      if (payload.transportProvider === "leo_hub") {
+        if (!payload.contactE164) {
+          await ctx.runMutation(internal.messages._markFailedFromAction, {
+            messageId: args.messageId,
+            failureReason: "leo_hub requires phone identity",
+          });
+          return null;
+        }
+        if (interactive) {
+          const hubInteractive = normalizeOpenBspInteractiveForLeo(interactive);
+          if (!hubInteractive.ok) {
+            await ctx.runMutation(internal.messages._markFailedFromAction, {
+              messageId: args.messageId,
+              failureReason: hubInteractive.reason,
+            });
+            return null;
+          }
+          result = normalizeLeoHubDispatchResult(
+            await sendLeoHubInteractive({
+              token,
+              to: payload.contactE164,
+              interactive: hubInteractive.interactive,
+            }),
+          );
+        } else if (isTemplate) {
+          const tpl = (
+            payload.content as {
+              template: {
+                name: string;
+                language: string;
+                variables: string[];
+              };
+            }
+          ).template;
+          result = normalizeLeoHubDispatchResult(
+            await sendLeoHubTemplate({
+              token,
+              to: payload.contactE164,
+              templateName: tpl.name,
+              languageCode: tpl.language,
+              bodyVariables: tpl.variables,
+            }),
+          );
+        } else {
+          const text =
+            (payload.content as { text?: { body?: string } })?.text?.body ?? "";
+          if (!text) {
+            await ctx.runMutation(internal.messages._markFailedFromAction, {
+              messageId: args.messageId,
+              failureReason: "empty text content",
+            });
+            return null;
+          }
+          result = normalizeLeoHubDispatchResult(
+            await sendLeoHubText({
+              token,
+              to: payload.contactE164,
+              text,
+            }),
+          );
+        }
+      } else if (interactive) {
         result = await sendWhatsAppInteractive({
           token,
           phoneNumberId: payload.phoneNumberId,
@@ -790,11 +876,102 @@ export const _dispatchOne = internalAction({
   },
 });
 
+type NormalizedDispatchResult =
+  | { ok: true; wamid: string }
+  | { ok: false; reason: string; statusCode?: number; metaCode?: number };
+
+function normalizeLeoHubDispatchResult(
+  result: Awaited<ReturnType<typeof sendLeoHubText>>,
+): NormalizedDispatchResult {
+  if (!result.ok) {
+    return {
+      ok: false,
+      reason: result.reason,
+      statusCode: result.status,
+    };
+  }
+  const data = result.data as LeoHubMessageResult & {
+    message_id?: string;
+    messages?: Array<{ id?: string }>;
+  };
+  const wamid =
+    data.wamid ??
+    data.message_id ??
+    data.messageId ??
+    data.id ??
+    data.messages?.[0]?.id;
+  if (!wamid) {
+    return {
+      ok: false,
+      statusCode: result.status,
+      reason: "leo_hub_missing_message_id",
+    };
+  }
+  return { ok: true, wamid };
+}
+
+function normalizeOpenBspInteractiveForLeo(
+  p: import("./lib/meta/graph").InteractivePayload,
+):
+  | {
+      ok: true;
+      interactive: Parameters<typeof sendLeoHubInteractive>[0]["interactive"];
+    }
+  | { ok: false; reason: string } {
+  const bodyText = p.bodyText.trim().slice(0, 1024);
+  if (!bodyText) return { ok: false, reason: "interactive body required" };
+
+  if (p.kind === "buttons") {
+    if (p.buttons.length < 1 || p.buttons.length > 3) {
+      return { ok: false, reason: "reply buttons require 1-3 buttons" };
+    }
+    return {
+      ok: true,
+      interactive: {
+        type: "button",
+        body: { text: bodyText },
+        ...(p.footerText ? { footer: { text: p.footerText.slice(0, 60) } } : {}),
+        action: {
+          buttons: p.buttons.map((b) => ({
+            type: "reply",
+            reply: { id: b.id.slice(0, 256), title: b.title.slice(0, 20) },
+          })),
+        },
+      },
+    };
+  }
+
+  const rowCount = p.sections.reduce((n, s) => n + s.rows.length, 0);
+  if (rowCount < 1 || rowCount > 10) {
+    return { ok: false, reason: "list messages require 1-10 rows total" };
+  }
+  return {
+    ok: true,
+    interactive: {
+      type: "list",
+      body: { text: bodyText },
+      ...(p.footerText ? { footer: { text: p.footerText.slice(0, 60) } } : {}),
+      action: {
+        button: p.buttonText.trim().slice(0, 20) || "Escolher",
+        sections: p.sections.map((s) => ({
+          ...(s.title ? { title: s.title.slice(0, 24) } : {}),
+          rows: s.rows.map((r) => ({
+            id: r.id.slice(0, 200),
+            title: r.title.slice(0, 24),
+            ...(r.description ? { description: r.description.slice(0, 72) } : {}),
+          })),
+        })),
+      },
+    },
+  };
+}
+
 async function syncCampaignRecipientFromMessage(
   ctx: {
     db: {
       query: any;
       patch: any;
+      insert: any;
     };
   },
   messageId: Id<"messages">,
@@ -815,17 +992,38 @@ async function syncCampaignRecipientFromMessage(
     .withIndex("by_message", (q: any) => q.eq("messageId", messageId))
     .unique();
   if (!recipient) return;
+  const now = Date.now();
+  const metaErrorCategory =
+    patch.status === "failed"
+      ? classifyMetaFailure({
+          code: patch.failureCode ?? recipient.failureCode,
+          reason: patch.failureReason ?? recipient.failureReason,
+        })
+      : recipient.metaErrorCategory;
   await ctx.db.patch(recipient._id, {
     status: patch.status,
     failureCode: patch.failureCode ?? recipient.failureCode,
     failureReason: patch.failureReason ?? recipient.failureReason,
-    metaErrorCategory:
-      patch.status === "failed"
-        ? classifyMetaFailure({
-            code: patch.failureCode ?? recipient.failureCode,
-            reason: patch.failureReason ?? recipient.failureReason,
-          })
-        : recipient.metaErrorCategory,
-    updatedAt: Date.now(),
+    metaErrorCategory,
+    updatedAt: now,
   });
+  if (recipient.status !== patch.status) {
+    await ctx.db.insert("campaignEvents", {
+      tenantId: recipient.tenantId,
+      campaignId: recipient.campaignId,
+      campaignRecipientId: recipient._id,
+      type: `campaign.recipient.${patch.status}`,
+      messageId,
+      payload:
+        patch.status === "failed"
+          ? {
+              previousStatus: recipient.status,
+              failureCode: patch.failureCode ?? recipient.failureCode,
+              failureReason: patch.failureReason ?? recipient.failureReason,
+              metaErrorCategory,
+            }
+          : { previousStatus: recipient.status },
+      createdAt: now,
+    });
+  }
 }

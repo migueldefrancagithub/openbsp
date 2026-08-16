@@ -192,6 +192,7 @@ export const list = tenantQuery({
       _id: v.id("contacts"),
       e164: v.optional(v.string()),
       bsuid: v.optional(v.string()),
+      parentBsuid: v.optional(v.string()),
       whatsappUsername: v.optional(v.string()),
       name: v.optional(v.string()),
       locale: v.optional(v.string()),
@@ -202,11 +203,17 @@ export const list = tenantQuery({
         v.literal("revoked"),
         v.literal("unknown"),
       ),
+      marketingConsentAt: v.optional(v.number()),
       transactionalConsent: v.union(
         v.literal("granted"),
         v.literal("revoked"),
         v.literal("unknown"),
       ),
+      transactionalConsentAt: v.optional(v.number()),
+      lastConversationAt: v.optional(v.number()),
+      lastLeadSource: v.optional(v.string()),
+      opportunityStatus: v.optional(v.string()),
+      serviceWindowExpiresAt: v.optional(v.number()),
     }),
   ),
   handler: async (ctx, args) => {
@@ -238,10 +245,18 @@ export const list = tenantQuery({
             .eq("channel", "whatsapp"),
         )
         .unique();
+      const latestConversation = await ctx.db
+        .query("conversations")
+        .withIndex("by_tenant_contact_lastmsg", (q) =>
+          q.eq("tenantId", ctx.tenantId).eq("contactId", c._id),
+        )
+        .order("desc")
+        .first();
       result.push({
         _id: c._id,
         e164: c.e164,
         bsuid: c.bsuid,
+        parentBsuid: c.parentBsuid,
         whatsappUsername: c.whatsappUsername,
         name: c.name,
         locale: c.locale,
@@ -251,10 +266,16 @@ export const list = tenantQuery({
           | "granted"
           | "revoked"
           | "unknown",
+        marketingConsentAt: marketing?.effectiveAt,
         transactionalConsent: (transactional?.status ?? "unknown") as
           | "granted"
           | "revoked"
           | "unknown",
+        transactionalConsentAt: transactional?.effectiveAt,
+        lastConversationAt: latestConversation?.lastMessageAt,
+        lastLeadSource: latestConversation?.leadSource,
+        opportunityStatus: latestConversation?.opportunityStatus,
+        serviceWindowExpiresAt: latestConversation?.serviceWindowExpiresAt,
       });
     }
     return result;

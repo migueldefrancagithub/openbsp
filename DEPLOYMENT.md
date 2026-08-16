@@ -4,7 +4,7 @@
 
 - Deploy staging/preview before production.
 - Vercel project root directory: `app`.
-- Vercel build command:
+- The build command is versioned in `app/vercel.json` and should match:
 
 ```bash
 npx convex deploy --cmd-url-env-var-name NEXT_PUBLIC_CONVEX_URL --cmd 'npm run build'
@@ -12,6 +12,21 @@ npx convex deploy --cmd-url-env-var-name NEXT_PUBLIC_CONVEX_URL --cmd 'npm run b
 
 - Required Vercel env:
   - `CONVEX_DEPLOY_KEY`
+  - `NEXT_PUBLIC_CONVEX_SITE_URL`
+
+Run this before staging or production:
+
+```bash
+cd app
+npm run predeploy:check -- --target=staging --strict
+```
+
+For production:
+
+```bash
+cd app
+npm run predeploy:check -- --target=production --strict
+```
 
 ## Convex Environment Variables
 
@@ -51,7 +66,9 @@ Before connecting real WABAs:
 
 ```bash
 cd app
+npx convex codegen
 npm run test
 npm run typecheck
 npm run build
+npm run predeploy:check -- --target=production --strict
 ```

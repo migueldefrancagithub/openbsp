@@ -555,8 +555,13 @@ export const submitForApproval = action({
       bodyText: data.bodyText,
       buttons: data.buttons,
       exampleVariables: data.parameterSchema
-        .sort((a, b) => a.index - b.index)
-        .map((p) => p.example),
+        .sort(
+          (
+            a: { index: number; example: string },
+            b: { index: number; example: string },
+          ) => a.index - b.index,
+        )
+        .map((p: { index: number; example: string }) => p.example),
     });
     if (!result.ok) {
       throw new ConvexError({
@@ -672,8 +677,13 @@ export const createAndSubmitForApproval = action({
       bodyText: data.bodyText,
       buttons: data.buttons,
       exampleVariables: data.parameterSchema
-        .sort((a, b) => a.index - b.index)
-        .map((p) => p.example),
+        .sort(
+          (
+            a: { index: number; example: string },
+            b: { index: number; example: string },
+          ) => a.index - b.index,
+        )
+        .map((p: { index: number; example: string }) => p.example),
     });
 
     if (!result.ok) {

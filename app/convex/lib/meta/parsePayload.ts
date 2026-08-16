@@ -74,11 +74,16 @@ export type ParsedStatus = {
   wabaId: string;
   metaTimestamp: number;
   wamid: string;
-  status: "sent" | "delivered" | "read" | "failed";
+  status: "sent" | "delivered" | "read" | "played" | "failed";
   recipientE164?: string;
   recipientBsuid?: string;
   recipientParentBsuid?: string;
-  errors?: Array<{ code: number; title?: string }>;
+  errors?: Array<{
+    code: number;
+    title?: string;
+    message?: string;
+    error_data?: { details?: string };
+  }>;
   // Per-message pricing (PMP, since July 2025): free messages carry the
   // same category as paid — billable/type distinguish them.
   pricing?: {
@@ -171,8 +176,12 @@ export type ParsedAccountUpdate = {
   event: string;
   banState?: string;
   banDate?: string;
-  restrictions?: Array<{ type: string; expiration?: number }>;
+  restrictions?: Array<{ type: string; expiration?: number; remediation?: string }>;
   violationType?: string;
+  disconnectionInfo?: {
+    reason?: string;
+    initiatedBy?: string;
+  };
   raw: Record<string, unknown>;
 };
 
@@ -343,6 +352,9 @@ export function parseMetaPayload(payload: unknown): ParsedItem[] {
         const violationInfo = v.violation_info as
           | { violation_type?: string }
           | undefined;
+        const disconnectionInfo = v.disconnection_info as
+          | { reason?: string; initiated_by?: string }
+          | undefined;
         items.push({
           kind: "account_update",
           eventKey: deriveEventKey({
@@ -365,9 +377,20 @@ export function parseMetaPayload(payload: unknown): ParsedItem[] {
             type: String(r.restriction_type ?? ""),
             expiration:
               typeof r.expiration === "number" ? r.expiration : undefined,
+            remediation: r.remediation ? String(r.remediation) : undefined,
           })),
           violationType: violationInfo?.violation_type
             ? String(violationInfo.violation_type)
+            : undefined,
+          disconnectionInfo: disconnectionInfo
+            ? {
+                reason: disconnectionInfo.reason
+                  ? String(disconnectionInfo.reason)
+                  : undefined,
+                initiatedBy: disconnectionInfo.initiated_by
+                  ? String(disconnectionInfo.initiated_by)
+                  : undefined,
+              }
             : undefined,
           raw: v,
         });
@@ -537,6 +560,7 @@ export function parseMetaPayload(payload: unknown): ParsedItem[] {
             statusValue !== "sent" &&
             statusValue !== "delivered" &&
             statusValue !== "read" &&
+            statusValue !== "played" &&
             statusValue !== "failed"
           )
             continue;
@@ -575,7 +599,7 @@ export function parseMetaPayload(payload: unknown): ParsedItem[] {
             recipientBsuid: recipientUserId || undefined,
             recipientParentBsuid: recipientParentUserId || undefined,
             errors: Array.isArray(s.errors)
-              ? (s.errors as Array<{ code: number; title?: string }>)
+              ? (s.errors as ParsedStatus["errors"])
               : undefined,
             pricing: s.pricing as ParsedStatus["pricing"],
             raw: s,

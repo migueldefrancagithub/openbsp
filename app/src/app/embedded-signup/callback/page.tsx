@@ -28,6 +28,7 @@ export default function EmbeddedSignupCallbackPage() {
       phone_number_id: searchParams.get("phone_number_id") ?? undefined,
       phone_e164: searchParams.get("phone_e164") ?? undefined,
       phone_display_name: searchParams.get("phone_display_name") ?? undefined,
+      flowVersion: "oauth_redirect" as const,
     }),
     [searchParams],
   );
