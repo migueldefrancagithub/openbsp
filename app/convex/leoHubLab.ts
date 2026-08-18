@@ -10,6 +10,10 @@ import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { tenantMutation } from "./lib/customFunctions";
 import {
+  projectThreadFromEvent,
+  reconcileOutboxFromStatus,
+} from "./lib/channels/projection";
+import {
   decryptSecret,
   encryptSecret,
   getSecretEncryptionStatus,
@@ -1120,6 +1124,7 @@ export const ingestWebhookEvents = internalMutation({
         continue;
       }
 
+      let identityId: Id<"channelIdentities"> | undefined;
       if (event.actorProviderScopedId) {
         const identity = await ctx.db
           .query("channelIdentities")
@@ -1130,13 +1135,14 @@ export const ingestWebhookEvents = internalMutation({
           )
           .unique();
         if (identity) {
+          identityId = identity._id;
           await ctx.db.patch(identity._id, {
             displayName: event.actorDisplayName ?? identity.displayName,
             phone: event.actorPhone ?? identity.phone,
             updatedAt: now,
           });
         } else {
-          await ctx.db.insert("channelIdentities", {
+          identityId = await ctx.db.insert("channelIdentities", {
             tenantId: channel.tenantId,
             channelId: channel._id,
             providerScopedId: event.actorProviderScopedId,
@@ -1166,6 +1172,15 @@ export const ingestWebhookEvents = internalMutation({
         receivedAt: now,
         processedAt: now,
       });
+
+      // Reconciliation and projection run only for newly inserted events, in
+      // this same transaction. The duplicate branch above returns early, which
+      // is what makes replay a no-op.
+      if (event.eventKind.startsWith("status.")) {
+        await reconcileOutboxFromStatus(ctx, { channel, event });
+      }
+      await projectThreadFromEvent(ctx, { channel, event, identityId, now });
+
       accepted += 1;
     }
     return { accepted, duplicates };

@@ -318,6 +318,7 @@ const neutralOutboxStatusValidator = v.union(
   v.literal("dispatching"),
   v.literal("accepted"),
   v.literal("delivered"),
+  v.literal("read"),
   v.literal("failed"),
   v.literal("unknown"),
 );
@@ -481,6 +482,7 @@ export default defineSchema({
   })
     .index("by_channel_key", ["channelId", "eventKey"])
     .index("by_channel_received", ["channelId", "receivedAt"])
+    .index("by_channel_thread", ["channelId", "threadKey", "receivedAt"])
     .index("by_tenant_received", ["tenantId", "receivedAt"]),
 
   channelOutbox: defineTable({
@@ -506,7 +508,33 @@ export default defineSchema({
   })
     .index("by_channel_business_key", ["channelId", "businessKey"])
     .index("by_channel_created", ["channelId", "createdAt"])
+    .index("by_channel_provider_message", ["channelId", "providerMessageId"])
     .index("by_tenant_created", ["tenantId", "createdAt"]),
+
+  /**
+   * Channel-neutral thread projection derived from channelEvents. This is the
+   * read surface for the multichannel inbox. It is deliberately separate from
+   * the legacy conversations table, which is bound to phoneNumbers and cannot
+   * represent a non-WhatsApp channel.
+   */
+  channelThreads: defineTable({
+    tenantId: v.id("tenants"),
+    channelId: v.id("channels"),
+    threadKey: v.string(),
+    identityId: v.optional(v.id("channelIdentities")),
+    lastEventAt: v.number(),
+    lastEventKind: v.string(),
+    lastInboundAt: v.optional(v.number()),
+    lastOutboundAt: v.optional(v.number()),
+    lastPreview: v.optional(v.string()),
+    unreadCount: v.number(),
+    serviceWindowExpiresAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_channel_thread", ["channelId", "threadKey"])
+    .index("by_channel_last_event", ["channelId", "lastEventAt"])
+    .index("by_tenant_last_event", ["tenantId", "lastEventAt"]),
 
   // ===== WhatsApp connections =====
   whatsappAccounts: defineTable({

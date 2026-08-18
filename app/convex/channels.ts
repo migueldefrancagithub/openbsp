@@ -145,6 +145,109 @@ export const listRecentOutbox = tenantQuery({
   },
 });
 
+export const listThreads = tenantQuery({
+  args: { channelId: v.id("channels"), limit: v.optional(v.number()) },
+  returns: v.array(
+    v.object({
+      _id: v.id("channelThreads"),
+      threadKey: v.string(),
+      displayName: v.optional(v.string()),
+      username: v.optional(v.string()),
+      phone: v.optional(v.string()),
+      lastEventAt: v.number(),
+      lastEventKind: v.string(),
+      lastInboundAt: v.optional(v.number()),
+      lastOutboundAt: v.optional(v.number()),
+      lastPreview: v.optional(v.string()),
+      unreadCount: v.number(),
+      serviceWindowExpiresAt: v.optional(v.number()),
+    }),
+  ),
+  handler: async (ctx, args) => {
+    const channel = await ctx.db.get(args.channelId);
+    if (!channel || channel.tenantId !== ctx.tenantId) {
+      throw new ConvexError({ code: "CHANNEL_NOT_FOUND" });
+    }
+    const limit = Math.min(Math.max(args.limit ?? 50, 1), 200);
+    const rows = await ctx.db
+      .query("channelThreads")
+      .withIndex("by_channel_last_event", (q) =>
+        q.eq("channelId", args.channelId),
+      )
+      .order("desc")
+      .take(limit);
+    return await Promise.all(
+      rows.map(async (row) => {
+        const identity = row.identityId
+          ? await ctx.db.get(row.identityId)
+          : null;
+        return {
+          _id: row._id,
+          threadKey: row.threadKey,
+          displayName: identity?.displayName,
+          username: identity?.username,
+          phone: identity?.phone,
+          lastEventAt: row.lastEventAt,
+          lastEventKind: row.lastEventKind,
+          lastInboundAt: row.lastInboundAt,
+          lastOutboundAt: row.lastOutboundAt,
+          lastPreview: row.lastPreview,
+          unreadCount: row.unreadCount,
+          serviceWindowExpiresAt: row.serviceWindowExpiresAt,
+        };
+      }),
+    );
+  },
+});
+
+export const listThreadEvents = tenantQuery({
+  args: {
+    channelId: v.id("channels"),
+    threadKey: v.string(),
+    limit: v.optional(v.number()),
+  },
+  returns: v.array(
+    v.object({
+      _id: v.id("channelEvents"),
+      eventKey: v.string(),
+      providerEventId: v.optional(v.string()),
+      eventKind: v.string(),
+      direction: v.string(),
+      actorProviderScopedId: v.optional(v.string()),
+      threadKey: v.optional(v.string()),
+      payload: v.any(),
+      status: v.string(),
+      receivedAt: v.number(),
+    }),
+  ),
+  handler: async (ctx, args) => {
+    const channel = await ctx.db.get(args.channelId);
+    if (!channel || channel.tenantId !== ctx.tenantId) {
+      throw new ConvexError({ code: "CHANNEL_NOT_FOUND" });
+    }
+    const limit = Math.min(Math.max(args.limit ?? 50, 1), 200);
+    const rows = await ctx.db
+      .query("channelEvents")
+      .withIndex("by_channel_thread", (q) =>
+        q.eq("channelId", args.channelId).eq("threadKey", args.threadKey),
+      )
+      .order("desc")
+      .take(limit);
+    return rows.map((row) => ({
+      _id: row._id,
+      eventKey: row.eventKey,
+      providerEventId: row.providerEventId,
+      eventKind: row.eventKind,
+      direction: row.direction,
+      actorProviderScopedId: row.actorProviderScopedId,
+      threadKey: row.threadKey,
+      payload: row.payload,
+      status: row.status,
+      receivedAt: row.receivedAt,
+    }));
+  },
+});
+
 export const setSendMode = tenantMutation({
   args: { channelId: v.id("channels"), sendMode: sendModeValidator },
   returns: v.null(),

@@ -9,6 +9,11 @@ path for a second WhatsApp channel. The direct Meta WhatsApp dispatcher remains
 unchanged. No production token or existing Hub connection was added to source
 control.
 
+Delivery/read status reconciliation and the neutral thread projection landed
+after the original handoff: status events now settle the `channelOutbox` row
+they belong to under a strictly monotonic ladder, and inbound events project
+into `channelThreads`.
+
 The implementation covers:
 
 - channel-neutral `channels`, `channelSecrets`, `channelIdentities`,
@@ -57,6 +62,12 @@ The laboratory is not imported by:
   - neutral channel, secret, identity, event, and outbox tables
 - `app/convex/channels.ts`
   - tenant-safe channel/event/outbox queries and kill switch mutation
+  - `listThreads` / `listThreadEvents`: neutral multichannel inbox reads
+- `app/convex/lib/channels/outboxStatus.ts`
+  - pure, provider-agnostic outbound status ladder (no Convex imports)
+- `app/convex/lib/channels/projection.ts`
+  - status-to-outbox reconciliation and thread projection, applied in the same
+    transaction as the event insert
 - `app/convex/leoHubLab.ts`
   - authenticated lab configuration, secrets, health, sends, Flow operations,
     outbox settlement, webhook persistence
@@ -175,13 +186,24 @@ were entered during this work.
 
 ## Known limitations
 
-- Hub inbound events are visible in the laboratory activity panel but are not
-  mirrored into the legacy WhatsApp `conversations/messages` tables.
+- Hub inbound events are **not** mirrored into the legacy WhatsApp
+  `conversations/messages` tables, and this is intentional, not a gap.
+  `conversations.phoneNumberId` is `v.id("phoneNumbers")`, so mirroring a
+  laboratory channel would require minting fake WhatsApp phone-number rows —
+  ADR-002 forbids the laboratory from reaching into the WhatsApp domain.
+  The channel-neutral `channelThreads` projection is the supported read
+  surface, and it is the same surface Instagram will use.
 - Hub inbound events do not start the legacy chatbot flow runtime.
 - The Settings UI currently sends text only. Templates, interactives, and Flow
   operations are backend-ready.
-- Delivery/read status events are stored neutrally but do not yet reconcile the
-  corresponding `channelOutbox` row.
+- The neutral thread projection has no UI yet. `channels.listThreads` and
+  `channels.listThreadEvents` are backend-ready; wiring them into a screen is
+  gated behind the first real round trip passing.
+- `channelOutbox` rows that reached `unknown` carry no `providerMessageId`,
+  because the send never returned one. No inbound status can match them, and
+  matching by recipient plus timestamp is deliberately not attempted — that
+  could mark an unsent message delivered. Resolving those needs a provider-side
+  message lookup.
 - The repository does not yet contain the direct Instagram adapter.
 - Hub webhook retry guarantees are not documented, so OpenBSP must retain its
   own deduplication and evidence.
