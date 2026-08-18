@@ -248,6 +248,71 @@ export const listThreadEvents = tenantQuery({
   },
 });
 
+export const getThread = tenantQuery({
+  args: { channelId: v.id("channels"), threadKey: v.string() },
+  returns: v.union(
+    v.object({
+      _id: v.id("channelThreads"),
+      threadKey: v.string(),
+      displayName: v.optional(v.string()),
+      phone: v.optional(v.string()),
+      lastEventAt: v.number(),
+      lastInboundAt: v.optional(v.number()),
+      unreadCount: v.number(),
+      serviceWindowExpiresAt: v.optional(v.number()),
+      channelSendMode: v.string(),
+      channelProvider: v.string(),
+      recipientAllowlisted: v.boolean(),
+    }),
+    v.null(),
+  ),
+  handler: async (ctx, args) => {
+    const channel = await ctx.db.get(args.channelId);
+    if (!channel || channel.tenantId !== ctx.tenantId) {
+      throw new ConvexError({ code: "CHANNEL_NOT_FOUND" });
+    }
+    const thread = await ctx.db
+      .query("channelThreads")
+      .withIndex("by_channel_thread", (q) =>
+        q.eq("channelId", args.channelId).eq("threadKey", args.threadKey),
+      )
+      .unique();
+    if (!thread) return null;
+    const identity = thread.identityId
+      ? await ctx.db.get(thread.identityId)
+      : null;
+    // The allowlist itself stays server-side; the UI only needs the verdict.
+    const recipient = identity?.phone ?? thread.threadKey;
+    return {
+      _id: thread._id,
+      threadKey: thread.threadKey,
+      displayName: identity?.displayName,
+      phone: identity?.phone,
+      lastEventAt: thread.lastEventAt,
+      lastInboundAt: thread.lastInboundAt,
+      unreadCount: thread.unreadCount,
+      serviceWindowExpiresAt: thread.serviceWindowExpiresAt,
+      channelSendMode: channel.sendMode,
+      channelProvider: channel.provider,
+      recipientAllowlisted: channel.outboundAllowlist.includes(recipient),
+    };
+  },
+});
+
+export const markThreadRead = tenantMutation({
+  args: { threadId: v.id("channelThreads") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const thread = await ctx.db.get(args.threadId);
+    if (!thread || thread.tenantId !== ctx.tenantId) {
+      throw new ConvexError({ code: "THREAD_NOT_FOUND" });
+    }
+    if (thread.unreadCount === 0) return null;
+    await ctx.db.patch(thread._id, { unreadCount: 0, updatedAt: Date.now() });
+    return null;
+  },
+});
+
 export const setSendMode = tenantMutation({
   args: { channelId: v.id("channels"), sendMode: sendModeValidator },
   returns: v.null(),

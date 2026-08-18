@@ -22,6 +22,7 @@ import {
   LifeBuoy,
   Workflow,
   Network,
+  Radio,
   Plus,
 } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
@@ -37,6 +38,7 @@ const NAV = [
   { href: "/app/campaigns", label: "Campaigns", icon: Send },
   { href: "/app/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/app/channels", label: "Channels", icon: Network },
+  { href: "/app/channel-inbox", label: "Channel inbox", icon: Radio },
   { href: "/app/templates", label: "Templates", icon: FileText },
   { href: "/app/chatbots", label: "Flow builder", icon: Workflow },
   { href: "/app/quick-replies", label: "Quick replies", icon: Zap },
