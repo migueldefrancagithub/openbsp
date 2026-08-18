@@ -7,17 +7,18 @@
 ## Current Position
 
 Milestone: v0.1 Channel-neutral multichannel core
-Phase: 2 of 5 (Neutral inbox projection and outbox reconciliation) — Complete
-Plans: 02-01 and 02-02 complete (both loops closed)
-Status: Ready for next PLAN — Phase 3 (Channel-neutral automation runtime)
-Last activity: 2026-08-18 19:54 CAT — UNIFY complete for 02-02 (webhook route end-to-end coverage)
+Phase: 3 of 5 (Channel inbox UI) — Complete
+Plans: 02-01, 02-02, 03-01 complete (all loops closed)
+Status: Ready for operator round trip; next PLAN is the automation runtime
+Last activity: 2026-08-18 21:05 CAT — UNIFY complete for 03-01 (channel inbox UI)
 
 Working checkout: /Users/sidneychambal/openbsp
-Branch: work/openbsp-direct-meta-cleanup (at 02fbed7 when this plan was written)
+Branch: feat/neutral-inbox-ui (off work/openbsp-direct-meta-cleanup)
 
 Progress:
-- Milestone: [████░░░░░░] 40%
+- Milestone: [██████░░░░] 60%
 - Phase 2: [██████████] 100%
+- Phase 3: [██████████] 100%
 
 ## Loop Position
 
@@ -54,7 +55,13 @@ PLAN ──▶ APPLY ──▶ UNIFY
   Production still needs the same schema before this ships.
 - The neutral thread projection has no UI; `listThreads`/`listThreadEvents` are
   backend-ready and gated behind the first real round trip.
-- Chatbot/flow runtime still keyed to the legacy WhatsApp path (Phase 3).
+- **WABA_TOKEN_ENCRYPTION_KEY_V1 absent from the dev Convex deployment.**
+  `leoHubLab.configure` throws SECRET_ENCRYPTION_KEY_MISSING, so the lab channel
+  cannot be connected until it is set. Hard blocker for the operator round trip.
+- Ayamed runs on the Leo Hub in production. The lab must use a SECOND Hub channel
+  and a SECOND number: inbound is NOT gated by the allowlist, so pointing the
+  Ayamed channel's webhook at OpenBSP would divert its traffic.
+- Chatbot/flow runtime still keyed to the legacy WhatsApp path (now Phase 4).
 - No direct Meta Instagram adapter yet (Phase 4).
 - Settings UI sends text only; template/interactive/Flow actions are
   backend-ready but unexposed.

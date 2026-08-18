@@ -60,7 +60,16 @@ Still unproven: whether the Hub's live payload matches the normalized shape.
 
 ---
 
-### Phase 3 — Channel-neutral automation runtime
+### Phase 3 — Channel inbox UI
+
+Status: **Complete** (plan 03-01, 2026-08-18)
+
+`/app/channel-inbox`: channel picker, thread list, thread view, text composer.
+Independent of the legacy `/app/inbox` so the laboratory stays deletable.
+
+---
+
+### Phase 4 — Channel-neutral automation runtime
 
 Status: **Next**
 
@@ -72,7 +81,7 @@ Handoff item 4.
 
 ---
 
-### Phase 4 — Direct Meta Instagram adapter
+### Phase 5 — Direct Meta Instagram adapter
 
 Status: **Not started**
 
@@ -84,7 +93,7 @@ Handoff item 5.
 
 ---
 
-### Phase 5 — Direct Meta WhatsApp completion and laboratory removal
+### Phase 6 — Direct Meta WhatsApp completion and laboratory removal
 
 Status: **Not started**
 
