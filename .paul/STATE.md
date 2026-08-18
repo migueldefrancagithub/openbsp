@@ -8,9 +8,9 @@
 
 Milestone: v0.1 Channel-neutral multichannel core
 Phase: 2 of 5 (Neutral inbox projection and outbox reconciliation) — Complete
-Plan: 02-01 complete (loop closed)
+Plans: 02-01 and 02-02 complete (both loops closed)
 Status: Ready for next PLAN — Phase 3 (Channel-neutral automation runtime)
-Last activity: 2026-08-18 19:39 CAT — UNIFY complete, loop closed for 02-01
+Last activity: 2026-08-18 19:54 CAT — UNIFY complete for 02-02 (webhook route end-to-end coverage)
 
 Working checkout: /Users/sidneychambal/openbsp
 Branch: work/openbsp-direct-meta-cleanup (at 02fbed7 when this plan was written)
@@ -45,9 +45,11 @@ PLAN ──▶ APPLY ──▶ UNIFY
   credentials and Hub-side webhook configuration. Not automatable.
 - `channelOutbox` rows that reached `unknown` have no `providerMessageId`, so
   no inbound status can match them. Resolving needs a provider-side lookup.
-- No real round trip yet: every Phase 2 AC is proven against `convex-test` and the
-  `normalizeWebhook` contract, not live Hub traffic. If the Hub's real status
-  payload shape differs, reconciliation silently matches nothing.
+- No real round trip yet. Plan 02-02 closed the route-level gap: the full HTTP
+  chain (HMAC over raw bytes, decrypt, normalize, ingest, reconcile, project) is
+  now proven end to end. What remains unproven is whether the Hub's real payload
+  matches the Meta `value` shape the adapter normalizes — only live traffic
+  answers that, and it needs operator credentials and a physical handset.
 - Phase 2 schema changes went to the **development** Convex deployment only.
   Production still needs the same schema before this ships.
 - The neutral thread projection has no UI; `listThreads`/`listThreadEvents` are
@@ -59,7 +61,7 @@ PLAN ──▶ APPLY ──▶ UNIFY
 
 ## Session Continuity
 
-Last session: 2026-08-18 19:39 CAT
-Stopped at: Loop closed for 02-01; Phase 2 complete
+Last session: 2026-08-18 19:54 CAT
+Stopped at: Loops closed for 02-01 and 02-02; Phase 2 complete
 Next action: Commit Phase 2, then /paul:plan for Phase 3 (Channel-neutral automation runtime)
 Resume file: .paul/phases/02-neutral-inbox/02-01-SUMMARY.md

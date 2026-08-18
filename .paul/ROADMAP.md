@@ -47,13 +47,16 @@ Deliberately **not** mirrored into legacy `conversations`/`messages`:
 require minting fake WhatsApp phone-number rows for a laboratory channel —
 which ADR-002 forbids. The neutral projection is the boundary-respecting route.
 
-Plans: `02-01` — complete. All 7 ACs pass. Tests 155 → 180.
+Plans: `02-01` and `02-02` — complete. All ACs pass. Tests 155 → 186.
 Delivered: monotonic status ladder (`lib/channels/outboxStatus.ts`), same-transaction
 reconciliation and thread projection (`lib/channels/projection.ts`), `channelThreads`,
 and the tenant-fenced `channels.listThreads` / `channels.listThreadEvents` reads.
 
+Plan 02-02 added end-to-end coverage of the `/provider-webhook/leo-hub/` route.
+
 Not delivered, by design: no inbox UI (gated behind the first real round trip), and
 `unknown` outbox rows remain unresolvable without a provider-side message lookup.
+Still unproven: whether the Hub's live payload matches the normalized shape.
 
 ---
 
