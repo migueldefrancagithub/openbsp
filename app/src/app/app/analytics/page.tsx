@@ -2,145 +2,76 @@
 
 import { useMemo, useState } from "react";
 import { useQuery } from "convex/react";
-import {
-  AlertTriangle,
-  BarChart3,
-  Calendar,
-  CheckCircle2,
-  Banknote,
-  Download,
-  MessageCircle,
-  RefreshCcw,
-  Search,
-  ShieldAlert,
-  Table2,
-  Users,
-  XCircle,
-} from "lucide-react";
-import type { LucideIcon } from "lucide-react";
-import { PageHeader } from "@/components/app/EmptyState";
+import { RefreshCcw } from "lucide-react";
 import { api } from "../../../../convex/_generated/api";
-import { formatMoney as formatDisplayMoney } from "@/lib/money";
-
-type RangeKey = "today" | "7d" | "30d";
-type Granularity = "hour" | "day";
-type Risk = "low" | "watch" | "high";
-type Category = "marketing" | "utility" | "authentication" | "service";
-
-type ReportRow = {
-  bucketStart: number;
-  bucketLabel: string;
-  sent: number;
-  delivered: number;
-  failed: number;
-  deliveryRate: number;
-  costMinor: number;
-  costCurrency: string;
-  category: Category;
-  country: string;
-  retrySafety: "safe" | "review" | "unsafe";
-  qualityRisk: Risk;
-};
-
-type SeriesRow = {
-  bucketStart: number;
-  bucketLabel: string;
-  sent: number;
-  delivered: number;
-  failed: number;
-  costMinor: number;
-  costCurrency: string;
-};
-
-const REPORT_NAV = [
-  { label: "Analytics Report", icon: BarChart3, active: true },
-  { label: "Staff Conversation Reports", icon: Users, active: false },
-  { label: "Contact Reports", icon: MessageCircle, active: false },
-] as const;
-
-const RANGE_LABELS: Record<RangeKey, string> = {
-  today: "Today",
-  "7d": "Last 7 days",
-  "30d": "Last 30 days",
-};
-
-const CATEGORY_STYLES: Record<Category, string> = {
-  marketing: "bg-red-50 text-red-700 border-red-100",
-  utility: "bg-blue-50 text-blue-700 border-blue-100",
-  authentication: "bg-amber-50 text-amber-700 border-amber-100",
-  service: "bg-emerald-50 text-emerald-700 border-emerald-100",
-};
-
-const RISK_STYLES: Record<Risk, string> = {
-  low: "bg-emerald-50 text-emerald-700 border-emerald-100",
-  watch: "bg-amber-50 text-amber-700 border-amber-100",
-  high: "bg-red-50 text-red-700 border-red-100",
-};
+import { ActivityTable } from "@/components/analytics/ActivityTable";
+import { TrendChart } from "@/components/analytics/TrendChart";
+import {
+  AnalyticsEmptyState,
+  KpiStrip,
+  Module,
+  RiskBadge,
+  StatLine,
+  TabPanel,
+  Tabs,
+} from "@/components/analytics/ui";
+import {
+  RANGE_LABELS,
+  dateWindow,
+  formatMoney,
+  formatNumber,
+  formatPercent,
+  formatUpdatedAt,
+  useAnalyticsParams,
+  type Granularity,
+  type RangeKey,
+} from "@/components/analytics/lib";
 
 export default function AnalyticsPage() {
-  const [range, setRange] = useState<RangeKey>("today");
-  const [granularity, setGranularity] = useState<Granularity>("hour");
-  const [search, setSearch] = useState("");
+  const { tab, range, granularity, setParam } = useAnalyticsParams();
   const [snapshotAt, setSnapshotAt] = useState(() => Date.now());
 
-  const windowArgs = useMemo(
-    () => dateWindow(range, snapshotAt),
-    [range, snapshotAt],
-  );
+  const window = useMemo(() => dateWindow(range, snapshotAt), [range, snapshotAt]);
   const report = useQuery(api.analytics.reports, {
-    ...windowArgs,
+    dateFrom: window.dateFrom,
+    dateTo: window.dateTo,
     granularity,
   });
 
-  const details = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    return (report?.details ?? []).filter((row) => {
-      if (!term) return true;
-      return (
-        row.bucketLabel.toLowerCase().includes(term) ||
-        row.category.toLowerCase().includes(term) ||
-        row.country.toLowerCase().includes(term)
-      );
-    });
-  }, [report?.details, search]);
-
-  if (!report) {
-    return (
-      <>
-        <PageHeader
-          eyebrow="Meta"
-          title="Analytics Reports"
-          description="Messaging, pricing, country, and category reporting."
-        />
-        <div className="p-8">
-          <div className="h-64 rounded-2xl border border-slate-200 bg-white animate-pulse" />
-        </div>
-      </>
-    );
-  }
+  const loading = report === undefined;
+  const summary = report?.summary;
+  const hasTraffic = (summary?.totalMessages ?? 0) > 0;
 
   return (
-    <>
-      <PageHeader
-        eyebrow="Meta"
-        title="Analytics Reports"
-        description="Messaging, pricing, country, and category reporting."
-        action={
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <SelectControl
-              icon={Calendar}
+    <div className="@container flex min-w-0 flex-col">
+      <header className="min-w-0 border-b border-slate-200 bg-white px-4 pt-4 sm:px-6">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 pb-3">
+          <div className="min-w-0">
+            <h1 className="truncate font-[var(--font-display)] text-[19px] font-medium tracking-tight text-[#0a1b33]">
+              Analytics
+            </h1>
+            <p className="truncate text-[11px] text-slate-400">
+              {loading
+                ? "Loading…"
+                : `${RANGE_LABELS[range]} · updated ${formatUpdatedAt(snapshotAt)}`}
+            </p>
+          </div>
+
+          <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-1.5">
+            <Select
+              label="Period"
               value={range}
-              onChange={(value) => setRange(value as RangeKey)}
+              onChange={(value) => setParam("range", value)}
               options={[
                 { value: "today", label: RANGE_LABELS.today },
                 { value: "7d", label: RANGE_LABELS["7d"] },
                 { value: "30d", label: RANGE_LABELS["30d"] },
               ]}
             />
-            <SelectControl
-              icon={BarChart3}
+            <Select
+              label="Granularity"
               value={granularity}
-              onChange={(value) => setGranularity(value as Granularity)}
+              onChange={(value) => setParam("granularity", value)}
               options={[
                 { value: "hour", label: "Hourly" },
                 { value: "day", label: "Daily" },
@@ -149,390 +80,262 @@ export default function AnalyticsPage() {
             <button
               type="button"
               onClick={() => setSnapshotAt(Date.now())}
-              className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-[#0a1b33] hover:border-slate-300"
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-[12px] font-medium text-[#0a1b33] outline-none hover:border-slate-300 focus-visible:ring-2 focus-visible:ring-[#3d52d5]"
             >
-              <RefreshCcw size={15} />
+              <RefreshCcw size={13} />
               Refresh
             </button>
           </div>
-        }
-      />
+        </div>
 
-      <div className="grid min-h-[calc(100vh-89px)] bg-[#f6f8fb] lg:grid-cols-[260px_1fr]">
-        <aside className="border-b border-slate-200 bg-white p-4 lg:border-b-0 lg:border-r">
-          <div className="space-y-6">
-            <ReportSection title="Meta" items={[REPORT_NAV[0]]} />
-            <ReportSection title="Teams" items={[REPORT_NAV[1]]} />
-            <ReportSection title="Contacts" items={[REPORT_NAV[2]]} />
+        <Tabs active={tab} onChange={(next) => setParam("tab", next)} />
+      </header>
+
+      <div className="min-w-0 flex-1 bg-[#fafbfc] p-4 sm:p-6">
+        {loading ? (
+          <LoadingState />
+        ) : !report ? (
+          <ErrorState onRetry={() => setSnapshotAt(Date.now())} />
+        ) : !hasTraffic ? (
+          <AnalyticsEmptyState />
+        ) : (
+          <div className="mx-auto min-w-0 max-w-[1400px]">
+            <TabPanel id="overview" active={tab}>
+              <div className="flex min-w-0 flex-col gap-4">
+                <KpiStrip
+                  items={[
+                    {
+                      label: "Sent",
+                      value: formatNumber(summary!.sent),
+                    },
+                    {
+                      label: "Delivered",
+                      value: formatNumber(summary!.delivered),
+                      foot: (
+                        <RiskBadge
+                          risk={report.health.deliveryRisk}
+                          hasTraffic={summary!.sent > 0}
+                        />
+                      ),
+                    },
+                    {
+                      label: "Delivery rate",
+                      value: formatPercent(
+                        summary!.deliveryRate,
+                        summary!.sent > 0,
+                      ),
+                    },
+                    {
+                      label: "Spend",
+                      value: formatMoney(
+                        summary!.totalCostMinor,
+                        summary!.costCurrency,
+                      ),
+                    },
+                  ]}
+                />
+
+                <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4 @4xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+                  <Module title="Messaging trend" hint={RANGE_LABELS[range]}>
+                    <TrendChart series={report.series} />
+                  </Module>
+
+                  <Module title="Health">
+                    <div className="divide-y divide-slate-50">
+                      <StatLine
+                        label="Failed"
+                        value={formatNumber(summary!.failed)}
+                      />
+                      <StatLine
+                        label="Failure rate"
+                        value={formatPercent(
+                          summary!.failureRate,
+                          summary!.sent > 0,
+                        )}
+                      />
+                      <StatLine
+                        label="Cost per delivered"
+                        value={formatMoney(
+                          summary!.costPerDeliveredMinor,
+                          summary!.costCurrency,
+                          summary!.delivered > 0,
+                        )}
+                      />
+                      <div className="flex items-center justify-between gap-3 px-4 py-2">
+                        <span className="text-[13px] text-slate-500">
+                          Delivery health
+                        </span>
+                        <RiskBadge
+                          risk={report.health.deliveryRisk}
+                          hasTraffic={summary!.sent > 0}
+                        />
+                      </div>
+                    </div>
+                  </Module>
+                </div>
+              </div>
+            </TabPanel>
+
+            <TabPanel id="delivery" active={tab}>
+              <div className="flex min-w-0 flex-col gap-4">
+                <KpiStrip
+                  items={[
+                    { label: "Sent", value: formatNumber(summary!.sent) },
+                    {
+                      label: "Delivered",
+                      value: formatNumber(summary!.delivered),
+                    },
+                    { label: "Failed", value: formatNumber(summary!.failed) },
+                    {
+                      label: "Failure rate",
+                      value: formatPercent(
+                        summary!.failureRate,
+                        summary!.sent > 0,
+                      ),
+                    },
+                  ]}
+                />
+                <Module title="Delivered vs failed" hint={RANGE_LABELS[range]}>
+                  <TrendChart
+                    series={report.series}
+                    only={["delivered", "failed"]}
+                  />
+                </Module>
+              </div>
+            </TabPanel>
+
+            <TabPanel id="costs" active={tab}>
+              <div className="flex min-w-0 flex-col gap-4">
+                <KpiStrip
+                  items={[
+                    {
+                      label: "Total spend",
+                      value: formatMoney(
+                        summary!.totalCostMinor,
+                        summary!.costCurrency,
+                      ),
+                    },
+                    {
+                      label: "Cost per delivered",
+                      value: formatMoney(
+                        summary!.costPerDeliveredMinor,
+                        summary!.costCurrency,
+                        summary!.delivered > 0,
+                      ),
+                    },
+                    {
+                      label: "Delivered",
+                      value: formatNumber(summary!.delivered),
+                    },
+                    {
+                      label: "Currency",
+                      value: summary!.costCurrency || "—",
+                    },
+                  ]}
+                />
+                <Breakdown
+                  title="By category"
+                  rows={report.categoryBreakdown.map((row) => ({
+                    key: row.category,
+                    label: row.category,
+                    sent: row.sent,
+                    value: formatMoney(row.costMinor, row.costCurrency),
+                  }))}
+                />
+              </div>
+            </TabPanel>
+
+            <TabPanel id="audience" active={tab}>
+              <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4 @3xl:grid-cols-2">
+                <Breakdown
+                  title="By country"
+                  rows={report.countryBreakdown.map((row) => ({
+                    key: row.key,
+                    label: row.key,
+                    sent: row.sent,
+                    value: formatPercent(row.deliveryRate, row.sent > 0),
+                  }))}
+                />
+                <Breakdown
+                  title="By category"
+                  rows={report.categoryBreakdown.map((row) => ({
+                    key: row.category,
+                    label: row.category,
+                    sent: row.sent,
+                    value: formatPercent(row.deliveryRate, row.sent > 0),
+                  }))}
+                />
+              </div>
+            </TabPanel>
+
+            <TabPanel id="activity" active={tab}>
+              <ActivityTable rows={report.details} />
+            </TabPanel>
           </div>
-        </aside>
-
-        <main className="min-w-0 space-y-5 p-5 lg:p-8">
-          <section className="grid gap-4 xl:grid-cols-4">
-            <MetricCard
-              icon={MessageCircle}
-              label="Messages Sent"
-              value={formatNumber(report.summary.sent)}
-              note="Total sent"
-            />
-            <MetricCard
-              icon={CheckCircle2}
-              label="Messages Delivered"
-              value={formatNumber(report.summary.delivered)}
-              note={`${formatPercent(report.summary.deliveryRate)} delivery rate`}
-              accent="emerald"
-            />
-            <MetricCard
-              icon={XCircle}
-              label="Messages Failed"
-              value={formatNumber(report.summary.failed)}
-              note={`${formatPercent(report.summary.failureRate)} failure rate`}
-              accent={report.health.failureRisk === "high" ? "red" : "amber"}
-            />
-            <MetricCard
-              icon={Banknote}
-              label="Total Cost"
-              value={formatMoney(
-                report.summary.totalCostMinor,
-                report.summary.costCurrency,
-              )}
-              note={`${formatMoney(
-                report.summary.costPerDeliveredMinor,
-                report.summary.costCurrency,
-              )} per delivered`}
-              accent="orange"
-            />
-          </section>
-
-          <section className="grid gap-5 xl:grid-cols-[1fr_280px]">
-            <div className="rounded-2xl border border-slate-200 bg-white">
-              <PanelHeader
-                title="Messaging Analytics"
-                subtitle="Sent vs delivered vs failed over time"
-              />
-              <LineChart rows={report.series} />
-            </div>
-
-            <aside className="grid gap-4 sm:grid-cols-3 xl:grid-cols-1">
-              <HealthCard
-                icon={CheckCircle2}
-                label="Delivery Rate"
-                value={formatPercent(report.summary.deliveryRate)}
-                risk={report.health.deliveryRisk}
-              />
-              <HealthCard
-                icon={Banknote}
-                label="Cost per Message"
-                value={formatMoney(
-                  report.summary.costPerDeliveredMinor,
-                  report.summary.costCurrency,
-                )}
-                risk={report.health.spendRisk}
-              />
-              <HealthCard
-                icon={ShieldAlert}
-                label="Failed Messages"
-                value={formatNumber(report.summary.failed)}
-                risk={report.health.failureRisk}
-              />
-            </aside>
-          </section>
-
-          <section className="rounded-2xl border border-slate-200 bg-white">
-            <PanelHeader
-              title="Detailed Analytics"
-              subtitle="Interval totals by category and country"
-              action={
-                <button
-                  type="button"
-                  onClick={() => copyRows(details)}
-                  className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-[#0a1b33] hover:border-slate-300"
-                >
-                  <Download size={15} />
-                  Export CSV
-                </button>
-              }
-            />
-            <div className="border-b border-slate-100 px-5 pb-5">
-              <label className="relative block max-w-2xl">
-                <Search
-                  size={16}
-                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                />
-                <input
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Search by date, category or country..."
-                  className="h-11 w-full rounded-lg border border-slate-200 bg-white pl-10 pr-3 text-sm text-[#0a1b33] outline-none placeholder:text-slate-400 focus:border-slate-400"
-                />
-              </label>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[920px] text-left text-sm">
-                <thead>
-                  <tr className="border-b border-slate-100 text-xs uppercase text-slate-400">
-                    <th className="px-5 py-3 font-semibold">Date</th>
-                    <th className="px-5 py-3 font-semibold">Sent</th>
-                    <th className="px-5 py-3 font-semibold">Delivered</th>
-                    <th className="px-5 py-3 font-semibold">Delivery Rate</th>
-                    <th className="px-5 py-3 font-semibold">Cost</th>
-                    <th className="px-5 py-3 font-semibold">Category</th>
-                    <th className="px-5 py-3 font-semibold">Country</th>
-                    <th className="px-5 py-3 font-semibold">Risk</th>
-                    <th className="px-5 py-3 font-semibold">Retry</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {details.length === 0 ? (
-                    <tr>
-                      <td colSpan={9} className="px-5 py-10 text-center text-slate-400">
-                        No analytics rows match this filter.
-                      </td>
-                    </tr>
-                  ) : (
-                    details.map((row) => (
-                      <tr
-                        key={`${row.bucketStart}-${row.category}-${row.country}`}
-                        className="border-b border-slate-100 last:border-b-0 hover:bg-slate-50"
-                      >
-                        <td className="px-5 py-4 font-semibold text-[#0a1b33]">
-                          {row.bucketLabel}
-                        </td>
-                        <td className="px-5 py-4 text-[#0a1b33]">{row.sent}</td>
-                        <td className="px-5 py-4 text-[#0a1b33]">
-                          {row.delivered}
-                        </td>
-                        <td className="px-5 py-4">
-                          <span className="inline-flex items-center gap-2 font-semibold text-[#0a1b33]">
-                            {formatPercent(row.deliveryRate)}
-                            {row.deliveryRate >= 0.9 ? (
-                              <CheckCircle2 size={14} className="text-emerald-500" />
-                            ) : row.deliveryRate >= 0.75 ? (
-                              <AlertTriangle size={14} className="text-amber-500" />
-                            ) : (
-                              <XCircle size={14} className="text-red-500" />
-                            )}
-                          </span>
-                        </td>
-                        <td className="px-5 py-4 text-[#0a1b33]">
-                          {formatMoney(row.costMinor, row.costCurrency)}
-                        </td>
-                        <td className="px-5 py-4">
-                          <span
-                            className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${CATEGORY_STYLES[row.category]}`}
-                          >
-                            {row.category.toUpperCase()}
-                          </span>
-                        </td>
-                        <td className="px-5 py-4 font-semibold text-[#0a1b33]">
-                          {row.country}
-                        </td>
-                        <td className="px-5 py-4">
-                          <RiskPill risk={row.qualityRisk} />
-                        </td>
-                        <td className="px-5 py-4">
-                          <span className="text-xs font-semibold capitalize text-slate-600">
-                            {row.retrySafety}
-                          </span>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </section>
-
-          <section className="grid gap-5 xl:grid-cols-2">
-            <BreakdownPanel
-              title="Category Breakdown"
-              rows={report.categoryBreakdown.map((row) => ({
-                label: row.category,
-                sent: row.sent,
-                delivered: row.delivered,
-                failed: row.failed,
-                deliveryRate: row.deliveryRate,
-                costMinor: row.costMinor,
-                costCurrency: row.costCurrency,
-              }))}
-            />
-            <BreakdownPanel
-              title="Country Breakdown"
-              rows={report.countryBreakdown.map((row) => ({
-                label: row.key,
-                sent: row.sent,
-                delivered: row.delivered,
-                failed: row.failed,
-                deliveryRate: row.deliveryRate,
-                costMinor: row.costMinor,
-                costCurrency: row.costCurrency,
-              }))}
-            />
-          </section>
-        </main>
+        )}
       </div>
-    </>
+    </div>
   );
 }
 
-function ReportSection({
+function Breakdown({
   title,
-  items,
+  rows,
 }: {
   title: string;
-  items: typeof REPORT_NAV[number][];
+  rows: { key: string; label: string; sent: number; value: string }[];
 }) {
+  const peak = Math.max(1, ...rows.map((row) => row.sent));
   return (
-    <div>
-      <p className="px-2 text-xs font-semibold uppercase text-slate-500">
-        {title}
-      </p>
-      <div className="mt-2 space-y-1">
-        {items.map((item) => {
-          const Icon = item.icon;
-          return (
-            <button
-              key={item.label}
-              type="button"
-              disabled={!item.active}
-              className={`flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left text-sm font-semibold transition-colors ${
-                item.active
-                  ? "bg-violet-50 text-violet-700"
-                  : "text-slate-500 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70"
-              }`}
-            >
-              <Icon size={17} />
-              <span>{item.label}</span>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function PanelHeader({
-  title,
-  subtitle,
-  action,
-}: {
-  title: string;
-  subtitle: string;
-  action?: React.ReactNode;
-}) {
-  return (
-    <div className="flex flex-col gap-3 border-b border-slate-100 px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
-      <div>
-        <h2 className="font-[var(--font-outfit)] text-xl font-semibold text-[#0a1b33]">
-          {title}
-        </h2>
-        <p className="mt-1 text-sm text-slate-500">{subtitle}</p>
-      </div>
-      {action}
-    </div>
-  );
-}
-
-function MetricCard({
-  icon: Icon,
-  label,
-  value,
-  note,
-  accent = "blue",
-}: {
-  icon: LucideIcon;
-  label: string;
-  value: string;
-  note: string;
-  accent?: "blue" | "emerald" | "amber" | "red" | "orange";
-}) {
-  const accentClass = {
-    blue: "text-blue-500 bg-blue-50",
-    emerald: "text-emerald-600 bg-emerald-50",
-    amber: "text-amber-600 bg-amber-50",
-    red: "text-red-600 bg-red-50",
-    orange: "text-orange-500 bg-orange-50",
-  }[accent];
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-sm font-semibold text-[#0a1b33]">{label}</p>
-          <p className="mt-4 font-[var(--font-outfit)] text-3xl font-semibold text-[#0a1b33]">
-            {value}
-          </p>
-          <p className="mt-3 text-sm text-slate-500">{note}</p>
+    <Module title={title}>
+      {rows.length === 0 ? (
+        <div className="px-4 py-10 text-center text-[13px] text-slate-400">
+          No data for this period
         </div>
-        <span className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${accentClass}`}>
-          <Icon size={20} />
-        </span>
-      </div>
-    </div>
-  );
-}
-
-function HealthCard({
-  icon: Icon,
-  label,
-  value,
-  risk,
-}: {
-  icon: LucideIcon;
-  label: string;
-  value: string;
-  risk: Risk;
-}) {
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <p className="text-sm font-semibold text-slate-500">{label}</p>
-          <p className="mt-2 font-[var(--font-outfit)] text-3xl font-semibold text-[#0a1b33]">
-            {value}
-          </p>
+      ) : (
+        <div className="divide-y divide-slate-50">
+          {rows.map((row) => (
+            <div key={row.key} className="min-w-0 px-4 py-2.5">
+              <div className="flex min-w-0 items-baseline justify-between gap-3">
+                <span className="truncate text-[13px] capitalize text-[#0a1b33]">
+                  {row.label}
+                </span>
+                <span className="shrink-0 text-[13px] font-medium tabular-nums text-slate-600">
+                  {row.value}
+                </span>
+              </div>
+              <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-slate-100">
+                <div
+                  className="h-full rounded-full bg-[#3d52d5]"
+                  style={{ width: `${Math.round((row.sent / peak) * 100)}%` }}
+                />
+              </div>
+            </div>
+          ))}
         </div>
-        <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-[#0a1b33]">
-          <Icon size={22} />
-        </span>
-      </div>
-      <div className="mt-5">
-        <RiskPill risk={risk} />
-      </div>
-    </div>
+      )}
+    </Module>
   );
 }
 
-function RiskPill({ risk }: { risk: Risk }) {
-  return (
-    <span
-      className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold capitalize ${RISK_STYLES[risk]}`}
-    >
-      {risk}
-    </span>
-  );
-}
-
-function SelectControl({
-  icon: Icon,
+function Select({
+  label,
   value,
   onChange,
   options,
 }: {
-  icon: LucideIcon;
+  label: string;
   value: string;
   onChange: (value: string) => void;
-  options: Array<{ value: string; label: string }>;
+  options: { value: string; label: string }[];
 }) {
   return (
-    <label className="relative inline-flex h-10 items-center">
-      <Icon
-        size={15}
-        className="pointer-events-none absolute left-3 text-slate-500"
-      />
+    <label className="min-w-0">
+      <span className="sr-only">{label}</span>
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="h-10 min-w-40 rounded-lg border border-slate-200 bg-white pl-9 pr-8 text-sm font-semibold text-[#0a1b33] outline-none focus:border-slate-400"
+        className="h-8 max-w-[9.5rem] truncate rounded-lg border border-slate-200 bg-white px-2 text-[12px] font-medium text-[#0a1b33] outline-none focus-visible:ring-2 focus-visible:ring-[#3d52d5]"
       >
         {options.map((option) => (
           <option key={option.value} value={option.value}>
@@ -544,238 +347,36 @@ function SelectControl({
   );
 }
 
-function LineChart({ rows }: { rows: SeriesRow[] }) {
-  const chartRows = rows.length > 0 ? rows : [];
-  const maxValue = Math.max(
-    1,
-    ...chartRows.flatMap((row) => [row.sent, row.delivered, row.failed]),
-  );
-  const width = 760;
-  const height = 260;
-  const padding = 34;
-  const sentPath = polyline(chartRows, width, height, padding, maxValue, "sent");
-  const deliveredPath = polyline(
-    chartRows,
-    width,
-    height,
-    padding,
-    maxValue,
-    "delivered",
-  );
-  const failedPath = polyline(chartRows, width, height, padding, maxValue, "failed");
-
+function LoadingState() {
   return (
-    <div className="px-5 py-6">
-      <div className="mb-4 flex flex-wrap justify-center gap-4 text-xs font-semibold text-slate-600">
-        <Legend color="#3b82f6" label="Messages Sent" />
-        <Legend color="#10b981" label="Messages Delivered" />
-        <Legend color="#ef4444" label="Messages Failed" />
-      </div>
-      <div className="overflow-x-auto">
-        <svg
-          role="img"
-          aria-label="Messaging analytics line chart"
-          viewBox={`0 0 ${width} ${height}`}
-          className="h-[280px] min-w-[760px] w-full"
-        >
-          {[0, 0.25, 0.5, 0.75, 1].map((tick) => {
-            const y = padding + (height - padding * 2) * tick;
-            return (
-              <g key={tick}>
-                <line
-                  x1={padding}
-                  x2={width - padding}
-                  y1={y}
-                  y2={y}
-                  stroke="#e2e8f0"
-                  strokeDasharray="4 6"
-                />
-                <text
-                  x={padding - 10}
-                  y={y + 4}
-                  textAnchor="end"
-                  className="fill-slate-400 text-[11px]"
-                >
-                  {Math.round(maxValue * (1 - tick))}
-                </text>
-              </g>
-            );
-          })}
-          <path d={sentPath} fill="none" stroke="#3b82f6" strokeWidth="3" />
-          <path d={deliveredPath} fill="none" stroke="#10b981" strokeWidth="3" />
-          <path d={failedPath} fill="none" stroke="#ef4444" strokeWidth="3" />
-          {chartRows.map((row, index) => {
-            const x = pointX(index, chartRows.length, width, padding);
-            return (
-              <text
-                key={`${row.bucketStart}-label`}
-                x={x}
-                y={height - 8}
-                textAnchor="middle"
-                className="fill-slate-400 text-[10px]"
-              >
-                {row.bucketLabel}
-              </text>
-            );
-          })}
-        </svg>
+    <div className="mx-auto flex min-w-0 max-w-[1400px] flex-col gap-4">
+      <div className="h-[76px] animate-pulse rounded-xl border border-slate-200/80 bg-white" />
+      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4 @4xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+        <div className="h-[280px] animate-pulse rounded-xl border border-slate-200/80 bg-white" />
+        <div className="h-[280px] animate-pulse rounded-xl border border-slate-200/80 bg-white" />
       </div>
     </div>
   );
 }
 
-function Legend({ color, label }: { color: string; label: string }) {
+function ErrorState({ onRetry }: { onRetry: () => void }) {
   return (
-    <span className="inline-flex items-center gap-2">
-      <span className="h-2.5 w-2.5 rounded-sm" style={{ background: color }} />
-      {label}
-    </span>
+    <div className="flex min-h-[50vh] flex-col items-center justify-center px-6 text-center">
+      <h2 className="font-[var(--font-display)] text-[17px] font-medium text-[#0a1b33]">
+        Analytics could not be loaded
+      </h2>
+      <p className="mt-1.5 max-w-sm text-sm text-slate-500">
+        The report request did not complete. Nothing was changed.
+      </p>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="mt-4 inline-flex h-9 items-center rounded-lg border border-slate-200 bg-white px-4 text-[13px] font-medium text-[#0a1b33] outline-none hover:border-slate-300 focus-visible:ring-2 focus-visible:ring-[#3d52d5]"
+      >
+        Try again
+      </button>
+    </div>
   );
 }
 
-function BreakdownPanel({
-  title,
-  rows,
-}: {
-  title: string;
-  rows: Array<{
-    label: string;
-    sent: number;
-    delivered: number;
-    failed: number;
-    deliveryRate: number;
-    costMinor: number;
-    costCurrency: string;
-  }>;
-}) {
-  return (
-    <section className="rounded-2xl border border-slate-200 bg-white">
-      <PanelHeader title={title} subtitle="Delivery and spend concentration" />
-      <div className="divide-y divide-slate-100">
-        {rows.length === 0 ? (
-          <div className="px-5 py-8 text-sm text-slate-400">
-            No report data in this window.
-          </div>
-        ) : (
-          rows.map((row) => (
-            <div key={row.label} className="px-5 py-4">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="font-semibold text-[#0a1b33]">{row.label}</p>
-                  <p className="mt-1 text-sm text-slate-500">
-                    {row.sent} sent · {row.delivered} delivered · {row.failed} failed
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="font-semibold text-[#0a1b33]">
-                    {formatPercent(row.deliveryRate)}
-                  </p>
-                  <p className="mt-1 text-sm text-slate-500">
-                    {formatMoney(row.costMinor, row.costCurrency)}
-                  </p>
-                </div>
-              </div>
-              <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
-                <div
-                  className="h-full rounded-full bg-[#10b981]"
-                  style={{ width: `${Math.min(100, row.deliveryRate * 100)}%` }}
-                />
-              </div>
-            </div>
-          ))
-        )}
-      </div>
-    </section>
-  );
-}
-
-function dateWindow(range: RangeKey, now: number) {
-  const end = now;
-  if (range === "today") {
-    const start = new Date(now);
-    start.setHours(0, 0, 0, 0);
-    return { dateFrom: start.getTime(), dateTo: end };
-  }
-  const days = range === "7d" ? 7 : 30;
-  return { dateFrom: end - days * 24 * 60 * 60 * 1000, dateTo: end };
-}
-
-function pointX(index: number, total: number, width: number, padding: number) {
-  if (total <= 1) return padding;
-  return padding + (index / (total - 1)) * (width - padding * 2);
-}
-
-function pointY(value: number, height: number, padding: number, maxValue: number) {
-  return height - padding - (value / maxValue) * (height - padding * 2);
-}
-
-function polyline(
-  rows: SeriesRow[],
-  width: number,
-  height: number,
-  padding: number,
-  maxValue: number,
-  key: "sent" | "delivered" | "failed",
-) {
-  if (rows.length === 0) return "";
-  return rows
-    .map((row, index) => {
-      const x = pointX(index, rows.length, width, padding);
-      const y = pointY(row[key], height, padding, maxValue);
-      return `${index === 0 ? "M" : "L"} ${x} ${y}`;
-    })
-    .join(" ");
-}
-
-function formatNumber(value: number) {
-  return new Intl.NumberFormat("en-US").format(value);
-}
-
-function formatPercent(value: number) {
-  return `${(value * 100).toFixed(value >= 1 || value === 0 ? 1 : 1)}%`;
-}
-
-function formatMoney(valueMinor: number, currency: string) {
-  return formatDisplayMoney(valueMinor, currency, {
-    minimumFractionDigits: valueMinor === 0 ? 2 : 4,
-    maximumFractionDigits: 4,
-  });
-}
-
-async function copyRows(rows: ReportRow[]) {
-  const csv = [
-    [
-      "date",
-      "sent",
-      "delivered",
-      "failed",
-      "delivery_rate",
-      "cost_minor",
-      "category",
-      "country",
-      "quality_risk",
-      "retry_safety",
-    ],
-    ...rows.map((row) => [
-      row.bucketLabel,
-      row.sent,
-      row.delivered,
-      row.failed,
-      row.deliveryRate,
-      row.costMinor,
-      row.category,
-      row.country,
-      row.qualityRisk,
-      row.retrySafety,
-    ]),
-  ]
-    .map((line) => line.map(escapeCsv).join(","))
-    .join("\n");
-  await navigator.clipboard.writeText(csv);
-}
-
-function escapeCsv(value: string | number) {
-  const text = String(value);
-  if (!/[",\n]/.test(text)) return text;
-  return `"${text.replaceAll("\"", "\"\"")}"`;
-}
+export type { Granularity, RangeKey };
