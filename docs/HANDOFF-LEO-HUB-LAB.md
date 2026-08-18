@@ -180,9 +180,22 @@ npm run typecheck
 
 Result at handoff: 4 test files, 17 tests passed, TypeScript clean.
 
-Convex bindings were regenerated with `npx convex codegen`. The command used
-the repository's configured development deployment; no production credentials
-were entered during this work.
+Convex bindings were regenerated with `npx convex codegen`.
+
+**Correction (2026-08-18):** `npx convex codegen` generates TypeScript bindings
+only. Despite printing "Uploading functions to Convex", it does **not** publish
+the HTTP router, so `/provider-webhook/leo-hub/{publicId}` stayed unregistered
+and answered with the router's `No matching routes found` instead of the
+handler's own `not found`. Use `npx convex dev --once` (or `npx convex deploy`
+for a real environment) to publish functions. Verify with:
+
+```bash
+curl -s -X POST https://<deployment>.convex.site/provider-webhook/leo-hub/lab_zzzzzzzzzzzzzzzzzzzzzzzz -d '{}'
+# "not found"                -> route is live
+# "No matching routes found" -> functions were never published
+```
+
+No production credentials were entered during this work.
 
 ## Known limitations
 
