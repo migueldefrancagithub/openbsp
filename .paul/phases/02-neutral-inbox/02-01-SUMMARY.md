@@ -111,6 +111,19 @@ ACs with named tests                       AC-1 … AC-7 (all)
 - Added the missing `by_channel_provider_message` index. Without it, every status
   event would have forced a full channel scan of `channelOutbox`.
 
+## Task Commits
+
+Committed as one phase commit rather than per task, since the three tasks are a
+single schema-plus-behaviour slice that is not independently green: Task 1's
+schema change does not compile into working behaviour until Task 2 wires it.
+
+| Commit | Type | Scope |
+|--------|------|-------|
+| `90f886b` | feat | Tasks 1–3 + `.paul/` scaffolding + handoff update (13 files) |
+
+`n8n-flow-corrigido/` was explicitly excluded from staging; it is untracked and
+not in `.gitignore`, so it was staged by path rather than with `git add -A`.
+
 ## Files Created/Modified
 
 | File | Change | Purpose |
