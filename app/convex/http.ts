@@ -3,6 +3,7 @@ import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { auth } from "./auth";
 import { verifyMetaHmac } from "./lib/meta/verify";
+import { normalizeWebhook as normalizeLeoHubWebhook } from "./integrations/leoHub/webhook";
 import {
   authenticateRequest,
   badRequestJson,
@@ -77,6 +78,81 @@ http.route({
     });
 
     return new Response("ok", { status: 200 });
+  }),
+});
+
+/**
+ * Temporary Hub laboratory webhook. It has a distinct URL, per-connection
+ * HMAC secret and neutral event store, so it cannot enter the official Meta
+ * webhook pipeline or affect an existing WhatsApp connection.
+ */
+http.route({
+  pathPrefix: "/provider-webhook/leo-hub/",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const prefix = "/provider-webhook/leo-hub/";
+    const pathname = new URL(request.url).pathname;
+    const publicId = pathname.slice(prefix.length);
+    if (!/^lab_[A-Za-z0-9_-]{24}$/.test(publicId)) {
+      return new Response("not found", { status: 404 });
+    }
+
+    const target = (await ctx.runAction(
+      internal.leoHubLab.loadWebhookContext,
+      { publicId },
+    )) as {
+      channelId: Id<"channels">;
+      status: string;
+      webhookSecret: string;
+    } | null;
+    if (!target) return new Response("not found", { status: 404 });
+    if (target.status === "revoked" || target.status === "disconnected") {
+      return new Response("channel disconnected", { status: 410 });
+    }
+
+    const buffer = await request.arrayBuffer();
+    if (buffer.byteLength > 1_000_000) {
+      return new Response("payload too large", { status: 413 });
+    }
+    const rawBodyBytes = new Uint8Array(buffer);
+    const signature = request.headers.get("x-hub-signature-256");
+    const verification = await verifyMetaHmac(
+      rawBodyBytes,
+      signature,
+      target.webhookSecret,
+    );
+    if (!verification.ok) {
+      return new Response("invalid signature", { status: 401 });
+    }
+
+    const rawPayload = new TextDecoder().decode(rawBodyBytes);
+    let payload: unknown;
+    try {
+      payload = JSON.parse(rawPayload);
+    } catch {
+      return new Response("invalid json", { status: 400 });
+    }
+    const events = normalizeLeoHubWebhook(
+      payload,
+      verification.bodySha256,
+    );
+    if (events.length === 0) {
+      return new Response("unsupported payload", { status: 400 });
+    }
+
+    const result = await ctx.runMutation(
+      internal.leoHubLab.ingestWebhookEvents,
+      {
+        channelId: target.channelId,
+        rawPayload,
+        rawBodySha256: verification.bodySha256,
+        events,
+      },
+    );
+    return new Response(JSON.stringify(result), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
   }),
 });
 
