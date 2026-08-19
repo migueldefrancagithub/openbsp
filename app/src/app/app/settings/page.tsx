@@ -28,6 +28,7 @@ import { ConnectWabaForm } from "@/components/settings/ConnectWabaForm";
 import { ApiKeysSection } from "@/components/settings/ApiKeysSection";
 import { MembersSection } from "@/components/settings/MembersSection";
 import { TeamsSection } from "@/components/settings/TeamsSection";
+import { ComplianceSection } from "@/components/settings/ComplianceSection";
 import { LeoHubLabSection } from "@/components/settings/LeoHubLabSection";
 import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
@@ -753,7 +754,13 @@ export default function SettingsPage() {
         </section>
         )}
 
-        {settingsTab === "whatsapp" && <LeoHubLabSection />}
+        {settingsTab === "whatsapp" && (
+          <div className="space-y-4">
+            {/* Connecting any channel is gated on this, so it comes first. */}
+            <ComplianceSection />
+            <LeoHubLabSection />
+          </div>
+        )}
 
         {settingsTab === "automation" && (
         <section className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
