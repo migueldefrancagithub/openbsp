@@ -105,3 +105,57 @@ describe("Leo Hub webhook normalization", () => {
     expect(replay[0].eventKey).toBe(first[0].eventKey);
   });
 });
+
+describe("envelope shapes the Hub actually delivers", () => {
+  const value = {
+    contacts: [{ wa_id: "258849489743", profile: { name: "Tester" } }],
+    messages: [
+      {
+        id: "wamid.ENV",
+        from: "258849489743",
+        type: "text",
+        timestamp: "1755500000",
+        text: { body: "teste openbsp" },
+      },
+    ],
+  };
+
+  // The AYAmed fan-out resolves senders from the flattened value, the complete
+  // Meta envelope and a `body` wrapper, because the Hub has delivered all
+  // three. The laboratory normalizer has to agree, or an enveloped delivery is
+  // stored as event.unknown: no thread, no bubble, and a webhook that looks
+  // healthy while producing nothing usable.
+  it("normalizes the flattened value shape", () => {
+    const events = normalizeWebhook(value, "sha-flat");
+    expect(events).toHaveLength(1);
+    expect(events[0].eventKind).toBe("message.text");
+    expect(events[0].threadKey).toBe("258849489743");
+  });
+
+  it("normalizes the complete entry/changes/value envelope", () => {
+    const events = normalizeWebhook(
+      { object: "whatsapp_business_account", entry: [{ changes: [{ value }] }] },
+      "sha-envelope",
+    );
+    expect(events).toHaveLength(1);
+    expect(events[0].eventKind).toBe("message.text");
+    expect(events[0].providerEventId).toBe("wamid.ENV");
+  });
+
+  it("normalizes a body wrapper around either shape", () => {
+    expect(normalizeWebhook({ body: value }, "sha-body")[0].eventKind).toBe(
+      "message.text",
+    );
+    expect(
+      normalizeWebhook(
+        { body: { entry: [{ changes: [{ value }] }] } },
+        "sha-body-envelope",
+      )[0].eventKind,
+    ).toBe("message.text");
+  });
+
+  it("still falls back for a shape it does not recognize", () => {
+    const events = normalizeWebhook({ type: "ping" }, "sha-ping");
+    expect(events[0].eventKind).toBe("event.ping");
+  });
+});

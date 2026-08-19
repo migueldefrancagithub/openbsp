@@ -47,6 +47,28 @@ function direction(value: unknown): "incoming" | "outgoing" {
 }
 
 /**
+ * The Hub has been observed delivering the flattened Meta `value` object, the
+ * complete `entry[].changes[].value` envelope, and both wrapped in `body`.
+ * Peel those wrappers so the rest of this module only ever sees `value`.
+ *
+ * Without this, an enveloped delivery falls through to the catch-all branch and
+ * a real text message is stored as `event.unknown`: no thread, no bubble, and a
+ * webhook that looks healthy while producing nothing usable.
+ */
+function unwrapEnvelope(root: JsonObject | null): JsonObject | null {
+  if (!root) return null;
+  const inner = object(root.body);
+  const base = inner && !root.messages && !root.statuses ? inner : root;
+
+  if (base.messages || base.statuses || base.contacts) return base;
+
+  const entry = firstObject(base.entry);
+  const change = firstObject(entry?.changes);
+  const value = object(change?.value);
+  return value ?? base;
+}
+
+/**
  * The Hub sends the Meta `value` shape directly instead of wrapping it in
  * `object/entry/changes`. Normalize that shape at the adapter boundary so
  * the channel core never depends on Hub-only enrichment fields.
@@ -55,7 +77,7 @@ export function normalizeWebhook(
   input: unknown,
   rawBodySha256: string,
 ): NormalizedHubEvent[] {
-  const root = object(input);
+  const root = unwrapEnvelope(object(input));
   if (!root) return [];
 
   const contact = firstObject(root.contacts);
