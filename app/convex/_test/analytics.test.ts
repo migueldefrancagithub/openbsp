@@ -9,7 +9,7 @@ async function seedAnalytics(t: ReturnType<typeof convexTest>) {
   const userId = await t.run(async (ctx) => {
     return await ctx.db.insert("users", { name: "Analytics Owner" });
   });
-  await t.run(async (ctx) => {
+  const ids = await t.run(async (ctx) => {
     const tenantId = await ctx.db.insert("tenants", {
       name: "CXCast Reports",
       vertical: "services",
@@ -21,7 +21,7 @@ async function seedAnalytics(t: ReturnType<typeof convexTest>) {
       },
       createdAt: BASE,
     });
-    await ctx.db.insert("members", {
+    const memberId = await ctx.db.insert("members", {
       tenantId,
       userId,
       role: "owner",
@@ -139,8 +139,9 @@ async function seedAnalytics(t: ReturnType<typeof convexTest>) {
       dispatchAttempts: 0,
       createdAt: BASE + 3 * 60 * 60 * 1000,
     });
+    return { tenantId, memberId };
   });
-  return { owner: t.withIdentity({ subject: userId }) };
+  return { owner: t.withIdentity({ subject: userId }), ...ids };
 }
 
 describe("analytics reports", () => {
@@ -199,5 +200,99 @@ describe("analytics reports", () => {
       failed: 1,
       costMinor: 31,
     });
+  });
+
+  it("includes neutral channel delivery lifecycles without double counting statuses", async () => {
+    const t = convexTest(schema);
+    const { owner, tenantId, memberId } = await seedAnalytics(t);
+
+    await t.run(async (ctx) => {
+      const channelId = await ctx.db.insert("channels", {
+        tenantId,
+        publicId: "lab_analytics",
+        kind: "whatsapp",
+        provider: "lab_bridge",
+        externalAccountId: "alfapay_lab",
+        displayName: "Alfapay lab",
+        status: "active",
+        sendMode: "disabled",
+        outboundAllowlist: [],
+        createdBy: memberId,
+        createdAt: BASE,
+        updatedAt: BASE,
+      });
+
+      const common = {
+        tenantId,
+        channelId,
+        direction: "outgoing" as const,
+        actorProviderScopedId: "258840000000",
+        threadKey: "258849489743",
+        payload: {},
+        rawPayload: "{}",
+        rawBodySha256: "sha",
+        status: "processed" as const,
+        attempts: 1,
+        processedAt: BASE,
+      };
+
+      await ctx.db.insert("channelEvents", {
+        ...common,
+        eventKey: "status:hub-1:sent",
+        providerEventId: "hub-1",
+        eventKind: "status.sent",
+        providerTimestamp: BASE + 4 * 60 * 60 * 1000,
+        receivedAt: BASE + 4 * 60 * 60 * 1000,
+      });
+      await ctx.db.insert("channelEvents", {
+        ...common,
+        eventKey: "status:hub-1:delivered",
+        providerEventId: "hub-1",
+        eventKind: "status.delivered",
+        providerTimestamp: BASE + 4 * 60 * 60 * 1000 + 1000,
+        receivedAt: BASE + 4 * 60 * 60 * 1000 + 1000,
+      });
+      await ctx.db.insert("channelEvents", {
+        ...common,
+        eventKey: "status:hub-2:failed",
+        providerEventId: "hub-2",
+        eventKind: "status.failed",
+        lastError: "recipient unavailable",
+        providerTimestamp: BASE + 5 * 60 * 60 * 1000,
+        receivedAt: BASE + 5 * 60 * 60 * 1000,
+      });
+      await ctx.db.insert("channelEvents", {
+        ...common,
+        eventKey: "message:inbound-ignore",
+        providerEventId: "inbound-ignore",
+        eventKind: "message.text",
+        direction: "incoming",
+        providerTimestamp: BASE + 6 * 60 * 60 * 1000,
+        receivedAt: BASE + 6 * 60 * 60 * 1000,
+      });
+    });
+
+    const report = await owner.query((api as any).analytics.reports, {
+      dateFrom: BASE - 60 * 1000,
+      dateTo: BASE + 24 * 60 * 60 * 1000,
+      granularity: "day",
+    });
+
+    expect(report.summary).toMatchObject({
+      sent: 3,
+      delivered: 3,
+      failed: 2,
+      totalMessages: 5,
+    });
+    expect(
+      report.categoryBreakdown.find(
+        (row: { category: string }) => row.category === "service",
+      ),
+    ).toMatchObject({ sent: 2, delivered: 2, failed: 1 });
+    expect(
+      report.countryBreakdown.find(
+        (row: { key: string }) => row.key === "MZ",
+      ),
+    ).toMatchObject({ sent: 2, delivered: 2, failed: 2 });
   });
 });
