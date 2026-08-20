@@ -117,7 +117,6 @@ function statusEvent(args: {
     direction: "outgoing" as const,
     actorProviderScopedId: RECIPIENT,
     actorPhone: RECIPIENT,
-    threadKey: RECIPIENT,
     providerTimestamp: args.timestamp ?? Date.now(),
     payload: {
       status: {
@@ -232,16 +231,15 @@ describe("neutral outbox reconciliation", () => {
     );
 
     expect((await readOutbox(t, outboxId))?.status).toBe("read");
-    const events = await t
-      .withIdentity({ subject: owner.userId })
-      .query(api.channels.listThreadEvents, {
-        channelId,
-        threadKey: RECIPIENT,
-      });
+    const state = await t.run(async (ctx) => ({
+      events: await ctx.db.query("channelEvents").collect(),
+      threads: await ctx.db.query("channelThreads").collect(),
+    }));
     // The late events are still persisted as evidence.
-    expect(events.map((e) => e.eventKind)).toEqual(
+    expect(state.events.map((e) => e.eventKind)).toEqual(
       expect.arrayContaining(["status.read", "status.sent", "status.delivered"]),
     );
+    expect(state.threads).toHaveLength(0);
   });
 
   it("keeps a proven delivery when a failure arrives later (AC-3)", async () => {
@@ -313,6 +311,10 @@ describe("neutral outbox reconciliation", () => {
 
     expect(result.accepted).toBe(1);
     expect((await readOutbox(t, outboxId))?.status).toBe("accepted");
+    const threads = await t.run(async (ctx) =>
+      await ctx.db.query("channelThreads").collect(),
+    );
+    expect(threads).toHaveLength(0);
   });
 
   it("applies the ladder once when a payload is replayed (AC-4)", async () => {
@@ -360,9 +362,13 @@ describe("neutral outbox reconciliation", () => {
     expect(afterSecond?.updatedAt).toBe(afterFirst?.updatedAt);
 
     const stored = await t.run(async (ctx) =>
-      await ctx.db.query("channelEvents").collect(),
+      ({
+        events: await ctx.db.query("channelEvents").collect(),
+        threads: await ctx.db.query("channelThreads").collect(),
+      }),
     );
-    expect(stored).toHaveLength(1);
+    expect(stored.events).toHaveLength(1);
+    expect(stored.threads).toHaveLength(0);
   });
 });
 
@@ -452,7 +458,7 @@ describe("neutral thread projection", () => {
     expect(threads[0].unreadCount).toBe(2);
   });
 
-  it("does not leak raw payload evidence through the inbox queries", async () => {
+  it("keeps status-only evidence out of the inbox projection", async () => {
     const t = convexTest(schema);
     const owner = await seedTenant(t, "OpenBSP Lab");
     const { channelId } = await seedLabConnection(t, owner);
@@ -463,11 +469,40 @@ describe("neutral thread projection", () => {
     const threads = await t
       .withIdentity({ subject: owner.userId })
       .query(api.channels.listThreads, { channelId });
+    expect(threads).toHaveLength(0);
     const serialized = JSON.stringify(threads);
     expect(serialized).not.toContain("rawPayload");
     expect(serialized).not.toContain("rawBodySha256");
     expect(serialized).not.toContain("ciphertext-token");
     expect(serialized).not.toContain("ciphertext-webhook");
+  });
+
+  it("does not project status events even when an old adapter includes a threadKey", async () => {
+    const t = convexTest(schema);
+    const owner = await seedTenant(t, "OpenBSP Lab");
+    const { channelId } = await seedLabConnection(t, owner);
+    const legacyStatus = {
+      ...statusEvent({
+        providerMessageId: "wamid.LEGACY_STATUS_THREAD",
+        status: "sent",
+      }),
+      threadKey: RECIPIENT,
+    };
+
+    await t.mutation(internal.leoHubLab.ingestWebhookEvents, {
+      channelId,
+      rawPayload: JSON.stringify({ statuses: [legacyStatus.payload.status] }),
+      rawBodySha256: "sha-legacy-status-thread",
+      events: [legacyStatus],
+    });
+
+    const state = await t.run(async (ctx) => ({
+      events: await ctx.db.query("channelEvents").collect(),
+      threads: await ctx.db.query("channelThreads").collect(),
+    }));
+    expect(state.events).toHaveLength(1);
+    expect(state.events[0].threadKey).toBe(RECIPIENT);
+    expect(state.threads).toHaveLength(0);
   });
 });
 

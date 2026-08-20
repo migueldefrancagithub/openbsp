@@ -146,7 +146,6 @@ export function normalizeWebhook(
         direction: "outgoing",
         actorProviderScopedId: actor,
         actorPhone: actor,
-        threadKey: actor,
         providerTimestamp: timestamp(status.timestamp),
         payload: { status },
       });

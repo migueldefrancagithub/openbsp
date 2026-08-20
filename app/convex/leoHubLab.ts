@@ -1176,10 +1176,12 @@ export const ingestWebhookEvents = internalMutation({
       // Reconciliation and projection run only for newly inserted events, in
       // this same transaction. The duplicate branch above returns early, which
       // is what makes replay a no-op.
-      if (event.eventKind.startsWith("status.")) {
+      const isStatusEvent = event.eventKind.startsWith("status.");
+      if (isStatusEvent) {
         await reconcileOutboxFromStatus(ctx, { channel, event });
+      } else {
+        await projectThreadFromEvent(ctx, { channel, event, identityId, now });
       }
-      await projectThreadFromEvent(ctx, { channel, event, identityId, now });
 
       accepted += 1;
     }

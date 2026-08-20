@@ -147,7 +147,7 @@ async function post(
 }
 
 describe("Leo Hub webhook route, end to end", () => {
-  it("settles an outbox row and projects a thread through the real route", async () => {
+  it("settles an outbox row without projecting a status-only thread", async () => {
     const t = convexTest(schema);
     const seeded = await seed(t);
     const outboxId = await seedAcceptedOutbox(t, {
@@ -170,9 +170,41 @@ describe("Leo Hub webhook route, end to end", () => {
       events: await ctx.db.query("channelEvents").collect(),
     }));
     expect(state.outbox?.status).toBe("delivered");
-    expect(state.threads).toHaveLength(1);
-    expect(state.threads[0].threadKey).toBe(RECIPIENT);
+    expect(state.threads).toHaveLength(0);
     expect(state.events).toHaveLength(1);
+    expect(state.events[0]).toMatchObject({
+      eventKind: "status.delivered",
+      providerEventId: "wamid.E2E",
+    });
+    expect(state.events[0].threadKey).toBeUndefined();
+  });
+
+  it("stores an orphan provider status as event evidence only", async () => {
+    const t = convexTest(schema);
+    await seed(t);
+
+    const body = statusBody("wamid.UNKNOWN", "delivered");
+    const res = await post(t, {
+      body,
+      signature: await signBody(WEBHOOK_SECRET, body),
+    });
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ accepted: 1, duplicates: 0 });
+
+    const state = await t.run(async (ctx) => ({
+      outbox: await ctx.db.query("channelOutbox").collect(),
+      threads: await ctx.db.query("channelThreads").collect(),
+      events: await ctx.db.query("channelEvents").collect(),
+    }));
+    expect(state.outbox).toHaveLength(0);
+    expect(state.threads).toHaveLength(0);
+    expect(state.events).toHaveLength(1);
+    expect(state.events[0]).toMatchObject({
+      eventKind: "status.delivered",
+      providerEventId: "wamid.UNKNOWN",
+    });
+    expect(state.events[0].threadKey).toBeUndefined();
   });
 
   it("treats a replayed delivery as a duplicate", async () => {
@@ -195,6 +227,12 @@ describe("Leo Hub webhook route, end to end", () => {
     expect(await second.json()).toEqual({ accepted: 0, duplicates: 1 });
     expect(afterSecond?.status).toBe("delivered");
     expect(afterSecond?.updatedAt).toBe(afterFirst?.updatedAt);
+    const state = await t.run(async (ctx) => ({
+      events: await ctx.db.query("channelEvents").collect(),
+      threads: await ctx.db.query("channelThreads").collect(),
+    }));
+    expect(state.events).toHaveLength(1);
+    expect(state.threads).toHaveLength(0);
   });
 
   it("rejects a tampered body and writes nothing", async () => {

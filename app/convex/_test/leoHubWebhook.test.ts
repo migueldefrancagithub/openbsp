@@ -77,6 +77,7 @@ describe("Leo Hub webhook normalization", () => {
       "status:wamid.LAB.2:read",
     ]);
     expect(events.every((event) => event.direction === "outgoing")).toBe(true);
+    expect(events.every((event) => event.threadKey === undefined)).toBe(true);
   });
 
   it("preserves Hub-only events without coupling the core schema", () => {
