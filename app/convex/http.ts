@@ -4,6 +4,7 @@ import { internal } from "./_generated/api";
 import { auth } from "./auth";
 import { verifyMetaHmac } from "./lib/meta/verify";
 import { normalizeWebhook as normalizeLeoHubWebhook } from "./integrations/leoHub/webhook";
+import { normalizeWebhook as normalizeIaSolutionHubWebhook } from "./integrations/iaSolutionHub/webhook";
 import {
   authenticateRequest,
   badRequestJson,
@@ -142,6 +143,87 @@ http.route({
 
     const result = await ctx.runMutation(
       internal.leoHubLab.ingestWebhookEvents,
+      {
+        channelId: target.channelId,
+        rawPayload,
+        rawBodySha256: verification.bodySha256,
+        events,
+      },
+    );
+    return new Response(JSON.stringify(result), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }),
+});
+
+/**
+ * Production iaSolution Hub webhook.
+ *
+ * The opaque public channel key resolves tenant + channel before the payload
+ * is trusted. Each channel then verifies the raw request with its own HMAC
+ * secret. There is deliberately no default channel or Alfapay fallback.
+ */
+http.route({
+  pathPrefix: "/provider-webhook/iasolution-hub/",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const prefix = "/provider-webhook/iasolution-hub/";
+    const pathname = new URL(request.url).pathname;
+    const publicId = pathname.slice(prefix.length);
+    if (!/^hub_[A-Za-z0-9_-]{24}$/.test(publicId)) {
+      return new Response("not found", { status: 404 });
+    }
+
+    const target = (await ctx.runAction(
+      internal.iaSolutionHub.loadWebhookContext,
+      { publicId },
+    )) as {
+      channelId: Id<"channels">;
+      status: string;
+      webhookStatus?: string;
+      webhookSecret: string;
+    } | null;
+    if (!target) return new Response("not found", { status: 404 });
+    if (target.status === "revoked" || target.status === "disconnected") {
+      return new Response("channel disconnected", { status: 410 });
+    }
+    if (target.status !== "active" || target.webhookStatus === "disabled") {
+      return new Response("channel not ready", { status: 409 });
+    }
+
+    const buffer = await request.arrayBuffer();
+    if (buffer.byteLength > 1_000_000) {
+      return new Response("payload too large", { status: 413 });
+    }
+    const rawBodyBytes = new Uint8Array(buffer);
+    const signature = request.headers.get("x-hub-signature-256");
+    const verification = await verifyMetaHmac(
+      rawBodyBytes,
+      signature,
+      target.webhookSecret,
+    );
+    if (!verification.ok) {
+      return new Response("invalid signature", { status: 401 });
+    }
+
+    const rawPayload = new TextDecoder().decode(rawBodyBytes);
+    let payload: unknown;
+    try {
+      payload = JSON.parse(rawPayload);
+    } catch {
+      return new Response("invalid json", { status: 400 });
+    }
+    const events = normalizeIaSolutionHubWebhook(
+      payload,
+      verification.bodySha256,
+    );
+    if (events.length === 0) {
+      return new Response("unsupported payload", { status: 400 });
+    }
+
+    const result = await ctx.runMutation(
+      internal.iaSolutionHub.ingestWebhookEvents,
       {
         channelId: target.channelId,
         rawPayload,

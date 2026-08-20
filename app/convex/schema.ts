@@ -297,6 +297,23 @@ const neutralChannelKindValidator = v.union(
 const neutralChannelProviderValidator = v.union(
   v.literal("meta_graph"),
   v.literal("lab_bridge"),
+  v.literal("iasolution_hub"),
+);
+
+const neutralChannelConnectionStateValidator = v.union(
+  v.literal("pending_number"),
+  v.literal("pending_credentials"),
+  v.literal("ready"),
+  v.literal("allowlist_only"),
+  v.literal("live"),
+  v.literal("disabled"),
+);
+
+const neutralChannelWebhookStatusValidator = v.union(
+  v.literal("disabled"),
+  v.literal("pending"),
+  v.literal("verified"),
+  v.literal("failed"),
 );
 
 const neutralChannelStatusValidator = v.union(
@@ -416,6 +433,15 @@ export default defineSchema({
       v.literal("live"),
     ),
     outboundAllowlist: v.array(v.string()),
+    connectionState: v.optional(neutralChannelConnectionStateValidator),
+    phoneNumber: v.optional(v.string()),
+    wabaId: v.optional(v.string()),
+    webhookStatus: v.optional(neutralChannelWebhookStatusValidator),
+    credentialsConfiguredAt: v.optional(v.number()),
+    lastWebhookAt: v.optional(v.number()),
+    lastWebhookEventKind: v.optional(v.string()),
+    liveApprovedAt: v.optional(v.number()),
+    liveApprovedBy: v.optional(v.id("members")),
     lastHealthStatus: v.optional(v.string()),
     lastHealthDetail: v.optional(v.string()),
     lastHealthCheckAt: v.optional(v.number()),
@@ -430,6 +456,7 @@ export default defineSchema({
       "kind",
       "externalAccountId",
     ])
+    .index("by_provider_phone", ["provider", "kind", "phoneNumber"])
     .index("by_tenant_identity", [
       "tenantId",
       "kind",
@@ -469,7 +496,11 @@ export default defineSchema({
     eventKind: v.string(),
     direction: v.union(v.literal("incoming"), v.literal("outgoing")),
     actorProviderScopedId: v.optional(v.string()),
+    actorDisplayName: v.optional(v.string()),
+    actorPhone: v.optional(v.string()),
     threadKey: v.optional(v.string()),
+    replyToProviderMessageId: v.optional(v.string()),
+    flowToken: v.optional(v.string()),
     payload: v.any(),
     rawPayload: v.string(),
     rawBodySha256: v.string(),
@@ -481,6 +512,7 @@ export default defineSchema({
     processedAt: v.optional(v.number()),
   })
     .index("by_channel_key", ["channelId", "eventKey"])
+    .index("by_channel_provider_event", ["channelId", "providerEventId"])
     .index("by_channel_received", ["channelId", "receivedAt"])
     .index("by_channel_thread", ["channelId", "threadKey", "receivedAt"])
     .index("by_channel_thread_kind", ["channelId", "threadKey", "eventKind"])
@@ -491,10 +523,13 @@ export default defineSchema({
     channelId: v.id("channels"),
     businessKey: v.string(),
     recipient: v.string(),
+    threadKey: v.optional(v.string()),
+    replyToProviderMessageId: v.optional(v.string()),
     messageKind: v.union(
       v.literal("text"),
       v.literal("template"),
       v.literal("interactive"),
+      v.literal("document"),
     ),
     payload: v.any(),
     status: neutralOutboxStatusValidator,
@@ -511,6 +546,86 @@ export default defineSchema({
     .index("by_channel_created", ["channelId", "createdAt"])
     .index("by_channel_provider_message", ["channelId", "providerMessageId"])
     .index("by_tenant_created", ["tenantId", "createdAt"]),
+
+  channelTemplates: defineTable({
+    tenantId: v.id("tenants"),
+    channelId: v.id("channels"),
+    name: v.string(),
+    languageCode: v.string(),
+    category: v.optional(v.string()),
+    status: v.string(),
+    components: v.optional(v.any()),
+    providerTemplateId: v.optional(v.string()),
+    syncedAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_channel", ["channelId"])
+    .index("by_channel_name_language", [
+      "channelId",
+      "name",
+      "languageCode",
+    ])
+    .index("by_tenant", ["tenantId"]),
+
+  channelFlowDrafts: defineTable({
+    tenantId: v.id("tenants"),
+    channelId: v.id("channels"),
+    name: v.string(),
+    categories: v.array(v.string()),
+    flowJson: v.any(),
+    status: v.union(
+      v.literal("draft"),
+      v.literal("validated"),
+      v.literal("published"),
+      v.literal("failed"),
+    ),
+    providerFlowId: v.optional(v.string()),
+    lastError: v.optional(v.string()),
+    createdBy: v.id("members"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_channel", ["channelId", "updatedAt"])
+    .index("by_channel_name", ["channelId", "name"])
+    .index("by_tenant", ["tenantId", "updatedAt"]),
+
+  channelFlowContexts: defineTable({
+    tenantId: v.id("tenants"),
+    channelId: v.id("channels"),
+    threadKey: v.string(),
+    recipient: v.string(),
+    externalMessageId: v.string(),
+    flowId: v.string(),
+    flowToken: v.string(),
+    createdAt: v.number(),
+    expiresAt: v.optional(v.number()),
+  })
+    .index("by_channel_external_message", [
+      "channelId",
+      "externalMessageId",
+    ])
+    .index("by_channel_flow_token", ["channelId", "flowToken"])
+    .index("by_tenant_created", ["tenantId", "createdAt"]),
+
+  channelRateLimitBuckets: defineTable({
+    tenantId: v.id("tenants"),
+    channelId: v.id("channels"),
+    scope: v.union(
+      v.literal("outbound"),
+      v.literal("health"),
+      v.literal("template_sync"),
+      v.literal("flow_publish"),
+    ),
+    bucketStart: v.number(),
+    count: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_channel_scope_bucket", [
+      "channelId",
+      "scope",
+      "bucketStart",
+    ])
+    .index("by_tenant_updated", ["tenantId", "updatedAt"]),
 
   /**
    * Channel-neutral thread projection derived from channelEvents. This is the

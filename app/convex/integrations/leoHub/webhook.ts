@@ -7,6 +7,8 @@ export type NormalizedHubEvent = {
   actorDisplayName?: string;
   actorPhone?: string;
   threadKey?: string;
+  replyToProviderMessageId?: string;
+  flowToken?: string;
   providerTimestamp?: number;
   payload: Record<string, unknown>;
 };
@@ -44,6 +46,24 @@ function direction(value: unknown): "incoming" | "outgoing" {
   return value === "outbound" || value === "outgoing"
     ? "outgoing"
     : "incoming";
+}
+
+function parseFlowResponse(value: unknown): {
+  response?: JsonObject;
+  error?: "missing_response_json" | "invalid_response_json" | "non_object_response";
+} {
+  if (typeof value !== "string" || !value.trim()) {
+    return { error: "missing_response_json" };
+  }
+  try {
+    const parsed = JSON.parse(value);
+    const response = object(parsed);
+    return response
+      ? { response }
+      : { error: "non_object_response" };
+  } catch {
+    return { error: "invalid_response_json" };
+  }
 }
 
 /**
@@ -96,7 +116,20 @@ export function normalizeWebhook(
       const message = object(candidate);
       if (!message) continue;
       const providerEventId = string(message.id);
-      const messageType = string(message.type) ?? "unknown";
+      const declaredMessageType = string(message.type) ?? "unknown";
+      const interactive = object(message.interactive);
+      const nfmReply = object(interactive?.nfm_reply);
+      const messageType = nfmReply ? "nfm_reply" : declaredMessageType;
+      const context = object(message.context);
+      const replyToProviderMessageId =
+        string(context?.id) ?? string(context?.message_id);
+      const parsedFlowResponse = nfmReply
+        ? parseFlowResponse(nfmReply.response_json)
+        : undefined;
+      const flowToken =
+        string(parsedFlowResponse?.response?.flow_token) ??
+        string(nfmReply?.flow_token) ??
+        string(message.flow_token);
       const actor =
         string(message.from_user_id) ??
         string(message.from) ??
@@ -114,6 +147,8 @@ export function normalizeWebhook(
         actorDisplayName: contactName,
         actorPhone: contactPhone,
         threadKey: actor,
+        replyToProviderMessageId,
+        flowToken,
         providerTimestamp: timestamp(message.timestamp),
         payload: {
           message,
@@ -125,6 +160,16 @@ export function normalizeWebhook(
           ...(message.conversation_window
             ? { conversationWindow: message.conversation_window }
             : {}),
+          ...(parsedFlowResponse?.response
+            ? { flowResponse: parsedFlowResponse.response }
+            : {}),
+          ...(parsedFlowResponse?.error
+            ? { flowResponseError: parsedFlowResponse.error }
+            : {}),
+          ...(replyToProviderMessageId
+            ? { replyToProviderMessageId }
+            : {}),
+          ...(flowToken ? { flowToken } : {}),
         },
       });
     }
