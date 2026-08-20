@@ -367,4 +367,52 @@ describe("outbound sendText gates", () => {
     });
     expect(second).toBeNull();
   });
+
+  it("fails authentication templates before dispatch when contact only has BSUID", async () => {
+    const t = convexTest(schema);
+    const seeded = await seed(t);
+    const bsuidOnlyContactId = await t.run(async (ctx) =>
+      ctx.db.insert("contacts", {
+        tenantId: seeded.tenantId,
+        bsuid: "MZ.13491208655302741918",
+        tags: [],
+        createdAt: Date.now(),
+      }),
+    );
+    const conversationId = await makeConversation(t, {
+      tenantId: seeded.tenantId,
+      phoneNumberId: seeded.phoneNumberId,
+      contactId: bsuidOnlyContactId,
+      windowOpen: true,
+    });
+    const messageId = await t.run(async (ctx) =>
+      ctx.db.insert("messages", {
+        tenantId: seeded.tenantId,
+        conversationId,
+        direction: "outgoing",
+        businessKey: "auth-bsuid-only",
+        type: "template",
+        content: {
+          template: {
+            name: "otp_code",
+            language: "pt_PT",
+            version: 1,
+            variables: ["123456"],
+          },
+        },
+        status: "queued",
+        dispatchAttempts: 0,
+        pricingCategory: "authentication",
+        createdAt: Date.now(),
+      }),
+    );
+
+    await t.action(internal.messages._dispatchOne, { messageId });
+
+    const message = await t.run(async (ctx) => ctx.db.get(messageId));
+    expect(message?.status).toBe("failed");
+    expect(message?.failureReason).toBe(
+      "authentication template requires phone identity",
+    );
+  });
 });

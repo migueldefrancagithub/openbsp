@@ -340,7 +340,7 @@ export const sendTextAsApi = internalMutation({
       createdAt: now,
     });
     await ctx.db.patch(args.conversationId, { lastMessageAt: now });
-    await ctx.scheduler.runAfter(0, internal.messages._dispatchOne, {
+    await ctx.scheduler.runAfter(1, internal.messages._dispatchOne, {
       messageId,
     });
     return { messageId, status: "queued" };
@@ -459,7 +459,7 @@ export const sendTemplateAsApi = internalMutation({
       createdAt: now,
     });
     await ctx.db.patch(args.conversationId, { lastMessageAt: now });
-    await ctx.scheduler.runAfter(0, internal.messages._dispatchOne, {
+    await ctx.scheduler.runAfter(1, internal.messages._dispatchOne, {
       messageId,
     });
     return { messageId, status: "queued" };

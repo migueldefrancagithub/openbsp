@@ -218,6 +218,10 @@ export default function CampaignsPage() {
     () => (campaigns ?? []).find((campaign) => campaign._id === logCampaignId),
     [campaigns, logCampaignId],
   );
+  const campaignEvents = useQuery(
+    api.campaigns.listEvents,
+    logCampaignId ? { campaignId: logCampaignId, limit: 80 } : "skip",
+  ) as CampaignEvent[] | undefined;
 
   async function handleCreateList(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -997,6 +1001,7 @@ export default function CampaignsPage() {
       {logCampaign && (
         <CampaignLogDrawer
           campaign={logCampaign}
+          events={campaignEvents}
           onClose={() => setLogCampaignId(null)}
         />
       )}
@@ -1044,6 +1049,25 @@ type CampaignSummary = {
   }>;
   createdAt: number;
   updatedAt?: number;
+};
+
+type CampaignEvent = {
+  _id: Id<"campaignEvents">;
+  type: string;
+  createdAt: number;
+  messageId?: Id<"messages">;
+  campaignRecipientId?: Id<"campaignRecipients">;
+  payload?: unknown;
+  recipient?: {
+    contactId: Id<"contacts">;
+    displayName: string;
+    identityKind: "phone" | "bsuid";
+    identityValue: string;
+    status: string;
+    failureCode?: string;
+    failureReason?: string;
+    metaErrorCategory?: string;
+  };
 };
 
 function BroadcastCard({
@@ -1267,9 +1291,11 @@ function BroadcastCard({
 
 function CampaignLogDrawer({
   campaign,
+  events,
   onClose,
 }: {
   campaign: CampaignSummary;
+  events: CampaignEvent[] | undefined;
   onClose: () => void;
 }) {
   const sent = sentLikeCount(campaign.stats);
@@ -1308,25 +1334,41 @@ function CampaignLogDrawer({
           <DrawerStat label="Progress" value={`${progress.toFixed(1)}%`} tone="blue" />
         </div>
 
-        <div className="space-y-3 p-6">
-          <LogEvent
-            kind="Info"
-            time={new Date(campaign.updatedAt ?? campaign.createdAt).toLocaleTimeString()}
-            message="Loaded from API"
-          />
-          {campaign.failureBreakdown.map((failure) => (
-            <LogEvent
-              key={failure.category}
-              kind="Failure"
-              time={new Date(campaign.updatedAt ?? campaign.createdAt).toLocaleTimeString()}
-              message={`${failure.title}: ${failure.count} contacts`}
-              danger
-            />
-          ))}
+        <div className="max-h-[calc(100vh-260px)] space-y-3 overflow-y-auto p-6 pb-28">
+          {events === undefined ? (
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm font-medium text-slate-500">
+              Loading campaign events...
+            </div>
+          ) : events.length === 0 ? (
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <div className="text-sm font-semibold text-[#0a1b33]">
+                No events recorded yet
+              </div>
+              <p className="mt-1 text-sm leading-6 text-slate-500">
+                Launch or process this campaign to populate the event stream.
+              </p>
+            </div>
+          ) : (
+            events.map((event) => {
+              const tone = eventTone(event);
+              return (
+                <LogEvent
+                  key={event._id}
+                  kind={eventKind(event)}
+                  time={new Date(event.createdAt).toLocaleTimeString()}
+                  message={eventMessage(event)}
+                  detail={eventDetail(event)}
+                  tone={tone}
+                />
+              );
+            })
+          )}
         </div>
 
         <div className="absolute bottom-0 right-0 flex w-full max-w-xl items-center justify-between border-t border-slate-100 bg-white px-6 py-4 text-sm text-slate-500">
-          <span>{1 + campaign.failureBreakdown.length} events</span>
+          <span>
+            {events === undefined ? "Loading events" : `${events.length} events`}
+          </span>
           <span>Last update: {new Date(campaign.updatedAt ?? campaign.createdAt).toLocaleTimeString()}</span>
         </div>
       </aside>
@@ -1442,28 +1484,126 @@ function LogEvent({
   kind,
   time,
   message,
-  danger,
+  detail,
+  tone,
 }: {
   kind: string;
   time: string;
   message: string;
-  danger?: boolean;
+  detail?: string;
+  tone: "good" | "warn" | "bad" | "neutral";
 }) {
+  const toneClass =
+    tone === "bad"
+      ? "bg-red-50 text-red-700"
+      : tone === "warn"
+        ? "bg-amber-50 text-amber-700"
+        : tone === "good"
+          ? "bg-emerald-50 text-emerald-700"
+          : "bg-slate-100 text-slate-600";
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4">
       <div className="flex items-center justify-between gap-3">
-        <span
-          className={`rounded-lg px-2 py-1 text-xs font-semibold ${
-            danger ? "bg-red-50 text-red-700" : "bg-slate-100 text-slate-600"
-          }`}
-        >
+        <span className={`rounded-lg px-2 py-1 text-xs font-semibold ${toneClass}`}>
           {kind}
         </span>
         <span className="text-xs font-medium text-slate-500">{time}</span>
       </div>
       <p className="mt-2 text-sm font-medium text-[#0a1b33]">{message}</p>
+      {detail && (
+        <p className="mt-1 break-words text-xs leading-5 text-slate-500">
+          {detail}
+        </p>
+      )}
     </div>
   );
+}
+
+function eventTone(event: CampaignEvent): "good" | "warn" | "bad" | "neutral" {
+  if (
+    event.type.includes("failed") ||
+    event.type.includes("auto_paused") ||
+    event.recipient?.status === "failed"
+  ) {
+    return "bad";
+  }
+  if (event.type.includes("skipped") || event.type.includes("retry")) {
+    return "warn";
+  }
+  if (
+    event.type.includes("sent") ||
+    event.type.includes("delivered") ||
+    event.type.includes("read") ||
+    event.type.includes("replied") ||
+    event.type.includes("clicked")
+  ) {
+    return "good";
+  }
+  return "neutral";
+}
+
+function eventKind(event: CampaignEvent): string {
+  if (event.type.includes("auto_paused")) return "Safety pause";
+  if (event.type.includes("failed")) return "Failure";
+  if (event.type.includes("retry")) return "Retry";
+  if (event.type.includes("skipped")) return "Skipped";
+  if (event.type.includes("replied") || event.type.includes("clicked")) {
+    return "Engagement";
+  }
+  if (
+    event.type.includes("sent") ||
+    event.type.includes("delivered") ||
+    event.type.includes("read")
+  ) {
+    return "Delivery";
+  }
+  return "Event";
+}
+
+function eventMessage(event: CampaignEvent): string {
+  const label = humanizeEventType(event.type);
+  if (!event.recipient) return label;
+  return `${label} · ${event.recipient.displayName}`;
+}
+
+function eventDetail(event: CampaignEvent): string | undefined {
+  const parts: string[] = [];
+  if (event.recipient) {
+    parts.push(
+      `${event.recipient.identityKind.toUpperCase()}: ${event.recipient.identityValue}`,
+    );
+    parts.push(`status: ${event.recipient.status}`);
+    if (event.recipient.metaErrorCategory) {
+      parts.push(`category: ${event.recipient.metaErrorCategory}`);
+    }
+    if (event.recipient.failureCode) {
+      parts.push(`Meta code: ${event.recipient.failureCode}`);
+    }
+    if (event.recipient.failureReason) {
+      parts.push(event.recipient.failureReason);
+    }
+  }
+  const payload = compactPayload(event.payload);
+  if (payload) parts.push(payload);
+  return parts.length ? parts.join(" · ") : undefined;
+}
+
+function humanizeEventType(type: string): string {
+  const clean = type
+    .replace(/^campaign\./, "")
+    .replace(/^recipient\./, "")
+    .replace(/\./g, " ")
+    .replace(/_/g, " ");
+  return clean.charAt(0).toUpperCase() + clean.slice(1);
+}
+
+function compactPayload(payload: unknown): string | undefined {
+  if (!payload || typeof payload !== "object") return undefined;
+  const entries = Object.entries(payload as Record<string, unknown>)
+    .filter(([, value]) => value !== undefined && value !== null && value !== "")
+    .slice(0, 4)
+    .map(([key, value]) => `${key}: ${String(value).slice(0, 80)}`);
+  return entries.length ? entries.join(" · ") : undefined;
 }
 
 function matchesBroadcastFilter(status: string, filter: BroadcastFilter): boolean {

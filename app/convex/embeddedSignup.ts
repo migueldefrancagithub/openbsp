@@ -1,5 +1,10 @@
 import { ConvexError, v } from "convex/values";
-import { action, internalMutation, internalQuery } from "./_generated/server";
+import {
+  action,
+  internalMutation,
+  internalQuery,
+  mutation,
+} from "./_generated/server";
 import { internal } from "./_generated/api";
 import { tenantMutation, tenantQuery } from "./lib/customFunctions";
 import type { Id } from "./_generated/dataModel";
@@ -18,12 +23,18 @@ type SignupCallbackStatus =
   | "connected"
   | "failed";
 
+const LAUNCH_TOKEN_DEFAULT_TTL_HOURS = 72;
+const LAUNCH_TOKEN_MAX_TTL_HOURS = 24 * 30;
+
 export const begin = tenantMutation({
   args: {},
   returns: v.object({
     sessionId: v.id("embeddedSignupSessions"),
     state: v.string(),
     url: v.optional(v.string()),
+    appId: v.optional(v.string()),
+    configId: v.optional(v.string()),
+    graphVersion: v.optional(v.string()),
     configured: v.boolean(),
   }),
   handler: async (ctx) => {
@@ -38,18 +49,183 @@ export const begin = tenantMutation({
     const appId = process.env.META_EMBEDDED_SIGNUP_APP_ID;
     const redirectUri = process.env.META_EMBEDDED_SIGNUP_REDIRECT_URI;
     const configId = process.env.META_EMBEDDED_SIGNUP_CONFIG_ID;
-    if (!appId || !redirectUri || !configId) {
+    const appSecret = process.env.META_EMBEDDED_SIGNUP_APP_SECRET;
+    if (!appId || !configId || !appSecret) {
       return { sessionId, state, configured: false };
     }
-    const url = new URL(
-      `https://www.facebook.com/${META_GRAPH_VERSION}/dialog/oauth`,
+    let url: string | undefined;
+    if (redirectUri) {
+      const fallbackUrl = new URL(
+        `https://www.facebook.com/${META_GRAPH_VERSION}/dialog/oauth`,
+      );
+      fallbackUrl.searchParams.set("client_id", appId);
+      fallbackUrl.searchParams.set("redirect_uri", redirectUri);
+      fallbackUrl.searchParams.set("state", state);
+      fallbackUrl.searchParams.set("config_id", configId);
+      fallbackUrl.searchParams.set("response_type", "code");
+      url = fallbackUrl.toString();
+    }
+    return {
+      sessionId,
+      state,
+      url,
+      appId,
+      configId,
+      graphVersion: META_GRAPH_VERSION,
+      configured: true,
+    };
+  },
+});
+
+export const createLaunchLink = tenantMutation({
+  args: {
+    label: v.optional(v.string()),
+    expiresInHours: v.optional(v.number()),
+  },
+  returns: v.object({
+    launcherId: v.id("embeddedSignupLaunchTokens"),
+    token: v.string(),
+    path: v.string(),
+    expiresAt: v.number(),
+  }),
+  handler: async (ctx, args) => {
+    if (ctx.role !== "owner" && ctx.role !== "admin") {
+      throw new ConvexError({
+        code: "FORBIDDEN",
+        message: "Only owner or admin can create client signup links.",
+      });
+    }
+
+    const ttlHours = Math.min(
+      Math.max(args.expiresInHours ?? LAUNCH_TOKEN_DEFAULT_TTL_HOURS, 1),
+      LAUNCH_TOKEN_MAX_TTL_HOURS,
     );
-    url.searchParams.set("client_id", appId);
-    url.searchParams.set("redirect_uri", redirectUri);
-    url.searchParams.set("state", state);
-    url.searchParams.set("config_id", configId);
-    url.searchParams.set("response_type", "code");
-    return { sessionId, state, url: url.toString(), configured: true };
+    const token = randomLaunchToken();
+    const tokenHash = await sha256Hex(token);
+    const expiresAt = Date.now() + ttlHours * 60 * 60 * 1000;
+    const launcherId = await ctx.db.insert("embeddedSignupLaunchTokens", {
+      tenantId: ctx.tenantId,
+      createdBy: ctx.memberId,
+      label: args.label?.trim() || undefined,
+      tokenHash,
+      status: "active",
+      createdAt: Date.now(),
+      expiresAt,
+      starts: 0,
+    });
+
+    return {
+      launcherId,
+      token,
+      path: `/connect/whatsapp/${token}`,
+      expiresAt,
+    };
+  },
+});
+
+export const beginFromLaunchToken = mutation({
+  args: {
+    token: v.string(),
+  },
+  returns: v.object({
+    sessionId: v.id("embeddedSignupSessions"),
+    state: v.string(),
+    url: v.optional(v.string()),
+    appId: v.optional(v.string()),
+    configId: v.optional(v.string()),
+    graphVersion: v.optional(v.string()),
+    configured: v.boolean(),
+    tenantName: v.string(),
+    expiresAt: v.number(),
+  }),
+  handler: async (ctx, args) => {
+    const tokenHash = await sha256Hex(args.token.trim());
+    const launcher = await ctx.db
+      .query("embeddedSignupLaunchTokens")
+      .withIndex("by_token_hash", (q) => q.eq("tokenHash", tokenHash))
+      .unique();
+    if (!launcher || launcher.status !== "active") {
+      throw new ConvexError({
+        code: "SIGNUP_LINK_NOT_FOUND",
+        message: "This signup link is not active.",
+      });
+    }
+    if (launcher.expiresAt <= Date.now()) {
+      throw new ConvexError({
+        code: "SIGNUP_LINK_EXPIRED",
+        message: "This signup link has expired.",
+      });
+    }
+
+    const tenant = await ctx.db.get(launcher.tenantId);
+    if (!tenant) {
+      throw new ConvexError({
+        code: "TENANT_NOT_FOUND",
+        message: "Workspace no longer exists.",
+      });
+    }
+
+    const compliance = getTenantConnectionCompliance(tenant);
+    if (!compliance.allowed) {
+      throw new ConvexError({
+        code: compliance.code,
+        message: compliance.message,
+      });
+    }
+
+    const state = crypto.randomUUID();
+    const sessionId = await ctx.db.insert("embeddedSignupSessions", {
+      tenantId: launcher.tenantId,
+      createdBy: launcher.createdBy,
+      launchTokenId: launcher._id,
+      state,
+      status: "created",
+      createdAt: Date.now(),
+    });
+    await ctx.db.patch(launcher._id, {
+      starts: launcher.starts + 1,
+      lastStartedAt: Date.now(),
+      lastSessionId: sessionId,
+    });
+
+    const appId = process.env.META_EMBEDDED_SIGNUP_APP_ID;
+    const redirectUri = process.env.META_EMBEDDED_SIGNUP_REDIRECT_URI;
+    const configId = process.env.META_EMBEDDED_SIGNUP_CONFIG_ID;
+    const appSecret = process.env.META_EMBEDDED_SIGNUP_APP_SECRET;
+    if (!appId || !configId || !appSecret) {
+      return {
+        sessionId,
+        state,
+        configured: false,
+        tenantName: tenant.name,
+        expiresAt: launcher.expiresAt,
+      };
+    }
+
+    let url: string | undefined;
+    if (redirectUri) {
+      const fallbackUrl = new URL(
+        `https://www.facebook.com/${META_GRAPH_VERSION}/dialog/oauth`,
+      );
+      fallbackUrl.searchParams.set("client_id", appId);
+      fallbackUrl.searchParams.set("redirect_uri", redirectUri);
+      fallbackUrl.searchParams.set("state", state);
+      fallbackUrl.searchParams.set("config_id", configId);
+      fallbackUrl.searchParams.set("response_type", "code");
+      url = fallbackUrl.toString();
+    }
+
+    return {
+      sessionId,
+      state,
+      url,
+      appId,
+      configId,
+      graphVersion: META_GRAPH_VERSION,
+      configured: true,
+      tenantName: tenant.name,
+      expiresAt: launcher.expiresAt,
+    };
   },
 });
 
@@ -92,6 +268,47 @@ export const listSessions = tenantQuery({
   },
 });
 
+function randomLaunchToken() {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes)
+    .map((value) => value.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+async function sha256Hex(value: string) {
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(value),
+  );
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+function getTenantConnectionCompliance(tenant: { rgpd?: {
+  dpaSignedAt?: number;
+  dpiaCompletedAt?: number;
+} }) {
+  if (!tenant.rgpd?.dpaSignedAt) {
+    return {
+      allowed: false as const,
+      code: "DPA_REQUIRED",
+      message:
+        "Sign the Data Processing Agreement before connecting WhatsApp.",
+    };
+  }
+  if (!tenant.rgpd?.dpiaCompletedAt) {
+    return {
+      allowed: false as const,
+      code: "DPIA_REQUIRED",
+      message:
+        "Complete the DPIA before connecting WhatsApp to this workspace.",
+    };
+  }
+  return { allowed: true as const };
+}
+
 export const completeCallback = action({
   args: {
     state: v.string(),
@@ -107,6 +324,9 @@ export const completeCallback = action({
     phone_e164: v.optional(v.string()),
     phoneDisplayName: v.optional(v.string()),
     phone_display_name: v.optional(v.string()),
+    flowVersion: v.optional(
+      v.union(v.literal("v4_sdk"), v.literal("oauth_redirect")),
+    ),
   },
   returns: v.object({ ok: v.boolean(), status: v.string() }),
   handler: async (ctx, args) => {
@@ -138,7 +358,7 @@ export const completeCallback = action({
     const appId = process.env.META_EMBEDDED_SIGNUP_APP_ID;
     const appSecret = process.env.META_EMBEDDED_SIGNUP_APP_SECRET;
     const redirectUri = process.env.META_EMBEDDED_SIGNUP_REDIRECT_URI;
-    if (!args.error && args.code && appId && appSecret && redirectUri) {
+    if (!args.error && args.code && appId && appSecret) {
       const compliance = (await ctx.runQuery(
         internal.whatsappAccounts.checkConnectionCompliance,
         { tenantId: session.tenantId },
@@ -152,7 +372,8 @@ export const completeCallback = action({
         const exchange = await exchangeEmbeddedSignupCode({
           appId,
           appSecret,
-          redirectUri,
+          redirectUri:
+            args.flowVersion === "v4_sdk" ? undefined : redirectUri,
           code: args.code,
         });
         if (!exchange.ok) {

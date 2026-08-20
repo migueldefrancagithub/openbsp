@@ -3025,20 +3025,100 @@ function FlowNodeCard({
   );
 }
 
-function FlowRuntimePanel({
-  runs,
-  loading,
-}: {
-  runs: FlowRunRow[];
-  loading: boolean;
-}) {
+function runStatusClass(status: string) {
+  if (status === "active") return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  if (status === "completed") return "border-sky-200 bg-sky-50 text-sky-700";
+  if (status === "handed_off") return "border-amber-200 bg-amber-50 text-amber-700";
+  if (status === "failed" || status === "timed_out") {
+    return "border-red-200 bg-red-50 text-red-700";
+  }
+  return "border-slate-200 bg-slate-100 text-slate-700";
+}
+
+function eventStatusClass(eventType: string) {
+  if (eventType === "error" || eventType === "timeout") return "bg-red-100 text-red-700";
+  if (eventType === "handoff") return "bg-amber-100 text-amber-700";
+  if (eventType === "message_skipped" || eventType === "fallback_fired") {
+    return "bg-orange-100 text-orange-700";
+  }
+  if (eventType === "completed") return "bg-sky-100 text-sky-700";
+  if (eventType === "message_sent") return "bg-emerald-100 text-emerald-700";
+  return "bg-slate-100 text-slate-600";
+}
+
+function runtimeEventLabel(eventType: string) {
+  const labels: Record<string, string> = {
+    started: "Started",
+    node_entered: "Node entered",
+    message_sent: "Message queued",
+    message_skipped: "Message skipped",
+    reply_received: "Reply received",
+    fallback_fired: "Fallback fired",
+    tag_set: "Tag applied",
+    handoff: "Handoff",
+    completed: "Completed",
+    timeout: "Timed out",
+    stopped: "Stopped",
+    error: "Error",
+  };
+  return labels[eventType] ?? eventType.replaceAll("_", " ");
+}
+
+function formatDuration(startedAt: number, endedAt?: number, lastAdvancedAt?: number) {
+  const end = endedAt ?? lastAdvancedAt ?? startedAt;
+  const seconds = Math.max(0, Math.round((end - startedAt) / 1000));
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  if (minutes < 60) return `${minutes}m ${remainingSeconds}s`;
+  const hours = Math.floor(minutes / 60);
+  return `${hours}h ${minutes % 60}m`;
+}
+
+function compactRuntimePayload(payload: unknown) {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return [];
+  return Object.entries(payload as Record<string, unknown>)
+    .slice(0, 5)
+    .map(([key, value]) => {
+      const serialized =
+        value && typeof value === "object" ? JSON.stringify(value) : String(value);
+      return {
+        key,
+        value: serialized.length > 72 ? `${serialized.slice(0, 69)}...` : serialized,
+      };
+    });
+}
+
+function FlowRuntimePanel({ runs, loading }: { runs: FlowRunRow[]; loading: boolean }) {
+  const activeRuns = runs.filter((run) => run.status === "active").length;
+  const completedRuns = runs.filter((run) => run.status === "completed").length;
+  const attentionRuns = runs.filter((run) =>
+    ["failed", "timed_out", "handed_off"].includes(run.status),
+  ).length;
+
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-5">
+    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
       <PanelTitle
         icon={History}
         title="Runtime history"
         body="Live flow runs, replies, tags, handoffs, and timeouts."
       />
+
+      <div className="mt-4 grid gap-2 sm:grid-cols-3">
+        {[
+          { label: "Active", value: activeRuns, tone: "text-emerald-700" },
+          { label: "Completed", value: completedRuns, tone: "text-sky-700" },
+          { label: "Needs review", value: attentionRuns, tone: "text-amber-700" },
+        ].map((item) => (
+          <div key={item.label} className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
+            <p className="text-[11px] font-semibold uppercase text-slate-400">
+              {item.label}
+            </p>
+            <p className={`mt-1 text-lg font-semibold ${item.tone}`}>{item.value}</p>
+          </div>
+        ))}
+      </div>
+
       <div className="mt-4 space-y-3">
         {loading ? (
           <div className="flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-3 text-sm text-slate-500">
@@ -3053,44 +3133,107 @@ function FlowRuntimePanel({
           runs.map((run) => (
             <div
               key={run._id}
-              className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-3"
+              className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
             >
-              <div className="flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-[#0a1b33]">
-                    {run.contactName ?? run.contactHandle ?? "Unknown contact"}
-                  </p>
-                  <p className="mt-0.5 truncate text-xs text-slate-500">
-                    {run.currentNodeKey
-                      ? `At ${run.currentNodeKey}`
-                      : (run.endReason ?? "Finished")}
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <p className="truncate text-sm font-semibold text-[#0a1b33]">
+                      {run.contactName ?? run.contactHandle ?? "Unknown contact"}
+                    </p>
+                    <span
+                      className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${runStatusClass(
+                        run.status,
+                      )}`}
+                    >
+                      {run.status.replaceAll("_", " ")}
+                    </span>
+                  </div>
+                  <p className="mt-1 truncate text-xs text-slate-500">
+                    {run.contactHandle ?? "No Meta handle"} · Started {relativeTime(run.startedAt)}
                   </p>
                 </div>
-                <span
-                  className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                    run.status === "active"
-                      ? "bg-emerald-100 text-emerald-700"
-                      : run.status === "failed" || run.status === "timed_out"
-                        ? "bg-red-100 text-red-700"
-                        : "bg-slate-200 text-slate-700"
-                  }`}
-                >
-                  {run.status.replace("_", " ")}
-                </span>
+                <div className="rounded-xl bg-slate-50 px-3 py-2 text-right">
+                  <p className="text-[11px] font-semibold text-slate-500">Duration</p>
+                  <p className="text-sm font-semibold text-[#0a1b33]">
+                    {formatDuration(run.startedAt, run.endedAt, run.lastAdvancedAt)}
+                  </p>
+                </div>
               </div>
-              <div className="mt-3 space-y-1">
-                {run.events.slice(-4).map((event) => (
-                  <div
-                    key={event._id}
-                    className="flex items-center justify-between gap-2 text-xs text-slate-500"
-                  >
-                    <span className="truncate">
-                      {event.eventType.replace("_", " ")}
-                      {event.nodeKey ? ` · ${event.nodeKey}` : ""}
+
+              <div className="mt-3 grid gap-2 text-xs sm:grid-cols-4">
+                <div className="rounded-xl bg-slate-50 px-3 py-2">
+                  <p className="font-semibold text-slate-500">Current</p>
+                  <p className="mt-1 truncate text-[#0a1b33]">
+                    {run.currentNodeKey ?? run.endReason ?? "Finished"}
+                  </p>
+                </div>
+                <div className="rounded-xl bg-slate-50 px-3 py-2">
+                  <p className="font-semibold text-slate-500">Events</p>
+                  <p className="mt-1 text-[#0a1b33]">
+                    {run.eventCount}
+                    {run.eventCount > run.events.length ? ` total · ${run.events.length} shown` : ""}
+                  </p>
+                </div>
+                <div className="rounded-xl bg-slate-50 px-3 py-2">
+                  <p className="font-semibold text-slate-500">Reprompts</p>
+                  <p className="mt-1 text-[#0a1b33]">{run.repromptCount}</p>
+                </div>
+                <div className="rounded-xl bg-slate-50 px-3 py-2">
+                  <p className="font-semibold text-slate-500">Variables</p>
+                  <p className="mt-1 text-[#0a1b33]">{Object.keys(run.vars ?? {}).length}</p>
+                </div>
+              </div>
+
+              {Object.keys(run.vars ?? {}).length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {Object.keys(run.vars ?? {}).map((key) => (
+                    <span
+                      key={key}
+                      className="rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-medium text-slate-600"
+                    >
+                      {key}: captured
                     </span>
-                    <span className="shrink-0">
-                      {relativeTime(event.createdAt)}
-                    </span>
+                  ))}
+                </div>
+              )}
+
+              <div className="mt-4 space-y-2">
+                {run.events.map((event) => (
+                  <div key={event._id} className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex min-w-0 flex-wrap items-center gap-2">
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${eventStatusClass(
+                              event.eventType,
+                            )}`}
+                          >
+                            {runtimeEventLabel(event.eventType)}
+                          </span>
+                          {event.nodeKey && (
+                            <span className="truncate text-xs font-medium text-slate-600">
+                              {event.nodeKey}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <span className="shrink-0 text-xs text-slate-400">
+                        {relativeTime(event.createdAt)}
+                      </span>
+                    </div>
+                    {compactRuntimePayload(event.payload).length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {compactRuntimePayload(event.payload).map((item) => (
+                          <span
+                            key={`${event._id}-${item.key}`}
+                            className="rounded-md bg-white px-2 py-1 text-[11px] text-slate-500"
+                          >
+                            {item.key}: {item.value}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

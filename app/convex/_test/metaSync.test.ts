@@ -1,11 +1,12 @@
 import { convexTest } from "convex-test";
 import { describe, expect, it } from "vitest";
-import { internal } from "../_generated/api";
+import { api, internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import schema from "../schema";
 import { parseMetaPayload } from "../lib/meta/parsePayload";
 
 type Seeded = {
+  userId: Id<"users">;
   tenantId: Id<"tenants">;
   memberId: Id<"members">;
   whatsappAccountId: Id<"whatsappAccounts">;
@@ -34,6 +35,11 @@ async function seedAccount(t: ReturnType<typeof convexTest>): Promise<Seeded> {
       status: "active",
       createdAt: now,
     });
+    await ctx.db.insert("sessions", {
+      userId,
+      activeTenantId: tenantId,
+      updatedAt: now,
+    });
     const whatsappAccountId = await ctx.db.insert("whatsappAccounts", {
       tenantId,
       metaAppId: "META_APP",
@@ -51,7 +57,7 @@ async function seedAccount(t: ReturnType<typeof convexTest>): Promise<Seeded> {
       displayName: "Sync Clinic",
       createdAt: now,
     });
-    return { tenantId, memberId, whatsappAccountId, phoneNumberId };
+    return { userId, tenantId, memberId, whatsappAccountId, phoneNumberId };
   });
 }
 
@@ -130,9 +136,162 @@ describe("parsePayload: WABA-level sync fields", () => {
       banState: "DISABLE",
     });
   });
+
+  it("parses coexistence disconnection_info from account_update", () => {
+    const account = parseMetaPayload(
+      wabaLevelPayload("account_update", {
+        event: "PARTNER_REMOVED",
+        disconnection_info: {
+          reason: "USER_RE_REGISTERED",
+          initiated_by: "USER",
+        },
+      }),
+    );
+    expect(account[0]).toMatchObject({
+      kind: "account_update",
+      event: "PARTNER_REMOVED",
+      disconnectionInfo: {
+        reason: "USER_RE_REGISTERED",
+        initiatedBy: "USER",
+      },
+    });
+  });
 });
 
 describe("webhook handlers: template / quality / account", () => {
+  it("listForTenant exposes channel health fields for the operator console", async () => {
+    const t = convexTest(schema);
+    const seeded = await seedAccount(t);
+    const now = Date.now();
+
+    await t.run(async (ctx) => {
+      await ctx.db.patch(seeded.whatsappAccountId, {
+        businessPortfolioId: "PORTFOLIO_1",
+        onboardingSource: "embedded_signup",
+        status: "disconnected",
+        tokenStatus: "expiring",
+        tokenHealthDetail: "expires soon",
+        lastTokenHealthCheckAt: now - 1_000,
+        dataAccessExpiresAt: now + 10_000,
+        validatedScopes: ["whatsapp_business_messaging"],
+        lastDisconnectionReason: "USER_RE_REGISTERED",
+        lastDisconnectionInitiatedBy: "USER",
+        lastDisconnectedAt: now - 2_000,
+      });
+      await ctx.db.patch(seeded.phoneNumberId, {
+        verifiedName: "Sync Clinic Verified",
+        messagingTier: "TIER_1K",
+        throughputLevel: "STANDARD",
+        lastQualityEvent: "FLAGGED",
+        lastQualityEventAt: now - 3_000,
+        lastMetaSyncAt: now - 4_000,
+        qualityRating: "yellow",
+        qualityLastErrorCode: "131048",
+        circuitBreakerUntil: now + 60_000,
+        circuitBreakerReason: "Meta pacing limit",
+        businessUsername: "syncclinic",
+        businessUsernameStatus: "APPROVED",
+        businessUsernameUpdatedAt: now - 5_000,
+      });
+    });
+
+    const owner = t.withIdentity({ subject: seeded.userId });
+    const rows = await owner.query(api.whatsappAccounts.listForTenant, {});
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      businessPortfolioId: "PORTFOLIO_1",
+      onboardingSource: "embedded_signup",
+      tokenStatus: "expiring",
+      tokenHealthDetail: "expires soon",
+      lastDisconnectionReason: "USER_RE_REGISTERED",
+      lastDisconnectionInitiatedBy: "USER",
+      coexRecovery: {
+        state: "needs_reconnect",
+        tone: "bad",
+        blocking: true,
+        title: "COEX partner connection lost",
+      },
+    });
+    expect(rows[0].coexRecovery.operatorSteps.join(" ")).toContain(
+      "Embedded Signup",
+    );
+    expect(rows[0].coexRecovery.customerSteps.join(" ")).toContain(
+      "WhatsApp Business",
+    );
+    expect(rows[0].coexRecovery.evidence).toContain(
+      "Disconnect reason: USER_RE_REGISTERED",
+    );
+    expect(rows[0].phoneNumbers[0]).toMatchObject({
+      verifiedName: "Sync Clinic Verified",
+      messagingTier: "TIER_1K",
+      throughputLevel: "STANDARD",
+      lastQualityEvent: "FLAGGED",
+      qualityRating: "yellow",
+      qualityLastErrorCode: "131048",
+      circuitBreakerReason: "Meta pacing limit",
+      businessUsername: "syncclinic",
+      businessUsernameStatus: "APPROVED",
+    });
+  });
+
+  it("refresh health target rejects cross-tenant phone ids", async () => {
+    const t = convexTest(schema);
+    const seeded = await seedAccount(t);
+    const other = await t.run(async (ctx) => {
+      const now = Date.now();
+      const tenantId = await ctx.db.insert("tenants", {
+        name: "Other Clinic",
+        vertical: "clinic",
+        plan: "growth",
+        settings: {
+          defaultLocale: "pt-PT",
+          timezone: "Europe/Lisbon",
+          retentionDays: 730,
+        },
+        createdAt: now,
+      });
+      const whatsappAccountId = await ctx.db.insert("whatsappAccounts", {
+        tenantId,
+        metaAppId: "META_APP",
+        wabaId: "WABA_OTHER",
+        accessToken: "test-token",
+        status: "active",
+        tokenStatus: "ok",
+        createdAt: now,
+      });
+      const phoneNumberId = await ctx.db.insert("phoneNumbers", {
+        tenantId,
+        whatsappAccountId,
+        phoneNumberId: "PHONE_OTHER",
+        e164: "+351910000009",
+        displayName: "Other Clinic",
+        createdAt: now,
+      });
+      return { phoneNumberId };
+    });
+
+    const valid = await t.query(
+      internal.whatsappAccounts._getRefreshChannelHealthTarget,
+      {
+        tenantId: seeded.tenantId,
+        whatsappAccountId: seeded.whatsappAccountId,
+        phoneNumberId: seeded.phoneNumberId,
+      },
+    );
+    expect(valid?.phoneNumberIds).toEqual([seeded.phoneNumberId]);
+
+    const crossTenant = await t.query(
+      internal.whatsappAccounts._getRefreshChannelHealthTarget,
+      {
+        tenantId: seeded.tenantId,
+        whatsappAccountId: seeded.whatsappAccountId,
+        phoneNumberId: other.phoneNumberId,
+      },
+    );
+    expect(crossTenant).toBeNull();
+  });
+
   it("template REJECTED maps status, stores reason and pauses running campaigns", async () => {
     const t = convexTest(schema);
     const seeded = await seedAccount(t);
@@ -299,5 +458,50 @@ describe("webhook handlers: template / quality / account", () => {
       ctx.db.get(seeded.whatsappAccountId),
     );
     expect(account?.status).toBe("active");
+  });
+
+  it("PARTNER_REMOVED disconnects coexistence and ACCOUNT_RECONNECTED clears the breaker", async () => {
+    const t = convexTest(schema);
+    const seeded = await seedAccount(t);
+    const disconnectedAt = Date.now();
+
+    await t.mutation(internal.whatsappAccounts.applyAccountUpdate, {
+      wabaId: "WABA_SYNC",
+      event: "PARTNER_REMOVED",
+      disconnectionInfo: {
+        reason: "USER_RE_REGISTERED",
+        initiatedBy: "USER",
+      },
+      updatedAt: disconnectedAt,
+    });
+
+    let rows = await t.run(async (ctx) => ({
+      account: await ctx.db.get(seeded.whatsappAccountId),
+      phone: await ctx.db.get(seeded.phoneNumberId),
+    }));
+    expect(rows.account?.status).toBe("disconnected");
+    expect(rows.account?.lastDisconnectionReason).toBe("USER_RE_REGISTERED");
+    expect(rows.account?.lastDisconnectionInitiatedBy).toBe("USER");
+    expect(rows.account?.lastDisconnectedAt).toBe(disconnectedAt);
+    expect(rows.phone?.circuitBreakerUntil).toBeGreaterThan(Date.now());
+    expect(rows.phone?.circuitBreakerReason).toContain("USER_RE_REGISTERED");
+
+    const reconnectedAt = disconnectedAt + 60_000;
+    await t.mutation(internal.whatsappAccounts.applyAccountUpdate, {
+      wabaId: "WABA_SYNC",
+      event: "ACCOUNT_RECONNECTED",
+      updatedAt: reconnectedAt,
+    });
+
+    rows = await t.run(async (ctx) => ({
+      account: await ctx.db.get(seeded.whatsappAccountId),
+      phone: await ctx.db.get(seeded.phoneNumberId),
+    }));
+    expect(rows.account?.status).toBe("active");
+    expect(rows.account?.lastDisconnectionReason).toBeUndefined();
+    expect(rows.account?.lastDisconnectionInitiatedBy).toBeUndefined();
+    expect(rows.account?.lastReconnectedAt).toBe(reconnectedAt);
+    expect(rows.phone?.circuitBreakerUntil).toBeUndefined();
+    expect(rows.phone?.circuitBreakerReason).toBeUndefined();
   });
 });

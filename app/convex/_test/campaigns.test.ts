@@ -101,7 +101,7 @@ async function seedTenant(t: ReturnType<typeof convexTest>) {
       effectiveAt: Date.now(),
       lastEventId: consentEventId,
     });
-    return { contactA, contactB, templateId };
+    return { tenantId, memberId, whatsappAccountId, contactA, contactB, templateId };
   });
 
   return { owner: t.withIdentity({ subject: userId }), ...seeded };
@@ -139,6 +139,56 @@ describe("campaign foundation", () => {
     const lists = await owner.query(campaignsApi.listContactLists, {});
     expect(lists).toHaveLength(1);
     expect(lists[0].memberCount).toBe(2);
+  });
+
+  it("materializes authentication campaigns only for contacts with phone identity", async () => {
+    const t = convexTest(schema);
+    const { owner, tenantId, memberId, whatsappAccountId, contactA, contactB } =
+      await seedTenant(t);
+    const authTemplateId = await t.run(async (ctx) => {
+      const templateId = await ctx.db.insert("templates", {
+        tenantId,
+        whatsappAccountId,
+        name: "otp_login",
+        language: "pt_PT",
+        category: "authentication",
+        currentVersion: 1,
+        status: "approved",
+        createdAt: Date.now(),
+        createdBy: memberId,
+      });
+      await ctx.db.insert("templateVersions", {
+        tenantId,
+        templateId,
+        version: 1,
+        bodyText: "O seu codigo e 123456.",
+        parameterSchema: [],
+        isLocked: true,
+        createdBy: memberId,
+        createdAt: Date.now(),
+      });
+      return templateId;
+    });
+    const campaignsApi = (api as any).campaigns;
+
+    const listId = await owner.mutation(campaignsApi.createContactList, {
+      name: "OTP Recipients",
+    });
+    await owner.mutation(campaignsApi.addContactToList, { listId, contactId: contactA });
+    await owner.mutation(campaignsApi.addContactToList, { listId, contactId: contactB });
+    const campaignId = await owner.mutation(campaignsApi.createDraftCampaign, {
+      name: "Login OTP",
+      listId,
+      templateId: authTemplateId,
+    });
+
+    const detail = await owner.query(campaignsApi.getCampaign, { campaignId });
+    expect(detail.stats.total).toBe(1);
+    expect(detail.recipients).toHaveLength(1);
+    expect(detail.recipients[0]).toMatchObject({
+      contactId: contactA,
+      identityKind: "phone",
+    });
   });
 
   it("launches a campaign through the outbox and skips recipients without consent", async () => {
@@ -283,6 +333,26 @@ describe("campaign foundation", () => {
 
     const afterRead = await owner.query(campaignsApi.getCampaign, { campaignId });
     expect(afterRead.stats.read).toBe(1);
+
+    const events = await owner.query(campaignsApi.listEvents, {
+      campaignId,
+      limit: 10,
+    });
+    expect(events.map((event: { type: string }) => event.type)).toEqual(
+      expect.arrayContaining([
+        "campaign.recipient.queued",
+        "campaign.recipient.sent",
+        "campaign.recipient.read",
+      ]),
+    );
+    expect(events[0]).toMatchObject({
+      type: "campaign.recipient.read",
+      recipient: {
+        displayName: "Ana",
+        status: "read",
+        identityKind: "phone",
+      },
+    });
   });
 
   it("marks campaign replies and button clicks from inbound engagement", async () => {

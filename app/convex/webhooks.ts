@@ -75,7 +75,7 @@ export const enqueue = internalMutation({
         metaTimestamp: item.metaTimestamp,
       });
       if (result.inserted && result.eventId) {
-        await ctx.scheduler.runAfter(0, internal.webhooks.processOne, {
+        await ctx.scheduler.runAfter(1, internal.webhooks.processOne, {
           eventId: result.eventId as Id<"webhookEvents">,
         });
       }
@@ -148,6 +148,26 @@ export const markFailed = internalMutation({
     return null;
   },
 });
+
+type MetaWebhookError = {
+  code: number;
+  title?: string;
+  message?: string;
+  error_data?: { details?: string };
+};
+
+function metaWebhookFailureReason(error?: MetaWebhookError): string | undefined {
+  if (!error) return undefined;
+  const title = error.title?.trim();
+  const message = error.message?.trim();
+  const details = error.error_data?.details?.trim();
+  const main = details || message || title;
+  if (!main) return undefined;
+  if (title && title !== main && !main.includes(title)) {
+    return `${title}: ${main}`;
+  }
+  return main;
+}
 
 /**
  * Resolve the tenant + phoneNumber row from a Meta phone_number_id.
@@ -819,11 +839,14 @@ export const processOne = internalAction({
           event: String(item.event),
           banState: item.banState ? String(item.banState) : undefined,
           restrictions: item.restrictions as
-            | Array<{ type: string; expiration?: number }>
+            | Array<{ type: string; expiration?: number; remediation?: string }>
             | undefined,
           violationType: item.violationType
             ? String(item.violationType)
             : undefined,
+          disconnectionInfo: item.disconnectionInfo as
+            | { reason?: string; initiatedBy?: string }
+            | undefined,
           updatedAt: Number(item.metaTimestamp),
         });
       } else if (item.kind === "status") {
@@ -843,15 +866,21 @@ export const processOne = internalAction({
             ? pricing.category
             : undefined;
         const errors = item.errors as
-          | Array<{ code: number; title?: string }>
+          | Array<MetaWebhookError>
           | undefined;
         const firstError = errors?.[0];
+        const failureReason = metaWebhookFailureReason(firstError);
 
         await ctx.runMutation(internal.messages.markStatusFromWebhook, {
           metaMessageId: String(item.wamid),
-          newStatus: item.status as "sent" | "delivered" | "read" | "failed",
+          newStatus: item.status as
+            | "sent"
+            | "delivered"
+            | "read"
+            | "played"
+            | "failed",
           failureCode: firstError ? String(firstError.code) : undefined,
-          failureReason: firstError?.title,
+          failureReason,
           pricingCategory,
           pricingBillable:
             typeof pricing?.billable === "boolean" ? pricing.billable : undefined,
@@ -863,7 +892,7 @@ export const processOne = internalAction({
             {
               metaMessageId: String(item.wamid),
               failureCode: firstError ? String(firstError.code) : undefined,
-              failureReason: firstError?.title,
+              failureReason,
             },
           );
         }

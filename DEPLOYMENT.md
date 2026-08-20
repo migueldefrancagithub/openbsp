@@ -4,14 +4,54 @@
 
 - Deploy staging/preview before production.
 - Vercel project root directory: `app`.
-- Vercel build command:
+- The build command is versioned in `app/vercel.json` and is conditional on
+  `VERCEL_ENV`:
 
 ```bash
-npx convex deploy --cmd-url-env-var-name NEXT_PUBLIC_CONVEX_URL --cmd 'npm run build'
+if [ "$VERCEL_ENV" = "production" ]; then
+  npx convex deploy --cmd-url-env-var-name NEXT_PUBLIC_CONVEX_URL --cmd 'npm run build'
+else
+  npm run build
+fi
 ```
+
+Production is unchanged: it still runs `npx convex deploy`. Previews only build
+the frontend and talk to whatever `NEXT_PUBLIC_CONVEX_URL` points at, so a
+preview can be pointed at an existing Convex deployment without publishing
+functions to production. Without this branch, every preview build fails on a
+missing `CONVEX_DEPLOY_KEY`, or worse, succeeds and deploys to production.
+
+### Preview against an existing Convex deployment
+
+```bash
+cd app
+vercel pull --yes --environment=preview
+NEXT_PUBLIC_CONVEX_URL=https://<deployment>.convex.cloud \
+NEXT_PUBLIC_CONVEX_SITE_URL=https://<deployment>.convex.site \
+  vercel build --target=preview --yes
+vercel deploy --prebuilt --target=preview --yes
+```
+
+Pass `--target=preview` explicitly. A bare `vercel deploy` on a freshly linked
+project targets production.
 
 - Required Vercel env:
   - `CONVEX_DEPLOY_KEY`
+  - `NEXT_PUBLIC_CONVEX_SITE_URL`
+
+Run this before staging or production:
+
+```bash
+cd app
+npm run predeploy:check -- --target=staging --strict
+```
+
+For production:
+
+```bash
+cd app
+npm run predeploy:check -- --target=production --strict
+```
 
 ## Convex Environment Variables
 
@@ -51,7 +91,9 @@ Before connecting real WABAs:
 
 ```bash
 cd app
+npx convex dev --once   # codegen alone does NOT publish functions
 npm run test
 npm run typecheck
 npm run build
+npm run predeploy:check -- --target=production --strict
 ```

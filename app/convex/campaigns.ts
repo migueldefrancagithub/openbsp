@@ -60,10 +60,18 @@ function normalizePhone(raw: string): string {
   return digits ? `+${digits}` : "";
 }
 
-function getRecipientIdentity(contact: Doc<"contacts">): {
+function getRecipientIdentity(
+  contact: Doc<"contacts">,
+  purpose?: "marketing" | "transactional" | "authentication",
+): {
   identityKind: "phone" | "bsuid";
   identityValue: string;
-} {
+} | null {
+  if (purpose === "authentication") {
+    return contact.e164
+      ? { identityKind: "phone", identityValue: contact.e164 }
+      : null;
+  }
   if (contact.bsuid) {
     return { identityKind: "bsuid", identityValue: contact.bsuid };
   }
@@ -442,7 +450,8 @@ export const createDraftCampaign = tenantMutation({
       seenContacts.add(member.contactId);
       const contact = await ctx.db.get(member.contactId);
       if (!contact || contact.tenantId !== ctx.tenantId) continue;
-      const identity = getRecipientIdentity(contact);
+      const identity = getRecipientIdentity(contact, purposeFromTemplate(template));
+      if (!identity) continue;
       await ctx.db.insert("campaignRecipients", {
         tenantId: ctx.tenantId,
         campaignId,
@@ -699,7 +708,11 @@ export const retrySafeFailures = tenantMutation({
         continue;
       }
       const contact = await ctx.db.get(recipient.contactId);
-      if (!contact || contact.tenantId !== ctx.tenantId || !hasSendIdentity(contact)) {
+      if (
+        !contact ||
+        contact.tenantId !== ctx.tenantId ||
+        !hasSendIdentityForPurpose(contact, purpose)
+      ) {
         skippedUnsafe++;
         continue;
       }
@@ -759,9 +772,13 @@ export const retrySafeFailures = tenantMutation({
         updatedAt: now,
       });
       await ctx.db.patch(conversationId, { lastMessageAt: now });
-      await ctx.scheduler.runAfter(retried * 1500, internal.messages._dispatchOne, {
-        messageId,
-      });
+      await ctx.scheduler.runAfter(
+        Math.max(1, retried * 1500),
+        internal.messages._dispatchOne,
+        {
+          messageId,
+        },
+      );
       await ctx.db.insert("campaignEvents", {
         tenantId: ctx.tenantId,
         campaignId: campaign._id,
@@ -950,6 +967,95 @@ export const getCampaign = tenantQuery({
       });
     }
     return { ...summary, recipients: recipientRows };
+  },
+});
+
+export const listEvents = tenantQuery({
+  args: {
+    campaignId: v.id("campaigns"),
+    limit: v.optional(v.number()),
+  },
+  returns: v.array(
+    v.object({
+      _id: v.id("campaignEvents"),
+      type: v.string(),
+      createdAt: v.number(),
+      messageId: v.optional(v.id("messages")),
+      campaignRecipientId: v.optional(v.id("campaignRecipients")),
+      payload: v.optional(v.any()),
+      recipient: v.optional(
+        v.object({
+          contactId: v.id("contacts"),
+          displayName: v.string(),
+          identityKind: v.union(v.literal("phone"), v.literal("bsuid")),
+          identityValue: v.string(),
+          status: v.string(),
+          failureCode: v.optional(v.string()),
+          failureReason: v.optional(v.string()),
+          metaErrorCategory: v.optional(v.string()),
+        }),
+      ),
+    }),
+  ),
+  handler: async (ctx, args) => {
+    await loadByIdInTenant(
+      ctx as Parameters<typeof loadByIdInTenant>[0],
+      "campaigns",
+      args.campaignId,
+    );
+    const limit = Math.min(150, Math.max(1, Math.floor(args.limit ?? 80)));
+    const events = await ctx.db
+      .query("campaignEvents")
+      .withIndex("by_campaign", (q) => q.eq("campaignId", args.campaignId))
+      .order("desc")
+      .take(limit);
+
+    const out = [];
+    for (const event of events) {
+      let recipientInfo:
+        | {
+            contactId: Id<"contacts">;
+            displayName: string;
+            identityKind: "phone" | "bsuid";
+            identityValue: string;
+            status: string;
+            failureCode?: string;
+            failureReason?: string;
+            metaErrorCategory?: string;
+          }
+        | undefined;
+      if (event.campaignRecipientId) {
+        const recipient = await ctx.db.get(event.campaignRecipientId);
+        if (recipient && recipient.tenantId === ctx.tenantId) {
+          const contact = await ctx.db.get(recipient.contactId);
+          recipientInfo = {
+            contactId: recipient.contactId,
+            displayName:
+              contact?.name ??
+              contact?.whatsappUsername ??
+              contact?.e164 ??
+              contact?.bsuid ??
+              "(unknown)",
+            identityKind: recipient.identityKind,
+            identityValue: recipient.identityValue,
+            status: recipient.status,
+            failureCode: recipient.failureCode,
+            failureReason: recipient.failureReason,
+            metaErrorCategory: recipient.metaErrorCategory,
+          };
+        }
+      }
+      out.push({
+        _id: event._id,
+        type: event.type,
+        createdAt: event.createdAt,
+        messageId: event.messageId,
+        campaignRecipientId: event.campaignRecipientId,
+        payload: event.payload,
+        recipient: recipientInfo,
+      });
+    }
+    return out;
   },
 });
 
@@ -1238,9 +1344,20 @@ async function queuePendingCampaignBatch(
   for (const recipient of orderedRecipients) {
     if (queued >= args.batchSize) break;
     const contact = await ctx.db.get(recipient.contactId);
-    if (!contact || contact.tenantId !== ctx.tenantId || !hasSendIdentity(contact)) {
+    if (
+      !contact ||
+      contact.tenantId !== ctx.tenantId ||
+      !hasSendIdentityForPurpose(contact, args.purpose)
+    ) {
       skippedUnsuitable++;
-      await markRecipientSkipped(ctx, recipient, "missing_send_identity", args.now);
+      await markRecipientSkipped(
+        ctx,
+        recipient,
+        args.purpose === "authentication"
+          ? "authentication_requires_phone_identity"
+          : "missing_send_identity",
+        args.now,
+      );
       continue;
     }
     if (
@@ -1300,9 +1417,13 @@ async function queuePendingCampaignBatch(
       updatedAt: args.now,
     });
     await ctx.db.patch(conversationId, { lastMessageAt: args.now });
-    await ctx.scheduler.runAfter(queued * 1500, internal.messages._dispatchOne, {
-      messageId,
-    });
+    await ctx.scheduler.runAfter(
+      Math.max(1, queued * 1500),
+      internal.messages._dispatchOne,
+      {
+        messageId,
+      },
+    );
     await ctx.db.insert("campaignEvents", {
       tenantId: ctx.tenantId,
       campaignId: args.campaign._id,
@@ -1332,6 +1453,24 @@ async function queuePendingCampaignBatch(
 
 function hasSendIdentity(contact: Doc<"contacts">): boolean {
   return !!(contact.bsuid || contact.e164);
+}
+
+function hasSendIdentityForPurpose(
+  contact: Doc<"contacts">,
+  purpose: "marketing" | "transactional" | "authentication",
+): boolean {
+  if (purpose === "authentication") return !!contact.e164;
+  return hasSendIdentity(contact);
+}
+
+function purposeFromTemplate(
+  template: Doc<"templates">,
+): "marketing" | "transactional" | "authentication" {
+  return template.category === "marketing"
+    ? "marketing"
+    : template.category === "authentication"
+      ? "authentication"
+      : "transactional";
 }
 
 async function hasGrantedConsent(

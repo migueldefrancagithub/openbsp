@@ -277,8 +277,9 @@ export const listRuns = tenantQuery({
             .query("chatbotFlowEvents")
             .withIndex("by_run", (q) => q.eq("flowRunId", run._id))
             .order("desc")
-            .take(10),
+            .collect(),
         ]);
+        const latestEvents = events.slice(0, 12).reverse();
         return {
           _id: run._id,
           status: run.status,
@@ -293,7 +294,7 @@ export const listRuns = tenantQuery({
           contactHandle:
             contact?.whatsappUsername ?? contact?.e164 ?? contact?.bsuid,
           eventCount: events.length,
-          events: events.reverse().map((event) => ({
+          events: latestEvents.map((event) => ({
             _id: event._id,
             eventType: event.eventType,
             nodeKey: event.nodeKey,
@@ -775,7 +776,7 @@ async function enqueueFlowText(
     createdAt: now,
   });
   await ctx.db.patch(args.conversationId, { lastMessageAt: now });
-  await ctx.scheduler.runAfter(0, internal.messages._dispatchOne, { messageId });
+  await ctx.scheduler.runAfter(1, internal.messages._dispatchOne, { messageId });
   await addEvent(ctx, args, {
     bot,
     runId,
@@ -899,7 +900,7 @@ async function enqueueFlowTemplate(
     createdAt: now,
   });
   await ctx.db.patch(args.conversationId, { lastMessageAt: now });
-  await ctx.scheduler.runAfter(0, internal.messages._dispatchOne, { messageId });
+  await ctx.scheduler.runAfter(1, internal.messages._dispatchOne, { messageId });
   await addEvent(ctx, args, {
     bot,
     runId: state.runId,

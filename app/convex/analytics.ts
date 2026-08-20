@@ -249,14 +249,23 @@ async function getContact(
 }
 
 function isReportableStatus(status: string) {
-  return status === "sent" || status === "delivered" || status === "read" || status === "failed";
+  return (
+    status === "sent" ||
+    status === "delivered" ||
+    status === "read" ||
+    status === "played" ||
+    status === "failed"
+  );
 }
 
 function statusCounters(status: string): Counters {
   if (status === "failed") return { sent: 0, delivered: 0, failed: 1 };
   return {
     sent: 1,
-    delivered: status === "delivered" || status === "read" ? 1 : 0,
+    delivered:
+      status === "delivered" || status === "read" || status === "played"
+        ? 1
+        : 0,
     failed: 0,
   };
 }

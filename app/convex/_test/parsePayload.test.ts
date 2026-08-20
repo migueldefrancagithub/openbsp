@@ -93,6 +93,44 @@ describe("parseMetaPayload", () => {
     }
   });
 
+  it("parses Meta played status with BSUID recipient", () => {
+    const payload = {
+      object: "whatsapp_business_account",
+      entry: [
+        {
+          id: "WABA_ID_123",
+          changes: [
+            {
+              field: "messages",
+              value: {
+                metadata: { phone_number_id: "PHONE_ID_1" },
+                statuses: [
+                  {
+                    id: "wamid.VOICE",
+                    status: "played",
+                    timestamp: "1700000040",
+                    recipient_user_id: "MZ.13491208655302741918",
+                    recipient_parent_user_id: "MZ.PARENT13491208655302741918",
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    };
+    const items = parseMetaPayload(payload);
+    expect(items).toHaveLength(1);
+    const s = items[0];
+    expect(s.kind).toBe("status");
+    if (s.kind === "status") {
+      expect(s.status).toBe("played");
+      expect(s.recipientBsuid).toBe("MZ.13491208655302741918");
+      expect(s.recipientParentBsuid).toBe("MZ.PARENT13491208655302741918");
+      expect(s.eventKey).toBe("status:PHONE_ID_1:wamid.VOICE:played");
+    }
+  });
+
   it("ignores wrong object", () => {
     expect(parseMetaPayload({ object: "page", entry: [] })).toEqual([]);
   });

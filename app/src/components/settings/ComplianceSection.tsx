@@ -1,0 +1,228 @@
+"use client";
+
+import { useEffect, useState, type FormEvent } from "react";
+import { useMutation, useQuery } from "convex/react";
+import { CheckCircle2, Loader2, ShieldCheck } from "lucide-react";
+import { api } from "../../../convex/_generated/api";
+
+function errorMessage(error: unknown): string {
+  const data =
+    error && typeof error === "object" && "data" in error
+      ? (error as { data?: unknown }).data
+      : null;
+  if (data && typeof data === "object" && "message" in data) {
+    return String((data as { message: unknown }).message);
+  }
+  if (data && typeof data === "object" && "code" in data) {
+    return String((data as { code: unknown }).code);
+  }
+  return error instanceof Error ? error.message : "Could not save.";
+}
+
+function formatDate(timestamp: number) {
+  return new Intl.DateTimeFormat("en-GB", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(timestamp);
+}
+
+export function ComplianceSection() {
+  const status = useQuery(api.compliance.status, {});
+  const accept = useMutation(api.compliance.acceptDataProcessingTerms);
+
+  const [controllerName, setControllerName] = useState("");
+  const [controllerEmail, setControllerEmail] = useState("");
+  const [acceptDpa, setAcceptDpa] = useState(false);
+  const [confirmDpia, setConfirmDpia] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!status) return;
+    setControllerName((current) => current || status.controllerName);
+    setControllerEmail((current) => current || status.controllerEmail);
+  }, [status]);
+
+  if (status === undefined) {
+    return (
+      <div className="h-40 animate-pulse rounded-xl border border-slate-200 bg-white" />
+    );
+  }
+
+  if (status.ready) {
+    return (
+      <section className="rounded-xl border border-slate-200 bg-white">
+        <header className="flex items-center gap-2.5 border-b border-slate-100 px-4 py-3">
+          <ShieldCheck size={16} className="text-emerald-600" />
+          <h2 className="font-[var(--font-display)] text-[14px] font-medium text-[#0a1b33]">
+            Data protection
+          </h2>
+        </header>
+        <div className="space-y-1 px-4 py-3 text-[13px]">
+          <Row label="Controller" value={status.controllerName} />
+          <Row label="Contact" value={status.controllerEmail} />
+          <Row
+            label="Agreement accepted"
+            value={formatDate(status.dpaSignedAt!)}
+          />
+          <Row
+            label="Impact assessment"
+            value={formatDate(status.dpiaCompletedAt!)}
+          />
+          <p className="pt-2 text-[12px] text-slate-500">
+            Channels can be connected. Acceptance is recorded once and is not
+            re-dated when this page is reopened.
+          </p>
+        </div>
+      </section>
+    );
+  }
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    if (saving) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await accept({
+        controllerName,
+        controllerEmail,
+        acceptDpa,
+        confirmDpiaCompleted: confirmDpia,
+      });
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const complete =
+    acceptDpa &&
+    confirmDpia &&
+    controllerName.trim().length >= 2 &&
+    /^[^@\s]+@[^@\s.]+\.[^@\s]+$/.test(controllerEmail.trim());
+
+  return (
+    <section className="rounded-xl border border-amber-200 bg-white">
+      <header className="flex items-center gap-2.5 border-b border-slate-100 px-4 py-3">
+        <ShieldCheck size={16} className="text-amber-600" />
+        <div>
+          <h2 className="font-[var(--font-display)] text-[14px] font-medium text-[#0a1b33]">
+            Data protection
+          </h2>
+          <p className="text-[12px] text-slate-500">
+            Required before any channel can be connected.
+          </p>
+        </div>
+      </header>
+
+      <form onSubmit={submit} className="space-y-3 px-4 py-3">
+        <Field
+          label="Data controller"
+          value={controllerName}
+          onChange={setControllerName}
+          placeholder="Legal entity responsible for the data"
+        />
+        <Field
+          label="Controller contact email"
+          value={controllerEmail}
+          onChange={setControllerEmail}
+          type="email"
+          placeholder="privacy@example.com"
+        />
+
+        <Check
+          checked={acceptDpa}
+          onChange={setAcceptDpa}
+          label="I accept the Data Processing Agreement on behalf of this controller."
+        />
+        <Check
+          checked={confirmDpia}
+          onChange={setConfirmDpia}
+          label="I confirm a Data Protection Impact Assessment has been completed for this use of messaging data."
+        />
+
+        {!status.canAccept && (
+          <p className="text-[12px] text-amber-700">
+            Only the workspace owner can accept these terms.
+          </p>
+        )}
+        {error && <p className="text-[12px] text-red-700">{error}</p>}
+
+        <button
+          type="submit"
+          disabled={!complete || saving || !status.canAccept}
+          className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#0a152d] px-4 text-[13px] font-medium text-white outline-none hover:bg-[#132145] disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-[#3d52d5] focus-visible:ring-offset-2"
+        >
+          {saving ? (
+            <Loader2 size={14} className="animate-spin" />
+          ) : (
+            <CheckCircle2 size={14} />
+          )}
+          Record acceptance
+        </button>
+      </form>
+    </section>
+  );
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-3">
+      <span className="text-slate-500">{label}</span>
+      <span className="text-right font-medium text-[#0a1b33]">{value}</span>
+    </div>
+  );
+}
+
+function Field({
+  label,
+  value,
+  onChange,
+  type = "text",
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  type?: string;
+  placeholder?: string;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-1 block text-[12px] font-medium text-slate-600">
+        {label}
+      </span>
+      <input
+        type={type}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        className="h-9 w-full rounded-lg border border-slate-200 px-3 text-[13px] outline-none focus:border-slate-400"
+      />
+    </label>
+  );
+}
+
+function Check({
+  checked,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  label: string;
+}) {
+  return (
+    <label className="flex cursor-pointer items-start gap-2.5 text-[12px] leading-relaxed text-slate-600">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+        className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-[#0a152d]"
+      />
+      {label}
+    </label>
+  );
+}

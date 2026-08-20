@@ -32,6 +32,27 @@ type ConnectionComplianceResult =
       message: string;
     };
 
+const coexRecoveryValidator = v.object({
+  state: v.union(
+    v.literal("connected"),
+    v.literal("needs_reconnect"),
+    v.literal("watch"),
+    v.literal("manual_review"),
+  ),
+  tone: v.union(
+    v.literal("good"),
+    v.literal("warn"),
+    v.literal("bad"),
+    v.literal("neutral"),
+  ),
+  blocking: v.boolean(),
+  title: v.string(),
+  summary: v.string(),
+  operatorSteps: v.array(v.string()),
+  customerSteps: v.array(v.string()),
+  evidence: v.array(v.string()),
+});
+
 /**
  * tenantQuery list of WhatsApp accounts for the active tenant. Used in
  * /app/settings to render the connection state.
@@ -42,25 +63,61 @@ export const listForTenant = tenantQuery({
     v.object({
       _id: v.id("whatsappAccounts"),
       wabaId: v.string(),
+      metaAppId: v.string(),
+      businessPortfolioId: v.optional(v.string()),
+      onboardingSource: v.optional(
+        v.union(
+          v.literal("manual"),
+          v.literal("embedded_signup"),
+          v.literal("api"),
+        ),
+      ),
+      embeddedSignupSessionId: v.optional(v.id("embeddedSignupSessions")),
       status: v.string(),
       qualityRating: v.optional(v.string()),
+      messagingTier: v.optional(v.string()),
+      lastQualityCheckAt: v.optional(v.number()),
       tokenStatus: v.string(),
       tokenStorage: v.union(
         v.literal("encrypted"),
         v.literal("legacy_plaintext"),
         v.literal("missing"),
       ),
+      lastTokenHealthCheckAt: v.optional(v.number()),
+      tokenHealthDetail: v.optional(v.string()),
+      dataAccessExpiresAt: v.optional(v.number()),
       validatedAt: v.optional(v.number()),
+      validatedScopes: v.optional(v.array(v.string())),
       tokenExpiresAt: v.optional(v.number()),
+      accountUpdateEvent: v.optional(v.string()),
+      banState: v.optional(v.string()),
+      accountRestrictions: v.optional(v.any()),
+      lastDisconnectionReason: v.optional(v.string()),
+      lastDisconnectionInitiatedBy: v.optional(v.string()),
+      lastDisconnectedAt: v.optional(v.number()),
+      lastReconnectedAt: v.optional(v.number()),
+      coexRecovery: coexRecoveryValidator,
       phoneNumbers: v.array(
         v.object({
           _id: v.id("phoneNumbers"),
           phoneNumberId: v.string(),
           e164: v.string(),
           displayName: v.string(),
+          verifiedName: v.optional(v.string()),
+          messagingTier: v.optional(v.string()),
+          throughputLevel: v.optional(v.string()),
+          lastQualityEvent: v.optional(v.string()),
+          lastQualityEventAt: v.optional(v.number()),
+          lastMetaSyncAt: v.optional(v.number()),
           qualityRating: v.optional(v.string()),
+          qualityLastErrorAt: v.optional(v.number()),
+          qualityLastErrorCode: v.optional(v.string()),
           circuitBreakerUntil: v.optional(v.number()),
           circuitBreakerReason: v.optional(v.string()),
+          circuitBreakerOpenedAt: v.optional(v.number()),
+          businessUsername: v.optional(v.string()),
+          businessUsernameStatus: v.optional(v.string()),
+          businessUsernameUpdatedAt: v.optional(v.number()),
         }),
       ),
     }),
@@ -80,24 +137,160 @@ export const listForTenant = tenantQuery({
       out.push({
         _id: a._id,
         wabaId: a.wabaId,
+        metaAppId: a.metaAppId,
+        businessPortfolioId: a.businessPortfolioId,
+        onboardingSource: a.onboardingSource,
+        embeddedSignupSessionId: a.embeddedSignupSessionId,
         status: a.status,
         qualityRating: a.qualityRating,
+        messagingTier: a.messagingTier,
+        lastQualityCheckAt: a.lastQualityCheckAt,
         tokenStatus: a.tokenStatus,
         tokenStorage: tokenStorageForAccount(a),
+        lastTokenHealthCheckAt: a.lastTokenHealthCheckAt,
+        tokenHealthDetail: a.tokenHealthDetail,
+        dataAccessExpiresAt: a.dataAccessExpiresAt,
         validatedAt: a.validatedAt,
+        validatedScopes: a.validatedScopes,
         tokenExpiresAt: a.tokenExpiresAt,
+        accountUpdateEvent: a.accountUpdateEvent,
+        banState: a.banState,
+        accountRestrictions: a.accountRestrictions,
+        lastDisconnectionReason: a.lastDisconnectionReason,
+        lastDisconnectionInitiatedBy: a.lastDisconnectionInitiatedBy,
+        lastDisconnectedAt: a.lastDisconnectedAt,
+        lastReconnectedAt: a.lastReconnectedAt,
+        coexRecovery: buildCoexRecovery(a),
         phoneNumbers: phones.map((p) => ({
           _id: p._id,
           phoneNumberId: p.phoneNumberId,
           e164: p.e164,
           displayName: p.displayName,
+          verifiedName: p.verifiedName,
+          messagingTier: p.messagingTier,
+          throughputLevel: p.throughputLevel,
+          lastQualityEvent: p.lastQualityEvent,
+          lastQualityEventAt: p.lastQualityEventAt,
+          lastMetaSyncAt: p.lastMetaSyncAt,
           qualityRating: p.qualityRating,
+          qualityLastErrorAt: p.qualityLastErrorAt,
+          qualityLastErrorCode: p.qualityLastErrorCode,
           circuitBreakerUntil: p.circuitBreakerUntil,
           circuitBreakerReason: p.circuitBreakerReason,
+          circuitBreakerOpenedAt: p.circuitBreakerOpenedAt,
+          businessUsername: p.businessUsername,
+          businessUsernameStatus: p.businessUsernameStatus,
+          businessUsernameUpdatedAt: p.businessUsernameUpdatedAt,
         })),
       });
     }
     return out;
+  },
+});
+
+export const refreshChannelHealth = action({
+  args: {
+    whatsappAccountId: v.id("whatsappAccounts"),
+    phoneNumberId: v.optional(v.id("phoneNumbers")),
+  },
+  returns: v.object({
+    refreshed: v.boolean(),
+    checkedPhoneNumbers: v.array(v.id("phoneNumbers")),
+  }),
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{
+    refreshed: boolean;
+    checkedPhoneNumbers: Id<"phoneNumbers">[];
+  }> => {
+    const me: {
+      tenantId: Id<"tenants">;
+      role: string;
+    } | null = await ctx.runQuery(internal.whatsappAccounts._meTenant, {});
+    if (!me) throw new ConvexError({ code: "UNAUTHENTICATED" });
+    if (me.role !== "owner" && me.role !== "admin") {
+      throw new ConvexError({
+        code: "FORBIDDEN",
+        message: "Only owner or admin can refresh Meta channel health.",
+      });
+    }
+
+    const target: {
+      whatsappAccountId: Id<"whatsappAccounts">;
+      phoneNumberIds: Id<"phoneNumbers">[];
+    } | null = await ctx.runQuery(
+      internal.whatsappAccounts._getRefreshChannelHealthTarget,
+      {
+        tenantId: me.tenantId,
+        whatsappAccountId: args.whatsappAccountId,
+        phoneNumberId: args.phoneNumberId,
+      },
+    );
+    if (!target) {
+      throw new ConvexError({
+        code: "NOT_FOUND",
+        message: "Channel does not belong to the active workspace.",
+      });
+    }
+
+    await ctx.runAction(internal.whatsappAccounts.runTokenHealthCheck, {
+      whatsappAccountId: target.whatsappAccountId,
+    });
+    for (const phoneNumberId of target.phoneNumberIds) {
+      await ctx.runAction(internal.whatsappAccounts.syncPhoneQuality, {
+        phoneNumberId,
+      });
+    }
+    return {
+      refreshed: true,
+      checkedPhoneNumbers: target.phoneNumberIds,
+    };
+  },
+});
+
+export const _getRefreshChannelHealthTarget = internalQuery({
+  args: {
+    tenantId: v.id("tenants"),
+    whatsappAccountId: v.id("whatsappAccounts"),
+    phoneNumberId: v.optional(v.id("phoneNumbers")),
+  },
+  returns: v.union(
+    v.object({
+      whatsappAccountId: v.id("whatsappAccounts"),
+      phoneNumberIds: v.array(v.id("phoneNumbers")),
+    }),
+    v.null(),
+  ),
+  handler: async (ctx, args) => {
+    const account = await ctx.db.get(args.whatsappAccountId);
+    if (!account || account.tenantId !== args.tenantId) return null;
+
+    if (args.phoneNumberId) {
+      const phone = await ctx.db.get(args.phoneNumberId);
+      if (
+        !phone ||
+        phone.tenantId !== args.tenantId ||
+        phone.whatsappAccountId !== account._id
+      ) {
+        return null;
+      }
+      return {
+        whatsappAccountId: account._id,
+        phoneNumberIds: [phone._id],
+      };
+    }
+
+    const phones = await ctx.db
+      .query("phoneNumbers")
+      .withIndex("by_account", (q) => q.eq("whatsappAccountId", account._id))
+      .collect();
+    return {
+      whatsappAccountId: account._id,
+      phoneNumberIds: phones
+        .filter((phone) => phone.tenantId === args.tenantId)
+        .map((phone) => phone._id),
+    };
   },
 });
 
@@ -107,6 +300,139 @@ function tokenStorageForAccount(
   if (account.accessTokenCiphertext) return "encrypted";
   if (account.accessToken) return "legacy_plaintext";
   return "missing";
+}
+
+const COEX_DISCONNECT_EVENTS = new Set([
+  "PARTNER_REMOVED",
+  "PARTNER_APP_UNINSTALLED",
+  "ACCOUNT_OFFBOARDED",
+]);
+
+const COEX_RECONNECT_EVENTS = new Set([
+  "PARTNER_ADDED",
+  "PARTNER_APP_INSTALLED",
+  "ACCOUNT_RECONNECTED",
+]);
+
+function buildCoexRecovery(account: Doc<"whatsappAccounts">) {
+  const event = account.accountUpdateEvent?.toUpperCase();
+  const reason = account.lastDisconnectionReason?.toUpperCase();
+  const initiatedBy = account.lastDisconnectionInitiatedBy?.toUpperCase();
+  const evidence = [
+    `Onboarding: ${account.onboardingSource ?? "unknown"}`,
+    `WABA status: ${account.status}`,
+  ];
+  if (event) evidence.push(`Last account_update: ${event}`);
+  if (reason) evidence.push(`Disconnect reason: ${reason}`);
+  if (initiatedBy) evidence.push(`Initiated by: ${initiatedBy}`);
+  if (account.lastDisconnectedAt) {
+    evidence.push(`Disconnected at: ${new Date(account.lastDisconnectedAt).toISOString()}`);
+  }
+  if (account.lastReconnectedAt) {
+    evidence.push(`Last reconnected at: ${new Date(account.lastReconnectedAt).toISOString()}`);
+  }
+
+  if (
+    account.status === "disconnected" ||
+    (event ? COEX_DISCONNECT_EVENTS.has(event) : false)
+  ) {
+    return {
+      state: "needs_reconnect" as const,
+      tone: "bad" as const,
+      blocking: true,
+      title: "COEX partner connection lost",
+      summary:
+        "Meta reports that the partner connection was removed or offboarded. Keep outbound paused until the same WABA and number are reconnected through Embedded Signup.",
+      operatorSteps: [
+        "Keep campaigns paused and avoid manual API sends from this number.",
+        "Run Refresh health, then confirm the WABA/phone IDs still match the client record.",
+        reasonAwareOperatorStep(reason, event),
+        "Ask the client to reconnect through Embedded Signup using the same Business App number.",
+        "After Meta sends ACCOUNT_RECONNECTED or PARTNER_ADDED, refresh health and run the evidence check.",
+      ],
+      customerSteps: [
+        "Open WhatsApp Business on the primary phone and confirm the business account is usable.",
+        "Go to WhatsApp Business settings and check Business Platform/partner connection.",
+        "Do not migrate the number to a classic Cloud API-only setup during recovery.",
+        "Complete the OpenBSP Embedded Signup flow with the same Facebook business and phone number.",
+      ],
+      evidence,
+    };
+  }
+
+  if (account.status !== "active") {
+    return {
+      state: "watch" as const,
+      tone: "warn" as const,
+      blocking: true,
+      title: "WABA requires Meta review",
+      summary:
+        "The account is not active. Treat the channel as blocked until Meta status, restrictions, and token health are clean.",
+      operatorSteps: [
+        "Inspect the latest account_update and restriction details.",
+        "Keep outbound paused until the WABA returns to active.",
+        "Run Refresh health after Meta remediation or appeal is complete.",
+      ],
+      customerSteps: [
+        "Check Meta Business Manager for policy, verification, or account restriction tasks.",
+        "Keep the WhatsApp Business app available for any required ownership checks.",
+      ],
+      evidence,
+    };
+  }
+
+  if (account.onboardingSource === "embedded_signup") {
+    return {
+      state: "connected" as const,
+      tone: "good" as const,
+      blocking: false,
+      title: "COEX path connected",
+      summary:
+        "This WABA came through Embedded Signup. Keep the Business App active and monitor account_update webhooks for partner removal.",
+      operatorSteps: [
+        "Refresh health before high-volume sends.",
+        "Watch for PARTNER_REMOVED, ACCOUNT_OFFBOARDED, or token health failures.",
+        "Run evidence before Meta App Review or provider handoff.",
+      ],
+      customerSteps: [
+        "Keep WhatsApp Business installed and signed in on the primary phone.",
+        "Avoid disconnecting OpenBSP from Business Platform unless intentionally offboarding.",
+      ],
+      evidence,
+    };
+  }
+
+  return {
+    state: "manual_review" as const,
+    tone: "warn" as const,
+    blocking: false,
+    title: "Manual connection, COEX not proven",
+    summary:
+      "This WABA was not connected through Embedded Signup, so OpenBSP cannot prove the coexistence recovery path from stored metadata.",
+    operatorSteps: [
+      "Use Embedded Signup for future COEX onboarding.",
+      "Confirm whether this number is Cloud API-only or Business App coexistence before campaign launch.",
+      "Run evidence and document WABA ownership before production handoff.",
+    ],
+    customerSteps: [
+      "Confirm whether the same phone number is still active inside WhatsApp Business App.",
+      "Do not disconnect or migrate the number without an agreed recovery plan.",
+    ],
+    evidence,
+  };
+}
+
+function reasonAwareOperatorStep(reason?: string, event?: string) {
+  if (reason === "USER_RE_REGISTERED") {
+    return "The phone number appears to have been re-registered/reset by the client; verify the primary Business App account before reconnecting.";
+  }
+  if (event === "PARTNER_APP_UNINSTALLED" || reason === "PARTNER_APP_UNINSTALLED") {
+    return "The partner app may have been removed; ask the client to add OpenBSP back as the connected partner.";
+  }
+  if (event === "ACCOUNT_OFFBOARDED") {
+    return "The account was offboarded; reconnect only after the client confirms they want OpenBSP partner access restored.";
+  }
+  return "Confirm why the partner connection was removed before asking the client to reconnect.";
 }
 
 // ---------- Internal helpers used by connectManual + dispatcher ----------
@@ -656,10 +982,20 @@ export const applyAccountUpdate = internalMutation({
     banState: v.optional(v.string()),
     restrictions: v.optional(
       v.array(
-        v.object({ type: v.string(), expiration: v.optional(v.number()) }),
+        v.object({
+          type: v.string(),
+          expiration: v.optional(v.number()),
+          remediation: v.optional(v.string()),
+        }),
       ),
     ),
     violationType: v.optional(v.string()),
+    disconnectionInfo: v.optional(
+      v.object({
+        reason: v.optional(v.string()),
+        initiatedBy: v.optional(v.string()),
+      }),
+    ),
     updatedAt: v.number(),
   },
   returns: v.null(),
@@ -679,18 +1015,59 @@ export const applyAccountUpdate = internalMutation({
       status = "revoked";
     } else if (ban === "SCHEDULE_FOR_DISABLE") {
       status = "flagged";
+    } else if (
+      event === "PARTNER_REMOVED" ||
+      event === "PARTNER_APP_UNINSTALLED" ||
+      event === "ACCOUNT_OFFBOARDED"
+    ) {
+      status = "disconnected";
+    } else if (
+      event === "PARTNER_ADDED" ||
+      event === "PARTNER_APP_INSTALLED" ||
+      event === "ACCOUNT_RECONNECTED"
+    ) {
+      status = "active";
     } else if (event === "ACCOUNT_RESTRICTION" || event === "ACCOUNT_VIOLATION") {
       status = "flagged";
     } else if (ban === "REINSTATE" || event === "VERIFIED_ACCOUNT") {
       status = "active";
     }
 
+    const disconnectionReason = args.disconnectionInfo?.reason?.toUpperCase();
+    const disconnectionInitiatedBy =
+      args.disconnectionInfo?.initiatedBy?.toUpperCase();
+    const isDisconnected = status === "disconnected";
+    const isReconnected = status === "active" && (
+      event === "ACCOUNT_RECONNECTED" ||
+      event === "PARTNER_ADDED" ||
+      event === "PARTNER_APP_INSTALLED" ||
+      ban === "REINSTATE"
+    );
+
     await ctx.db.patch(account._id, {
       status,
       accountUpdateEvent: event,
       banState: ban,
       accountRestrictions:
-        status === "active" ? undefined : (args.restrictions ?? account.accountRestrictions),
+        status === "active"
+          ? undefined
+          : (args.restrictions ?? account.accountRestrictions),
+      lastDisconnectionReason: isDisconnected
+        ? disconnectionReason
+        : isReconnected
+          ? undefined
+          : account.lastDisconnectionReason,
+      lastDisconnectionInitiatedBy: isDisconnected
+        ? disconnectionInitiatedBy
+        : isReconnected
+          ? undefined
+          : account.lastDisconnectionInitiatedBy,
+      lastDisconnectedAt: isDisconnected
+        ? args.updatedAt
+        : account.lastDisconnectedAt,
+      lastReconnectedAt: isReconnected
+        ? args.updatedAt
+        : account.lastReconnectedAt,
     });
 
     const phones = await ctx.db
@@ -701,10 +1078,11 @@ export const applyAccountUpdate = internalMutation({
     if (status !== "active") {
       const expiration = args.restrictions?.find((r) => r.expiration)?.expiration;
       const until = expiration ? expiration * 1000 : now + 24 * 60 * 60 * 1000;
-      const reason =
-        args.violationType ??
-        ban ??
-        `Meta account_update ${event}`;
+      const reason = disconnectionReason
+        ? `Meta disconnected: ${disconnectionReason}${
+            disconnectionInitiatedBy ? ` (${disconnectionInitiatedBy})` : ""
+          }`
+        : (args.violationType ?? ban ?? `Meta account_update ${event}`);
       for (const phone of phones) {
         await ctx.db.patch(phone._id, {
           circuitBreakerUntil: until,
@@ -730,15 +1108,23 @@ export const applyAccountUpdate = internalMutation({
           tenantId: account.tenantId,
           campaignId: campaign._id,
           type: "campaign.auto_paused.account_update",
-          payload: { event, banState: ban },
+          payload: {
+            event,
+            banState: ban,
+            disconnectionReason,
+            disconnectionInitiatedBy,
+          },
           createdAt: now,
         });
       }
     } else {
       // Reinstated: clear account-level circuit breakers.
       for (const phone of phones) {
-        if (phone.circuitBreakerReason?.startsWith("Meta account_update") ||
-            phone.circuitBreakerReason === ban) {
+        if (
+          phone.circuitBreakerReason?.startsWith("Meta account_update") ||
+          phone.circuitBreakerReason?.startsWith("Meta disconnected") ||
+          phone.circuitBreakerReason === ban
+        ) {
           await ctx.db.patch(phone._id, {
             circuitBreakerUntil: undefined,
             circuitBreakerReason: undefined,

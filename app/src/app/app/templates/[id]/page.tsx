@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useQuery, useAction } from "convex/react";
 import {
+  AlertTriangle,
   ChevronLeft,
   Send,
   Loader2,
@@ -12,12 +13,17 @@ import {
   CheckCircle2,
   XCircle,
   Clock,
+  FileText,
+  MessageSquare,
+  ShieldCheck,
 } from "lucide-react";
 import { PageHeader } from "@/components/app/EmptyState";
+import { WhatsAppIosPreview } from "@/components/WhatsAppIosPreview";
 import { api } from "../../../../../convex/_generated/api";
 import type { Id } from "../../../../../convex/_generated/dataModel";
 import { friendlyId } from "@/lib/friendlyId";
 import { relativeTime } from "@/lib/relativeTime";
+import type { TemplateCategory } from "@/lib/whatsappTemplateAdvisor";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -104,8 +110,8 @@ export default function TemplateDetailPage({ params }: Props) {
         }
       />
 
-      <div className="px-8 py-8 max-w-3xl space-y-6">
-        {/* Status card */}
+      <div className="grid gap-6 px-8 py-8 xl:grid-cols-[minmax(0,760px)_360px]">
+        <div className="space-y-6">
         <section className="bg-white rounded-2xl border border-slate-200 p-5">
           {submissionNotice === "submitted" && (
             <div className="mb-4 flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[12px] text-emerald-700">
@@ -180,21 +186,51 @@ export default function TemplateDetailPage({ params }: Props) {
           )}
         </section>
 
-        {/* Body preview */}
+        <ApprovalReadinessCard
+          status={tpl.status}
+          qualityScore={tpl.qualityScore}
+          rejectionReason={tpl.rejectionReason}
+          syncedAt={tpl.syncedAt}
+        />
+
         {currentVersion && (
           <section className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
             <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
               <h3 className="font-semibold text-[#0a1b33] text-sm">
-                Body (v{currentVersion.version})
+                Meta payload (v{currentVersion.version})
               </h3>
               <span className="text-[11px] text-slate-400">
                 {currentVersion.isLocked ? "Locked (submitted)" : "Editable"}
               </span>
             </div>
             <div className="p-5 space-y-4">
+              <div className="grid gap-3 sm:grid-cols-3">
+                <PayloadMetric
+                  icon={FileText}
+                  label="Language"
+                  value={tpl.language}
+                />
+                <PayloadMetric
+                  icon={ShieldCheck}
+                  label="Category"
+                  value={tpl.category}
+                />
+                <PayloadMetric
+                  icon={MessageSquare}
+                  label="Buttons"
+                  value={String(currentVersion.buttons?.length ?? 0)}
+                />
+              </div>
               <pre className="bg-slate-50 border border-slate-100 rounded-lg p-3 text-[13px] text-[#0a1b33] whitespace-pre-wrap font-mono">
                 {currentVersion.bodyText}
               </pre>
+              <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-3 text-[13px] leading-6 text-emerald-800">
+                <span className="font-semibold">Rendered with examples:</span>{" "}
+                {renderTemplateText(
+                  currentVersion.bodyText,
+                  examplesFromSchema(currentVersion.parameterSchema),
+                )}
+              </div>
               {currentVersion.parameterSchema.length > 0 && (
                 <div>
                   <div className="text-[11px] uppercase tracking-wider text-slate-400 mb-2">
@@ -218,7 +254,147 @@ export default function TemplateDetailPage({ params }: Props) {
             </div>
           </section>
         )}
+        </div>
+
+        {currentVersion && (
+          <WhatsAppIosPreview
+            title="Exact WhatsApp preview"
+            subtitle="Rendered with the examples submitted to Meta."
+            category={tpl.category as TemplateCategory}
+            bodyText={currentVersion.bodyText}
+            buttons={currentVersion.buttons ?? []}
+            examples={examplesFromSchema(currentVersion.parameterSchema)}
+            hasMarketingOptIn={tpl.category !== "marketing"}
+            serviceWindowOpen={tpl.category === "utility"}
+            freeEntryWindowOpen={false}
+          />
+        )}
       </div>
     </>
   );
+}
+
+function ApprovalReadinessCard({
+  status,
+  qualityScore,
+  rejectionReason,
+  syncedAt,
+}: {
+  status: string;
+  qualityScore?: string;
+  rejectionReason?: string;
+  syncedAt?: number;
+}) {
+  const readiness = approvalReadiness(status, rejectionReason);
+  const Icon = readiness.tone === "good" ? CheckCircle2 : readiness.tone === "bad" ? XCircle : AlertTriangle;
+  return (
+    <section className={`rounded-2xl border p-5 ${readinessClass(readiness.tone)}`}>
+      <div className="flex items-start gap-3">
+        <span className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/80">
+          <Icon size={18} />
+        </span>
+        <div>
+          <h2 className="font-[var(--font-outfit)] text-lg font-semibold">
+            {readiness.title}
+          </h2>
+          <p className="mt-1 text-sm leading-6">{readiness.body}</p>
+          <div className="mt-3 grid gap-2 text-xs font-semibold sm:grid-cols-3">
+            <span className="rounded-lg bg-white/70 px-2.5 py-2">
+              Status: {status}
+            </span>
+            <span className="rounded-lg bg-white/70 px-2.5 py-2">
+              Quality: {qualityScore ?? "unknown"}
+            </span>
+            <span className="rounded-lg bg-white/70 px-2.5 py-2">
+              Sync: {syncedAt ? relativeTime(syncedAt) : "not synced"}
+            </span>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function PayloadMetric({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: typeof FileText;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
+      <div className="mb-2 flex h-8 w-8 items-center justify-center rounded-lg bg-white text-slate-500">
+        <Icon size={15} />
+      </div>
+      <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+        {label}
+      </div>
+      <div className="mt-1 truncate text-sm font-semibold text-[#0a1b33] capitalize">
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function approvalReadiness(status: string, rejectionReason?: string) {
+  if (status === "approved") {
+    return {
+      tone: "good" as const,
+      title: "Ready to use",
+      body:
+        "Meta approved this template. It can be used for campaigns and conversations outside the 24h service window.",
+    };
+  }
+  if (status === "pending") {
+    return {
+      tone: "warn" as const,
+      title: "Waiting for Meta review",
+      body:
+        "Do not attach this template to a campaign yet. Sync from Meta or wait for the status webhook before launch.",
+    };
+  }
+  if (status === "draft") {
+    return {
+      tone: "warn" as const,
+      title: "Draft only",
+      body:
+        "This template still needs Meta approval before production sends. Review the preview and submit it when ready.",
+    };
+  }
+  if (status === "rejected") {
+    return {
+      tone: "bad" as const,
+      title: "Rejected by Meta",
+      body:
+        rejectionReason ??
+        "Fix policy/category/copy issues, then create or submit a corrected version before using it.",
+    };
+  }
+  return {
+    tone: "bad" as const,
+    title: "Not safe for campaigns",
+    body:
+      "Meta has paused or disabled this template. Remove it from active campaign plans until it is approved again.",
+  };
+}
+
+function readinessClass(tone: "good" | "warn" | "bad") {
+  if (tone === "good") return "border-emerald-100 bg-emerald-50 text-emerald-800";
+  if (tone === "warn") return "border-amber-100 bg-amber-50 text-amber-900";
+  return "border-red-100 bg-red-50 text-red-800";
+}
+
+function examplesFromSchema(
+  schema: Array<{ index: number; name: string; example: string }>,
+) {
+  return Object.fromEntries(schema.map((param) => [param.index, param.example]));
+}
+
+function renderTemplateText(bodyText: string, examples: Record<number, string>) {
+  return bodyText.replace(/\{\{(\d+)\}\}/g, (_, index: string) => {
+    return examples[Number(index)] || `{{${index}}}`;
+  });
 }

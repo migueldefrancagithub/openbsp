@@ -8,6 +8,7 @@ afterEach(() => {
   delete process.env.META_EMBEDDED_SIGNUP_APP_ID;
   delete process.env.META_EMBEDDED_SIGNUP_APP_SECRET;
   delete process.env.META_EMBEDDED_SIGNUP_REDIRECT_URI;
+  delete process.env.META_EMBEDDED_SIGNUP_CONFIG_ID;
 });
 
 async function seedSignupSession(
@@ -46,6 +47,11 @@ async function seedSignupSession(
       status: "active",
       createdAt: Date.now(),
     });
+    await ctx.db.insert("sessions", {
+      userId,
+      activeTenantId: tenantId,
+      updatedAt: Date.now(),
+    });
     const sessionId = await ctx.db.insert("embeddedSignupSessions", {
       tenantId,
       createdBy: memberId,
@@ -53,7 +59,7 @@ async function seedSignupSession(
       status: "created",
       createdAt: Date.now(),
     });
-    return { sessionId };
+    return { userId, tenantId, memberId, sessionId };
   });
 }
 
@@ -279,5 +285,81 @@ describe("embedded signup", () => {
     }));
     expect(rows.session?.error).toContain("DPA_REQUIRED");
     expect(rows.accounts).toHaveLength(0);
+  });
+
+  it("creates a hashed client launcher and starts a tenant-scoped signup session", async () => {
+    const t = convexTest(schema);
+    const seeded = await seedSignupSession(t);
+    process.env.META_EMBEDDED_SIGNUP_APP_ID = "APP_1";
+    process.env.META_EMBEDDED_SIGNUP_APP_SECRET = "APP_SECRET";
+    process.env.META_EMBEDDED_SIGNUP_CONFIG_ID = "CONFIG_1";
+    process.env.META_EMBEDDED_SIGNUP_REDIRECT_URI =
+      "https://cxcast.example/embedded-signup/callback";
+
+    const owner = t.withIdentity({ subject: seeded.userId });
+    const link = await owner.mutation(api.embeddedSignup.createLaunchLink, {
+      label: "Client connect",
+      expiresInHours: 24,
+    });
+
+    expect(link.token).toHaveLength(64);
+    expect(link.path).toBe(`/connect/whatsapp/${link.token}`);
+
+    const stored = await t.run(async (ctx) => {
+      return await ctx.db.get(link.launcherId);
+    });
+    expect(stored?.tokenHash).not.toBe(link.token);
+    expect(stored?.starts).toBe(0);
+
+    const begin = await t.mutation(api.embeddedSignup.beginFromLaunchToken, {
+      token: link.token,
+    });
+
+    expect(begin).toMatchObject({
+      configured: true,
+      appId: "APP_1",
+      configId: "CONFIG_1",
+      tenantName: "Coex Clinic",
+    });
+    expect(begin.url).toContain("https://www.facebook.com/");
+    expect(begin.url).toContain(`state=${begin.state}`);
+    expect(begin.url).not.toContain(link.token);
+
+    const rows = await t.run(async (ctx) => ({
+      launcher: await ctx.db.get(link.launcherId),
+      session: await ctx.db.get(begin.sessionId),
+    }));
+    expect(rows.launcher?.starts).toBe(1);
+    expect(rows.launcher?.lastSessionId).toBe(begin.sessionId);
+    expect(rows.session).toMatchObject({
+      tenantId: seeded.tenantId,
+      createdBy: seeded.memberId,
+      launchTokenId: link.launcherId,
+      state: begin.state,
+      status: "created",
+    });
+  });
+
+  it("blocks launcher signup before session creation when compliance is missing", async () => {
+    const t = convexTest(schema);
+    const seeded = await seedSignupSession(t, { signedCompliance: false });
+    const owner = t.withIdentity({ subject: seeded.userId });
+    const link = await owner.mutation(api.embeddedSignup.createLaunchLink, {
+      label: "Blocked client connect",
+    });
+    const before = await t.run(async (ctx) => {
+      return await ctx.db.query("embeddedSignupSessions").collect();
+    });
+
+    await expect(
+      t.mutation(api.embeddedSignup.beginFromLaunchToken, {
+        token: link.token,
+      }),
+    ).rejects.toThrow(/DPA_REQUIRED/);
+
+    const after = await t.run(async (ctx) => {
+      return await ctx.db.query("embeddedSignupSessions").collect();
+    });
+    expect(after).toHaveLength(before.length);
   });
 });

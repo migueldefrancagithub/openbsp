@@ -11,6 +11,7 @@ const isPublic = createRouteMatcher([
   "/privacy",
   "/terms",
   "/embedded-signup/callback",
+  "/connect/whatsapp/:path*",
 ]);
 const isAuthRoute = createRouteMatcher(["/login", "/signup"]);
 

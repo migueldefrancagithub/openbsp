@@ -3,20 +3,24 @@
 import { useMemo, useState } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
 import {
+  AlertTriangle,
+  BadgeCheck,
   BellOff,
-  Columns3,
+  CheckCircle2,
+  Clock3,
   Copy,
+  Fingerprint,
   Loader2,
   MessageCircle,
   MoreVertical,
   PhoneCall,
   Search,
   SlidersHorizontal,
-  Star,
   Upload,
   Users,
   X,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { PageHeader, EmptyState } from "@/components/app/EmptyState";
 import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
@@ -29,8 +33,31 @@ const CONSENT_PILL: Record<string, string> = {
   unknown: "bg-slate-100 text-slate-500 border-slate-200",
 };
 
+type ContactRow = {
+  _id: Id<"contacts">;
+  e164?: string;
+  bsuid?: string;
+  parentBsuid?: string;
+  whatsappUsername?: string;
+  name?: string;
+  locale?: string;
+  tags: string[];
+  createdAt: number;
+  marketingConsent: "granted" | "revoked" | "unknown";
+  marketingConsentAt?: number;
+  transactionalConsent: "granted" | "revoked" | "unknown";
+  transactionalConsentAt?: number;
+  lastConversationAt?: number;
+  lastLeadSource?: string;
+  opportunityStatus?: string;
+  serviceWindowExpiresAt?: number;
+};
+
+type IdentityFilter = "all" | "phone" | "bsuid" | "username" | "needs_phone";
+type ConsentFilter = "all" | "marketing_granted" | "marketing_revoked" | "marketing_unknown";
+
 export default function ContactsPage() {
-  const contacts = useQuery(api.contacts.list, {});
+  const contacts = useQuery(api.contacts.list, {}) as ContactRow[] | undefined;
   const bulkImport = useMutation(api.contacts.bulkImport);
   const sendContactRequest = useAction(api.contactRequest.send);
   const [open, setOpen] = useState(false);
@@ -47,17 +74,40 @@ export default function ContactsPage() {
   const [search, setSearch] = useState("");
   const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc");
   const [explainMatch, setExplainMatch] = useState(false);
+  const [identityFilter, setIdentityFilter] = useState<IdentityFilter>("all");
+  const [consentFilter, setConsentFilter] = useState<ConsentFilter>("all");
 
   const visibleContacts = useMemo(() => {
     const term = search.trim().toLowerCase();
     return (contacts ?? [])
       .filter((contact) => {
+        const matchesIdentity =
+          identityFilter === "all" ||
+          (identityFilter === "phone" && Boolean(contact.e164)) ||
+          (identityFilter === "bsuid" && Boolean(contact.bsuid)) ||
+          (identityFilter === "username" && Boolean(contact.whatsappUsername)) ||
+          (identityFilter === "needs_phone" && Boolean(contact.bsuid) && !contact.e164);
+        if (!matchesIdentity) return false;
+
+        const matchesConsent =
+          consentFilter === "all" ||
+          (consentFilter === "marketing_granted" &&
+            contact.marketingConsent === "granted") ||
+          (consentFilter === "marketing_revoked" &&
+            contact.marketingConsent === "revoked") ||
+          (consentFilter === "marketing_unknown" &&
+            contact.marketingConsent === "unknown");
+        if (!matchesConsent) return false;
+
         if (!term) return true;
         return [
           contact.name,
           contact.e164,
           contact.bsuid,
+          contact.parentBsuid,
           contact.whatsappUsername,
+          contact.lastLeadSource,
+          contact.opportunityStatus,
           contact.tags.join(" "),
         ]
           .filter(Boolean)
@@ -65,10 +115,22 @@ export default function ContactsPage() {
       })
       .sort((a, b) =>
         sortOrder === "desc"
-          ? b.createdAt - a.createdAt
-          : a.createdAt - b.createdAt,
+          ? (b.lastConversationAt ?? b.createdAt) - (a.lastConversationAt ?? a.createdAt)
+          : (a.lastConversationAt ?? a.createdAt) - (b.lastConversationAt ?? b.createdAt),
       );
-  }, [contacts, search, sortOrder]);
+  }, [contacts, consentFilter, identityFilter, search, sortOrder]);
+
+  const contactStats = useMemo(() => {
+    const rows = contacts ?? [];
+    return {
+      total: rows.length,
+      bsuid: rows.filter((contact) => contact.bsuid).length,
+      needsPhone: rows.filter((contact) => contact.bsuid && !contact.e164).length,
+      marketingGranted: rows.filter(
+        (contact) => contact.marketingConsent === "granted",
+      ).length,
+    };
+  }, [contacts]);
 
   async function handleSendContactRequest() {
     if (!requestContact) return;
@@ -91,6 +153,12 @@ export default function ContactsPage() {
     } finally {
       setBusy(false);
     }
+  }
+
+  async function copyIdentity(value: string, label: string) {
+    await navigator.clipboard.writeText(value);
+    setNotice(`${label} copied.`);
+    window.setTimeout(() => setNotice(null), 1600);
   }
 
   return (
@@ -144,7 +212,13 @@ export default function ContactsPage() {
         ) : (
           <>
             <section className="rounded-2xl border border-slate-200 bg-white p-4">
-              <div className="grid gap-3 xl:grid-cols-[1fr_auto_auto_auto]">
+              <div className="mb-4 grid gap-3 md:grid-cols-4">
+                <ContactStat icon={Users} label="Total" value={contactStats.total} tone="neutral" />
+                <ContactStat icon={Fingerprint} label="BSUID known" value={contactStats.bsuid} tone="good" />
+                <ContactStat icon={PhoneCall} label="Need phone" value={contactStats.needsPhone} tone="warn" />
+                <ContactStat icon={BadgeCheck} label="Marketing opt-in" value={contactStats.marketingGranted} tone="good" />
+              </div>
+              <div className="grid gap-3 xl:grid-cols-[1fr_180px_210px_auto]">
                 <label className="relative block">
                   <Search
                     size={16}
@@ -157,20 +231,31 @@ export default function ContactsPage() {
                     className="h-11 w-full rounded-lg border border-slate-200 bg-white pl-10 pr-3 text-sm text-[#0a1b33] outline-none transition-colors placeholder:text-slate-400 focus:border-slate-400"
                   />
                 </label>
-                <button
-                  type="button"
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-[#0a1b33] transition-colors hover:border-slate-300"
+                <select
+                  value={identityFilter}
+                  onChange={(event) =>
+                    setIdentityFilter(event.target.value as IdentityFilter)
+                  }
+                  className="h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-[#0a1b33] outline-none focus:border-slate-400"
                 >
-                  <SlidersHorizontal size={15} />
-                  Filters
-                </button>
-                <button
-                  type="button"
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-[#0a1b33] transition-colors hover:border-slate-300"
+                  <option value="all">All identities</option>
+                  <option value="phone">Has phone</option>
+                  <option value="bsuid">Has BSUID</option>
+                  <option value="username">Has username</option>
+                  <option value="needs_phone">BSUID, no phone</option>
+                </select>
+                <select
+                  value={consentFilter}
+                  onChange={(event) =>
+                    setConsentFilter(event.target.value as ConsentFilter)
+                  }
+                  className="h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-[#0a1b33] outline-none focus:border-slate-400"
                 >
-                  <Columns3 size={15} />
-                  Columns
-                </button>
+                  <option value="all">All marketing consent</option>
+                  <option value="marketing_granted">Marketing granted</option>
+                  <option value="marketing_revoked">Marketing revoked</option>
+                  <option value="marketing_unknown">Marketing unknown</option>
+                </select>
                 <label className="inline-flex h-11 items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-600">
                   Explain Match
                   <input
@@ -186,8 +271,22 @@ export default function ContactsPage() {
                   Sort by:
                 </span>
                 <select className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-[#0a1b33]">
-                  <option>Created Date</option>
+                  <option>Last activity</option>
                 </select>
+                {(identityFilter !== "all" || consentFilter !== "all" || search) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearch("");
+                      setIdentityFilter("all");
+                      setConsentFilter("all");
+                    }}
+                    className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-[#0a1b33] transition-colors hover:border-slate-300"
+                  >
+                    <SlidersHorizontal size={15} />
+                    Reset filters
+                  </button>
+                )}
                 <select
                   value={sortOrder}
                   onChange={(event) =>
@@ -203,15 +302,14 @@ export default function ContactsPage() {
 
             <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
               <div className="min-w-[1040px]">
-                <div className="grid grid-cols-[44px_1.35fr_1fr_0.8fr_0.8fr_0.55fr_0.6fr_1fr_0.7fr] gap-3 border-b border-slate-100 bg-slate-50 px-5 py-3 text-[12px] font-semibold text-slate-500">
+                <div className="grid grid-cols-[44px_1.25fr_1.25fr_1.1fr_1fr_0.9fr_1fr_0.65fr] gap-3 border-b border-slate-100 bg-slate-50 px-5 py-3 text-[12px] font-semibold text-slate-500">
                   <span />
                   <span>Name</span>
-                  <span>Phone</span>
-                  <span>Created</span>
-                  <span>Updated</span>
-                  <span>DND</span>
-                  <span>Starred</span>
-                  <span>Contact groups</span>
+                  <span>Meta identity</span>
+                  <span>Consent</span>
+                  <span>Lead / pipeline</span>
+                  <span>Last activity</span>
+                  <span>Tags</span>
                   <span>Actions</span>
                 </div>
                 <ul className="divide-y divide-slate-100">
@@ -230,16 +328,11 @@ export default function ContactsPage() {
                   c.bsuid?.charAt(0) ??
                   "?"
                 ).toUpperCase();
-                const secondaryParts: string[] = [];
-                if (c.e164) secondaryParts.push(c.e164);
-                else if (c.bsuid) secondaryParts.push(`BSUID ${c.bsuid.slice(0, 18)}…`);
-                if (c.whatsappUsername && primary !== `@${c.whatsappUsername}`)
-                  secondaryParts.push(`@${c.whatsappUsername}`);
-                secondaryParts.push(`added ${relativeTime(c.createdAt)}`);
+                const secondaryParts = contactEvidence(c);
                 return (
                 <li
                   key={c._id}
-                  className="grid grid-cols-[44px_1.35fr_1fr_0.8fr_0.8fr_0.55fr_0.6fr_1fr_0.7fr] items-center gap-3 px-5 py-3.5 transition-colors hover:bg-slate-50"
+                  className="grid grid-cols-[44px_1.25fr_1.25fr_1.1fr_1fr_0.9fr_1fr_0.65fr] items-center gap-3 px-5 py-3.5 transition-colors hover:bg-slate-50"
                 >
                   <input type="checkbox" className="h-4 w-4 accent-violet-600" />
                   <div className="flex min-w-0 items-center gap-3">
@@ -252,38 +345,61 @@ export default function ContactsPage() {
                       </div>
                       {explainMatch && (
                         <div className="mt-0.5 truncate text-[11px] text-slate-500">
-                          {secondaryParts.join(" · ")}
+                          {secondaryParts}
                         </div>
                       )}
                     </div>
                   </div>
-                  <div className="flex min-w-0 items-center gap-1 text-sm font-semibold text-[#0a1b33]">
-                    <span className="truncate">
-                      {c.e164
-                        ? maskPhone(c.e164)
-                        : c.bsuid
-                          ? `BSUID ${c.bsuid.slice(0, 8)}...`
-                          : "-"}
-                    </span>
-                    {(c.e164 || c.bsuid) && (
-                      <Copy size={13} className="shrink-0 text-slate-400" />
+                  <div className="min-w-0 space-y-1">
+                    <IdentityLine
+                      icon={PhoneCall}
+                      label="Phone"
+                      value={c.e164 ? maskPhone(c.e164) : "Missing"}
+                      tone={c.e164 ? "good" : "warn"}
+                      copy={c.e164 ? () => copyIdentity(c.e164 as string, "Phone") : undefined}
+                    />
+                    <IdentityLine
+                      icon={Fingerprint}
+                      label="BSUID"
+                      value={c.bsuid ? compactId(c.bsuid) : "Not seen"}
+                      tone={c.bsuid ? "good" : "neutral"}
+                      copy={c.bsuid ? () => copyIdentity(c.bsuid as string, "BSUID") : undefined}
+                    />
+                    {c.whatsappUsername && (
+                      <IdentityLine
+                        icon={BadgeCheck}
+                        label="User"
+                        value={`@${c.whatsappUsername}`}
+                        tone="neutral"
+                        copy={() =>
+                          copyIdentity(c.whatsappUsername as string, "Username")
+                        }
+                      />
                     )}
                   </div>
-                  <span className="text-sm text-slate-500">
-                    {relativeTime(c.createdAt)}
-                  </span>
-                  <span className="text-sm text-slate-500">
-                    {relativeTime(c.createdAt)}
-                  </span>
-                  <BellOff
-                    size={16}
-                    className={
-                      c.marketingConsent === "revoked"
-                        ? "text-red-500"
-                        : "text-slate-300"
-                    }
-                  />
-                  <Star size={16} className="text-slate-300" />
+                  <div className="space-y-1">
+                    <ConsentPill label="Marketing" status={c.marketingConsent} at={c.marketingConsentAt} />
+                    <ConsentPill label="Transactional" status={c.transactionalConsent} at={c.transactionalConsentAt} />
+                  </div>
+                  <div className="min-w-0 space-y-1 text-sm">
+                    <div className="truncate font-semibold capitalize text-[#0a1b33]">
+                      {c.lastLeadSource ?? "unknown source"}
+                    </div>
+                    <div className="truncate text-xs font-medium text-slate-500">
+                      {c.opportunityStatus ?? "no pipeline status"}
+                    </div>
+                  </div>
+                  <div className="space-y-1 text-sm text-slate-500">
+                    <div className="inline-flex items-center gap-1">
+                      <Clock3 size={14} />
+                      {c.lastConversationAt
+                        ? relativeTime(c.lastConversationAt)
+                        : relativeTime(c.createdAt)}
+                    </div>
+                    <div className="text-xs">
+                      {serviceWindowLabel(c.serviceWindowExpiresAt)}
+                    </div>
+                  </div>
                   <span className="truncate text-sm text-slate-500">
                     {c.tags.length > 0 ? c.tags.join(", ") : "-"}
                   </span>
@@ -307,6 +423,12 @@ export default function ContactsPage() {
                     >
                       <MessageCircle size={16} />
                     </button>
+                    {c.marketingConsent === "revoked" && (
+                      <BellOff size={16} className="text-red-500" />
+                    )}
+                    {c.bsuid && !c.e164 && (
+                      <AlertTriangle size={16} className="text-amber-500" />
+                    )}
                     <button
                       type="button"
                       className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"
@@ -314,30 +436,6 @@ export default function ContactsPage() {
                     >
                       <MoreVertical size={16} />
                     </button>
-                  </div>
-                  <div className="hidden">
-                  <span
-                    className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium border ${CONSENT_PILL[c.marketingConsent]}`}
-                  >
-                    {c.marketingConsent}
-                  </span>
-                  <span
-                    className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium border ${CONSENT_PILL[c.transactionalConsent]}`}
-                  >
-                    {c.transactionalConsent}
-                  </span>
-                  {c.bsuid && !c.e164 && (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setRequestContact({ id: c._id, name: primary })
-                      }
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-medium text-[#0a1b33] transition-colors hover:border-slate-300"
-                    >
-                      <PhoneCall size={12} />
-                      Request phone
-                    </button>
-                  )}
                   </div>
                 </li>
                 );
@@ -418,4 +516,123 @@ export default function ContactsPage() {
 function maskPhone(value: string): string {
   if (value.length <= 7) return value;
   return `${value.slice(0, 4)}****${value.slice(-4)}`;
+}
+
+function ContactStat({
+  icon: Icon,
+  label,
+  value,
+  tone,
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: number;
+  tone: "good" | "warn" | "neutral";
+}) {
+  const toneClass =
+    tone === "good"
+      ? "border-emerald-100 bg-emerald-50 text-emerald-700"
+      : tone === "warn"
+        ? "border-amber-100 bg-amber-50 text-amber-700"
+        : "border-slate-200 bg-slate-50 text-slate-600";
+  return (
+    <div className={`rounded-xl border p-3 ${toneClass}`}>
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-xs font-semibold uppercase tracking-[0.12em] opacity-75">
+          {label}
+        </span>
+        <Icon size={15} />
+      </div>
+      <div className="mt-2 text-xl font-semibold">{value}</div>
+    </div>
+  );
+}
+
+function IdentityLine({
+  icon: Icon,
+  label,
+  value,
+  tone,
+  copy,
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: string;
+  tone: "good" | "warn" | "neutral";
+  copy?: () => void;
+}) {
+  const toneClass =
+    tone === "good"
+      ? "text-emerald-700"
+      : tone === "warn"
+        ? "text-amber-700"
+        : "text-slate-600";
+  return (
+    <div className="flex min-w-0 items-center gap-2 text-xs">
+      <Icon size={13} className={`shrink-0 ${toneClass}`} />
+      <span className="shrink-0 font-semibold text-slate-500">{label}</span>
+      <span className="min-w-0 flex-1 truncate font-medium text-[#0a1b33]">
+        {value}
+      </span>
+      {copy && (
+        <button
+          type="button"
+          onClick={copy}
+          className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-[#0a1b33]"
+          aria-label={`Copy ${label}`}
+        >
+          <Copy size={12} />
+        </button>
+      )}
+    </div>
+  );
+}
+
+function ConsentPill({
+  label,
+  status,
+  at,
+}: {
+  label: string;
+  status: "granted" | "revoked" | "unknown";
+  at?: number;
+}) {
+  const Icon =
+    status === "granted"
+      ? CheckCircle2
+      : status === "revoked"
+        ? BellOff
+        : AlertTriangle;
+  return (
+    <div className="flex items-center gap-2">
+      <span
+        className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-semibold ${CONSENT_PILL[status]}`}
+      >
+        <Icon size={11} />
+        {label}: {status}
+      </span>
+      {at && <span className="text-[10px] text-slate-400">{relativeTime(at)}</span>}
+    </div>
+  );
+}
+
+function serviceWindowLabel(expiresAt?: number) {
+  if (!expiresAt) return "no service window";
+  if (expiresAt <= Date.now()) return "service window expired";
+  return `service window ${relativeTime(expiresAt)}`;
+}
+
+function contactEvidence(contact: ContactRow) {
+  const parts: string[] = [];
+  if (contact.e164) parts.push(`phone ${contact.e164}`);
+  if (contact.bsuid) parts.push(`BSUID ${compactId(contact.bsuid)}`);
+  if (contact.parentBsuid) parts.push(`parent ${compactId(contact.parentBsuid)}`);
+  if (contact.whatsappUsername) parts.push(`@${contact.whatsappUsername}`);
+  parts.push(`added ${relativeTime(contact.createdAt)}`);
+  return parts.join(" · ");
+}
+
+function compactId(value: string) {
+  if (value.length <= 18) return value;
+  return `${value.slice(0, 10)}...${value.slice(-5)}`;
 }

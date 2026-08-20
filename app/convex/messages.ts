@@ -88,6 +88,7 @@ const STATUS_RANK: Record<string, number> = {
   sent: 4,
   delivered: 5,
   read: 6,
+  played: 7,
 };
 
 /**
@@ -103,6 +104,7 @@ export const markStatusFromWebhook = internalMutation({
       v.literal("sent"),
       v.literal("delivered"),
       v.literal("read"),
+      v.literal("played"),
       v.literal("failed"),
     ),
     failureCode: v.optional(v.string()),
@@ -141,12 +143,12 @@ export const markStatusFromWebhook = internalMutation({
       pricingType: args.pricingType ?? msg.pricingType,
     });
     await syncCampaignRecipientFromMessage(ctx, msg._id, {
-      status: args.newStatus,
+      status: args.newStatus === "played" ? "read" : args.newStatus,
       failureCode: args.failureCode,
       failureReason: args.failureReason,
     });
     if (msg.sentByCampaignId && args.newStatus === "failed") {
-      await ctx.scheduler.runAfter(0, internal.campaigns._evaluateSafetyPause, {
+      await ctx.scheduler.runAfter(1, internal.campaigns._evaluateSafetyPause, {
         campaignId: msg.sentByCampaignId,
       });
     }
@@ -301,7 +303,7 @@ export const sendText = tenantMutation({
       });
     }
 
-    await ctx.scheduler.runAfter(0, internal.messages._dispatchOne, {
+    await ctx.scheduler.runAfter(1, internal.messages._dispatchOne, {
       messageId,
     });
 
@@ -408,11 +410,11 @@ export const _markFailedFromAction = internalMutation({
     });
     const msg = await ctx.db.get(args.messageId);
     if (msg?.sentByCampaignId) {
-      await ctx.scheduler.runAfter(0, internal.campaigns._evaluateSafetyPause, {
+      await ctx.scheduler.runAfter(1, internal.campaigns._evaluateSafetyPause, {
         campaignId: msg.sentByCampaignId,
       });
       await ctx.scheduler.runAfter(
-        0,
+        1,
         internal.whatsappAccounts.openCircuitBreakerForMessageFailure,
         {
           messageId: args.messageId,
@@ -621,7 +623,7 @@ export const sendTemplate = tenantMutation({
         at: now,
       });
     }
-    await ctx.scheduler.runAfter(0, internal.messages._dispatchOne, {
+    await ctx.scheduler.runAfter(1, internal.messages._dispatchOne, {
       messageId,
     });
     return messageId;
@@ -681,10 +683,18 @@ export const _dispatchOne = internalAction({
       return null;
     }
 
-    // Prefer BSUID over phone: it's the only identifier guaranteed to keep
-    // working once the user adopts a WhatsApp username (Meta June-2026 GA).
+    // Prefer BSUID for marketing/utility because it survives WhatsApp
+    // usernames. Authentication templates are the exception: OTP-style
+    // flows still need a phone identity, so fail early with a useful reason.
     const recipient: import("./lib/meta/graph").WhatsAppRecipient | null =
-      payload.contactBsuid
+      payload.pricingCategory === "authentication"
+        ? payload.contactE164
+          ? {
+              kind: "phone",
+              e164WithoutPlus: payload.contactE164.replace(/^\+/, ""),
+            }
+          : null
+        : payload.contactBsuid
         ? { kind: "bsuid", bsuid: payload.contactBsuid }
         : payload.contactE164
           ? {
@@ -695,7 +705,10 @@ export const _dispatchOne = internalAction({
     if (!recipient) {
       await ctx.runMutation(internal.messages._markFailedFromAction, {
         messageId: args.messageId,
-        failureReason: "contact has neither phone nor bsuid",
+        failureReason:
+          payload.pricingCategory === "authentication"
+            ? "authentication template requires phone identity"
+            : "contact has neither phone nor bsuid",
       });
       return null;
     }
@@ -795,6 +808,7 @@ async function syncCampaignRecipientFromMessage(
     db: {
       query: any;
       patch: any;
+      insert: any;
     };
   },
   messageId: Id<"messages">,
@@ -815,17 +829,38 @@ async function syncCampaignRecipientFromMessage(
     .withIndex("by_message", (q: any) => q.eq("messageId", messageId))
     .unique();
   if (!recipient) return;
+  const now = Date.now();
+  const metaErrorCategory =
+    patch.status === "failed"
+      ? classifyMetaFailure({
+          code: patch.failureCode ?? recipient.failureCode,
+          reason: patch.failureReason ?? recipient.failureReason,
+        })
+      : recipient.metaErrorCategory;
   await ctx.db.patch(recipient._id, {
     status: patch.status,
     failureCode: patch.failureCode ?? recipient.failureCode,
     failureReason: patch.failureReason ?? recipient.failureReason,
-    metaErrorCategory:
-      patch.status === "failed"
-        ? classifyMetaFailure({
-            code: patch.failureCode ?? recipient.failureCode,
-            reason: patch.failureReason ?? recipient.failureReason,
-          })
-        : recipient.metaErrorCategory,
-    updatedAt: Date.now(),
+    metaErrorCategory,
+    updatedAt: now,
   });
+  if (recipient.status !== patch.status) {
+    await ctx.db.insert("campaignEvents", {
+      tenantId: recipient.tenantId,
+      campaignId: recipient.campaignId,
+      campaignRecipientId: recipient._id,
+      type: `campaign.recipient.${patch.status}`,
+      messageId,
+      payload:
+        patch.status === "failed"
+          ? {
+              previousStatus: recipient.status,
+              failureCode: patch.failureCode ?? recipient.failureCode,
+              failureReason: patch.failureReason ?? recipient.failureReason,
+              metaErrorCategory,
+            }
+          : { previousStatus: recipient.status },
+      createdAt: now,
+    });
+  }
 }

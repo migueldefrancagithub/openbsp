@@ -66,7 +66,8 @@ const messageTypeValidator = v.union(
   v.literal("system"),
 );
 
-// queued < dispatching < unknown < failed; sent < delivered < read (terminal lanes).
+// queued < dispatching < unknown < failed; sent < delivered < read < played
+// (played is Meta's voice-message playback status).
 const messageStatusValidator = v.union(
   v.literal("queued"),
   v.literal("dispatching"),
@@ -74,6 +75,7 @@ const messageStatusValidator = v.union(
   v.literal("sent"),
   v.literal("delivered"),
   v.literal("read"),
+  v.literal("played"),
   v.literal("failed"),
 );
 
@@ -286,6 +288,41 @@ const chatbotFlowNodeValidator = v.object({
   ),
 });
 
+const neutralChannelKindValidator = v.union(
+  v.literal("whatsapp"),
+  v.literal("instagram"),
+  v.literal("messenger"),
+);
+
+const neutralChannelProviderValidator = v.union(
+  v.literal("meta_graph"),
+  v.literal("lab_bridge"),
+);
+
+const neutralChannelStatusValidator = v.union(
+  v.literal("pending"),
+  v.literal("active"),
+  v.literal("degraded"),
+  v.literal("revoked"),
+  v.literal("disconnected"),
+);
+
+const neutralEventStatusValidator = v.union(
+  v.literal("pending"),
+  v.literal("processed"),
+  v.literal("failed"),
+);
+
+const neutralOutboxStatusValidator = v.union(
+  v.literal("queued"),
+  v.literal("dispatching"),
+  v.literal("accepted"),
+  v.literal("delivered"),
+  v.literal("read"),
+  v.literal("failed"),
+  v.literal("unknown"),
+);
+
 // ---------- Schema ----------
 
 export default defineSchema({
@@ -362,6 +399,143 @@ export default defineSchema({
     rotatedAt: v.optional(v.number()),
   }).index("by_app_id", ["metaAppId"]),
 
+  // ===== Channel-neutral core =====
+  // Provider-specific code lives in adapters. These records own tenant,
+  // lifecycle, allowlist and idempotency contracts only.
+  channels: defineTable({
+    tenantId: v.id("tenants"),
+    publicId: v.string(),
+    kind: neutralChannelKindValidator,
+    provider: neutralChannelProviderValidator,
+    externalAccountId: v.string(),
+    displayName: v.string(),
+    status: neutralChannelStatusValidator,
+    sendMode: v.union(
+      v.literal("disabled"),
+      v.literal("allowlist"),
+      v.literal("live"),
+    ),
+    outboundAllowlist: v.array(v.string()),
+    lastHealthStatus: v.optional(v.string()),
+    lastHealthDetail: v.optional(v.string()),
+    lastHealthCheckAt: v.optional(v.number()),
+    createdBy: v.id("members"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_public_id", ["publicId"])
+    .index("by_tenant", ["tenantId"])
+    .index("by_provider_identity", [
+      "provider",
+      "kind",
+      "externalAccountId",
+    ])
+    .index("by_tenant_identity", [
+      "tenantId",
+      "kind",
+      "externalAccountId",
+    ]),
+
+  channelSecrets: defineTable({
+    tenantId: v.id("tenants"),
+    channelId: v.id("channels"),
+    accessTokenCiphertext: v.string(),
+    accessTokenKeyVersion: v.number(),
+    webhookSecretCiphertext: v.string(),
+    webhookSecretKeyVersion: v.number(),
+    encryptedAt: v.number(),
+  })
+    .index("by_channel", ["channelId"])
+    .index("by_tenant", ["tenantId"]),
+
+  channelIdentities: defineTable({
+    tenantId: v.id("tenants"),
+    channelId: v.id("channels"),
+    providerScopedId: v.string(),
+    displayName: v.optional(v.string()),
+    username: v.optional(v.string()),
+    phone: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_channel_identity", ["channelId", "providerScopedId"])
+    .index("by_tenant", ["tenantId"]),
+
+  channelEvents: defineTable({
+    tenantId: v.id("tenants"),
+    channelId: v.id("channels"),
+    eventKey: v.string(),
+    providerEventId: v.optional(v.string()),
+    eventKind: v.string(),
+    direction: v.union(v.literal("incoming"), v.literal("outgoing")),
+    actorProviderScopedId: v.optional(v.string()),
+    threadKey: v.optional(v.string()),
+    payload: v.any(),
+    rawPayload: v.string(),
+    rawBodySha256: v.string(),
+    providerTimestamp: v.optional(v.number()),
+    status: neutralEventStatusValidator,
+    attempts: v.number(),
+    lastError: v.optional(v.string()),
+    receivedAt: v.number(),
+    processedAt: v.optional(v.number()),
+  })
+    .index("by_channel_key", ["channelId", "eventKey"])
+    .index("by_channel_received", ["channelId", "receivedAt"])
+    .index("by_channel_thread", ["channelId", "threadKey", "receivedAt"])
+    .index("by_tenant_received", ["tenantId", "receivedAt"]),
+
+  channelOutbox: defineTable({
+    tenantId: v.id("tenants"),
+    channelId: v.id("channels"),
+    businessKey: v.string(),
+    recipient: v.string(),
+    messageKind: v.union(
+      v.literal("text"),
+      v.literal("template"),
+      v.literal("interactive"),
+    ),
+    payload: v.any(),
+    status: neutralOutboxStatusValidator,
+    providerMessageId: v.optional(v.string()),
+    failureReason: v.optional(v.string()),
+    dispatchAttempts: v.number(),
+    claimedAt: v.optional(v.number()),
+    unknownSince: v.optional(v.number()),
+    createdBy: v.id("members"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_channel_business_key", ["channelId", "businessKey"])
+    .index("by_channel_created", ["channelId", "createdAt"])
+    .index("by_channel_provider_message", ["channelId", "providerMessageId"])
+    .index("by_tenant_created", ["tenantId", "createdAt"]),
+
+  /**
+   * Channel-neutral thread projection derived from channelEvents. This is the
+   * read surface for the multichannel inbox. It is deliberately separate from
+   * the legacy conversations table, which is bound to phoneNumbers and cannot
+   * represent a non-WhatsApp channel.
+   */
+  channelThreads: defineTable({
+    tenantId: v.id("tenants"),
+    channelId: v.id("channels"),
+    threadKey: v.string(),
+    identityId: v.optional(v.id("channelIdentities")),
+    lastEventAt: v.number(),
+    lastEventKind: v.string(),
+    lastInboundAt: v.optional(v.number()),
+    lastOutboundAt: v.optional(v.number()),
+    lastPreview: v.optional(v.string()),
+    unreadCount: v.number(),
+    serviceWindowExpiresAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_channel_thread", ["channelId", "threadKey"])
+    .index("by_channel_last_event", ["channelId", "lastEventAt"])
+    .index("by_tenant_last_event", ["tenantId", "lastEventAt"]),
+
   // ===== WhatsApp connections =====
   whatsappAccounts: defineTable({
     tenantId: v.id("tenants"),
@@ -398,6 +572,10 @@ export default defineSchema({
     accountUpdateEvent: v.optional(v.string()),
     banState: v.optional(v.string()),
     accountRestrictions: v.optional(v.any()),
+    lastDisconnectionReason: v.optional(v.string()),
+    lastDisconnectionInitiatedBy: v.optional(v.string()),
+    lastDisconnectedAt: v.optional(v.number()),
+    lastReconnectedAt: v.optional(v.number()),
     createdAt: v.number(),
   })
     .index("by_waba", ["wabaId"])
@@ -536,6 +714,11 @@ export default defineSchema({
       "tenantId",
       "phoneNumberId",
       "contactId",
+    ])
+    .index("by_tenant_contact_lastmsg", [
+      "tenantId",
+      "contactId",
+      "lastMessageAt",
     ])
     .index("by_tenant_lastmsg", ["tenantId", "lastMessageAt"]),
 
@@ -858,6 +1041,7 @@ export default defineSchema({
   embeddedSignupSessions: defineTable({
     tenantId: v.id("tenants"),
     createdBy: v.id("members"),
+    launchTokenId: v.optional(v.id("embeddedSignupLaunchTokens")),
     state: v.string(),
     status: v.union(
       v.literal("created"),
@@ -878,6 +1062,21 @@ export default defineSchema({
   })
     .index("by_tenant", ["tenantId"])
     .index("by_state", ["state"]),
+
+  embeddedSignupLaunchTokens: defineTable({
+    tenantId: v.id("tenants"),
+    createdBy: v.id("members"),
+    label: v.optional(v.string()),
+    tokenHash: v.string(),
+    status: v.union(v.literal("active"), v.literal("revoked")),
+    createdAt: v.number(),
+    expiresAt: v.number(),
+    starts: v.number(),
+    lastStartedAt: v.optional(v.number()),
+    lastSessionId: v.optional(v.id("embeddedSignupSessions")),
+  })
+    .index("by_tenant", ["tenantId"])
+    .index("by_token_hash", ["tokenHash"]),
 
   metaAdmissionChecks: defineTable({
     tenantId: v.id("tenants"),

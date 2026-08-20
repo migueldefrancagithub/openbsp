@@ -4,7 +4,9 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useQuery, useAction } from "convex/react";
 import {
+  AlertTriangle,
   CheckCircle2,
+  Clock3,
   Eye,
   FileText,
   FilterX,
@@ -13,6 +15,7 @@ import {
   Plus,
   RefreshCw,
   Search,
+  XCircle,
 } from "lucide-react";
 import { PageHeader } from "@/components/app/EmptyState";
 import { api } from "../../../../convex/_generated/api";
@@ -49,6 +52,17 @@ export default function TemplatesPage() {
       return matchesQuery && matchesCategory && matchesStatus;
     });
   }, [templates, query, category, status]);
+  const templateStats = useMemo(() => {
+    const rows = templates ?? [];
+    return {
+      approved: rows.filter((template) => template.status === "approved").length,
+      pending: rows.filter((template) => template.status === "pending").length,
+      blocked: rows.filter((template) =>
+        ["rejected", "paused", "disabled"].includes(template.status),
+      ).length,
+      withVariables: rows.filter((template) => template.parameterCount > 0).length,
+    };
+  }, [templates]);
 
   async function onSync() {
     setSyncing(true);
@@ -116,6 +130,32 @@ export default function TemplatesPage() {
         ) : (
           <>
             <section className="rounded-2xl border border-slate-200 bg-white p-4">
+              <div className="mb-4 grid gap-3 md:grid-cols-4">
+                <TemplateStat
+                  icon={CheckCircle2}
+                  label="Approved"
+                  value={templateStats.approved}
+                  tone="good"
+                />
+                <TemplateStat
+                  icon={Clock3}
+                  label="Pending Meta"
+                  value={templateStats.pending}
+                  tone="warn"
+                />
+                <TemplateStat
+                  icon={XCircle}
+                  label="Blocked"
+                  value={templateStats.blocked}
+                  tone="bad"
+                />
+                <TemplateStat
+                  icon={FileText}
+                  label="With variables"
+                  value={templateStats.withVariables}
+                  tone="neutral"
+                />
+              </div>
               <div className="grid gap-3 lg:grid-cols-[1fr_220px_220px_auto]">
                 <label className="relative block">
                   <Search
@@ -195,7 +235,21 @@ export default function TemplatesPage() {
                       <div className="mt-1 text-[12px] text-slate-500 capitalize">
                         {t.language} · v{t.currentVersion}
                         {t.syncedAt && ` · synced ${relativeTime(t.syncedAt)}`}
+                        {t.parameterCount > 0 &&
+                          ` · ${t.parameterCount} variable${t.parameterCount === 1 ? "" : "s"}`}
                       </div>
+                      {templateReadiness(t.status, t.rejectionReason) && (
+                        <div
+                          className={`mt-2 inline-flex max-w-full items-start gap-2 rounded-lg border px-2.5 py-1.5 text-[12px] ${templateReadinessClass(
+                            t.status,
+                          )}`}
+                        >
+                          {templateReadinessIcon(t.status)}
+                          <span className="min-w-0 truncate">
+                            {templateReadiness(t.status, t.rejectionReason)}
+                          </span>
+                        </div>
+                      )}
                     </div>
                     <div className="flex flex-wrap items-center gap-2 lg:justify-end">
                       <Link
@@ -236,4 +290,64 @@ export default function TemplatesPage() {
       </div>
     </>
   );
+}
+
+function TemplateStat({
+  icon: Icon,
+  label,
+  value,
+  tone,
+}: {
+  icon: typeof CheckCircle2;
+  label: string;
+  value: number;
+  tone: "good" | "warn" | "bad" | "neutral";
+}) {
+  const toneClass =
+    tone === "good"
+      ? "border-emerald-100 bg-emerald-50 text-emerald-700"
+      : tone === "warn"
+        ? "border-amber-100 bg-amber-50 text-amber-700"
+        : tone === "bad"
+          ? "border-red-100 bg-red-50 text-red-700"
+          : "border-slate-200 bg-slate-50 text-slate-600";
+  return (
+    <div className={`rounded-xl border p-3 ${toneClass}`}>
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-xs font-semibold uppercase tracking-[0.12em] opacity-75">
+          {label}
+        </span>
+        <Icon size={15} />
+      </div>
+      <div className="mt-2 text-xl font-semibold">{value}</div>
+    </div>
+  );
+}
+
+function templateReadiness(status: string, reason?: string) {
+  if (status === "approved") return "Ready for campaigns and service-window sends.";
+  if (status === "pending") return "Waiting for Meta review. Do not use in launches yet.";
+  if (status === "rejected") {
+    return reason ? `Rejected: ${reason}` : "Rejected by Meta. Fix copy and submit a new version.";
+  }
+  if (status === "paused") return "Paused by Meta. Avoid campaigns until quality recovers.";
+  if (status === "disabled") return "Disabled by Meta. Remove from campaign flows.";
+  if (status === "draft") return "Draft only. Submit to Meta before using outside 24h windows.";
+  return "";
+}
+
+function templateReadinessClass(status: string) {
+  if (status === "approved") return "border-emerald-100 bg-emerald-50 text-emerald-700";
+  if (status === "pending" || status === "draft") {
+    return "border-amber-100 bg-amber-50 text-amber-800";
+  }
+  return "border-red-100 bg-red-50 text-red-700";
+}
+
+function templateReadinessIcon(status: string) {
+  if (status === "approved") return <CheckCircle2 size={14} className="mt-0.5 shrink-0" />;
+  if (status === "pending" || status === "draft") {
+    return <AlertTriangle size={14} className="mt-0.5 shrink-0" />;
+  }
+  return <XCircle size={14} className="mt-0.5 shrink-0" />;
 }
