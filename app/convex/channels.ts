@@ -1,11 +1,39 @@
 import { ConvexError, v } from "convex/values";
+import type { Doc } from "./_generated/dataModel";
+import type { QueryCtx } from "./_generated/server";
 import { tenantMutation, tenantQuery } from "./lib/customFunctions";
+
+const MESSAGE_EVENT_KIND_START = "message.";
+const MESSAGE_EVENT_KIND_END = "message/";
+// Bounded scan: skip legacy status-only projections without unbounded reads.
+const THREAD_LIST_PAGE_SIZE = 100;
+const THREAD_LIST_MAX_PAGES = 10;
 
 const sendModeValidator = v.union(
   v.literal("disabled"),
   v.literal("allowlist"),
   v.literal("live"),
 );
+
+async function threadHasMessageEvent(
+  ctx: QueryCtx,
+  thread: Doc<"channelThreads">,
+): Promise<boolean> {
+  if (thread.lastEventKind.startsWith(MESSAGE_EVENT_KIND_START)) {
+    return true;
+  }
+  const messageEvent = await ctx.db
+    .query("channelEvents")
+    .withIndex("by_channel_thread_kind", (q) =>
+      q
+        .eq("channelId", thread.channelId)
+        .eq("threadKey", thread.threadKey)
+        .gte("eventKind", MESSAGE_EVENT_KIND_START)
+        .lt("eventKind", MESSAGE_EVENT_KIND_END),
+    )
+    .first();
+  return messageEvent !== null;
+}
 
 export const list = tenantQuery({
   args: {},
@@ -169,13 +197,31 @@ export const listThreads = tenantQuery({
       throw new ConvexError({ code: "CHANNEL_NOT_FOUND" });
     }
     const limit = Math.min(Math.max(args.limit ?? 50, 1), 200);
-    const rows = await ctx.db
-      .query("channelThreads")
-      .withIndex("by_channel_last_event", (q) =>
-        q.eq("channelId", args.channelId),
-      )
-      .order("desc")
-      .take(limit);
+    const rows: Doc<"channelThreads">[] = [];
+    let cursor: string | null = null;
+    let pagesRead = 0;
+
+    while (rows.length < limit && pagesRead < THREAD_LIST_MAX_PAGES) {
+      const page = await ctx.db
+        .query("channelThreads")
+        .withIndex("by_channel_last_event", (q) =>
+          q.eq("channelId", args.channelId),
+        )
+        .order("desc")
+        .paginate({ cursor, numItems: THREAD_LIST_PAGE_SIZE });
+
+      pagesRead += 1;
+      for (const row of page.page) {
+        if (await threadHasMessageEvent(ctx, row)) {
+          rows.push(row);
+          if (rows.length >= limit) break;
+        }
+      }
+
+      if (page.isDone) break;
+      cursor = page.continueCursor;
+    }
+
     return await Promise.all(
       rows.map(async (row) => {
         const identity = row.identityId
@@ -278,6 +324,7 @@ export const getThread = tenantQuery({
       )
       .unique();
     if (!thread) return null;
+    if (!(await threadHasMessageEvent(ctx, thread))) return null;
     const identity = thread.identityId
       ? await ctx.db.get(thread.identityId)
       : null;

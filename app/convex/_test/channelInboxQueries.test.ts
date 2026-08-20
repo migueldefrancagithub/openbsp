@@ -96,6 +96,70 @@ async function inbound(
   });
 }
 
+async function insertLegacyThreadProjection(
+  t: ReturnType<typeof convexTest>,
+  args: {
+    tenantId: Id<"tenants">;
+    channelId: Id<"channels">;
+    threadKey: string;
+    hasMessageEvent: boolean;
+    lastEventAt?: number;
+  },
+) {
+  await t.run(async (ctx) => {
+    const now = args.lastEventAt ?? Date.now();
+    if (args.hasMessageEvent) {
+      await ctx.db.insert("channelEvents", {
+        tenantId: args.tenantId,
+        channelId: args.channelId,
+        eventKey: `message:legacy:${args.threadKey}`,
+        providerEventId: `wamid.LEGACY.${args.threadKey}`,
+        eventKind: "message.text",
+        direction: "incoming",
+        actorProviderScopedId: args.threadKey,
+        threadKey: args.threadKey,
+        payload: { normalizedText: "Mensagem antiga" },
+        rawPayload: '{"messages":[{"id":"legacy"}]}',
+        rawBodySha256: `sha-legacy-message-${args.threadKey}`,
+        providerTimestamp: now - 1_000,
+        status: "processed",
+        attempts: 1,
+        receivedAt: now - 1_000,
+        processedAt: now - 1_000,
+      });
+    }
+    await ctx.db.insert("channelEvents", {
+      tenantId: args.tenantId,
+      channelId: args.channelId,
+      eventKey: `status:legacy:${args.threadKey}:delivered`,
+      providerEventId: `wamid.STATUS.${args.threadKey}`,
+      eventKind: "status.delivered",
+      direction: "outgoing",
+      actorProviderScopedId: args.threadKey,
+      threadKey: args.threadKey,
+      payload: { status: { id: `wamid.STATUS.${args.threadKey}` } },
+      rawPayload: '{"statuses":[{"status":"delivered"}]}',
+      rawBodySha256: `sha-legacy-status-${args.threadKey}`,
+      providerTimestamp: now,
+      status: "processed",
+      attempts: 1,
+      receivedAt: now,
+      processedAt: now,
+    });
+    await ctx.db.insert("channelThreads", {
+      tenantId: args.tenantId,
+      channelId: args.channelId,
+      threadKey: args.threadKey,
+      lastEventAt: now,
+      lastEventKind: "status.delivered",
+      lastOutboundAt: now,
+      unreadCount: 0,
+      createdAt: now,
+      updatedAt: now,
+    });
+  });
+}
+
 describe("channel inbox queries", () => {
   it("zeroes only the opened thread's unread count (AC-4)", async () => {
     const t = convexTest(schema);
@@ -154,6 +218,86 @@ describe("channel inbox queries", () => {
       .withIdentity({ subject: owner.userId })
       .query(api.channels.getThread, { channelId, threadKey: "258000000000" });
     expect(thread).toBeNull();
+  });
+
+  it("hides a legacy status-only projection without deleting audit evidence", async () => {
+    const t = convexTest(schema);
+    const owner = await seedTenant(t, "OpenBSP Lab");
+    const { channelId } = await seedChannel(t, owner);
+    await insertLegacyThreadProjection(t, {
+      tenantId: owner.tenantId,
+      channelId,
+      threadKey: ALLOWED,
+      hasMessageEvent: false,
+    });
+
+    const as = t.withIdentity({ subject: owner.userId });
+    expect(await as.query(api.channels.listThreads, { channelId })).toEqual([]);
+    expect(
+      await as.query(api.channels.getThread, { channelId, threadKey: ALLOWED }),
+    ).toBeNull();
+
+    const stored = await t.run(async (ctx) => ({
+      events: await ctx.db.query("channelEvents").collect(),
+      threads: await ctx.db.query("channelThreads").collect(),
+      outbox: await ctx.db.query("channelOutbox").collect(),
+    }));
+    expect(stored.events).toHaveLength(1);
+    expect(stored.threads).toHaveLength(1);
+    expect(stored.outbox).toHaveLength(0);
+  });
+
+  it("keeps a legacy thread visible when any message event exists", async () => {
+    const t = convexTest(schema);
+    const owner = await seedTenant(t, "OpenBSP Lab");
+    const { channelId } = await seedChannel(t, owner);
+    await insertLegacyThreadProjection(t, {
+      tenantId: owner.tenantId,
+      channelId,
+      threadKey: ALLOWED,
+      hasMessageEvent: true,
+    });
+
+    const as = t.withIdentity({ subject: owner.userId });
+    const threads = await as.query(api.channels.listThreads, { channelId });
+    expect(threads).toHaveLength(1);
+    expect(threads[0]).toMatchObject({
+      threadKey: ALLOWED,
+      lastEventKind: "status.delivered",
+    });
+    await expect(
+      as.query(api.channels.getThread, { channelId, threadKey: ALLOWED }),
+    ).resolves.toMatchObject({ threadKey: ALLOWED });
+  });
+
+  it("paginates past recent status-only projections to fill the requested limit", async () => {
+    const t = convexTest(schema);
+    const owner = await seedTenant(t, "OpenBSP Lab");
+    const { channelId } = await seedChannel(t, owner);
+    const base = Date.now();
+    await insertLegacyThreadProjection(t, {
+      tenantId: owner.tenantId,
+      channelId,
+      threadKey: ALLOWED,
+      hasMessageEvent: true,
+      lastEventAt: base,
+    });
+
+    for (let i = 0; i < 101; i += 1) {
+      await insertLegacyThreadProjection(t, {
+        tenantId: owner.tenantId,
+        channelId,
+        threadKey: `${STRANGER}-${i}`,
+        hasMessageEvent: false,
+        lastEventAt: base + 1_000 + i,
+      });
+    }
+
+    const threads = await t
+      .withIdentity({ subject: owner.userId })
+      .query(api.channels.listThreads, { channelId, limit: 1 });
+    expect(threads).toHaveLength(1);
+    expect(threads[0].threadKey).toBe(ALLOWED);
   });
 
   it("refuses cross-tenant access on both new functions (AC-5)", async () => {
