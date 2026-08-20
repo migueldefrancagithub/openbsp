@@ -483,6 +483,7 @@ export default defineSchema({
     .index("by_channel_key", ["channelId", "eventKey"])
     .index("by_channel_received", ["channelId", "receivedAt"])
     .index("by_channel_thread", ["channelId", "threadKey", "receivedAt"])
+    .index("by_channel_thread_kind", ["channelId", "threadKey", "eventKind"])
     .index("by_tenant_received", ["tenantId", "receivedAt"]),
 
   channelOutbox: defineTable({
