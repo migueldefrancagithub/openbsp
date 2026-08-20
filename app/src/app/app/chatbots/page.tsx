@@ -232,9 +232,9 @@ export default function ChatbotsPage() {
     Id<"chatbotFolders"> | ""
   >("");
   const [triggerKind, setTriggerKind] = useState<TriggerKind>("ctwa");
-  const [templateSlug, setTemplateSlug] = useState<FlowTemplate["slug"]>(
-    "clinic_lead_capture",
-  );
+  const [templateSlug, setTemplateSlug] = useState<
+    FlowTemplate["slug"] | ""
+  >("clinic_lead_capture");
   const [studioTab, setStudioTab] = useState<StudioTab>("flows");
   const [selectedBotId, setSelectedBotId] = useState<Id<"chatbots"> | "">("");
   const [flowEntryNodeKey, setFlowEntryNodeKey] = useState("");
@@ -315,7 +315,7 @@ export default function ChatbotsPage() {
         folderId: selectedFolderId || undefined,
         triggerKind: template?.triggerKind ?? triggerKind,
         model: "CXCast guardrail bot",
-        templateSlug,
+        templateSlug: templateSlug || undefined,
       });
       setBotName("");
       setBotDescription("");
@@ -722,7 +722,7 @@ export default function ChatbotsPage() {
                     label="Starter flow"
                     value={templateSlug}
                     onChange={(value) =>
-                      setTemplateSlug(value as FlowTemplate["slug"])
+                      setTemplateSlug(value as FlowTemplate["slug"] | "")
                     }
                     options={templates.map((template) => ({
                       value: template.slug,

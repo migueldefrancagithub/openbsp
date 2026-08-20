@@ -21,6 +21,8 @@ const qualityRiskValidator = v.union(
   v.literal("high"),
 );
 
+const MAX_ANALYTICS_ROWS = 2_500;
+
 const reportRowValidator = v.object({
   bucketStart: v.number(),
   bucketLabel: v.string(),
@@ -108,7 +110,16 @@ export const reports = tenantQuery({
           .gte("createdAt", dateFrom)
           .lt("createdAt", dateTo),
       )
-      .collect();
+      .take(MAX_ANALYTICS_ROWS);
+    const channelEvents = await ctx.db
+      .query("channelEvents")
+      .withIndex("by_tenant_received", (q) =>
+        q
+          .eq("tenantId", ctx.tenantId)
+          .gte("receivedAt", dateFrom)
+          .lt("receivedAt", dateTo),
+      )
+      .take(MAX_ANALYTICS_ROWS);
 
     const conversationCache = new Map<
       Id<"conversations">,
@@ -169,6 +180,44 @@ export const reports = tenantQuery({
       );
     }
 
+    for (const event of collapseChannelLifecycleEvents(channelEvents)) {
+      const status = event.eventKind.slice("status.".length);
+      if (!isReportableStatus(status)) continue;
+
+      const timestamp = event.providerTimestamp ?? event.receivedAt;
+      const category: PricingCategory = "service";
+      const country = inferCountryFromIdentity(event.threadKey);
+      const bucketStart = bucketTimestamp(timestamp, granularity);
+      const bucketLabel = formatBucket(bucketStart, granularity);
+      const counters = statusCounters(status);
+      const failureSignal =
+        status === "failed" ? event.lastError ?? "channel delivery failed" : "";
+
+      upsertSeries(series, bucketStart, bucketLabel, counters, 0, costCurrency);
+      upsertDetail(
+        details,
+        { bucketStart, bucketLabel, category, country },
+        counters,
+        0,
+        costCurrency,
+        failureSignal,
+      );
+      upsertBreakdown(
+        categoryBreakdown,
+        category,
+        counters,
+        0,
+        costCurrency,
+      );
+      upsertBreakdown(
+        countryBreakdown,
+        country,
+        counters,
+        0,
+        costCurrency,
+      );
+    }
+
     const summary = summarize([...series.values()], costCurrency);
     const detailRows = [...details.values()]
       .map(finalizeDetail)
@@ -208,6 +257,7 @@ type PricingCategory = "marketing" | "utility" | "authentication" | "service";
 type RetrySafety = "safe" | "review" | "unsafe";
 type QualityRisk = "low" | "watch" | "high";
 type Counters = { sent: number; delivered: number; failed: number };
+type ChannelLifecycleEvent = Doc<"channelEvents">;
 type SeriesRow = Counters & {
   bucketStart: number;
   bucketLabel: string;
@@ -433,6 +483,67 @@ function inferCountry(contact: Doc<"contacts"> | null): string {
   if (e164?.startsWith("+1")) return "US";
   const bsuidCountry = contact?.bsuid?.split(".")[0];
   return bsuidCountry && bsuidCountry.length <= 3 ? bsuidCountry : "Unknown";
+}
+
+function inferCountryFromIdentity(identity?: string): string {
+  const digits = identity?.replace(/\D/g, "") ?? "";
+  if (digits.startsWith("258")) return "MZ";
+  if (digits.startsWith("351")) return "PT";
+  if (digits.startsWith("55")) return "BR";
+  if (digits.startsWith("244")) return "AO";
+  if (digits.startsWith("27")) return "ZA";
+  if (digits.startsWith("44")) return "GB";
+  if (digits.startsWith("1")) return "US";
+  return "Unknown";
+}
+
+function collapseChannelLifecycleEvents(
+  events: ChannelLifecycleEvent[],
+): ChannelLifecycleEvent[] {
+  const latestByMessage = new Map<string, ChannelLifecycleEvent>();
+  for (const event of events) {
+    if (
+      event.direction !== "outgoing" ||
+      !event.eventKind.startsWith("status.")
+    ) {
+      continue;
+    }
+    const key = event.providerEventId ?? event.eventKey;
+    const existing = latestByMessage.get(key);
+    if (!existing || channelEventIsLater(event, existing)) {
+      latestByMessage.set(key, event);
+    }
+  }
+  return [...latestByMessage.values()];
+}
+
+function channelEventIsLater(
+  candidate: ChannelLifecycleEvent,
+  existing: ChannelLifecycleEvent,
+): boolean {
+  const candidateAt = candidate.providerTimestamp ?? candidate.receivedAt;
+  const existingAt = existing.providerTimestamp ?? existing.receivedAt;
+  if (candidateAt !== existingAt) return candidateAt > existingAt;
+  return (
+    channelStatusRank(candidate.eventKind) >
+    channelStatusRank(existing.eventKind)
+  );
+}
+
+function channelStatusRank(eventKind: string): number {
+  switch (eventKind) {
+    case "status.sent":
+      return 1;
+    case "status.delivered":
+      return 2;
+    case "status.read":
+    case "status.played":
+      return 3;
+    case "status.failed":
+      return 4;
+    default:
+      return 0;
+  }
 }
 
 function retrySafety(failed: number, signals: string[]): RetrySafety {
