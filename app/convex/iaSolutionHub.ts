@@ -1524,6 +1524,7 @@ async function dispatch(
     payload: unknown;
     replyToProviderMessageId?: string;
     flowContext?: { flowId: string; flowToken: string };
+    origin?: "human" | "automation";
     sender: (
       token: string,
       recipient: string,
@@ -1533,6 +1534,13 @@ async function dispatch(
   const nonce = args.clientNonce.trim();
   if (!nonce || nonce.length > 120) {
     throw new ConvexError({ code: "INVALID_CLIENT_NONCE" });
+  }
+  if (args.origin !== "automation") {
+    await ctx.runMutation(internal.channelAutomation.pauseForHuman, {
+      tenantId: args.caller.tenantId,
+      channelId: args.channelId,
+      threadKey: args.threadKey,
+    });
   }
   await ctx.runMutation(internal.iaSolutionHub._consumeRateLimit, {
     tenantId: args.caller.tenantId,
@@ -1604,6 +1612,158 @@ const dispatchReturnValidator = v.object({
   outboxId: v.id("channelOutbox"),
   status: v.string(),
   providerMessageId: v.optional(v.string()),
+});
+
+/**
+ * Durable server-only bridge from the neutral chatbot runtime to the exact
+ * same guarded outbox used by human sends. No client can choose a recipient,
+ * tenant, token, or provider through this action.
+ */
+export const dispatchAutomationMessage = internalAction({
+  args: { dispatchId: v.id("channelAutomationDispatches") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const target = (await ctx.runQuery(
+      internal.channelAutomation.loadDispatch,
+      args,
+    )) as {
+      dispatchId: Id<"channelAutomationDispatches">;
+      tenantId: Id<"tenants">;
+      memberId: Id<"members">;
+      channelId: Id<"channels">;
+      threadKey: string;
+      businessKey: string;
+      messageKind: "text" | "template" | "interactive";
+      payload: unknown;
+      replyToProviderMessageId?: string;
+    } | null;
+    if (!target) {
+      await ctx.runMutation(internal.channelAutomation.settleDispatch, {
+        dispatchId: args.dispatchId,
+        status: "failed",
+        failureReason: "Automation dispatch is no longer authorized.",
+      });
+      return null;
+    }
+    try {
+      const payload = asObject(target.payload);
+      if (!payload) throw new Error("Invalid automation payload.");
+      let result: DispatchResult;
+      if (target.messageKind === "text") {
+        const text = nonEmptyString(payload.text);
+        if (!text || text.length > 4_096) throw new Error("Invalid automation text.");
+        result = await dispatch(ctx, {
+          caller: {
+            tenantId: target.tenantId,
+            memberId: target.memberId,
+            role: "automation",
+          },
+          channelId: target.channelId,
+          threadKey: target.threadKey,
+          clientNonce: target.businessKey,
+          messageKind: "text",
+          payload: { text, previewUrl: false },
+          replyToProviderMessageId: target.replyToProviderMessageId,
+          origin: "automation",
+          sender: async (token, recipient) =>
+            await sendTextViaHub({
+              token,
+              to: recipient,
+              text,
+              previewUrl: false,
+              contextMessageId: target.replyToProviderMessageId,
+            }),
+        });
+      } else if (target.messageKind === "template") {
+        const templateName = nonEmptyString(payload.templateName);
+        const languageCode = nonEmptyString(payload.languageCode);
+        const bodyVariables = Array.isArray(payload.bodyVariables)
+          ? payload.bodyVariables.filter((value): value is string => typeof value === "string")
+          : [];
+        if (!templateName || !languageCode) {
+          throw new Error("Invalid automation template.");
+        }
+        result = await dispatch(ctx, {
+          caller: {
+            tenantId: target.tenantId,
+            memberId: target.memberId,
+            role: "automation",
+          },
+          channelId: target.channelId,
+          threadKey: target.threadKey,
+          clientNonce: target.businessKey,
+          messageKind: "template",
+          payload: { templateName, languageCode, bodyVariables },
+          origin: "automation",
+          sender: async (token, recipient) =>
+            await sendTemplateViaHub({
+              token,
+              to: recipient,
+              templateName,
+              languageCode,
+              bodyVariables,
+            }),
+        });
+      } else {
+        const interactive = asObject(payload.interactive);
+        if (
+          !interactive ||
+          !["button", "list"].includes(String(interactive.type)) ||
+          interactive.context !== undefined ||
+          JSON.stringify(interactive).length > 32_000
+        ) {
+          throw new Error("Invalid automation interactive payload.");
+        }
+        const providerInteractive = {
+          ...interactive,
+          ...(target.replyToProviderMessageId
+            ? { context: { message_id: target.replyToProviderMessageId } }
+            : {}),
+        };
+        result = await dispatch(ctx, {
+          caller: {
+            tenantId: target.tenantId,
+            memberId: target.memberId,
+            role: "automation",
+          },
+          channelId: target.channelId,
+          threadKey: target.threadKey,
+          clientNonce: target.businessKey,
+          messageKind: "interactive",
+          payload: { interactive },
+          replyToProviderMessageId: target.replyToProviderMessageId,
+          origin: "automation",
+          sender: async (token, recipient) =>
+            await sendInteractiveViaHub({
+              token,
+              to: recipient,
+              interactive: providerInteractive,
+            }),
+        });
+      }
+      await ctx.runMutation(internal.channelAutomation.settleDispatch, {
+        dispatchId: target.dispatchId,
+        status:
+          result.status === "accepted"
+            ? "accepted"
+            : result.status === "failed"
+              ? "failed"
+              : "unknown",
+        outboxId: result.outboxId,
+        providerMessageId: result.providerMessageId,
+        failureReason:
+          result.status === "accepted" ? undefined : `Outbox status: ${result.status}`,
+      });
+    } catch (error) {
+      await ctx.runMutation(internal.channelAutomation.settleDispatch, {
+        dispatchId: target.dispatchId,
+        status: "failed",
+        failureReason:
+          error instanceof Error ? error.message : "Automation dispatch failed.",
+      });
+    }
+    return null;
+  },
 });
 
 export const sendText = action({
@@ -1987,7 +2147,7 @@ export const ingestWebhookEvents = internalMutation({
           });
         }
       }
-      await ctx.db.insert("channelEvents", {
+      const eventId = await ctx.db.insert("channelEvents", {
         tenantId: channel.tenantId,
         channelId: channel._id,
         eventKey: event.eventKey,
@@ -2019,6 +2179,16 @@ export const ingestWebhookEvents = internalMutation({
         await reconcileOutboxFromStatus(ctx, { channel, event });
       } else {
         await projectThreadFromEvent(ctx, { channel, event, identityId, now });
+      }
+      if (
+        event.direction === "incoming" &&
+        event.eventKind.startsWith("message.")
+      ) {
+        await ctx.scheduler.runAfter(
+          0,
+          internal.channelAutomation.dispatchInbound,
+          { eventId },
+        );
       }
       accepted += 1;
     }

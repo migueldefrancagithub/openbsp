@@ -29,11 +29,23 @@ Delivered capabilities:
 - server-generated Flow tokens and persisted WAMID/ReplyContext;
 - `nfm_reply` failure when context, recipient, thread or response JSON is invalid;
 - Settings UI for the isolated lifecycle; the legacy lab UI is no longer mounted;
-- legacy channel threads are read-only in Channel Inbox.
+- legacy channel threads are read-only in Channel Inbox;
+- channel-neutral chatbot runs and events, separate from legacy Meta tables;
+- explicit chatbot-to-channel binding in the bot library and Flow Builder;
+- inbound, keyword, CTWA and explicit handoff trigger matching per channel;
+- durable automation dispatch records feeding the same guarded Hub outbox;
+- ordered flow continuation only after the prior send is accepted;
+- text, buttons, lists, input collection, conditions, tags, handoff and end nodes;
+- same-channel approved templates for provider-neutral template nodes;
+- STOP/cancel suppression, three-attempt fallback handoff and stale-run timeout;
+- any human operator send stops the active bot before outbound dispatch;
+- unbound legacy bots remain compatible but cannot enter the neutral runtime.
 
 ## Main files
 
 - `app/convex/iaSolutionHub.ts`
+- `app/convex/channelAutomation.ts`
+- `app/convex/chatbots.ts`
 - `app/convex/integrations/iaSolutionHub/client.ts`
 - `app/convex/integrations/iaSolutionHub/webhook.ts`
 - `app/convex/http.ts`
@@ -41,6 +53,7 @@ Delivered capabilities:
 - `app/convex/channels.ts`
 - `app/src/components/settings/IaSolutionHubSection.tsx`
 - `app/src/components/channel-inbox/ChannelThreadView.tsx`
+- `app/src/app/app/chatbots/page.tsx`
 - `docs/ADR-003-IASOLUTION-HUB-ISOLATED-CHANNEL.md`
 
 ## Test evidence
@@ -56,6 +69,14 @@ New test suites cover:
 - same-channel approved template enforcement;
 - Flow 7.3 domain isolation;
 - ReplyContext shape and malformed/array `nfm_reply` rejection.
+- exact chatbot/channel isolation and ignored unbound bots;
+- keyword and CTWA triggers;
+- normalized-event idempotency;
+- ordered collect-input continuation and human handoff;
+- STOP suppression and human-operator collision prevention.
+
+Current result: **40 test files / 228 tests green**, TypeScript clean, and the
+Next.js production build green.
 
 Validation commands:
 
@@ -75,8 +96,9 @@ npm run build
 - no outbound message;
 - no Flow publication to Meta/Hub;
 - no real CTWA or template test;
-- channel-neutral chatbot execution remains Phase 4 work; existing bots are not
-  silently attached to the new channel.
+- existing bots are not silently attached to the new channel;
+- no bot is bound or activated against a real Hub channel until that channel is
+  connected, webhook-verified and in allowlist-only mode.
 
 ## Inputs required for the controlled pilot
 
@@ -101,4 +123,6 @@ Pilot order:
 8. send one reply inside the 24-hour window;
 9. confirm WAMID plus delivered/read receipt;
 10. test one published Flow and its `nfm_reply`;
-11. confirm zero events in AYAmed/Alfapay.
+11. bind one draft bot to the exact OpenBSP channel and publish it;
+12. prove keyword, STOP and human handoff with the allowlisted sender;
+13. confirm zero events in AYAmed/Alfapay.

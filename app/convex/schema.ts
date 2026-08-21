@@ -261,6 +261,13 @@ const chatbotFlowNodeValidator = v.object({
       variables: v.record(v.string(), v.string()),
     }),
   ),
+  /** Provider-neutral template binding for an explicitly selected channel. */
+  channelTemplate: v.optional(
+    v.object({
+      templateId: v.id("channelTemplates"),
+      variables: v.record(v.string(), v.string()),
+    }),
+  ),
   condition: v.optional(
     v.object({
       variableKey: v.string(),
@@ -645,6 +652,17 @@ export default defineSchema({
     lastPreview: v.optional(v.string()),
     unreadCount: v.number(),
     serviceWindowExpiresAt: v.optional(v.number()),
+    tags: v.optional(v.array(v.string())),
+    automationMode: v.optional(
+      v.union(
+        v.literal("idle"),
+        v.literal("bot"),
+        v.literal("human"),
+        v.literal("stopped"),
+      ),
+    ),
+    automationChangedAt: v.optional(v.number()),
+    automationChangeReason: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
@@ -1063,13 +1081,16 @@ export default defineSchema({
     flowNodes: v.optional(v.array(chatbotFlowNodeValidator)),
     flowValidationIssues: v.optional(v.array(chatbotFlowIssueValidator)),
     channel: v.literal("whatsapp"),
+    /** Required for the channel-neutral runtime. Unbound legacy rows never run there. */
+    channelId: v.optional(v.id("channels")),
     createdBy: v.id("members"),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
     .index("by_tenant", ["tenantId"])
     .index("by_tenant_status", ["tenantId", "status"])
-    .index("by_tenant_folder", ["tenantId", "folderId"]),
+    .index("by_tenant_folder", ["tenantId", "folderId"])
+    .index("by_channel_status", ["channelId", "status"]),
 
   chatbotFlowRuns: defineTable({
     tenantId: v.id("tenants"),
@@ -1107,6 +1128,90 @@ export default defineSchema({
     .index("by_run", ["flowRunId", "createdAt"])
     .index("by_tenant_meta_message", ["tenantId", "metaMessageId"])
     .index("by_chatbot_time", ["chatbotId", "createdAt"]),
+
+  /**
+   * Provider-neutral automation runtime. These tables deliberately do not
+   * reference legacy conversations, contacts, phoneNumbers, or Meta IDs.
+   */
+  channelAutomationRuns: defineTable({
+    tenantId: v.id("tenants"),
+    chatbotId: v.id("chatbots"),
+    channelId: v.id("channels"),
+    threadId: v.id("channelThreads"),
+    threadKey: v.string(),
+    status: chatbotFlowRunStatusValidator,
+    currentNodeKey: v.optional(v.string()),
+    vars: v.optional(v.record(v.string(), v.string())),
+    repromptCount: v.number(),
+    pendingDispatchId: v.optional(v.id("channelAutomationDispatches")),
+    startedAt: v.number(),
+    lastAdvancedAt: v.number(),
+    endedAt: v.optional(v.number()),
+    endReason: v.optional(v.string()),
+    lastInboundEventId: v.optional(v.id("channelEvents")),
+  })
+    .index("by_tenant", ["tenantId"])
+    .index("by_thread_status", ["channelId", "threadId", "status"])
+    .index("by_chatbot_started", ["chatbotId", "startedAt"])
+    .index("by_status_last_advanced", ["status", "lastAdvancedAt"]),
+
+  channelAutomationEvents: defineTable({
+    tenantId: v.id("tenants"),
+    chatbotId: v.id("chatbots"),
+    runId: v.id("channelAutomationRuns"),
+    channelId: v.id("channels"),
+    threadId: v.id("channelThreads"),
+    sourceEventId: v.optional(v.id("channelEvents")),
+    eventType: chatbotFlowEventTypeValidator,
+    nodeKey: v.optional(v.string()),
+    payload: v.optional(v.any()),
+    createdAt: v.number(),
+  })
+    .index("by_run", ["runId", "createdAt"])
+    .index("by_channel_source_event", ["channelId", "sourceEventId"])
+    .index("by_chatbot_time", ["chatbotId", "createdAt"]),
+
+  channelAutomationDispatches: defineTable({
+    tenantId: v.id("tenants"),
+    chatbotId: v.id("chatbots"),
+    runId: v.id("channelAutomationRuns"),
+    channelId: v.id("channels"),
+    threadId: v.id("channelThreads"),
+    threadKey: v.string(),
+    sourceEventId: v.id("channelEvents"),
+    nodeKey: v.string(),
+    businessKey: v.string(),
+    messageKind: v.union(
+      v.literal("text"),
+      v.literal("template"),
+      v.literal("interactive"),
+    ),
+    payload: v.any(),
+    replyToProviderMessageId: v.optional(v.string()),
+    resumeMode: v.union(
+      v.literal("continue"),
+      v.literal("wait_input"),
+      v.literal("terminal"),
+    ),
+    autoDispatch: v.boolean(),
+    nextNodeKey: v.optional(v.string()),
+    waitNodeKey: v.optional(v.string()),
+    status: v.union(
+      v.literal("queued"),
+      v.literal("accepted"),
+      v.literal("failed"),
+      v.literal("unknown"),
+    ),
+    outboxId: v.optional(v.id("channelOutbox")),
+    providerMessageId: v.optional(v.string()),
+    failureReason: v.optional(v.string()),
+    createdBy: v.id("members"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_channel_business_key", ["channelId", "businessKey"])
+    .index("by_run", ["runId", "createdAt"])
+    .index("by_status_created", ["status", "createdAt"]),
 
   // ===== API keys — external API auth, wakit-api parity =====
   apiKeys: defineTable({

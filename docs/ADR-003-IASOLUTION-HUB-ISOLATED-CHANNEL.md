@@ -39,6 +39,14 @@ OpenBSP uses a distinct `iasolution_hub` provider with these invariants:
     closed. ReplyContext is emitted at the top of provider payloads.
 11. Legacy `lab_bridge` threads are read-only in the neutral inbox. OpenBSP
     never sends through Alfapay or a laboratory fallback.
+12. Neutral chatbot execution requires an explicit `chatbots.channelId`; the
+    dispatcher only selects active bots through the exact channel index.
+13. Automation state lives in channel-neutral runs, events and dispatches. It
+    never mints legacy contacts, conversations, phone numbers, or Meta messages.
+14. One automation send is durably queued at a time. The run advances only
+    after the shared guarded outbox accepts and persists the provider WAMID.
+15. STOP marks the thread stopped, handoff marks it human-owned, and any human
+    operator send stops an active run before outbound dispatch.
 
 ## Data ownership
 
@@ -49,6 +57,8 @@ The neutral channel owns:
 - identities, events, threads and outbox;
 - channel-specific template catalog;
 - Flow 7.3 drafts, provider IDs and persisted outbound ReplyContexts.
+- chatbot bindings, neutral runs, audit events, durable dispatches, thread tags
+  and human/bot/stopped ownership state.
 
 No AYAmed tenant, patient, appointment, insurance, ClicPay, branding, token,
 identifier, deployment, domain, or `OPENBSP_LAB_*` configuration is permitted.
