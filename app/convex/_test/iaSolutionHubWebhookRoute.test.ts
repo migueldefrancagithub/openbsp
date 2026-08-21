@@ -58,6 +58,7 @@ async function seed(t: ReturnType<typeof convexTest>) {
       publicId: PUBLIC_ID,
       kind: "whatsapp",
       provider: "iasolution_hub",
+      operationalTerritory: "openbsp",
       externalAccountId: `pending:${PUBLIC_ID}`,
       displayName: "OpenBSP WhatsApp",
       status: "pending",

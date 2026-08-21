@@ -37,6 +37,7 @@ import {
 } from "./integrations/iaSolutionHub/client";
 
 const PROVIDER = "iasolution_hub" as const;
+const TERRITORY = "openbsp" as const;
 const PUBLIC_ID_PATTERN = /^hub_[A-Za-z0-9_-]{24}$/;
 const STALE_DISPATCH_MS = 2 * 60 * 1_000;
 const MAX_SECRET_ERROR = 500;
@@ -47,6 +48,80 @@ const RATE_LIMITS = {
   flow_publish: 2,
 } as const;
 const RATE_LIMIT_WINDOW_MS = 60_000;
+
+function isOpenBspHubChannel(
+  channel: Pick<Doc<"channels">, "provider" | "operationalTerritory"> | null,
+): channel is Pick<Doc<"channels">, "provider" | "operationalTerritory"> {
+  return (
+    channel?.provider === PROVIDER &&
+    channel.operationalTerritory === TERRITORY
+  );
+}
+
+function envSet(name: string, normalize?: (value: string) => string): Set<string> {
+  return new Set(
+    (process.env[name] ?? "")
+      .split(/[\s,;]+/)
+      .map((value) => value.trim())
+      .filter(Boolean)
+      .map((value) => (normalize ? normalize(value) : value)),
+  );
+}
+
+/**
+ * Configuration is default-deny. Sidney must authorize the future third
+ * OpenBSP channel in server-side environment allowlists. Protected AYAmed and
+ * Cindy identifiers, when supplied in denylist variables, always win.
+ */
+function assertAuthorizedOpenBspConnection(args: {
+  externalChannelId: string;
+  phoneNumber: string;
+  wabaId: string;
+}) {
+  const protectedChannelIds = envSet("OPENBSP_PROTECTED_HUB_CHANNEL_IDS");
+  const protectedPhones = envSet(
+    "OPENBSP_PROTECTED_PHONE_NUMBERS",
+    normalizePhone,
+  );
+  const protectedWabaIds = envSet("OPENBSP_PROTECTED_WABA_IDS");
+  if (
+    protectedChannelIds.has(args.externalChannelId) ||
+    protectedPhones.has(normalizePhone(args.phoneNumber)) ||
+    protectedWabaIds.has(args.wabaId)
+  ) {
+    throw new ConvexError({
+      code: "PROTECTED_CHANNEL_HARD_DENY",
+      message: "AYAmed/Alfapay and Cindy channels cannot be used by OpenBSP.",
+    });
+  }
+
+  const allowedChannelIds = envSet("OPENBSP_ALLOWED_HUB_CHANNEL_IDS");
+  const allowedPhones = envSet(
+    "OPENBSP_ALLOWED_PHONE_NUMBERS",
+    normalizePhone,
+  );
+  const allowedWabaIds = envSet("OPENBSP_ALLOWED_WABA_IDS");
+  if (
+    allowedChannelIds.size === 0 ||
+    allowedPhones.size === 0 ||
+    allowedWabaIds.size === 0
+  ) {
+    throw new ConvexError({
+      code: "OPENBSP_CHANNEL_ALLOWLIST_NOT_CONFIGURED",
+      message: "Awaiting Sidney's dedicated third OpenBSP channel.",
+    });
+  }
+  if (
+    !allowedChannelIds.has(args.externalChannelId) ||
+    !allowedPhones.has(normalizePhone(args.phoneNumber)) ||
+    !allowedWabaIds.has(args.wabaId)
+  ) {
+    throw new ConvexError({
+      code: "OPENBSP_CHANNEL_NOT_ALLOWLISTED",
+      message: "Only Sidney's explicitly authorized OpenBSP channel may connect.",
+    });
+  }
+}
 
 const messageKindValidator = v.union(
   v.literal("text"),
@@ -310,7 +385,7 @@ export const createPendingChannel = tenantMutation({
       .take(100);
     const pending = existing.find(
       (channel) =>
-        channel.provider === PROVIDER &&
+        isOpenBspHubChannel(channel) &&
         channel.connectionState === "pending_number" &&
         channel.status !== "disconnected",
     );
@@ -328,6 +403,7 @@ export const createPendingChannel = tenantMutation({
       publicId,
       kind: "whatsapp",
       provider: PROVIDER,
+      operationalTerritory: TERRITORY,
       externalAccountId: `pending:${publicId}`,
       displayName,
       status: "pending",
@@ -366,7 +442,7 @@ export const _configureConnection = internalMutation({
     if (
       !channel ||
       channel.tenantId !== args.tenantId ||
-      channel.provider !== PROVIDER
+      !isOpenBspHubChannel(channel)
     ) {
       throw new ConvexError({ code: "HUB_CHANNEL_NOT_FOUND" });
     }
@@ -453,6 +529,8 @@ export const configureChannel = action({
       {},
     )) as Caller | null;
     requireAdmin(caller);
+    const args = validateConfiguredInput(rawArgs);
+    assertAuthorizedOpenBspConnection(args);
     const encryption = getSecretEncryptionStatus();
     if (!encryption.configured) {
       throw new ConvexError({
@@ -463,7 +541,6 @@ export const configureChannel = action({
         message: encryption.message,
       });
     }
-    const args = validateConfiguredInput(rawArgs);
     const [info, health] = await Promise.all([
       getPhoneInfo({ token: args.channelToken }),
       getPhoneHealth({ token: args.channelToken }),
@@ -534,7 +611,7 @@ export const updateAllowlist = tenantMutation({
     if (
       !channel ||
       channel.tenantId !== ctx.tenantId ||
-      channel.provider !== PROVIDER
+      !isOpenBspHubChannel(channel)
     ) {
       throw new ConvexError({ code: "HUB_CHANNEL_NOT_FOUND" });
     }
@@ -562,7 +639,7 @@ export const setPilotMode = tenantMutation({
     if (
       !channel ||
       channel.tenantId !== ctx.tenantId ||
-      channel.provider !== PROVIDER
+      !isOpenBspHubChannel(channel)
     ) {
       throw new ConvexError({ code: "HUB_CHANNEL_NOT_FOUND" });
     }
@@ -603,7 +680,7 @@ export const _loadSecret = internalQuery({
     if (
       !channel ||
       channel.tenantId !== args.tenantId ||
-      channel.provider !== PROVIDER
+      !isOpenBspHubChannel(channel)
     ) {
       return null;
     }
@@ -657,7 +734,7 @@ export const _loadWebhookTarget = internalQuery({
       .query("channels")
       .withIndex("by_public_id", (q) => q.eq("publicId", args.publicId))
       .unique();
-    if (!channel || channel.provider !== PROVIDER) return null;
+    if (!isOpenBspHubChannel(channel)) return null;
     const secret = await ctx.db
       .query("channelSecrets")
       .withIndex("by_channel", (q) => q.eq("channelId", channel._id))
@@ -722,7 +799,7 @@ export const _patchHealth = internalMutation({
     if (
       !channel ||
       channel.tenantId !== args.tenantId ||
-      channel.provider !== PROVIDER
+      !isOpenBspHubChannel(channel)
     ) {
       return null;
     }
@@ -754,7 +831,7 @@ export const _consumeRateLimit = internalMutation({
     if (
       !channel ||
       channel.tenantId !== args.tenantId ||
-      channel.provider !== PROVIDER
+      !isOpenBspHubChannel(channel)
     ) {
       throw new ConvexError({ code: "HUB_CHANNEL_NOT_FOUND" });
     }
@@ -860,7 +937,7 @@ export const _replaceTemplates = internalMutation({
     if (
       !channel ||
       channel.tenantId !== args.tenantId ||
-      channel.provider !== PROVIDER
+      !isOpenBspHubChannel(channel)
     ) {
       throw new ConvexError({ code: "HUB_CHANNEL_NOT_FOUND" });
     }
@@ -959,7 +1036,7 @@ export const listFlowDrafts = tenantQuery({
     if (
       !channel ||
       channel.tenantId !== ctx.tenantId ||
-      channel.provider !== PROVIDER
+      !isOpenBspHubChannel(channel)
     ) {
       throw new ConvexError({ code: "HUB_CHANNEL_NOT_FOUND" });
     }
@@ -998,7 +1075,7 @@ export const saveFlowDraft = tenantMutation({
     if (
       !channel ||
       channel.tenantId !== ctx.tenantId ||
-      channel.provider !== PROVIDER
+      !isOpenBspHubChannel(channel)
     ) {
       throw new ConvexError({ code: "HUB_CHANNEL_NOT_FOUND" });
     }
@@ -1079,7 +1156,7 @@ export const _loadFlowDraft = internalQuery({
     if (
       !channel ||
       channel.tenantId !== args.tenantId ||
-      channel.provider !== PROVIDER ||
+      !isOpenBspHubChannel(channel) ||
       !draft ||
       draft.tenantId !== args.tenantId ||
       draft.channelId !== channel._id
@@ -1282,7 +1359,7 @@ export const _claimOutbox = internalMutation({
     if (
       !channel ||
       channel.tenantId !== args.tenantId ||
-      channel.provider !== PROVIDER
+      !isOpenBspHubChannel(channel)
     ) {
       throw new ConvexError({ code: "HUB_CHANNEL_NOT_FOUND" });
     }
@@ -1405,7 +1482,7 @@ export const _markUnknownIfStale = internalMutation({
       return null;
     }
     const channel = await ctx.db.get(row.channelId);
-    if (!channel || channel.provider !== PROVIDER) return null;
+    if (!isOpenBspHubChannel(channel)) return null;
     await ctx.db.patch(row._id, {
       status: "unknown",
       failureReason: "Dispatch did not settle before the safety deadline.",
@@ -1435,7 +1512,7 @@ export const _settleOutbox = internalMutation({
     const row = await ctx.db.get(args.outboxId);
     if (!row || row.status !== "dispatching") return null;
     const channel = await ctx.db.get(row.channelId);
-    if (!channel || channel.provider !== PROVIDER) return null;
+    if (!isOpenBspHubChannel(channel)) return null;
     const now = Date.now();
     await ctx.db.patch(row._id, {
       status: args.status,
@@ -2099,7 +2176,7 @@ export const ingestWebhookEvents = internalMutation({
   returns: v.object({ accepted: v.number(), duplicates: v.number(), failed: v.number() }),
   handler: async (ctx, args) => {
     const channel = await ctx.db.get(args.channelId);
-    if (!channel || channel.provider !== PROVIDER) {
+    if (!isOpenBspHubChannel(channel)) {
       throw new ConvexError({ code: "HUB_CHANNEL_NOT_FOUND" });
     }
     let accepted = 0;

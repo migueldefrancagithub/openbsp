@@ -431,6 +431,17 @@ export default defineSchema({
     publicId: v.string(),
     kind: neutralChannelKindValidator,
     provider: neutralChannelProviderValidator,
+    /**
+     * Server-assigned operational territory. iaSolution Hub code only accepts
+     * `openbsp`; missing/AYAmed/Cindy territory fails closed.
+     */
+    operationalTerritory: v.optional(
+      v.union(
+        v.literal("openbsp"),
+        v.literal("ayamed"),
+        v.literal("cindy"),
+      ),
+    ),
     externalAccountId: v.string(),
     displayName: v.string(),
     status: neutralChannelStatusValidator,

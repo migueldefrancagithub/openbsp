@@ -84,7 +84,13 @@ export const dispatchInbound = internalMutation({
       return { consumed: false };
     }
     const channel = await ctx.db.get(event.channelId);
-    if (!channel || channel.provider !== PROVIDER) return { consumed: false };
+    if (
+      !channel ||
+      channel.provider !== PROVIDER ||
+      channel.operationalTerritory !== "openbsp"
+    ) {
+      return { consumed: false };
+    }
     const thread = await ctx.db
       .query("channelThreads")
       .withIndex("by_channel_thread", (q) =>
@@ -299,6 +305,7 @@ export const loadDispatch = internalQuery({
       bot.channelId !== dispatch.channelId ||
       !channel ||
       channel.provider !== PROVIDER ||
+      channel.operationalTerritory !== "openbsp" ||
       channel.tenantId !== dispatch.tenantId ||
       !thread ||
       thread.channelId !== channel._id ||

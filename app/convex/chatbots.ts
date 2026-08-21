@@ -498,7 +498,9 @@ export const list = tenantQuery({
       automationChannels: tenantChannels
         .filter(
           (channel) =>
-            channel.provider === "iasolution_hub" && channel.kind === "whatsapp",
+            channel.provider === "iasolution_hub" &&
+            channel.kind === "whatsapp" &&
+            channel.operationalTerritory === "openbsp",
         )
         .map((channel) => ({
           _id: channel._id,
@@ -796,7 +798,8 @@ async function requireAutomationChannel(
     !channel ||
     channel.tenantId !== ctx.tenantId ||
     channel.kind !== "whatsapp" ||
-    channel.provider !== "iasolution_hub"
+    channel.provider !== "iasolution_hub" ||
+    channel.operationalTerritory !== "openbsp"
   ) {
     throw new ConvexError({ code: "AUTOMATION_CHANNEL_NOT_FOUND" });
   }

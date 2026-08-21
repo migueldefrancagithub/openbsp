@@ -18,6 +18,10 @@ auditing, safety gates, and provider-independent domain state.
 
 OpenBSP uses a distinct `iasolution_hub` provider with these invariants:
 
+0. Operational territories are immutable boundaries: Alfapay is AYAmed-only,
+   the channel added by Miguel on 2026-08-20 is Cindy-only for OTP/password
+   recovery, and OpenBSP waits for a third dedicated channel from Sidney.
+
 1. A channel is first reserved as `pending_number`, without secrets, webhook,
    WABA, number, allowlist, or outbound capability.
 2. Configuration requires an explicit tenant channel, Hub channel ID, number,
@@ -47,6 +51,12 @@ OpenBSP uses a distinct `iasolution_hub` provider with these invariants:
     after the shared guarded outbox accepts and persists the provider WAMID.
 15. STOP marks the thread stopped, handoff marks it human-owned, and any human
     operator send stops an active run before outbound dispatch.
+16. iaSolution operations require `operationalTerritory === "openbsp"`.
+    Missing, AYAmed and Cindy territory values fail closed across secrets,
+    webhook resolution, health, templates, Flows, outbox and automation.
+17. Connection is default-deny until exact OpenBSP channel ID, phone and WABA
+    server allowlists are configured. Protected AYAmed/Cindy denylists take
+    precedence and fail before provider network or encryption work.
 
 ## Data ownership
 
@@ -65,7 +75,7 @@ identifier, deployment, domain, or `OPENBSP_LAB_*` configuration is permitted.
 
 ## Deployment gate
 
-This code must not be deployed or connected to the Hub until the new channel
-has its own number and the owner supplies the channel metadata through the
-secure configuration path. No real message is sent before a signed inbound
-round trip and an explicit allowlist-only pilot activation.
+This code must not be connected to the Hub until Sidney supplies the third
+OpenBSP channel with its own number and the exact ID/number/WABA gates are set
+server-side. Cindy is not a temporary substitute. No real message is sent
+before a signed inbound round trip and explicit allowlist-only pilot activation.

@@ -109,6 +109,7 @@ describe("isolated iaSolution Hub channel core", () => {
     }));
     expect(state.channel).toMatchObject({
       provider: "iasolution_hub",
+      operationalTerritory: "openbsp",
       status: "pending",
       connectionState: "pending_number",
       webhookStatus: "disabled",
@@ -117,6 +118,57 @@ describe("isolated iaSolution Hub channel core", () => {
     });
     expect(state.channel?.phoneNumber).toBeUndefined();
     expect(state.secrets).toEqual([]);
+  });
+
+  it("hard-denies protected Cindy/AYAmed identifiers before health or secret work", async () => {
+    const t = convexTest(schema);
+    const owner = await seedTenant(t, "OpenBSP territory guard");
+    const pending = await t
+      .withIdentity({ subject: owner.userId })
+      .mutation(api.iaSolutionHub.createPendingChannel, {
+        displayName: "Future OpenBSP channel",
+      });
+    const previous = {
+      channel: process.env.OPENBSP_PROTECTED_HUB_CHANNEL_IDS,
+      phone: process.env.OPENBSP_PROTECTED_PHONE_NUMBERS,
+      waba: process.env.OPENBSP_PROTECTED_WABA_IDS,
+    };
+    process.env.OPENBSP_PROTECTED_HUB_CHANNEL_IDS = "cindy-channel";
+    process.env.OPENBSP_PROTECTED_PHONE_NUMBERS = "258840000086";
+    process.env.OPENBSP_PROTECTED_WABA_IDS = "cindy-waba";
+    try {
+      await expect(
+        t.withIdentity({ subject: owner.userId }).action(
+          api.iaSolutionHub.configureChannel,
+          {
+            channelId: pending.channelId,
+            externalChannelId: "cindy-channel",
+            displayName: "Must stay Cindy",
+            phoneNumber: "258840000086",
+            wabaId: "cindy-waba",
+            channelToken: "token-long-enough-for-validation",
+            webhookSecret: "webhook-secret-long-enough-for-validation",
+            outboundAllowlist: ["258840000099"],
+          },
+        ),
+      ).rejects.toThrow(/PROTECTED_CHANNEL_HARD_DENY/);
+    } finally {
+      if (previous.channel === undefined) {
+        delete process.env.OPENBSP_PROTECTED_HUB_CHANNEL_IDS;
+      } else {
+        process.env.OPENBSP_PROTECTED_HUB_CHANNEL_IDS = previous.channel;
+      }
+      if (previous.phone === undefined) {
+        delete process.env.OPENBSP_PROTECTED_PHONE_NUMBERS;
+      } else {
+        process.env.OPENBSP_PROTECTED_PHONE_NUMBERS = previous.phone;
+      }
+      if (previous.waba === undefined) {
+        delete process.env.OPENBSP_PROTECTED_WABA_IDS;
+      } else {
+        process.env.OPENBSP_PROTECTED_WABA_IDS = previous.waba;
+      }
+    }
   });
 
   it("scopes the same WAMID independently to each tenant and channel", async () => {
@@ -226,6 +278,37 @@ describe("isolated iaSolution Hub channel core", () => {
         channelId: labChannel,
         threadKey: "258840000099",
         businessKey: "hub:text:no-fallback",
+        messageKind: "text",
+        payload: { text: "never sent" },
+      }),
+    ).rejects.toThrow(/HUB_CHANNEL_NOT_FOUND/);
+
+    const cindyChannel = await t.run(async (ctx) =>
+      ctx.db.insert("channels", {
+        tenantId: owner.tenantId,
+        publicId: "hub_cindyxxxxxxxxxxxxxxxxxxx",
+        kind: "whatsapp",
+        provider: "iasolution_hub",
+        operationalTerritory: "cindy",
+        externalAccountId: "cindy-password-recovery-only",
+        displayName: "Cindy OTP",
+        status: "active",
+        sendMode: "allowlist",
+        outboundAllowlist: ["258840000099"],
+        connectionState: "allowlist_only",
+        webhookStatus: "verified",
+        createdBy: owner.memberId,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      }),
+    );
+    await expect(
+      t.mutation(internal.iaSolutionHub._claimOutbox, {
+        tenantId: owner.tenantId,
+        memberId: owner.memberId,
+        channelId: cindyChannel,
+        threadKey: "258840000099",
+        businessKey: "hub:text:cindy-hard-deny",
         messageKind: "text",
         payload: { text: "never sent" },
       }),

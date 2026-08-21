@@ -1,5 +1,22 @@
 # Handoff: isolated iaSolution Hub channel for OpenBSP
 
+## Final operational territory policy (superseding)
+
+There are three separate territories and they must never be merged:
+
+1. **Alfapay = AYAmed/ClinicBook only.** Hard deny. OpenBSP must not read,
+   configure, test, send through, or change its number, WABA, token, webhook,
+   HMAC, templates, Flows or allowlist.
+2. **The WhatsApp channel Miguel added on 2026-08-20 = Cindy Paciente only.**
+   It is reserved for OTP/password recovery. OpenBSP must not configure, test,
+   or send through it, even temporarily.
+3. **OpenBSP = a future third channel supplied by Sidney.** Current blocker:
+   **awaiting the new dedicated OpenBSP channel from Sidney**. Until it exists,
+   there is no real configuration, webhook, egress, Flow publication or pilot.
+
+The branch stays prepared. It does not need or request the Cindy channel ID,
+number, WABA or token.
+
 ## Delivered locally
 
 Branch: `codex/whatsapp-hub-channels`
@@ -39,7 +56,12 @@ Delivered capabilities:
 - same-channel approved templates for provider-neutral template nodes;
 - STOP/cancel suppression, three-attempt fallback handoff and stale-run timeout;
 - any human operator send stops the active bot before outbound dispatch;
-- unbound legacy bots remain compatible but cannot enter the neutral runtime.
+- unbound legacy bots remain compatible but cannot enter the neutral runtime;
+- server-assigned `operationalTerritory`; iaSolution code accepts only
+  `openbsp`, while missing, `ayamed`, and `cindy` fail closed;
+- default-deny configuration requiring exact server-side allowlists for the
+  future OpenBSP Hub channel ID, phone and WABA;
+- protected identifier denylists that override allowlists for AYAmed/Cindy.
 
 ## Main files
 
@@ -68,15 +90,28 @@ New test suites cover:
 - WAMID persistence and monotonic delivery receipts;
 - same-channel approved template enforcement;
 - Flow 7.3 domain isolation;
-- ReplyContext shape and malformed/array `nfm_reply` rejection.
+- ReplyContext shape and malformed/array `nfm_reply` rejection;
 - exact chatbot/channel isolation and ignored unbound bots;
 - keyword and CTWA triggers;
 - normalized-event idempotency;
 - ordered collect-input continuation and human handoff;
 - STOP suppression and human-operator collision prevention.
 
-Current result: **40 test files / 228 tests green**, TypeScript clean, and the
+Current result: **40 test files / 229 tests green**, TypeScript clean, and the
 Next.js production build green.
+
+Territory environment gates (values must never be committed):
+
+- `OPENBSP_ALLOWED_HUB_CHANNEL_IDS`
+- `OPENBSP_ALLOWED_PHONE_NUMBERS`
+- `OPENBSP_ALLOWED_WABA_IDS`
+- `OPENBSP_PROTECTED_HUB_CHANNEL_IDS`
+- `OPENBSP_PROTECTED_PHONE_NUMBERS`
+- `OPENBSP_PROTECTED_WABA_IDS`
+
+All three allowlists are mandatory before configuration. Protected matches
+always return `PROTECTED_CHANNEL_HARD_DENY` before Hub health calls or secret
+encryption.
 
 Validation commands:
 
@@ -102,7 +137,9 @@ npm run build
 
 ## Inputs required for the controlled pilot
 
-When available, provide through the secure UI/environment rather than chat:
+Blocker: **wait for Sidney to register and provide a third OpenBSP channel.**
+Do not substitute the Cindy channel. When the third channel exists, provide
+through the secure UI/environment rather than chat:
 
 - new Hub channel ID;
 - connected OpenBSP-owned number;
@@ -113,16 +150,18 @@ When available, provide through the secure UI/environment rather than chat:
 
 Pilot order:
 
-1. reserve the OpenBSP channel;
-2. connect the new number in the Hub;
-3. validate and encrypt credentials;
-4. configure the dedicated webhook;
-5. prove one signed inbound message and one idempotent replay;
-6. check health;
-7. enable allowlist-only mode;
-8. send one reply inside the 24-hour window;
-9. confirm WAMID plus delivered/read receipt;
-10. test one published Flow and its `nfm_reply`;
-11. bind one draft bot to the exact OpenBSP channel and publish it;
-12. prove keyword, STOP and human handoff with the allowlisted sender;
-13. confirm zero events in AYAmed/Alfapay.
+1. add Alfapay and Cindy identifiers to the protected server denylist;
+2. add only the third OpenBSP channel ID, number and WABA to the server allowlist;
+3. reserve the OpenBSP channel;
+4. connect the new number in the Hub;
+5. validate and encrypt credentials;
+6. configure the dedicated webhook;
+7. prove one signed inbound message and one idempotent replay;
+8. check health;
+9. enable allowlist-only mode;
+10. send one reply inside the 24-hour window;
+11. confirm WAMID plus delivered/read receipt;
+12. test one published Flow and its `nfm_reply`;
+13. bind one draft bot to the exact OpenBSP channel and publish it;
+14. prove keyword, STOP and human handoff with the allowlisted sender;
+15. confirm zero events in both AYAmed/Alfapay and Cindy.

@@ -41,6 +41,7 @@ async function seedChannel(
       publicId: `hub_${suffix.padEnd(24, "x")}`,
       kind: "whatsapp",
       provider: "iasolution_hub",
+      operationalTerritory: "openbsp",
       externalAccountId: `channel-${suffix}`,
       displayName: `Channel ${suffix}`,
       status: "active",

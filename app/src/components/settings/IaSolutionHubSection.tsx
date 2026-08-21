@@ -50,7 +50,9 @@ export function IaSolutionHubSection() {
   const hubChannels = useMemo(
     () =>
       (channels ?? []).filter(
-        (channel) => channel.provider === "iasolution_hub",
+        (channel) =>
+          channel.provider === "iasolution_hub" &&
+          channel.operationalTerritory === "openbsp",
       ),
     [channels],
   );
@@ -168,7 +170,8 @@ export function IaSolutionHubSection() {
             </h2>
           </div>
           <p className="mt-1 text-xs text-slate-500">
-            Dedicated to OpenBSP. No fallback to Alfapay or any legacy channel.
+            Awaiting Sidney&apos;s third, dedicated OpenBSP channel. Alfapay and
+            the Cindy OTP/recovery channel are hard-denied.
           </p>
         </div>
         <span className="w-fit rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-medium text-slate-600">
@@ -177,6 +180,11 @@ export function IaSolutionHubSection() {
       </div>
 
       <div className="space-y-5 p-6">
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-800">
+          Do not enter Alfapay or Cindy credentials here. Configuration remains
+          default-deny until the new OpenBSP channel ID, number and WABA are
+          explicitly allowlisted server-side.
+        </div>
         {!channel ? (
           <div className="flex flex-col gap-4 rounded-xl border border-dashed border-slate-300 p-5 sm:flex-row sm:items-end">
             <Field

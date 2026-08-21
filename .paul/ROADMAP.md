@@ -83,8 +83,13 @@ outbox acceptance, STOP/human ownership gates, fallback handoff, stale-run
 timeout, same-channel templates, and Flow Builder channel selection. Unbound
 legacy bots stay compatible but never enter this runtime.
 
-Evidence: `docs/HANDOFF-IASOLUTION-HUB-ISOLATED.md`. 40 test files / 228 tests
+Evidence: `docs/HANDOFF-IASOLUTION-HUB-ISOLATED.md`. 40 test files / 229 tests
 green, TypeScript clean, production build green.
+
+Superseding operational gate (2026-08-21): Alfapay remains AYAmed-only; the
+channel added by Miguel is Cindy-only for OTP/password recovery; the OpenBSP
+pilot waits for a third dedicated channel supplied by Sidney. Territory guards
+and exact server-side channel/phone/WABA allowlists enforce this boundary.
 
 ---
 
