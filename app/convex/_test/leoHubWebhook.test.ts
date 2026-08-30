@@ -15,12 +15,12 @@ describe("Leo Hub webhook normalization", () => {
         contacts: [
           {
             profile: { name: "Maria Cliente" },
-            wa_id: "258860439352",
+            wa_id: "258840000099",
           },
         ],
         messages: [
           {
-            from: "258860439352",
+            from: "258840000099",
             id: "wamid.LAB.1",
             timestamp: "1785071400",
             type: "text",
@@ -40,10 +40,10 @@ describe("Leo Hub webhook normalization", () => {
       providerEventId: "wamid.LAB.1",
       eventKind: "message.text",
       direction: "incoming",
-      actorProviderScopedId: "258860439352",
+      actorProviderScopedId: "258840000099",
       actorDisplayName: "Maria Cliente",
-      actorPhone: "258860439352",
-      threadKey: "258860439352",
+      actorPhone: "258840000099",
+      threadKey: "258840000099",
       providerTimestamp: 1_785_071_400_000,
       payload: {
         normalizedText: "Oi",
@@ -59,13 +59,13 @@ describe("Leo Hub webhook normalization", () => {
           {
             id: "wamid.LAB.2",
             status: "delivered",
-            recipient_id: "258860439352",
+            recipient_id: "258840000099",
             timestamp: "1785071500",
           },
           {
             id: "wamid.LAB.2",
             status: "read",
-            recipient_id: "258860439352",
+            recipient_id: "258840000099",
             timestamp: "1785071600",
           },
         ],
@@ -86,7 +86,7 @@ describe("Leo Hub webhook normalization", () => {
         type: "template_link_click",
         direction: "inbound",
         message_id: "wamid.LAB.3",
-        to: "258860439352",
+        to: "258840000099",
         link: { target_url: "https://example.test" },
       },
       SHA,
@@ -95,7 +95,7 @@ describe("Leo Hub webhook normalization", () => {
       eventKey: "event:template_link_click:wamid.LAB.3",
       eventKind: "event.template_link_click",
       direction: "incoming",
-      actorProviderScopedId: "258860439352",
+      actorProviderScopedId: "258840000099",
     });
   });
 
@@ -109,11 +109,11 @@ describe("Leo Hub webhook normalization", () => {
 
 describe("envelope shapes the Hub actually delivers", () => {
   const value = {
-    contacts: [{ wa_id: "258849489743", profile: { name: "Tester" } }],
+    contacts: [{ wa_id: "258840000099", profile: { name: "Tester" } }],
     messages: [
       {
         id: "wamid.ENV",
-        from: "258849489743",
+        from: "258840000099",
         type: "text",
         timestamp: "1755500000",
         text: { body: "teste openbsp" },
@@ -121,16 +121,15 @@ describe("envelope shapes the Hub actually delivers", () => {
     ],
   };
 
-  // The AYAmed fan-out resolves senders from the flattened value, the complete
-  // Meta envelope and a `body` wrapper, because the Hub has delivered all
-  // three. The laboratory normalizer has to agree, or an enveloped delivery is
-  // stored as event.unknown: no thread, no bubble, and a webhook that looks
-  // healthy while producing nothing usable.
+  // Hub deliveries may arrive as a flattened value, a complete Meta envelope or
+  // a `body` wrapper. The laboratory normalizer has to agree across all three,
+  // or an enveloped delivery is stored as event.unknown: no thread, no bubble,
+  // and a webhook that looks healthy while producing nothing usable.
   it("normalizes the flattened value shape", () => {
     const events = normalizeWebhook(value, "sha-flat");
     expect(events).toHaveLength(1);
     expect(events[0].eventKind).toBe("message.text");
-    expect(events[0].threadKey).toBe("258849489743");
+    expect(events[0].threadKey).toBe("258840000099");
   });
 
   it("normalizes the complete entry/changes/value envelope", () => {

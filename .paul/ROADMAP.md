@@ -71,19 +71,31 @@ Independent of the legacy `/app/inbox` so the laboratory stays deletable.
 
 ### Phase 4 — Channel-neutral automation runtime
 
-Status: **Next**
+Status: **Complete** (2026-08-21)
 
-Move chatbot/flow execution onto normalized `channelEvents` so both WhatsApp
-adapters — and later Instagram — run without provider branches. Depends on
-Phase 2's thread projection being the automation's input surface.
+Move chatbot/flow execution onto normalized `channelEvents`, starting with the
+isolated `iasolution_hub` channel and leaving `lab_bridge`/Alfapay excluded.
+Later Instagram adapters can feed the same runtime without legacy Meta tables.
 
-Handoff item 4.
+Delivered with an explicit `chatbots.channelId`, neutral runs/events/durable
+dispatches, channel-indexed trigger selection, ordered continuation after
+outbox acceptance, STOP/human ownership gates, fallback handoff, stale-run
+timeout, same-channel templates, and Flow Builder channel selection. Unbound
+legacy bots stay compatible but never enter this runtime.
+
+Evidence: `docs/HANDOFF-IASOLUTION-HUB-ISOLATED.md`. 40 test files / 229 tests
+green, TypeScript clean, production build green.
+
+Superseding operational gate (2026-08-21): Alfapay remains AYAmed-only; the
+channel added by Miguel is Cindy-only for OTP/password recovery; the OpenBSP
+pilot waits for a third dedicated channel supplied by Sidney. Territory guards
+and exact server-side channel/phone/WABA allowlists enforce this boundary.
 
 ---
 
 ### Phase 5 — Direct Meta Instagram adapter
 
-Status: **Not started**
+Status: **Next**
 
 Implement a direct Meta Graph Instagram adapter against the same neutral
 contracts. Import the Instagram pack as behavior/reference only — do not copy

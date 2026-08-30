@@ -227,7 +227,7 @@ describe("analytics reports", () => {
         channelId,
         direction: "outgoing" as const,
         actorProviderScopedId: "258840000000",
-        threadKey: "258849489743",
+        threadKey: "258840000099",
         payload: {},
         rawPayload: "{}",
         rawBodySha256: "sha",

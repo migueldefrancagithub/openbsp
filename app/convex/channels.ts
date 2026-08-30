@@ -44,11 +44,19 @@ export const list = tenantQuery({
       webhookUrl: v.optional(v.string()),
       kind: v.string(),
       provider: v.string(),
+      operationalTerritory: v.optional(v.string()),
       externalAccountId: v.string(),
       displayName: v.string(),
       status: v.string(),
       sendMode: v.string(),
       outboundAllowlist: v.array(v.string()),
+      connectionState: v.optional(v.string()),
+      phoneNumber: v.optional(v.string()),
+      wabaId: v.optional(v.string()),
+      webhookStatus: v.optional(v.string()),
+      credentialsConfiguredAt: v.optional(v.number()),
+      lastWebhookAt: v.optional(v.number()),
+      lastWebhookEventKind: v.optional(v.string()),
       lastHealthStatus: v.optional(v.string()),
       lastHealthDetail: v.optional(v.string()),
       lastHealthCheckAt: v.optional(v.number()),
@@ -67,15 +75,27 @@ export const list = tenantQuery({
       _id: row._id,
       publicId: row.publicId,
       webhookUrl: siteUrl
-        ? `${siteUrl}/provider-webhook/leo-hub/${row.publicId}`
+        ? row.provider === "iasolution_hub"
+          ? `${siteUrl}/provider-webhook/iasolution-hub/${row.publicId}`
+          : row.provider === "lab_bridge"
+            ? `${siteUrl}/provider-webhook/leo-hub/${row.publicId}`
+            : undefined
         : undefined,
       kind: row.kind,
       provider: row.provider,
+      operationalTerritory: row.operationalTerritory,
       externalAccountId: row.externalAccountId,
       displayName: row.displayName,
       status: row.status,
       sendMode: row.sendMode,
       outboundAllowlist: row.outboundAllowlist,
+      connectionState: row.connectionState,
+      phoneNumber: row.phoneNumber,
+      wabaId: row.wabaId,
+      webhookStatus: row.webhookStatus,
+      credentialsConfiguredAt: row.credentialsConfiguredAt,
+      lastWebhookAt: row.lastWebhookAt,
+      lastWebhookEventKind: row.lastWebhookEventKind,
       lastHealthStatus: row.lastHealthStatus,
       lastHealthDetail: row.lastHealthDetail,
       lastHealthCheckAt: row.lastHealthCheckAt,
@@ -375,6 +395,13 @@ export const setSendMode = tenantMutation({
       throw new ConvexError({
         code: "LAB_LIVE_MODE_FORBIDDEN",
         message: "Laboratory bridges can only be disabled or allowlisted.",
+      });
+    }
+    if (channel.provider === "iasolution_hub") {
+      throw new ConvexError({
+        code: "USE_PROVIDER_PILOT_GATE",
+        message:
+          "iaSolution Hub channels must use the provider pilot gate so health, webhook verification, and allowlist checks cannot be bypassed.",
       });
     }
     await ctx.db.patch(channel._id, {

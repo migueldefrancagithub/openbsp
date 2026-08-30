@@ -5,7 +5,7 @@ import type { Id } from "../_generated/dataModel";
 import schema from "../schema";
 import { normalizeWebhook } from "../integrations/leoHub/webhook";
 
-const ALLOWED = "258860439352";
+const ALLOWED = "258840000099";
 const STRANGER = "258999111222";
 
 async function seedTenant(t: ReturnType<typeof convexTest>, name: string) {

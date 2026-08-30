@@ -62,6 +62,12 @@ const flowNodeValidator = v.object({
       variables: v.record(v.string(), v.string()),
     }),
   ),
+  channelTemplate: v.optional(
+    v.object({
+      templateId: v.id("channelTemplates"),
+      variables: v.record(v.string(), v.string()),
+    }),
+  ),
   condition: v.optional(
     v.object({
       variableKey: v.string(),
@@ -120,6 +126,10 @@ type FlowNode = {
   tag?: string;
   template?: {
     templateId: Id<"templates">;
+    variables: Record<string, string>;
+  };
+  channelTemplate?: {
+    templateId: Id<"channelTemplates">;
     variables: Record<string, string>;
   };
   condition?: {
@@ -352,6 +362,9 @@ export const list = tenantQuery({
         nodeCount: v.number(),
         flowValidationIssues: v.array(flowIssueValidator),
         channel: v.literal("whatsapp"),
+        channelId: v.optional(v.id("channels")),
+        channelDisplayName: v.optional(v.string()),
+        channelConnectionState: v.optional(v.string()),
         createdAt: v.number(),
         updatedAt: v.number(),
       }),
@@ -373,9 +386,19 @@ export const list = tenantQuery({
         nodeCount: v.number(),
       }),
     ),
+    automationChannels: v.array(
+      v.object({
+        _id: v.id("channels"),
+        displayName: v.string(),
+        connectionState: v.optional(v.string()),
+        status: v.string(),
+        sendMode: v.string(),
+        phoneNumber: v.optional(v.string()),
+      }),
+    ),
   }),
   handler: async (ctx) => {
-    const [folders, bots] = await Promise.all([
+    const [folders, bots, tenantChannels] = await Promise.all([
       ctx.db
         .query("chatbotFolders")
         .withIndex("by_tenant", (q) => q.eq("tenantId", ctx.tenantId))
@@ -386,9 +409,15 @@ export const list = tenantQuery({
         .withIndex("by_tenant", (q) => q.eq("tenantId", ctx.tenantId))
         .order("desc")
         .collect(),
+      ctx.db
+        .query("channels")
+        .withIndex("by_tenant", (q) => q.eq("tenantId", ctx.tenantId))
+        .order("desc")
+        .take(100),
     ]);
 
     const folderById = new Map(folders.map((folder) => [folder._id, folder]));
+    const channelById = new Map(tenantChannels.map((channel) => [channel._id, channel]));
     const botCountByFolder = new Map<Id<"chatbotFolders">, number>();
     const stats = {
       total: bots.length,
@@ -448,6 +477,13 @@ export const list = tenantQuery({
         nodeCount: bot.flowNodes?.length ?? 0,
         flowValidationIssues: botIssues.get(bot._id) ?? [],
         channel: bot.channel,
+        channelId: bot.channelId,
+        channelDisplayName: bot.channelId
+          ? channelById.get(bot.channelId)?.displayName
+          : undefined,
+        channelConnectionState: bot.channelId
+          ? channelById.get(bot.channelId)?.connectionState
+          : undefined,
         createdAt: bot.createdAt,
         updatedAt: bot.updatedAt,
       })),
@@ -459,6 +495,21 @@ export const list = tenantQuery({
         triggerKind: template.triggerKind,
         nodeCount: template.nodes.length,
       })),
+      automationChannels: tenantChannels
+        .filter(
+          (channel) =>
+            channel.provider === "iasolution_hub" &&
+            channel.kind === "whatsapp" &&
+            channel.operationalTerritory === "openbsp",
+        )
+        .map((channel) => ({
+          _id: channel._id,
+          displayName: channel.displayName,
+          connectionState: channel.connectionState,
+          status: channel.status,
+          sendMode: channel.sendMode,
+          phoneNumber: channel.phoneNumber,
+        })),
     };
   },
 });
@@ -496,6 +547,7 @@ export const createBot = tenantMutation({
     triggerKeywords: v.optional(v.array(v.string())),
     model: v.optional(v.string()),
     templateSlug: v.optional(flowTemplateSlugValidator),
+    channelId: v.optional(v.id("channels")),
   },
   returns: v.id("chatbots"),
   handler: async (ctx, args) => {
@@ -507,6 +559,9 @@ export const createBot = tenantMutation({
         "chatbotFolders",
         args.folderId,
       );
+    }
+    if (args.channelId) {
+      await requireAutomationChannel(ctx, args.channelId);
     }
     const now = Date.now();
     const template =
@@ -534,10 +589,35 @@ export const createBot = tenantMutation({
       flowNodes: template.nodes,
       flowValidationIssues: issues,
       channel: "whatsapp",
+      channelId: args.channelId,
       createdBy: ctx.memberId,
       createdAt: now,
       updatedAt: now,
     });
+  },
+});
+
+export const bindChannel = tenantMutation({
+  args: {
+    chatbotId: v.id("chatbots"),
+    channelId: v.id("channels"),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    requireCapability(ctx.role, "campaigns.create");
+    const bot = (await loadByIdInTenant(
+      ctx as Parameters<typeof loadByIdInTenant>[0],
+      "chatbots",
+      args.chatbotId,
+    )) as Doc<"chatbots">;
+    await requireAutomationChannel(ctx, args.channelId);
+    if (bot.channelId === args.channelId) return null;
+    await ctx.db.patch(bot._id, {
+      channelId: args.channelId,
+      status: "draft",
+      updatedAt: Date.now(),
+    });
+    return null;
   },
 });
 
@@ -569,7 +649,7 @@ export const updateFlow = tenantMutation({
       entryNodeKey: args.entryNodeKey.trim(),
       nodes,
     });
-    issues.push(...(await validateTemplateRefs(ctx, nodes)));
+    issues.push(...(await validateTemplateRefs(ctx, nodes, bot.channelId)));
     await ctx.db.patch(args.chatbotId, {
       triggerKind: args.triggerKind,
       triggerKeywords,
@@ -655,7 +735,27 @@ export const updateStatus = tenantMutation({
       entryNodeKey,
       nodes,
     });
-    issues.push(...(await validateTemplateRefs(ctx, nodes)));
+    issues.push(...(await validateTemplateRefs(ctx, nodes, bot.channelId)));
+    if (args.status === "active") {
+      if (bot.channelId) {
+        const channel = await requireAutomationChannel(ctx, bot.channelId);
+        if (
+          channel.status !== "active" ||
+          channel.webhookStatus !== "verified" ||
+          channel.sendMode !== "allowlist" ||
+          channel.connectionState !== "allowlist_only"
+        ) {
+          issues.push({
+            severity: "error",
+            scope: "flow",
+            field: "channelId",
+            message:
+              "The selected channel must have a verified webhook and allowlist-only pilot enabled.",
+          });
+        }
+        issues.push(...(await validateTriggerConflicts(ctx, bot)));
+      }
+    }
     if (
       args.status === "active" &&
       issues.some((issue) => issue.severity === "error")
@@ -687,6 +787,55 @@ export const updateStatus = tenantMutation({
 
 function findTemplate(slug?: FlowTemplate["slug"]): FlowTemplate | undefined {
   return slug ? FLOW_TEMPLATES.find((template) => template.slug === slug) : undefined;
+}
+
+async function requireAutomationChannel(
+  ctx: { db: any; tenantId: Id<"tenants"> },
+  channelId: Id<"channels">,
+): Promise<Doc<"channels">> {
+  const channel = await ctx.db.get(channelId);
+  if (
+    !channel ||
+    channel.tenantId !== ctx.tenantId ||
+    channel.kind !== "whatsapp" ||
+    channel.provider !== "iasolution_hub" ||
+    channel.operationalTerritory !== "openbsp"
+  ) {
+    throw new ConvexError({ code: "AUTOMATION_CHANNEL_NOT_FOUND" });
+  }
+  return channel;
+}
+
+async function validateTriggerConflicts(
+  ctx: { db: any; tenantId: Id<"tenants"> },
+  bot: Doc<"chatbots">,
+): Promise<FlowIssue[]> {
+  if (!bot.channelId) return [];
+  const active = await ctx.db
+    .query("chatbots")
+    .withIndex("by_channel_status", (q: any) =>
+      q.eq("channelId", bot.channelId).eq("status", "active"),
+    )
+    .take(50);
+  const keywords = new Set(cleanKeywords(bot.triggerKeywords) ?? []);
+  const conflict = active.find((candidate: Doc<"chatbots">) => {
+    if (candidate._id === bot._id || candidate.tenantId !== ctx.tenantId) {
+      return false;
+    }
+    if (candidate.triggerKind !== bot.triggerKind) return false;
+    if (bot.triggerKind !== "keyword") return true;
+    return (cleanKeywords(candidate.triggerKeywords) ?? []).some((keyword) =>
+      keywords.has(keyword),
+    );
+  });
+  return conflict
+    ? [{
+        severity: "error" as const,
+        scope: "trigger" as const,
+        field: "triggerKind",
+        message: `Trigger overlaps active bot "${conflict.name}" on this channel.`,
+      }]
+    : [];
 }
 
 function defaultTemplateForTrigger(triggerKind: FlowTemplate["triggerKind"]): FlowTemplate {
@@ -726,6 +875,16 @@ function normalizeNodes(nodes: FlowNode[]): FlowNode[] {
           templateId: node.template.templateId,
           variables: Object.fromEntries(
             Object.entries(node.template.variables ?? {})
+              .map(([key, value]) => [key.trim(), value.trim()])
+              .filter(([key]) => key.length > 0),
+          ),
+        }
+      : undefined,
+    channelTemplate: node.channelTemplate
+      ? {
+          templateId: node.channelTemplate.templateId,
+          variables: Object.fromEntries(
+            Object.entries(node.channelTemplate.variables ?? {})
               .map(([key, value]) => [key.trim(), value.trim()])
               .filter(([key]) => key.length > 0),
           ),
@@ -861,10 +1020,49 @@ function validateFlow(args: {
 async function validateTemplateRefs(
   ctx: { db: any; tenantId: Id<"tenants"> },
   nodes: FlowNode[],
+  channelId?: Id<"channels">,
 ): Promise<FlowIssue[]> {
   const issues: FlowIssue[] = [];
   for (const node of nodes) {
-    if (node.type !== "send_template" || !node.template?.templateId) continue;
+    if (node.type !== "send_template") continue;
+    if (channelId) {
+      if (!node.channelTemplate?.templateId) {
+        issues.push({
+          severity: "error",
+          scope: "node",
+          nodeKey: node.key,
+          field: "channelTemplate.templateId",
+          message: `${node.title} needs a template synced to the selected channel.`,
+        });
+        continue;
+      }
+      const channelTemplate = await ctx.db.get(node.channelTemplate.templateId);
+      if (
+        !channelTemplate ||
+        channelTemplate.tenantId !== ctx.tenantId ||
+        channelTemplate.channelId !== channelId
+      ) {
+        issues.push({
+          severity: "error",
+          scope: "node",
+          nodeKey: node.key,
+          field: "channelTemplate.templateId",
+          message: `${node.title} references a template from another channel.`,
+        });
+      } else if (
+        !["approved", "active"].includes(channelTemplate.status.toLowerCase())
+      ) {
+        issues.push({
+          severity: "error",
+          scope: "node",
+          nodeKey: node.key,
+          field: "channelTemplate.templateId",
+          message: `${node.title} must use an approved channel template.`,
+        });
+      }
+      continue;
+    }
+    if (!node.template?.templateId) continue;
     const tpl = await ctx.db.get(node.template.templateId);
     if (!tpl || tpl.tenantId !== ctx.tenantId) {
       issues.push({
@@ -956,7 +1154,7 @@ function validateNode(node: FlowNode, keys: Set<string>): FlowIssue[] {
     checkTarget(node.nextKey, "nextKey");
   }
   if (node.type === "send_template") {
-    if (!node.template?.templateId) {
+    if (!node.template?.templateId && !node.channelTemplate?.templateId) {
       issues.push({
         severity: "error",
         scope: "node",

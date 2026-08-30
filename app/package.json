@@ -14,14 +14,14 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@convex-dev/auth": "^0.0.92",
+    "@convex-dev/auth": "^0.0.95",
     "@xyflow/react": "^12.10.2",
     "clsx": "^2.1.1",
     "convex": "^1.38.0",
     "convex-helpers": "^0.1.116",
     "lucide-react": "^1.14.0",
     "motion": "^12.38.0",
-    "next": "16.2.6",
+    "next": "16.3.3",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "tailwind-merge": "^3.6.0"

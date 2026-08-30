@@ -7,7 +7,7 @@ import { encryptSecret } from "../lib/secrets";
 
 const PUBLIC_ID = "lab_abcdefghijklmnopqrstuvwx";
 const WEBHOOK_SECRET = "hub-webhook-secret-value";
-const RECIPIENT = "258860439352";
+const RECIPIENT = "258840000099";
 const ROUTE = `/provider-webhook/leo-hub/${PUBLIC_ID}`;
 
 beforeAll(() => {

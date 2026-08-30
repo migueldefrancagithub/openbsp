@@ -57,7 +57,7 @@ async function seedLabConnection(
     publicId: "lab_abcdefghijklmnopqrstuvwx",
     externalChannelId: args.externalChannelId ?? "hub-channel-lab-1",
     displayName: "OpenBSP Lab",
-    outboundAllowlist: ["258860439352"],
+    outboundAllowlist: ["258840000099"],
     accessTokenCiphertext: "ciphertext-token",
     accessTokenKeyVersion: 1,
     webhookSecretCiphertext: "ciphertext-webhook",
@@ -81,7 +81,7 @@ describe("Leo Hub isolated laboratory core", () => {
       _id: connection.channelId,
       provider: "lab_bridge",
       sendMode: "disabled",
-      outboundAllowlist: ["258860439352"],
+      outboundAllowlist: ["258840000099"],
     });
     expect(JSON.stringify(rows[0])).not.toContain("ciphertext-token");
     expect(JSON.stringify(rows[0])).not.toContain("ciphertext-webhook");
@@ -98,7 +98,7 @@ describe("Leo Hub isolated laboratory core", () => {
         memberId: owner.memberId,
         channelId,
         businessKey: "lab:text:nonce-1",
-        recipient: "258860439352",
+        recipient: "258840000099",
         messageKind: "text",
         payload: { text: "Teste" },
       }),
@@ -128,7 +128,7 @@ describe("Leo Hub isolated laboratory core", () => {
       memberId: owner.memberId,
       channelId,
       businessKey: "lab:text:nonce-1",
-      recipient: "258860439352",
+      recipient: "258840000099",
       messageKind: "text",
       payload: { text: "Teste" },
     });
@@ -137,7 +137,7 @@ describe("Leo Hub isolated laboratory core", () => {
       memberId: owner.memberId,
       channelId,
       businessKey: "lab:text:nonce-1",
-      recipient: "258860439352",
+      recipient: "258840000099",
       messageKind: "text",
       payload: { text: "Teste" },
     });
@@ -178,10 +178,10 @@ describe("Leo Hub isolated laboratory core", () => {
           providerEventId: "wamid.1",
           eventKind: "message.text",
           direction: "incoming" as const,
-          actorProviderScopedId: "258860439352",
+          actorProviderScopedId: "258840000099",
           actorDisplayName: "Maria",
-          actorPhone: "258860439352",
-          threadKey: "258860439352",
+          actorPhone: "258840000099",
+          threadKey: "258840000099",
           providerTimestamp: 1_785_071_400_000,
           payload: { normalizedText: "Oi" },
         },
@@ -204,7 +204,7 @@ describe("Leo Hub isolated laboratory core", () => {
     expect(stored.identities[0]).toMatchObject({
       tenantId: owner.tenantId,
       channelId,
-      providerScopedId: "258860439352",
+      providerScopedId: "258840000099",
       displayName: "Maria",
     });
   });

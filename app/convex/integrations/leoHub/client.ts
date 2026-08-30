@@ -49,7 +49,10 @@ export type HubFlowAssetResult = {
 };
 
 export function baseUrl(
-  raw = process.env.LEO_HUB_BASE_URL ?? DEFAULT_BASE_URL,
+  raw =
+    process.env.WHATSAPP_HUB_BASE_URL ??
+    process.env.LEO_HUB_BASE_URL ??
+    DEFAULT_BASE_URL,
 ): string {
   const trimmed = raw.trim().replace(/\/+$/, "");
   return trimmed.endsWith("/api/v1") ? trimmed : `${trimmed}/api/v1`;
@@ -65,7 +68,9 @@ export function normalizePhone(input: string): string {
 }
 
 function requestTimeout(input?: number): number {
-  const configured = Number(process.env.LEO_HUB_TIMEOUT_MS);
+  const configured = Number(
+    process.env.WHATSAPP_HUB_TIMEOUT_MS ?? process.env.LEO_HUB_TIMEOUT_MS,
+  );
   const value = input ?? configured;
   return Number.isFinite(value) && value > 0 ? value : DEFAULT_TIMEOUT_MS;
 }
@@ -186,11 +191,15 @@ export function buildTextPayload(args: {
   to: string;
   text: string;
   previewUrl?: boolean;
+  contextMessageId?: string;
 }) {
   return {
     to: normalizePhone(args.to),
     text: args.text,
     preview_url: args.previewUrl ?? false,
+    ...(args.contextMessageId
+      ? { context: { message_id: args.contextMessageId } }
+      : {}),
   };
 }
 
@@ -199,6 +208,7 @@ export async function sendText(args: {
   to: string;
   text: string;
   previewUrl?: boolean;
+  contextMessageId?: string;
   customBaseUrl?: string;
   timeoutMs?: number;
 }) {
@@ -338,6 +348,86 @@ export async function getPhoneHealth(args: {
   });
 }
 
+export async function listTemplates(args: {
+  token: string;
+  sync?: boolean;
+  customBaseUrl?: string;
+  timeoutMs?: number;
+}) {
+  return await request<unknown[]>({
+    token: args.token,
+    path: `/templates?sync=${args.sync === false ? "false" : "true"}`,
+    customBaseUrl: args.customBaseUrl,
+    timeoutMs: args.timeoutMs,
+  });
+}
+
+export async function getConversationHistory(args: {
+  token: string;
+  phone: string;
+  customBaseUrl?: string;
+  timeoutMs?: number;
+}) {
+  return await request<unknown[]>({
+    token: args.token,
+    path: `/history/conversation/${encodeURIComponent(normalizePhone(args.phone))}`,
+    customBaseUrl: args.customBaseUrl,
+    timeoutMs: args.timeoutMs,
+  });
+}
+
+export async function uploadMedia(args: {
+  token: string;
+  file: Blob;
+  filename: string;
+  customBaseUrl?: string;
+  timeoutMs?: number;
+}) {
+  const form = new FormData();
+  form.set("file", args.file, args.filename);
+  return await request<Record<string, unknown>>({
+    token: args.token,
+    path: "/media/upload",
+    body: form,
+    customBaseUrl: args.customBaseUrl,
+    timeoutMs: args.timeoutMs ?? 30_000,
+  });
+}
+
+export async function sendDocument(args: {
+  token: string;
+  to: string;
+  mediaId?: string;
+  url?: string;
+  filename?: string;
+  caption?: string;
+  contextMessageId?: string;
+  customBaseUrl?: string;
+  timeoutMs?: number;
+}) {
+  if (Boolean(args.mediaId) === Boolean(args.url)) {
+    return {
+      ok: false as const,
+      reason: "document_requires_exactly_one_source",
+    };
+  }
+  return await request<HubMessageResult>({
+    token: args.token,
+    path: "/messages/document",
+    body: {
+      to: normalizePhone(args.to),
+      ...(args.mediaId ? { media_id: args.mediaId } : { url: args.url }),
+      ...(args.filename ? { filename: args.filename } : {}),
+      ...(args.caption ? { caption: args.caption } : {}),
+      ...(args.contextMessageId
+        ? { context: { message_id: args.contextMessageId } }
+        : {}),
+    },
+    customBaseUrl: args.customBaseUrl,
+    timeoutMs: args.timeoutMs,
+  });
+}
+
 export async function listFlows(args: {
   token: string;
   customBaseUrl?: string;
@@ -362,6 +452,27 @@ export async function createFlow(args: {
     token: args.token,
     path: "/flows",
     body: { name: args.name, categories: args.categories },
+    customBaseUrl: args.customBaseUrl,
+    timeoutMs: args.timeoutMs,
+  });
+}
+
+export async function updateFlow(args: {
+  token: string;
+  flowId: string;
+  name?: string;
+  categories?: string[];
+  customBaseUrl?: string;
+  timeoutMs?: number;
+}) {
+  return await request<HubFlowContainer>({
+    token: args.token,
+    path: `/flows/${encodeURIComponent(args.flowId)}`,
+    method: "PUT",
+    body: {
+      ...(args.name ? { name: args.name } : {}),
+      ...(args.categories ? { categories: args.categories } : {}),
+    },
     customBaseUrl: args.customBaseUrl,
     timeoutMs: args.timeoutMs,
   });

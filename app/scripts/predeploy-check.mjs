@@ -6,20 +6,31 @@ const targetArg = process.argv.find((arg) => arg.startsWith("--target="));
 const target = targetArg?.split("=")[1] || "staging";
 
 const requiredVercelEnv = [
-  "CONVEX_DEPLOY_KEY",
+  "NEXT_PUBLIC_CONVEX_URL",
   "NEXT_PUBLIC_CONVEX_SITE_URL",
 ];
 
 const requiredConvexEnv = [
+  "SITE_URL",
+  "JWT_PRIVATE_KEY",
+  "JWKS",
   "PLATFORM_META_VERIFY_TOKEN",
+  "WABA_TOKEN_ENCRYPTION_KEY_V1",
+  "META_GRAPH_VERSION",
+];
+
+const metaGraphReadinessEnv = [
   "PLATFORM_META_APP_SECRET",
   "META_EMBEDDED_SIGNUP_APP_ID",
   "META_EMBEDDED_SIGNUP_CONFIG_ID",
   "META_EMBEDDED_SIGNUP_REDIRECT_URI",
   "META_EMBEDDED_SIGNUP_APP_SECRET",
-  "WABA_TOKEN_ENCRYPTION_KEY_V1",
-  "META_GRAPH_VERSION",
-  "CONVEX_SITE_URL",
+];
+
+const hubLabReadinessEnv = [
+  "OPENBSP_ALLOWED_HUB_CHANNEL_IDS",
+  "OPENBSP_ALLOWED_PHONE_NUMBERS",
+  "OPENBSP_ALLOWED_WABA_IDS",
 ];
 
 const requiredFiles = [
@@ -54,6 +65,24 @@ for (const name of requiredConvexEnv) {
   }
 }
 
+for (const name of metaGraphReadinessEnv) {
+  if (!process.env[name]) {
+    warnings.push(`Meta Graph direct not ready for ${target}: ${name}`);
+  }
+}
+
+for (const name of hubLabReadinessEnv) {
+  if (!process.env[name]) {
+    warnings.push(`Hub lab configuration gated for ${target}: ${name}`);
+  }
+}
+
+if (!process.env.CONVEX_DEPLOY_KEY) {
+  warnings.push(
+    "CONVEX_DEPLOY_KEY is absent. This is OK for local Convex deploys; set it only if CI/Vercel deploys Convex.",
+  );
+}
+
 if (
   process.env.META_EMBEDDED_SIGNUP_REDIRECT_URI &&
   !process.env.META_EMBEDDED_SIGNUP_REDIRECT_URI.endsWith(
@@ -65,7 +94,12 @@ if (
   );
 }
 
-for (const name of ["CONVEX_SITE_URL", "NEXT_PUBLIC_CONVEX_SITE_URL"]) {
+for (const name of [
+  "CONVEX_SITE_URL",
+  "NEXT_PUBLIC_CONVEX_URL",
+  "NEXT_PUBLIC_CONVEX_SITE_URL",
+  "SITE_URL",
+]) {
   const value = process.env[name];
   if (value && !value.startsWith("https://")) {
     failures.push(`${name} must be public https://`);

@@ -53,7 +53,7 @@ export function ChannelThreadView({
     limit: 200,
   });
   const markRead = useMutation(api.channels.markThreadRead);
-  const sendText = useAction(api.leoHubLab.sendText);
+  const sendText = useAction(api.iaSolutionHub.sendText);
 
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
@@ -77,18 +77,25 @@ export function ChannelThreadView({
 
   const blocked: BlockedReason = useMemo(() => {
     if (!thread) return null;
+    if (thread.channelProvider !== "iasolution_hub") {
+      return {
+        title: "Legacy channel is read-only",
+        detail:
+          "This inbox never falls back to another provider connection. Configure the isolated OpenBSP Hub channel before sending.",
+      };
+    }
     if (thread.channelSendMode === "disabled") {
       return {
         title: "Kill switch active",
         detail:
-          "This channel starts disabled by design. Enable allowlist mode in Settings > WhatsApp before sending.",
+          "This channel starts disabled by design. Verify its dedicated webhook and enable pilot mode before sending.",
       };
     }
     if (!thread.recipientAllowlisted) {
       return {
         title: "Recipient not allowlisted",
         detail:
-          "Add this number to the laboratory allowlist in Settings before sending to it.",
+          "Add this number to the isolated channel allowlist before sending to it.",
       };
     }
     const windowOpen =
@@ -115,7 +122,7 @@ export function ChannelThreadView({
       // so a double click cannot produce two sends.
       await sendText({
         channelId,
-        to: thread?.phone ?? threadKey,
+        threadKey,
         text,
         clientNonce: crypto.randomUUID(),
       });
@@ -150,7 +157,7 @@ export function ChannelThreadView({
           {thread.displayName ?? thread.phone ?? thread.threadKey}
         </div>
         <div className="text-[11px] text-slate-400 mt-0.5">
-          {thread.phone ?? thread.threadKey} · laboratory channel
+          {thread.phone ?? thread.threadKey} · isolated OpenBSP channel
         </div>
       </div>
 

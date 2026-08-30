@@ -320,7 +320,7 @@ export function LeoHubLabSection() {
                 label="Allowlisted recipient"
                 value={testRecipient}
                 onChange={setTestRecipient}
-                placeholder="258860439352"
+                placeholder="258840000099"
               />
               <Field
                 label="Test message"
@@ -430,7 +430,7 @@ export function LeoHubLabSection() {
                   label="Outbound allowlist"
                   value={allowlist}
                   onChange={setAllowlist}
-                  placeholder="258860439352, one or more test numbers"
+                  placeholder="258840000099, one or more test numbers"
                 />
               </div>
             </div>

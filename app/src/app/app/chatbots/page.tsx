@@ -101,6 +101,10 @@ type FlowNode = {
     templateId: Id<"templates">;
     variables: Record<string, string>;
   };
+  channelTemplate?: {
+    templateId: Id<"channelTemplates">;
+    variables: Record<string, string>;
+  };
   condition?: {
     variableKey: string;
     operator: ConditionOperator;
@@ -146,6 +150,9 @@ type BotRow = {
   nodeCount: number;
   flowValidationIssues: FlowIssue[];
   channel: "whatsapp";
+  channelId?: Id<"channels">;
+  channelDisplayName?: string;
+  channelConnectionState?: string;
   createdAt: number;
   updatedAt: number;
 };
@@ -158,8 +165,17 @@ type FolderRow = {
   updatedAt: number;
 };
 
+type AutomationChannelRow = {
+  _id: Id<"channels">;
+  displayName: string;
+  connectionState?: string;
+  status: string;
+  sendMode: string;
+  phoneNumber?: string;
+};
+
 type FlowRunRow = {
-  _id: Id<"chatbotFlowRuns">;
+  _id: string;
   status: string;
   currentNodeKey?: string;
   vars?: Record<string, string>;
@@ -172,7 +188,7 @@ type FlowRunRow = {
   contactHandle?: string;
   eventCount: number;
   events: Array<{
-    _id: Id<"chatbotFlowEvents">;
+    _id: string;
     eventType: string;
     nodeKey?: string;
     payload?: unknown;
@@ -225,6 +241,7 @@ export default function ChatbotsPage() {
   const updateFlow = useMutation(api.chatbots.updateFlow);
   const applyTemplate = useMutation(api.chatbots.applyTemplate);
   const updateStatus = useMutation(api.chatbots.updateStatus);
+  const bindChannel = useMutation(api.chatbots.bindChannel);
   const [folderName, setFolderName] = useState("");
   const [botName, setBotName] = useState("");
   const [botDescription, setBotDescription] = useState("");
@@ -235,6 +252,7 @@ export default function ChatbotsPage() {
   const [templateSlug, setTemplateSlug] = useState<
     FlowTemplate["slug"] | ""
   >("clinic_lead_capture");
+  const [botChannelId, setBotChannelId] = useState<Id<"channels"> | "">("");
   const [studioTab, setStudioTab] = useState<StudioTab>("flows");
   const [selectedBotId, setSelectedBotId] = useState<Id<"chatbots"> | "">("");
   const [flowEntryNodeKey, setFlowEntryNodeKey] = useState("");
@@ -248,6 +266,7 @@ export default function ChatbotsPage() {
   const folders = (studio?.folders ?? []) as FolderRow[];
   const bots = (studio?.bots ?? []) as BotRow[];
   const templates = (studio?.templates ?? []) as FlowTemplate[];
+  const automationChannels = (studio?.automationChannels ?? []) as AutomationChannelRow[];
   const selectedFolder = useMemo(
     () => folders.find((folder) => folder._id === selectedFolderId),
     [folders, selectedFolderId],
@@ -259,10 +278,19 @@ export default function ChatbotsPage() {
     () => bots.find((bot) => bot._id === selectedBotId) ?? visibleBots[0],
     [bots, selectedBotId, visibleBots],
   );
-  const flowRuns = useQuery(
+  const legacyFlowRuns = useQuery(
     api.chatbotFlows.listRuns,
-    selectedBot ? { chatbotId: selectedBot._id, limit: 12 } : "skip",
+    selectedBot && !selectedBot.channelId
+      ? { chatbotId: selectedBot._id, limit: 12 }
+      : "skip",
   ) as FlowRunRow[] | undefined;
+  const neutralFlowRuns = useQuery(
+    api.channelAutomation.listRuns,
+    selectedBot?.channelId
+      ? { chatbotId: selectedBot._id, limit: 12 }
+      : "skip",
+  ) as FlowRunRow[] | undefined;
+  const flowRuns = selectedBot?.channelId ? neutralFlowRuns : legacyFlowRuns;
   const flowIssues = selectedBot?.flowValidationIssues ?? [];
   const flowErrors = flowIssues.filter((issue) => issue.severity === "error");
   const flowWarnings = flowIssues.filter(
@@ -274,6 +302,12 @@ export default function ChatbotsPage() {
       setSelectedBotId(visibleBots[0]._id);
     }
   }, [selectedBotId, visibleBots]);
+
+  useEffect(() => {
+    if (!botChannelId && automationChannels[0]) {
+      setBotChannelId(automationChannels[0]._id);
+    }
+  }, [automationChannels, botChannelId]);
 
   useEffect(() => {
     if (!selectedBot) return;
@@ -316,6 +350,7 @@ export default function ChatbotsPage() {
         triggerKind: template?.triggerKind ?? triggerKind,
         model: "CXCast guardrail bot",
         templateSlug: templateSlug || undefined,
+        channelId: botChannelId || undefined,
       });
       setBotName("");
       setBotDescription("");
@@ -432,6 +467,23 @@ export default function ChatbotsPage() {
     }
   }
 
+  async function handleBindChannel(
+    chatbotId: Id<"chatbots">,
+    channelId: Id<"channels">,
+  ) {
+    setBusy(`channel:${chatbotId}`);
+    setNotice(null);
+    setError(null);
+    try {
+      await bindChannel({ chatbotId, channelId });
+      setNotice("Isolated channel selected. Review and publish the flow when the pilot is ready.");
+    } catch (err) {
+      setError(readError(err));
+    } finally {
+      setBusy(null);
+    }
+  }
+
   const flowBuilder = (
     <FlowBuilder
       bots={visibleBots}
@@ -457,6 +509,8 @@ export default function ChatbotsPage() {
       onPublish={handlePublishFlow}
       onApplyTemplate={handleApplyTemplate}
       onOpenBots={() => setStudioTab("bots")}
+      automationChannels={automationChannels}
+      onBindChannel={handleBindChannel}
       runs={flowRuns ?? []}
       runsLoading={Boolean(selectedBot && flowRuns === undefined)}
     />
@@ -742,6 +796,18 @@ export default function ChatbotsPage() {
                     ]}
                     placeholder="Choose trigger"
                   />
+                  <SelectBox
+                    label="Isolated WhatsApp channel"
+                    value={botChannelId}
+                    onChange={(value) =>
+                      setBotChannelId(value as Id<"channels"> | "")
+                    }
+                    options={automationChannels.map((channel) => ({
+                      value: channel._id,
+                      label: `${channel.displayName} · ${channel.connectionState ?? channel.status}`,
+                    }))}
+                    placeholder="Select iaSolution Hub channel"
+                  />
                   <SubmitButton
                     disabled={busy !== null || botName.trim().length < 2}
                     loading={busy === "bot"}
@@ -827,9 +893,33 @@ export default function ChatbotsPage() {
                           />
                           <BotMeta
                             icon={Radio}
-                            label="Updated"
-                            value={relativeTime(bot.updatedAt)}
+                            label="Channel"
+                            value={bot.channelDisplayName ?? "Not bound"}
                           />
+                        </div>
+
+                        <div className="mt-4 rounded-xl border border-slate-100 bg-white/55 p-3">
+                          <SelectBox
+                            label="Automation channel (iaSolution Hub only)"
+                            value={bot.channelId ?? ""}
+                            onChange={(value) => {
+                              if (value) {
+                                void handleBindChannel(
+                                  bot._id,
+                                  value as Id<"channels">,
+                                );
+                              }
+                            }}
+                            options={automationChannels.map((channel) => ({
+                              value: channel._id,
+                              label: `${channel.displayName} · ${channel.connectionState ?? channel.status}`,
+                            }))}
+                            placeholder="Required before activation"
+                          />
+                          <p className="mt-2 text-[11px] leading-5 text-slate-500">
+                            Changing channel returns the bot to draft. Only
+                            active OpenBSP Hub channels appear here.
+                          </p>
                         </div>
 
                         <div className="mt-5 flex flex-wrap gap-2 border-t border-slate-100 pt-4">
@@ -994,6 +1084,8 @@ function FlowBuilder({
   onPublish,
   onApplyTemplate,
   onOpenBots,
+  automationChannels,
+  onBindChannel,
   runs,
   runsLoading,
 }: {
@@ -1020,6 +1112,11 @@ function FlowBuilder({
   onPublish: () => void;
   onApplyTemplate: (slug: FlowTemplate["slug"]) => void;
   onOpenBots: () => void;
+  automationChannels: AutomationChannelRow[];
+  onBindChannel: (
+    chatbotId: Id<"chatbots">,
+    channelId: Id<"channels">,
+  ) => void;
   runs: FlowRunRow[];
   runsLoading: boolean;
 }) {
@@ -1253,6 +1350,27 @@ function FlowBuilder({
             ))}
           </select>
           <span className="hidden h-1 w-1 rounded-full bg-slate-300 sm:inline-block" />
+          <select
+            value={selectedBot.channelId ?? ""}
+            onChange={(event) => {
+              if (event.target.value) {
+                onBindChannel(
+                  selectedBot._id,
+                  event.target.value as Id<"channels">,
+                );
+              }
+            }}
+            className="hidden h-8 max-w-[220px] truncate rounded-md border border-transparent bg-transparent px-1 text-xs font-medium text-slate-600 outline-none hover:border-white/80 hover:bg-white/60 md:block"
+            aria-label="Select isolated automation channel"
+          >
+            <option value="">No Hub channel</option>
+            {automationChannels.map((channel) => (
+              <option key={channel._id} value={channel._id}>
+                {channel.displayName} · {channel.connectionState ?? channel.status}
+              </option>
+            ))}
+          </select>
+          <span className="hidden h-1 w-1 rounded-full bg-slate-300 md:inline-block" />
           <span className="hidden whitespace-nowrap sm:inline">
             {nodes.length} blocks
           </span>

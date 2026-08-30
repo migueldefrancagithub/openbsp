@@ -29,7 +29,7 @@ import { ApiKeysSection } from "@/components/settings/ApiKeysSection";
 import { MembersSection } from "@/components/settings/MembersSection";
 import { TeamsSection } from "@/components/settings/TeamsSection";
 import { ComplianceSection } from "@/components/settings/ComplianceSection";
-import { LeoHubLabSection } from "@/components/settings/LeoHubLabSection";
+import { IaSolutionHubSection } from "@/components/settings/IaSolutionHubSection";
 import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
 
@@ -758,7 +758,7 @@ export default function SettingsPage() {
           <div className="space-y-4">
             {/* Connecting any channel is gated on this, so it comes first. */}
             <ComplianceSection />
-            <LeoHubLabSection />
+            <IaSolutionHubSection />
           </div>
         )}
 
