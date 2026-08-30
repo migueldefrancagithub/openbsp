@@ -69,9 +69,9 @@ function envSet(name: string, normalize?: (value: string) => string): Set<string
 }
 
 /**
- * Configuration is default-deny. Sidney must authorize the future third
- * OpenBSP channel in server-side environment allowlists. Protected AYAmed and
- * Cindy identifiers, when supplied in denylist variables, always win.
+ * Configuration is default-deny. The currently authorized Alfapay lab channel
+ * still has to match all three server-side allowlists. Reserved identifiers,
+ * when supplied in denylist variables, always win.
  */
 function assertAuthorizedOpenBspConnection(args: {
   externalChannelId: string;
@@ -91,7 +91,8 @@ function assertAuthorizedOpenBspConnection(args: {
   ) {
     throw new ConvexError({
       code: "PROTECTED_CHANNEL_HARD_DENY",
-      message: "AYAmed/Alfapay and Cindy channels cannot be used by OpenBSP.",
+      message:
+        "This Hub channel is reserved for another operation and cannot be used by OpenBSP.",
     });
   }
 
@@ -108,7 +109,8 @@ function assertAuthorizedOpenBspConnection(args: {
   ) {
     throw new ConvexError({
       code: "OPENBSP_CHANNEL_ALLOWLIST_NOT_CONFIGURED",
-      message: "Awaiting Sidney's dedicated third OpenBSP channel.",
+      message:
+        "Configure the authorized OpenBSP Hub channel allowlists before connecting.",
     });
   }
   if (
@@ -118,7 +120,8 @@ function assertAuthorizedOpenBspConnection(args: {
   ) {
     throw new ConvexError({
       code: "OPENBSP_CHANNEL_NOT_ALLOWLISTED",
-      message: "Only Sidney's explicitly authorized OpenBSP channel may connect.",
+      message:
+        "Only the explicitly authorized OpenBSP Hub lab channel may connect.",
     });
   }
 }

@@ -81,7 +81,7 @@ export function ChannelThreadView({
       return {
         title: "Legacy channel is read-only",
         detail:
-          "This inbox never falls back to the previous laboratory/Alfapay connection. Configure the new isolated OpenBSP channel before sending.",
+          "This inbox never falls back to another provider connection. Configure the isolated OpenBSP Hub channel before sending.",
       };
     }
     if (thread.channelSendMode === "disabled") {

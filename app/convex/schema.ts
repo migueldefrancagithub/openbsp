@@ -433,7 +433,7 @@ export default defineSchema({
     provider: neutralChannelProviderValidator,
     /**
      * Server-assigned operational territory. iaSolution Hub code only accepts
-     * `openbsp`; missing/AYAmed/Cindy territory fails closed.
+     * `openbsp`; missing or reserved territories fail closed.
      */
     operationalTerritory: v.optional(
       v.union(

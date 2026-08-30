@@ -162,7 +162,7 @@ http.route({
  *
  * The opaque public channel key resolves tenant + channel before the payload
  * is trusted. Each channel then verifies the raw request with its own HMAC
- * secret. There is deliberately no default channel or Alfapay fallback.
+ * secret. There is deliberately no default provider fallback.
  */
 http.route({
   pathPrefix: "/provider-webhook/iasolution-hub/",

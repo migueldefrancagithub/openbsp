@@ -5,7 +5,7 @@ import type { Id } from "../_generated/dataModel";
 import schema from "../schema";
 import { normalizeWebhook } from "../integrations/leoHub/webhook";
 
-const RECIPIENT = "258860439352";
+const RECIPIENT = "258840000099";
 const SERVICE_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 async function seedTenant(t: ReturnType<typeof convexTest>, name: string) {

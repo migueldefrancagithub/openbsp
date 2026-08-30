@@ -170,8 +170,8 @@ export function IaSolutionHubSection() {
             </h2>
           </div>
           <p className="mt-1 text-xs text-slate-500">
-            Awaiting Sidney&apos;s third, dedicated OpenBSP channel. Alfapay and
-            the Cindy OTP/recovery channel are hard-denied.
+            Authorized Alfapay lab connection for OpenBSP, isolated by
+            tenant, channel, webhook, HMAC and allowlist.
           </p>
         </div>
         <span className="w-fit rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-medium text-slate-600">
@@ -181,9 +181,10 @@ export function IaSolutionHubSection() {
 
       <div className="space-y-5 p-6">
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-800">
-          Do not enter Alfapay or Cindy credentials here. Configuration remains
-          default-deny until the new OpenBSP channel ID, number and WABA are
-          explicitly allowlisted server-side.
+          Configuration remains default-deny until the authorized Hub channel
+          ID, phone number and WABA are explicitly allowlisted server-side.
+          Outbound starts disabled and can only move to pilot allowlist mode
+          after a signed webhook round trip.
         </div>
         {!channel ? (
           <div className="flex flex-col gap-4 rounded-xl border border-dashed border-slate-300 p-5 sm:flex-row sm:items-end">

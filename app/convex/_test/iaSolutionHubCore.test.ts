@@ -71,7 +71,7 @@ function textPayload(wamid: string, text = "Olá") {
       {
         from: "258840000099",
         id: wamid,
-        timestamp: "1787300000",
+        timestamp: String(Math.floor(Date.now() / 1000)),
         type: "text",
         text: { body: text },
       },
@@ -120,7 +120,7 @@ describe("isolated iaSolution Hub channel core", () => {
     expect(state.secrets).toEqual([]);
   });
 
-  it("hard-denies protected Cindy/AYAmed identifiers before health or secret work", async () => {
+  it("hard-denies protected reserved identifiers before health or secret work", async () => {
     const t = convexTest(schema);
     const owner = await seedTenant(t, "OpenBSP territory guard");
     const pending = await t
@@ -133,19 +133,19 @@ describe("isolated iaSolution Hub channel core", () => {
       phone: process.env.OPENBSP_PROTECTED_PHONE_NUMBERS,
       waba: process.env.OPENBSP_PROTECTED_WABA_IDS,
     };
-    process.env.OPENBSP_PROTECTED_HUB_CHANNEL_IDS = "cindy-channel";
+    process.env.OPENBSP_PROTECTED_HUB_CHANNEL_IDS = "reserved-channel";
     process.env.OPENBSP_PROTECTED_PHONE_NUMBERS = "258840000086";
-    process.env.OPENBSP_PROTECTED_WABA_IDS = "cindy-waba";
+    process.env.OPENBSP_PROTECTED_WABA_IDS = "reserved-waba";
     try {
       await expect(
         t.withIdentity({ subject: owner.userId }).action(
           api.iaSolutionHub.configureChannel,
           {
             channelId: pending.channelId,
-            externalChannelId: "cindy-channel",
-            displayName: "Must stay Cindy",
+            externalChannelId: "reserved-channel",
+            displayName: "Reserved operation",
             phoneNumber: "258840000086",
-            wabaId: "cindy-waba",
+            wabaId: "reserved-waba",
             channelToken: "token-long-enough-for-validation",
             webhookSecret: "webhook-secret-long-enough-for-validation",
             outboundAllowlist: ["258840000099"],
@@ -283,15 +283,15 @@ describe("isolated iaSolution Hub channel core", () => {
       }),
     ).rejects.toThrow(/HUB_CHANNEL_NOT_FOUND/);
 
-    const cindyChannel = await t.run(async (ctx) =>
+    const reservedChannel = await t.run(async (ctx) =>
       ctx.db.insert("channels", {
         tenantId: owner.tenantId,
-        publicId: "hub_cindyxxxxxxxxxxxxxxxxxxx",
+        publicId: "hub_reservedxxxxxxxxxxxxxxxx",
         kind: "whatsapp",
         provider: "iasolution_hub",
         operationalTerritory: "cindy",
-        externalAccountId: "cindy-password-recovery-only",
-        displayName: "Cindy OTP",
+        externalAccountId: "reserved-operation-only",
+        displayName: "Reserved operation",
         status: "active",
         sendMode: "allowlist",
         outboundAllowlist: ["258840000099"],
@@ -306,9 +306,9 @@ describe("isolated iaSolution Hub channel core", () => {
       t.mutation(internal.iaSolutionHub._claimOutbox, {
         tenantId: owner.tenantId,
         memberId: owner.memberId,
-        channelId: cindyChannel,
+        channelId: reservedChannel,
         threadKey: "258840000099",
-        businessKey: "hub:text:cindy-hard-deny",
+        businessKey: "hub:text:reserved-hard-deny",
         messageKind: "text",
         payload: { text: "never sent" },
       }),
@@ -357,7 +357,7 @@ describe("isolated iaSolution Hub channel core", () => {
     expect(state.threads).toEqual([]);
   });
 
-  it("keeps Flow drafts channel-scoped and rejects AYAmed domain markers", async () => {
+  it("keeps Flow drafts channel-scoped and rejects reserved domain markers", async () => {
     const t = convexTest(schema);
     const owner = await seedTenant(t, "OpenBSP");
     const channelId = await seedConfiguredChannel(t, owner, "5");
@@ -396,7 +396,7 @@ describe("isolated iaSolution Hub channel core", () => {
           categories: ["OTHER"],
           flowJson: {
             ...validFlow,
-            screens: [{ ...validFlow.screens[0], title: "AYAmed paciente" }],
+            screens: [{ ...validFlow.screens[0], title: "reserved paciente" }],
           },
         },
       ),

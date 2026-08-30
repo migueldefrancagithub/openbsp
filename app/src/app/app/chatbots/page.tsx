@@ -917,7 +917,8 @@ export default function ChatbotsPage() {
                             placeholder="Required before activation"
                           />
                           <p className="mt-2 text-[11px] leading-5 text-slate-500">
-                            Changing channel returns the bot to draft. Alfapay and lab channels are never listed here.
+                            Changing channel returns the bot to draft. Only
+                            active OpenBSP Hub channels appear here.
                           </p>
                         </div>
 

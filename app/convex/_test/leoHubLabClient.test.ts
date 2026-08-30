@@ -24,8 +24,8 @@ describe("Leo Hub laboratory client", () => {
     expect(endpoint("/messages/text", "https://hub.example/")).toBe(
       "https://hub.example/api/v1/messages/text",
     );
-    expect(buildTextPayload({ to: "+258 86 043 9352", text: "Ola" })).toEqual({
-      to: "258860439352",
+    expect(buildTextPayload({ to: "+258 84 000 0099", text: "Ola" })).toEqual({
+      to: "258840000099",
       text: "Ola",
       preview_url: false,
     });
@@ -56,7 +56,7 @@ describe("Leo Hub laboratory client", () => {
     const result = await sendText({
       token: "channel-token",
       customBaseUrl: "https://hub.example",
-      to: "+258860439352",
+      to: "+258840000099",
       text: "Teste",
     });
 
@@ -66,7 +66,7 @@ describe("Leo Hub laboratory client", () => {
     });
     expect(calls[0]).toMatchObject({
       url: "https://hub.example/api/v1/messages/text",
-      body: { to: "258860439352", text: "Teste", preview_url: false },
+      body: { to: "258840000099", text: "Teste", preview_url: false },
     });
     expect(calls[0].headers.authorization).toBe("Bearer channel-token");
   });
@@ -74,13 +74,13 @@ describe("Leo Hub laboratory client", () => {
   it("builds templates and interactive payloads", () => {
     expect(
       buildTemplatePayload({
-        to: "+258860439352",
+        to: "+258840000099",
         templateName: "obsp_lab_booking",
         languageCode: "pt_PT",
         bodyVariables: ["Maria", "10:30"],
       }),
     ).toMatchObject({
-      to: "258860439352",
+      to: "258840000099",
       template: {
         name: "obsp_lab_booking",
         language: { code: "pt_PT" },
@@ -97,7 +97,7 @@ describe("Leo Hub laboratory client", () => {
     });
     expect(
       buildInteractivePayload({
-        to: "+258860439352",
+        to: "+258840000099",
         interactive: {
           type: "list",
           header: "Agenda",
@@ -190,7 +190,7 @@ describe("Leo Hub laboratory client", () => {
       sendTemplate({
         token: "token",
         customBaseUrl: "https://hub.example",
-        to: "+258860439352",
+        to: "+258840000099",
         templateName: "obsp_lab_test",
         languageCode: "pt_PT",
       }),
