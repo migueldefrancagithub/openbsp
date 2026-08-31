@@ -3,13 +3,26 @@
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { useQuery } from "convex/react";
-import { FlaskConical, Radio } from "lucide-react";
+import { Bot, FlaskConical, Radio, Tag, Timer, UserRound } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { cn } from "@/lib/cn";
 import { relativeTime } from "@/lib/relativeTime";
 
 const SHELL = "w-[320px] shrink-0 border-r border-slate-200 bg-white flex flex-col h-full";
+
+function automationLabel(mode?: string): string {
+  if (mode === "bot") return "Bot";
+  if (mode === "human") return "Human";
+  if (mode === "stopped") return "Stopped";
+  return "Idle";
+}
+
+function AutomationIcon({ mode }: { mode?: string }) {
+  if (mode === "bot") return <Bot size={10} />;
+  if (mode === "human") return <UserRound size={10} />;
+  return <Timer size={10} />;
+}
 
 export function ChannelThreadList() {
   const channels = useQuery(api.channels.list, {});
@@ -103,6 +116,7 @@ export function ChannelThreadList() {
               thread.serviceWindowExpiresAt !== undefined &&
               thread.serviceWindowExpiresAt > Date.now();
             const label = thread.displayName ?? thread.phone ?? thread.threadKey;
+            const tags = thread.tags ?? [];
             return (
               <li key={thread._id}>
                 <Link
@@ -163,6 +177,38 @@ export function ChannelThreadList() {
                           </span>
                         )}
                       </div>
+                    </div>
+                    <div className="mt-1.5 flex min-h-5 flex-wrap items-center gap-1">
+                      <span
+                        className={cn(
+                          "inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-medium",
+                          thread.automationMode === "bot"
+                            ? "border-violet-200 bg-violet-50 text-violet-700"
+                            : thread.automationMode === "human"
+                              ? "border-blue-200 bg-blue-50 text-blue-700"
+                              : thread.automationMode === "stopped"
+                                ? "border-amber-200 bg-amber-50 text-amber-700"
+                                : "border-slate-200 bg-slate-50 text-slate-500",
+                        )}
+                      >
+                        <AutomationIcon mode={thread.automationMode} />
+                        {automationLabel(thread.automationMode)}
+                      </span>
+                      {tags.slice(0, 2).map((tag) => (
+                        <span
+                          key={tag}
+                          className="inline-flex max-w-[110px] items-center gap-1 truncate rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-slate-500"
+                          title={tag}
+                        >
+                          <Tag size={10} className="shrink-0" />
+                          <span className="truncate">{tag}</span>
+                        </span>
+                      ))}
+                      {tags.length > 2 && (
+                        <span className="text-[10px] font-medium text-slate-400">
+                          +{tags.length - 2}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </Link>
