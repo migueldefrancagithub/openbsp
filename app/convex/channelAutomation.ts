@@ -180,10 +180,13 @@ export const dispatchInbound = internalMutation({
       );
     }
 
-    if (thread.automationMode === "human" || thread.automationMode === "stopped") {
+    const bot = await findMatchingBot(ctx, channel._id, event, inbound);
+    if (
+      thread.automationMode === "stopped" ||
+      (thread.automationMode === "human" && bot?.triggerKind !== "keyword")
+    ) {
       return { consumed: false };
     }
-    const bot = await findMatchingBot(ctx, channel._id, event, inbound);
     if (!bot?.entryNodeKey || !bot.flowNodes?.length) {
       return { consumed: false };
     }
