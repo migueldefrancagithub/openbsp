@@ -1734,6 +1734,20 @@ const dispatchReturnValidator = v.object({
   providerMessageId: v.optional(v.string()),
 });
 
+const microCampaignResultValidator = v.object({
+  accepted: v.number(),
+  failed: v.number(),
+  results: v.array(
+    v.object({
+      threadKey: v.string(),
+      outboxId: v.optional(v.id("channelOutbox")),
+      status: v.string(),
+      providerMessageId: v.optional(v.string()),
+      failureReason: v.optional(v.string()),
+    }),
+  ),
+});
+
 /**
  * Durable server-only bridge from the neutral chatbot runtime to the exact
  * same guarded outbox used by human sends. No client can choose a recipient,
@@ -1923,6 +1937,90 @@ export const sendText = action({
           contextMessageId: args.replyToProviderMessageId,
         }),
     });
+  },
+});
+
+export const sendMicroCampaignText = action({
+  args: {
+    channelId: v.id("channels"),
+    threadKeys: v.array(v.string()),
+    text: v.string(),
+    clientNonce: v.string(),
+    campaignName: v.optional(v.string()),
+  },
+  returns: microCampaignResultValidator,
+  handler: async (ctx, args) => {
+    const caller = (await ctx.runQuery(
+      internal.iaSolutionHub._meTenant,
+      {},
+    )) as Caller | null;
+    requireOperator(caller);
+    const text = args.text.trim();
+    if (!text || text.length > 4_096) {
+      throw new ConvexError({ code: "INVALID_TEXT" });
+    }
+    const nonce = args.clientNonce.trim();
+    if (!nonce || nonce.length > 80) {
+      throw new ConvexError({ code: "INVALID_CLIENT_NONCE" });
+    }
+    const threadKeys = Array.from(
+      new Set(args.threadKeys.map((key) => key.trim()).filter(Boolean)),
+    );
+    if (threadKeys.length === 0) {
+      throw new ConvexError({ code: "MICRO_CAMPAIGN_EMPTY" });
+    }
+    if (threadKeys.length > 10) {
+      throw new ConvexError({ code: "MICRO_CAMPAIGN_TOO_LARGE", limit: 10 });
+    }
+
+    let accepted = 0;
+    let failed = 0;
+    const results: Array<{
+      threadKey: string;
+      outboxId?: Id<"channelOutbox">;
+      status: string;
+      providerMessageId?: string;
+      failureReason?: string;
+    }> = [];
+    const campaignName = args.campaignName?.trim().slice(0, 80);
+
+    for (const [index, threadKey] of threadKeys.entries()) {
+      try {
+        const result = await dispatch(ctx, {
+          caller,
+          channelId: args.channelId,
+          threadKey,
+          clientNonce: `micro:${nonce}:${index}`,
+          messageKind: "text",
+          payload: {
+            text,
+            previewUrl: false,
+            ...(campaignName ? { campaignName } : {}),
+          },
+          origin: "automation",
+          sender: async (token, recipient) =>
+            await sendTextViaHub({
+              token,
+              to: recipient,
+              text,
+              previewUrl: false,
+            }),
+        });
+        if (result.status === "accepted") accepted += 1;
+        else failed += 1;
+        results.push({ threadKey, ...result });
+      } catch (error) {
+        failed += 1;
+        results.push({
+          threadKey,
+          status: "failed",
+          failureReason:
+            error instanceof Error ? error.message.slice(0, 300) : "Send failed.",
+        });
+      }
+    }
+
+    return { accepted, failed, results };
   },
 });
 
