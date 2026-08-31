@@ -781,4 +781,173 @@ describe("isolated iaSolution Hub channel core", () => {
       }
     }
   });
+
+  it("answers a micro campaign reply once through the guarded outbox", async () => {
+    const t = convexTest(schema);
+    const owner = await seedTenant(t, "OpenBSP micro campaign reply");
+    const previous = {
+      encryptionKey: process.env.WABA_TOKEN_ENCRYPTION_KEY_V1,
+      hubBaseUrl: process.env.WHATSAPP_HUB_BASE_URL,
+    };
+    process.env.WABA_TOKEN_ENCRYPTION_KEY_V1 = "e".repeat(64);
+    process.env.WHATSAPP_HUB_BASE_URL = "https://hub.example";
+    const requests: unknown[] = [];
+    vi.stubGlobal(
+      "fetch",
+      async (input: string | URL | Request, init?: RequestInit) => {
+        expect(input.toString()).toBe("https://hub.example/api/v1/messages/text");
+        requests.push(JSON.parse(String(init?.body ?? "{}")));
+        return Response.json({
+          success: true,
+          data: { message_id: `wamid.micro.reply.${requests.length}` },
+        });
+      },
+    );
+
+    try {
+      const token = await encryptSecret("hub-token");
+      const hook = await encryptSecret("hub-secret");
+      const now = Date.now();
+      const eventId = await t.run(async (ctx) => {
+        const channelId = await ctx.db.insert("channels", {
+          tenantId: owner.tenantId,
+          publicId: "hub_microreplyxxxxxxxxxxx",
+          kind: "whatsapp",
+          provider: "iasolution_hub",
+          operationalTerritory: "openbsp",
+          externalAccountId: "hub-micro-reply",
+          displayName: "OpenBSP Micro Reply",
+          status: "active",
+          sendMode: "allowlist",
+          outboundAllowlist: ["258840000099"],
+          connectionState: "allowlist_only",
+          webhookStatus: "verified",
+          createdBy: owner.memberId,
+          createdAt: now,
+          updatedAt: now,
+        });
+        await ctx.db.insert("channelSecrets", {
+          tenantId: owner.tenantId,
+          channelId,
+          accessTokenCiphertext: token.ciphertext,
+          accessTokenKeyVersion: token.keyVersion,
+          webhookSecretCiphertext: hook.ciphertext,
+          webhookSecretKeyVersion: hook.keyVersion,
+          encryptedAt: now,
+        });
+        const identityId = await ctx.db.insert("channelIdentities", {
+          tenantId: owner.tenantId,
+          channelId,
+          providerScopedId: "258840000099",
+          phone: "258840000099",
+          displayName: "Lead 099",
+          createdAt: now,
+          updatedAt: now,
+        });
+        await ctx.db.insert("channelThreads", {
+          tenantId: owner.tenantId,
+          channelId,
+          threadKey: "258840000099",
+          identityId,
+          lastEventAt: now,
+          lastEventKind: "message.text",
+          lastInboundAt: now,
+          lastPreview: "Olá",
+          unreadCount: 0,
+          serviceWindowExpiresAt: now + 60_000,
+          automationMode: "human",
+          automationChangedAt: now,
+          automationChangeReason: "human_operator_reply",
+          createdAt: now,
+          updatedAt: now,
+        });
+        await ctx.db.insert("channelOutbox", {
+          tenantId: owner.tenantId,
+          channelId,
+          businessKey: "hub:text:micro-campaign",
+          recipient: "258840000099",
+          threadKey: "258840000099",
+          messageKind: "text",
+          payload: {
+            text: "✨ Micro Sale OpenBSP\n\nResponde:\n1 — Quero ver demo",
+            previewUrl: false,
+            campaignName: "Micro Sale WhatsApp",
+          },
+          status: "delivered",
+          providerMessageId: "wamid.micro.campaign",
+          dispatchAttempts: 1,
+          createdBy: owner.memberId,
+          createdAt: now,
+          updatedAt: now,
+        });
+        const payload = textPayload("wamid.micro.reply.inbound", "micro demo");
+        const event = normalizeWebhook(payload, "sha-micro-reply")[0];
+        if (!event.threadKey) throw new Error("Missing thread key");
+        return await ctx.db.insert("channelEvents", {
+          tenantId: owner.tenantId,
+          channelId,
+          eventKey: event.eventKey,
+          providerEventId: event.providerEventId,
+          eventKind: event.eventKind,
+          direction: event.direction,
+          actorProviderScopedId: event.actorProviderScopedId,
+          actorDisplayName: event.actorDisplayName,
+          actorPhone: event.actorPhone,
+          threadKey: event.threadKey,
+          replyToProviderMessageId: event.replyToProviderMessageId,
+          flowToken: event.flowToken,
+          payload: event.payload,
+          rawPayload: JSON.stringify(payload),
+          rawBodySha256: "sha-micro-reply",
+          providerTimestamp: event.providerTimestamp,
+          status: "processed",
+          attempts: 1,
+          receivedAt: now + 1_000,
+          processedAt: now + 1_000,
+        });
+      });
+
+      await t.action(internal.iaSolutionHub.dispatchMicroCampaignReply, {
+        eventId,
+        intent: "demo",
+      });
+      await t.action(internal.iaSolutionHub.dispatchMicroCampaignReply, {
+        eventId,
+        intent: "demo",
+      });
+
+      expect(requests).toHaveLength(1);
+      expect(requests[0]).toMatchObject({
+        to: "258840000099",
+      });
+      expect(JSON.stringify(requests[0])).toContain("demo");
+      const rows = await t.run(async (ctx) => ({
+        outbox: await ctx.db.query("channelOutbox").collect(),
+        thread: await ctx.db.query("channelThreads").first(),
+      }));
+      const reply = rows.outbox.find((row) =>
+        row.businessKey.startsWith("hub:text:micro-reply:"),
+      );
+      expect(reply).toMatchObject({
+        status: "accepted",
+        providerMessageId: "wamid.micro.reply.1",
+        payload: {
+          campaignIntent: "demo",
+          campaignName: "Micro Sale WhatsApp",
+        },
+      });
+      expect(rows.thread?.automationMode).toBe("human");
+    } finally {
+      if (previous.encryptionKey === undefined) {
+        delete process.env.WABA_TOKEN_ENCRYPTION_KEY_V1;
+      } else {
+        process.env.WABA_TOKEN_ENCRYPTION_KEY_V1 = previous.encryptionKey;
+      }
+      if (previous.hubBaseUrl === undefined) {
+        delete process.env.WHATSAPP_HUB_BASE_URL;
+      } else {
+        process.env.WHATSAPP_HUB_BASE_URL = previous.hubBaseUrl;
+      }
+    }
+  });
 });

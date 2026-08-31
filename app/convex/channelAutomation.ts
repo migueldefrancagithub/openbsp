@@ -15,6 +15,7 @@ const STOP_WORDS = new Set(["stop", "parar", "sair", "cancelar"]);
 const HANDOFF_TAG = "handoff_requested";
 const HANDOFF_COPY =
   "Obrigado. A nossa equipa humana vai continuar o atendimento daqui.";
+const MICRO_CAMPAIGN_LOOKBACK_MS = 7 * 24 * 60 * 60 * 1_000;
 
 const runStatusValidator = v.union(
   v.literal("active"),
@@ -52,6 +53,8 @@ type InboundContent = {
   isCtwa: boolean;
   isHandoff: boolean;
 };
+
+type MicroCampaignIntent = "demo" | "pricing" | "human";
 
 const dispatchResultValidator = v.object({
   consumed: v.boolean(),
@@ -181,6 +184,22 @@ export const dispatchInbound = internalMutation({
     }
 
     const bot = await findMatchingBot(ctx, channel._id, event, inbound);
+    if (!bot && thread.automationMode !== "stopped") {
+      const campaignIntent = classifyMicroCampaignIntent(inbound);
+      if (
+        campaignIntent &&
+        (await hasRecentMicroCampaign(ctx, channel._id, thread.threadKey, event.receivedAt))
+      ) {
+        await addThreadTag(ctx, thread, "campaign_micro");
+        await addThreadTag(ctx, thread, `campaign_intent_${campaignIntent}`);
+        await ctx.scheduler.runAfter(
+          0,
+          internal.iaSolutionHub.dispatchMicroCampaignReply,
+          { eventId: event._id, intent: campaignIntent },
+        );
+        return { consumed: true, status: "completed" };
+      }
+    }
     if (
       thread.automationMode === "stopped" ||
       (thread.automationMode === "human" && bot?.triggerKind !== "keyword")
@@ -1219,6 +1238,67 @@ function interpolate(
 function isStop(inbound: InboundContent): boolean {
   const value = normalizeText(inbound.text ?? inbound.replyId ?? "");
   return STOP_WORDS.has(value);
+}
+
+function classifyMicroCampaignIntent(
+  inbound: InboundContent,
+): MicroCampaignIntent | null {
+  const value = normalizeText(inbound.replyId ?? inbound.text ?? "");
+  if (!value) return null;
+  if (
+    value === "1" ||
+    value.includes("demo") ||
+    value.includes("demonstracao") ||
+    value.includes("quero ver")
+  ) {
+    return "demo";
+  }
+  if (
+    value === "2" ||
+    value.includes("preco") ||
+    value.includes("precos") ||
+    value.includes("valor") ||
+    value.includes("plano")
+  ) {
+    return "pricing";
+  }
+  if (
+    value === "3" ||
+    value.includes("falar") ||
+    value.includes("humano") ||
+    value.includes("atendente") ||
+    value.includes("alguem")
+  ) {
+    return "human";
+  }
+  return null;
+}
+
+async function hasRecentMicroCampaign(
+  ctx: any,
+  channelId: Id<"channels">,
+  threadKey: string,
+  eventReceivedAt: number,
+): Promise<boolean> {
+  const cutoff = eventReceivedAt - MICRO_CAMPAIGN_LOOKBACK_MS;
+  const rows = await ctx.db
+    .query("channelOutbox")
+    .withIndex("by_channel_created", (q: any) => q.eq("channelId", channelId))
+    .order("desc")
+    .take(80);
+  return rows.some((row: Doc<"channelOutbox">) => {
+    if (row.threadKey !== threadKey) return false;
+    if (row.createdAt > eventReceivedAt || row.createdAt < cutoff) return false;
+    if (row.status === "failed") return false;
+    const payload = object(row.payload);
+    const campaignName = normalizeText(string(payload?.campaignName) ?? "");
+    const text = normalizeText(string(payload?.text) ?? "");
+    return (
+      campaignName.includes("micro") ||
+      text.includes("micro sale openbsp") ||
+      text.includes("responde: 1")
+    );
+  });
 }
 
 function normalizeText(value: string): string {

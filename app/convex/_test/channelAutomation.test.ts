@@ -434,6 +434,61 @@ describe("channel-neutral chatbot runtime", () => {
     expect(nextInbound.result).toEqual({ consumed: false });
   });
 
+  it("captures micro campaign intent even while the thread is under human control", async () => {
+    const t = convexTest(schema);
+    const owner = await seedTenant(t, "OpenBSP micro reply");
+    const channel = await seedChannel(t, owner, "micro-reply");
+    await ingestAndDispatch(
+      t,
+      channel,
+      textPayload("wamid.micro-thread", "Olá"),
+      "sha-micro-thread",
+    );
+    await t.mutation(internal.channelAutomation.pauseForHuman, {
+      tenantId: owner.tenantId,
+      channelId: channel,
+      threadKey: "258840000099",
+    });
+    await t.run(async (ctx) => {
+      const thread = await ctx.db.query("channelThreads").first();
+      if (!thread) throw new Error("Missing thread");
+      await ctx.db.insert("channelOutbox", {
+        tenantId: owner.tenantId,
+        channelId: channel,
+        businessKey: "hub:text:micro-lab-campaign",
+        recipient: "258840000099",
+        threadKey: thread.threadKey,
+        messageKind: "text",
+        payload: {
+          text: "✨ Micro Sale OpenBSP\n\nResponde:\n1 — Quero ver demo",
+          previewUrl: false,
+          campaignName: "Micro Sale WhatsApp",
+        },
+        status: "delivered",
+        providerMessageId: "wamid.micro.campaign",
+        dispatchAttempts: 1,
+        createdBy: owner.memberId,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+    });
+
+    const reply = await ingestAndDispatch(
+      t,
+      channel,
+      textPayload("wamid.micro-reply", "micro demo"),
+      "sha-micro-reply",
+    );
+    expect(reply.result).toEqual({ consumed: true, status: "completed" });
+    const thread = await t.run(async (ctx) =>
+      await ctx.db.query("channelThreads").first(),
+    );
+    expect(thread).toMatchObject({
+      automationMode: "human",
+      tags: ["campaign_micro", "campaign_intent_demo"],
+    });
+  });
+
   it("lets an explicit keyword restart a bot on a human-controlled thread", async () => {
     const t = convexTest(schema);
     const owner = await seedTenant(t, "OpenBSP keyword resume");
