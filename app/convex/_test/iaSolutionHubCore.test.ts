@@ -4,6 +4,7 @@ import { api, internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import schema from "../schema";
 import { normalizeWebhook } from "../integrations/iaSolutionHub/webhook";
+import { encryptSecret } from "../lib/secrets";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -655,5 +656,129 @@ describe("isolated iaSolution Hub channel core", () => {
       },
     );
     expect(other.remaining).toBe(19);
+  });
+
+  it("sends a micro campaign through the isolated Hub gates only", async () => {
+    const t = convexTest(schema);
+    const owner = await seedTenant(t, "OpenBSP micro campaign");
+    const previous = {
+      encryptionKey: process.env.WABA_TOKEN_ENCRYPTION_KEY_V1,
+      hubBaseUrl: process.env.WHATSAPP_HUB_BASE_URL,
+    };
+    process.env.WABA_TOKEN_ENCRYPTION_KEY_V1 = "d".repeat(64);
+    process.env.WHATSAPP_HUB_BASE_URL = "https://hub.example";
+    const requests: unknown[] = [];
+    vi.stubGlobal(
+      "fetch",
+      async (input: string | URL | Request, init?: RequestInit) => {
+        expect(input.toString()).toBe("https://hub.example/api/v1/messages/text");
+        requests.push(JSON.parse(String(init?.body ?? "{}")));
+        return Response.json({
+          success: true,
+          data: { message_id: `wamid.micro.${requests.length}` },
+        });
+      },
+    );
+
+    try {
+      const token = await encryptSecret("hub-token");
+      const hook = await encryptSecret("hub-secret");
+      const now = Date.now();
+      const channelId = await t.run(async (ctx) => {
+        const channelId = await ctx.db.insert("channels", {
+          tenantId: owner.tenantId,
+          publicId: "hub_microcampaignxxxxxxxx",
+          kind: "whatsapp",
+          provider: "iasolution_hub",
+          operationalTerritory: "openbsp",
+          externalAccountId: "hub-micro-campaign",
+          displayName: "OpenBSP Micro",
+          status: "active",
+          sendMode: "allowlist",
+          outboundAllowlist: ["258840000099"],
+          connectionState: "allowlist_only",
+          webhookStatus: "verified",
+          createdBy: owner.memberId,
+          createdAt: now,
+          updatedAt: now,
+        });
+        await ctx.db.insert("channelSecrets", {
+          tenantId: owner.tenantId,
+          channelId,
+          accessTokenCiphertext: token.ciphertext,
+          accessTokenKeyVersion: token.keyVersion,
+          webhookSecretCiphertext: hook.ciphertext,
+          webhookSecretKeyVersion: hook.keyVersion,
+          encryptedAt: now,
+        });
+        for (const phone of ["258840000099", "258840000100"]) {
+          const identityId = await ctx.db.insert("channelIdentities", {
+            tenantId: owner.tenantId,
+            channelId,
+            providerScopedId: phone,
+            phone,
+            displayName: `Lead ${phone.slice(-3)}`,
+            createdAt: now,
+            updatedAt: now,
+          });
+          await ctx.db.insert("channelThreads", {
+            tenantId: owner.tenantId,
+            channelId,
+            threadKey: phone,
+            identityId,
+            lastEventAt: now,
+            lastEventKind: "message.text",
+            lastInboundAt: now,
+            lastPreview: "Olá",
+            unreadCount: 0,
+            serviceWindowExpiresAt: now + 60_000,
+            createdAt: now,
+            updatedAt: now,
+          });
+        }
+        return channelId;
+      });
+
+      const result = await t
+        .withIdentity({ subject: owner.userId })
+        .action(api.iaSolutionHub.sendMicroCampaignText, {
+          channelId,
+          threadKeys: ["258840000099", "258840000100"],
+          text: "Micro sale OpenBSP",
+          clientNonce: "test-nonce",
+          campaignName: "Micro lab",
+        });
+
+      expect(result.accepted).toBe(1);
+      expect(result.failed).toBe(1);
+      expect(requests).toHaveLength(1);
+      expect(requests[0]).toMatchObject({
+        to: "258840000099",
+        text: "Micro sale OpenBSP",
+      });
+      const rows = await t.run(async (ctx) => ({
+        outbox: await ctx.db.query("channelOutbox").collect(),
+        threads: await ctx.db.query("channelThreads").collect(),
+      }));
+      expect(rows.outbox).toHaveLength(1);
+      expect(rows.outbox[0]).toMatchObject({
+        status: "accepted",
+        providerMessageId: "wamid.micro.1",
+      });
+      expect(rows.threads.some((thread) => thread.automationMode === "human")).toBe(
+        false,
+      );
+    } finally {
+      if (previous.encryptionKey === undefined) {
+        delete process.env.WABA_TOKEN_ENCRYPTION_KEY_V1;
+      } else {
+        process.env.WABA_TOKEN_ENCRYPTION_KEY_V1 = previous.encryptionKey;
+      }
+      if (previous.hubBaseUrl === undefined) {
+        delete process.env.WHATSAPP_HUB_BASE_URL;
+      } else {
+        process.env.WHATSAPP_HUB_BASE_URL = previous.hubBaseUrl;
+      }
+    }
   });
 });

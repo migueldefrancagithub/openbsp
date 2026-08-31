@@ -1,7 +1,7 @@
 "use client";
 
-import { FormEvent, useMemo, useState, type ReactNode } from "react";
-import { useConvex, useMutation, useQuery } from "convex/react";
+import { FormEvent, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useAction, useConvex, useMutation, useQuery } from "convex/react";
 import {
   AlertTriangle,
   Ban,
@@ -31,6 +31,7 @@ import {
   Users,
   X,
   XCircle,
+  Zap,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { PageHeader } from "@/components/app/EmptyState";
@@ -61,6 +62,16 @@ const BROADCAST_TABS = [
   { key: "failed", label: "Failed", icon: XCircle },
 ] as const;
 
+const MICRO_CAMPAIGN_DEFAULT_TEXT = `✨ Micro Sale OpenBSP
+
+Hoje abrimos um teste pequeno no WhatsApp:
+setup guiado + inbox multiatendente + automação inicial.
+
+Responde:
+1 — Quero ver demo
+2 — Quero preços
+3 — Falar com alguém`;
+
 type BroadcastFilter = (typeof BROADCAST_TABS)[number]["key"];
 type AudienceLogic = "all" | "any";
 type ConsentFilter = "any" | "granted" | "revoked" | "unknown";
@@ -82,7 +93,13 @@ type CampaignOutcomeFilter =
   | "read"
   | "delivered"
   | "sent";
-type StudioTabKey = "dashboard" | "copy" | "lists" | "audience" | "launch";
+type StudioTabKey =
+  | "dashboard"
+  | "copy"
+  | "lists"
+  | "audience"
+  | "launch"
+  | "micro";
 
 export default function CampaignsPage() {
   const convex = useConvex();
@@ -98,6 +115,10 @@ export default function CampaignsPage() {
   const launchCampaign = useMutation(api.campaigns.launchCampaign);
   const sendNextBatch = useMutation(api.campaigns.sendNextBatch);
   const retrySafeFailures = useMutation(api.campaigns.retrySafeFailures);
+  const sendMicroCampaignText = useAction(
+    api.iaSolutionHub.sendMicroCampaignText,
+  );
+  const channels = useQuery(api.channels.list);
 
   const approvedTemplates = useMemo(
     () =>
@@ -106,6 +127,21 @@ export default function CampaignsPage() {
           template.status === "approved" && template.parameterCount === 0,
       ),
     [templates],
+  );
+  const labChannels = useMemo(
+    () =>
+      (channels ?? []).filter(
+        (channel) =>
+          channel.provider === "iasolution_hub" &&
+          channel.operationalTerritory === "openbsp",
+      ),
+    [channels],
+  );
+  const [microChannelId, setMicroChannelId] =
+    useState<Id<"channels"> | "">("");
+  const microThreads = useQuery(
+    api.channels.listThreads,
+    microChannelId ? { channelId: microChannelId, limit: 20 } : "skip",
   );
   const [listName, setListName] = useState("");
   const [listDescription, setListDescription] = useState("");
@@ -158,6 +194,14 @@ export default function CampaignsPage() {
   const [logCampaignId, setLogCampaignId] =
     useState<Id<"campaigns"> | null>(null);
   const [batchSize, setBatchSize] = useState(1000);
+  const [microCampaignName, setMicroCampaignName] =
+    useState("Micro Sale WhatsApp");
+  const [microCampaignText, setMicroCampaignText] = useState(
+    MICRO_CAMPAIGN_DEFAULT_TEXT,
+  );
+  const [selectedMicroThreadKeys, setSelectedMicroThreadKeys] = useState<
+    string[]
+  >([]);
   const audienceCriteria = useMemo(
     () => ({
       logic: audienceLogic,
@@ -222,6 +266,54 @@ export default function CampaignsPage() {
     api.campaigns.listEvents,
     logCampaignId ? { campaignId: logCampaignId, limit: 80 } : "skip",
   ) as CampaignEvent[] | undefined;
+  const selectedMicroChannel = labChannels.find(
+    (channel) => channel._id === microChannelId,
+  );
+  const selectedMicroThreads = useMemo(
+    () =>
+      (microThreads ?? []).filter((thread) =>
+        selectedMicroThreadKeys.includes(thread.threadKey),
+      ),
+    [microThreads, selectedMicroThreadKeys],
+  );
+  const microCampaignReady =
+    Boolean(microChannelId) &&
+    selectedMicroThreadKeys.length > 0 &&
+    microCampaignName.trim().length >= 2 &&
+    microCampaignText.trim().length > 0 &&
+    microCampaignText.trim().length <= 4_096;
+
+  useEffect(() => {
+    if (microChannelId || labChannels.length === 0) return;
+    setMicroChannelId(labChannels[0]._id);
+  }, [labChannels, microChannelId]);
+
+  useEffect(() => {
+    if (!microChannelId) return;
+    if (labChannels.some((channel) => channel._id === microChannelId)) return;
+    setMicroChannelId(labChannels[0]?._id ?? "");
+  }, [labChannels, microChannelId]);
+
+  useEffect(() => {
+    if (!microThreads) return;
+    setSelectedMicroThreadKeys((current) => {
+      const available = new Set(microThreads.map((thread) => thread.threadKey));
+      const kept = current.filter((threadKey) => available.has(threadKey));
+      if (kept.length > 0) return kept;
+      const firstOpen =
+        microThreads.find((thread) => isMicroThreadWindowOpen(thread)) ??
+        microThreads[0];
+      return firstOpen ? [firstOpen.threadKey] : [];
+    });
+  }, [microThreads]);
+
+  function toggleMicroThread(threadKey: string) {
+    setSelectedMicroThreadKeys((current) =>
+      current.includes(threadKey)
+        ? current.filter((value) => value !== threadKey)
+        : [...current, threadKey],
+    );
+  }
 
   async function handleCreateList(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -257,6 +349,30 @@ export default function CampaignsPage() {
       });
       setSelectedContactId("");
       setNotice(result.added ? "Contact added to list." : "Contact was already in this list.");
+    } catch (err) {
+      setError(readError(err));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function handleSendMicroCampaign(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!microCampaignReady || !microChannelId) return;
+    setBusy("micro-campaign");
+    setError(null);
+    setNotice(null);
+    try {
+      const result = await sendMicroCampaignText({
+        channelId: microChannelId,
+        threadKeys: selectedMicroThreadKeys,
+        text: microCampaignText,
+        campaignName: microCampaignName,
+        clientNonce: crypto.randomUUID(),
+      });
+      setNotice(
+        `Micro campaign sent: ${result.accepted} accepted, ${result.failed} blocked by channel gates.`,
+      );
     } catch (err) {
       setError(readError(err));
     } finally {
@@ -455,6 +571,12 @@ export default function CampaignsPage() {
               value: "Safe send",
               icon: Rocket,
             },
+            {
+              key: "micro",
+              label: "Micro lab",
+              value: `${microThreads?.length ?? 0} threads`,
+              icon: Zap,
+            },
           ]}
         />
 
@@ -597,6 +719,161 @@ export default function CampaignsPage() {
               </SubmitButton>
             </form>
           </WorkflowPanel>
+        )}
+
+        {studioTab === "micro" && (
+          <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+            <WorkflowPanel
+              icon={Zap}
+              title="Micro campaign lab"
+              subtitle="Provider-neutral WhatsApp send through the isolated Hub channel."
+            >
+              <form className="space-y-4" onSubmit={handleSendMicroCampaign}>
+                <div className="grid gap-3 lg:grid-cols-2">
+                  <TextInput
+                    label="Campaign name"
+                    value={microCampaignName}
+                    onChange={setMicroCampaignName}
+                    placeholder="Micro Sale WhatsApp"
+                  />
+                  <SelectBox
+                    label="Channel"
+                    value={microChannelId}
+                    onChange={(value) => {
+                      setMicroChannelId(value as Id<"channels"> | "");
+                      setSelectedMicroThreadKeys([]);
+                    }}
+                    options={labChannels.map((channel) => ({
+                      value: channel._id,
+                      label: `${channel.displayName} · ${channel.sendMode}`,
+                    }))}
+                    placeholder="Choose isolated channel"
+                  />
+                </div>
+
+                <div>
+                  <span className="mb-2 block text-[11px] font-medium text-slate-500">
+                    Recipients
+                  </span>
+                  <div className="grid max-h-64 gap-2 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-2">
+                    {channels === undefined || microThreads === undefined ? (
+                      <div className="rounded-lg bg-white px-3 py-3 text-sm text-slate-400">
+                        Loading recipients...
+                      </div>
+                    ) : labChannels.length === 0 ? (
+                      <div className="rounded-lg bg-white px-3 py-3 text-sm text-slate-500">
+                        No isolated Hub channel connected.
+                      </div>
+                    ) : microThreads.length === 0 ? (
+                      <div className="rounded-lg bg-white px-3 py-3 text-sm text-slate-500">
+                        No inbound threads with message events yet.
+                      </div>
+                    ) : (
+                      microThreads.map((thread) => {
+                        const selected = selectedMicroThreadKeys.includes(
+                          thread.threadKey,
+                        );
+                        const windowOpen = isMicroThreadWindowOpen(thread);
+                        return (
+                          <button
+                            key={thread.threadKey}
+                            type="button"
+                            onClick={() => toggleMicroThread(thread.threadKey)}
+                            className={`flex min-h-16 w-full items-center gap-3 rounded-lg border px-3 py-2 text-left transition-colors ${
+                              selected
+                                ? "border-[#0a152d] bg-white"
+                                : "border-slate-200 bg-white hover:border-slate-300"
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selected}
+                              onChange={() => toggleMicroThread(thread.threadKey)}
+                              onClick={(event) => event.stopPropagation()}
+                              className="h-4 w-4 shrink-0 accent-[#0a152d]"
+                            />
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-sm font-semibold text-[#0a1b33]">
+                                {thread.displayName ??
+                                  thread.phone ??
+                                  thread.threadKey}
+                              </span>
+                              <span className="mt-0.5 block truncate text-xs text-slate-500">
+                                {thread.lastPreview ?? thread.lastEventKind}
+                              </span>
+                            </span>
+                            <span
+                              className={`shrink-0 rounded-full px-2 py-1 text-[11px] font-semibold ${
+                                windowOpen
+                                  ? "bg-emerald-50 text-emerald-700"
+                                  : "bg-amber-50 text-amber-700"
+                              }`}
+                            >
+                              {windowOpen ? "24h open" : "template needed"}
+                            </span>
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+
+                <label className="block">
+                  <span className="mb-1 block text-[11px] font-medium text-slate-500">
+                    Message
+                  </span>
+                  <textarea
+                    value={microCampaignText}
+                    onChange={(event) => setMicroCampaignText(event.target.value)}
+                    rows={8}
+                    className="w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm leading-6 text-[#0a1b33] outline-none transition-colors placeholder:text-slate-300 focus:border-slate-400"
+                  />
+                </label>
+
+                <div className="grid gap-2 sm:grid-cols-3">
+                  <Metric label="selected" value={selectedMicroThreadKeys.length} />
+                  <Metric
+                    label="24h open"
+                    value={selectedMicroThreads.filter(isMicroThreadWindowOpen).length}
+                  />
+                  <Metric label="chars" value={microCampaignText.length} />
+                </div>
+
+                {selectedMicroChannel && (
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-800">
+                    {selectedMicroChannel.displayName} ·{" "}
+                    {selectedMicroChannel.connectionState ?? "unknown"} ·{" "}
+                    {selectedMicroChannel.webhookStatus ?? "webhook unknown"}
+                  </div>
+                )}
+
+                <SubmitButton
+                  disabled={busy !== null || !microCampaignReady}
+                  loading={busy === "micro-campaign"}
+                  icon={Zap}
+                >
+                  Send micro campaign
+                </SubmitButton>
+              </form>
+            </WorkflowPanel>
+
+            <WhatsAppIosPreview
+              title="Micro campaign preview"
+              subtitle={microCampaignName}
+              category="marketing"
+              bodyText={
+                microCampaignText.trim() ||
+                "Write the campaign message to preview it here."
+              }
+              buttons={[]}
+              examples={{}}
+              hasMarketingOptIn
+              serviceWindowOpen={selectedMicroThreads.some(
+                isMicroThreadWindowOpen,
+              )}
+              freeEntryWindowOpen={false}
+            />
+          </section>
         )}
 
         {studioTab === "copy" && (
@@ -1638,6 +1915,13 @@ function rate(value: number, total: number): number {
 function normalizedBatchSize(value: number): number {
   if (!Number.isFinite(value)) return 1;
   return Math.min(5000, Math.max(1, Math.floor(value)));
+}
+
+function isMicroThreadWindowOpen(thread: { serviceWindowExpiresAt?: number }) {
+  return (
+    thread.serviceWindowExpiresAt !== undefined &&
+    thread.serviceWindowExpiresAt > Date.now()
+  );
 }
 
 function commaList(value: string): string[] {
