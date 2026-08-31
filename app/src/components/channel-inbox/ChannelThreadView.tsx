@@ -31,6 +31,10 @@ function eventText(payload: unknown): string | null {
   const root = payload as Record<string, unknown>;
   const normalized = root.normalizedText;
   if (typeof normalized === "string" && normalized.trim()) return normalized;
+  const outboundText = root.text;
+  if (typeof outboundText === "string" && outboundText.trim()) {
+    return outboundText;
+  }
   const message = root.message as Record<string, unknown> | undefined;
   const text = message?.text as Record<string, unknown> | undefined;
   const body = text?.body;
