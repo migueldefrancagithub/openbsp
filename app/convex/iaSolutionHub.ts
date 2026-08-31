@@ -48,6 +48,7 @@ const RATE_LIMITS = {
   flow_publish: 2,
 } as const;
 const RATE_LIMIT_WINDOW_MS = 60_000;
+const MICRO_CAMPAIGN_REPLY_LOOKBACK_MS = 7 * 24 * 60 * 60 * 1_000;
 
 function isOpenBspHubChannel(
   channel: Pick<Doc<"channels">, "provider" | "operationalTerritory"> | null,
@@ -184,6 +185,8 @@ type DispatchResult = {
   providerMessageId?: string;
 };
 
+type MicroCampaignIntent = "demo" | "pricing" | "human";
+
 function asObject(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -194,6 +197,15 @@ function nonEmptyString(value: unknown): string | undefined {
   return typeof value === "string" && value.trim()
     ? value.trim()
     : undefined;
+}
+
+function normalizeLabel(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ");
 }
 
 function requireAdmin(caller: Caller | null): asserts caller is Caller {
@@ -1747,6 +1759,179 @@ const microCampaignResultValidator = v.object({
     }),
   ),
 });
+
+const microCampaignIntentValidator = v.union(
+  v.literal("demo"),
+  v.literal("pricing"),
+  v.literal("human"),
+);
+
+const microCampaignReplyTargetValidator = v.union(
+  v.object({
+    tenantId: v.id("tenants"),
+    memberId: v.id("members"),
+    channelId: v.id("channels"),
+    threadKey: v.string(),
+    replyToProviderMessageId: v.optional(v.string()),
+    campaignName: v.optional(v.string()),
+  }),
+  v.null(),
+);
+
+export const _loadMicroCampaignReplyTarget = internalQuery({
+  args: {
+    eventId: v.id("channelEvents"),
+    intent: microCampaignIntentValidator,
+  },
+  returns: microCampaignReplyTargetValidator,
+  handler: async (ctx, args) => {
+    const event = await ctx.db.get(args.eventId);
+    if (
+      !event ||
+      event.status !== "processed" ||
+      event.direction !== "incoming" ||
+      !event.eventKind.startsWith("message.") ||
+      !event.threadKey
+    ) {
+      return null;
+    }
+    const channel = await ctx.db.get(event.channelId);
+    if (!channel || !isOpenBspHubChannel(channel)) return null;
+    const thread = await ctx.db
+      .query("channelThreads")
+      .withIndex("by_channel_thread", (q) =>
+        q.eq("channelId", channel._id).eq("threadKey", event.threadKey!),
+      )
+      .unique();
+    if (
+      !thread ||
+      thread.tenantId !== channel.tenantId ||
+      !thread.serviceWindowExpiresAt ||
+      thread.serviceWindowExpiresAt <= Date.now()
+    ) {
+      return null;
+    }
+
+    const cutoff = event.receivedAt - MICRO_CAMPAIGN_REPLY_LOOKBACK_MS;
+    const recentOutbox = await ctx.db
+      .query("channelOutbox")
+      .withIndex("by_channel_created", (q) => q.eq("channelId", channel._id))
+      .order("desc")
+      .take(80);
+    const campaign = recentOutbox.find((row) => {
+      if (row.threadKey !== event.threadKey) return false;
+      if (row.createdAt > event.receivedAt || row.createdAt < cutoff) {
+        return false;
+      }
+      if (row.status === "failed") return false;
+      return isMicroCampaignPayload(row.payload);
+    });
+    if (!campaign) return null;
+    const member = await ctx.db.get(campaign.createdBy);
+    if (
+      !member ||
+      member.tenantId !== channel.tenantId ||
+      member.status !== "active"
+    ) {
+      return null;
+    }
+    const payload = asObject(campaign.payload);
+    return {
+      tenantId: channel.tenantId,
+      memberId: member._id,
+      channelId: channel._id,
+      threadKey: thread.threadKey,
+      replyToProviderMessageId: event.providerEventId,
+      campaignName: nonEmptyString(payload?.campaignName)?.slice(0, 80),
+    };
+  },
+});
+
+export const dispatchMicroCampaignReply = internalAction({
+  args: {
+    eventId: v.id("channelEvents"),
+    intent: microCampaignIntentValidator,
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const target = (await ctx.runQuery(
+      internal.iaSolutionHub._loadMicroCampaignReplyTarget,
+      args,
+    )) as {
+      tenantId: Id<"tenants">;
+      memberId: Id<"members">;
+      channelId: Id<"channels">;
+      threadKey: string;
+      replyToProviderMessageId?: string;
+      campaignName?: string;
+    } | null;
+    if (!target) return null;
+    const text = microCampaignReplyText(args.intent);
+    await dispatch(ctx, {
+      caller: {
+        tenantId: target.tenantId,
+        memberId: target.memberId,
+        role: "automation",
+      },
+      channelId: target.channelId,
+      threadKey: target.threadKey,
+      clientNonce: `micro-reply:${args.eventId}`,
+      messageKind: "text",
+      payload: {
+        text,
+        previewUrl: false,
+        campaignIntent: args.intent,
+        ...(target.campaignName ? { campaignName: target.campaignName } : {}),
+      },
+      replyToProviderMessageId: target.replyToProviderMessageId,
+      origin: "automation",
+      sender: async (token, recipient) =>
+        await sendTextViaHub({
+          token,
+          to: recipient,
+          text,
+          previewUrl: false,
+          contextMessageId: target.replyToProviderMessageId,
+        }),
+    });
+    return null;
+  },
+});
+
+function isMicroCampaignPayload(payload: unknown): boolean {
+  const objectPayload = asObject(payload);
+  const campaignName = normalizeLabel(nonEmptyString(objectPayload?.campaignName) ?? "");
+  const text = normalizeLabel(nonEmptyString(objectPayload?.text) ?? "");
+  return (
+    campaignName.includes("micro") ||
+    text.includes("micro sale openbsp") ||
+    text.includes("responde: 1")
+  );
+}
+
+function microCampaignReplyText(intent: MicroCampaignIntent): string {
+  if (intent === "pricing") {
+    return [
+      "Boa, envio-te já a leitura rápida de preço.",
+      "",
+      "O OpenBSP começa pelo essencial: canal WhatsApp ligado, inbox para equipa, automações simples e logs de entrega.",
+      "Para orçamento certo, diz-me quantos atendentes vão usar e quantas conversas por mês esperas.",
+    ].join("\n");
+  }
+  if (intent === "human") {
+    return [
+      "Combinado. Já deixei isto marcado para atendimento humano.",
+      "",
+      "Alguém da equipa pode continuar daqui e ver contigo o melhor caminho para testar o WhatsApp no OpenBSP.",
+    ].join("\n");
+  }
+  return [
+    "Perfeito, demo anotada.",
+    "",
+    "A demo ideal é curta: primeiro vemos o inbox, depois uma automação de boas-vindas, e no fim os logs de entrega/status.",
+    "Queres testar como lead, operador ou admin?",
+  ].join("\n");
+}
 
 /**
  * Durable server-only bridge from the neutral chatbot runtime to the exact
