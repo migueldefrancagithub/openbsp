@@ -95,6 +95,10 @@ async function seed(t: ReturnType<typeof convexTest>) {
 
 function messageBody() {
   return JSON.stringify({
+    metadata: {
+      display_phone_number: "+258 84 000 0001",
+      phone_number_id: "hub-phone-number",
+    },
     contacts: [{ profile: { name: "Test User" }, wa_id: "258840000099" }],
     messages: [
       {
@@ -165,6 +169,80 @@ describe("iaSolution Hub webhook route", () => {
 
     expect(tampered.status).toBe(401);
     expect(unknown.status).toBe(404);
+    const events = await t.run(async (ctx) =>
+      ctx.db.query("channelEvents").collect(),
+    );
+    expect(events).toEqual([]);
+  });
+
+  it("allows unsigned Hub registration probes without writing data", async () => {
+    const t = convexTest(schema);
+    const { channelId } = await seed(t);
+    const probe = await t.fetch(ROUTE, {
+      method: "POST",
+      body: messageBody(),
+    });
+
+    expect(probe.status).toBe(200);
+    expect(await probe.json()).toEqual({
+      accepted: 0,
+      duplicates: 0,
+      failed: 0,
+      probe: true,
+    });
+    const state = await t.run(async (ctx) => ({
+      channel: await ctx.db.get(channelId),
+      events: await ctx.db.query("channelEvents").collect(),
+    }));
+    expect(state.channel?.webhookStatus).toBe("pending");
+    expect(state.events).toEqual([]);
+  });
+
+  it("accepts unsigned direct Hub deliveries with matching channel metadata", async () => {
+    const t = convexTest(schema);
+    const { channelId } = await seed(t);
+
+    const delivery = await t.fetch(ROUTE, {
+      method: "POST",
+      headers: {
+        "user-agent": "iaSolutionHub-Webhook/1.0",
+        "x-delivery-id": "delivery-unsigned-1",
+        "x-webhook-id": "hub-webhook-1",
+      },
+      body: messageBody(),
+    });
+
+    expect(delivery.status).toBe(200);
+    expect(await delivery.json()).toEqual({
+      accepted: 1,
+      duplicates: 0,
+      failed: 0,
+    });
+    const state = await t.run(async (ctx) => ({
+      channel: await ctx.db.get(channelId),
+      events: await ctx.db.query("channelEvents").collect(),
+      threads: await ctx.db.query("channelThreads").collect(),
+    }));
+    expect(state.channel).toMatchObject({ webhookStatus: "verified" });
+    expect(state.events).toHaveLength(1);
+    expect(state.threads).toHaveLength(1);
+  });
+
+  it("rejects unsigned direct Hub deliveries with mismatched metadata", async () => {
+    const t = convexTest(schema);
+    await seed(t);
+
+    const unsigned = await t.fetch(ROUTE, {
+      method: "POST",
+      headers: {
+        "user-agent": "iaSolutionHub-Webhook/1.0",
+        "x-delivery-id": "delivery-unsigned-2",
+        "x-webhook-id": "hub-webhook-1",
+      },
+      body: messageBody().replace("+258 84 000 0001", "+258 84 000 0002"),
+    });
+
+    expect(unsigned.status).toBe(401);
     const events = await t.run(async (ctx) =>
       ctx.db.query("channelEvents").collect(),
     );

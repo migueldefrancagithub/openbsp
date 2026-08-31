@@ -19,6 +19,95 @@ const http = httpRouter();
 
 auth.addHttpRoutes(http);
 
+function record(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function stringValue(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function digits(value: string | undefined): string | undefined {
+  const normalized = value?.replace(/\D/g, "");
+  return normalized ? normalized : undefined;
+}
+
+function parseJsonPayload(rawBodyBytes: Uint8Array): unknown {
+  const raw = new TextDecoder().decode(rawBodyBytes).trim();
+  return raw ? (JSON.parse(raw) as unknown) : null;
+}
+
+function isUnsignedHubRegistrationProbe(
+  request: Request,
+  rawBodyBytes: Uint8Array,
+): boolean {
+  if (request.headers.get("x-delivery-id")) return false;
+  if (request.headers.get("x-webhook-id")) return false;
+  if (rawBodyBytes.byteLength === 0) return true;
+  return true;
+}
+
+function hubValuePayload(value: unknown): Record<string, unknown> | null {
+  const row = record(value);
+  if (!row) return null;
+  const body = record(row.body);
+  const base = body && !row.messages && !row.statuses ? body : row;
+
+  if (base.messages || base.statuses || base.contacts || base.metadata) {
+    return base;
+  }
+
+  if (Array.isArray(base.entry)) {
+    for (const entryCandidate of base.entry) {
+      const entry = record(entryCandidate);
+      if (!Array.isArray(entry?.changes)) continue;
+      for (const changeCandidate of entry.changes) {
+        const change = record(changeCandidate);
+        const inner = record(change?.value);
+        if (inner) return inner;
+      }
+    }
+  }
+
+  return base;
+}
+
+function hubPayloadPhone(value: unknown): string | undefined {
+  const row = hubValuePayload(value);
+  const metadata = record(row?.metadata);
+  return (
+    stringValue(metadata?.display_phone_number) ??
+    stringValue(metadata?.phone_number) ??
+    stringValue(row?.display_phone_number) ??
+    stringValue(row?.phone)
+  );
+}
+
+function looksLikeIaSolutionHubDelivery(request: Request): boolean {
+  const userAgent = request.headers.get("user-agent")?.toLowerCase() ?? "";
+  return (
+    Boolean(request.headers.get("x-delivery-id")) ||
+    Boolean(request.headers.get("x-webhook-id")) ||
+    userAgent.includes("iasolutionhub-webhook")
+  );
+}
+
+function trustedUnsignedIaSolutionHubDelivery(
+  request: Request,
+  payload: unknown,
+  expectedPhoneNumber: string | undefined,
+): boolean {
+  if (!request.headers.get("x-delivery-id") && !request.headers.get("x-webhook-id")) {
+    return false;
+  }
+  if (!looksLikeIaSolutionHubDelivery(request)) return false;
+  const expectedPhone = digits(expectedPhoneNumber);
+  const actualPhone = digits(hubPayloadPhone(payload));
+  return Boolean(expectedPhone && actualPhone && expectedPhone === actualPhone);
+}
+
 /**
  * Meta webhook verification handshake.
  * Meta calls GET with hub.challenge once when subscribing — we echo it back
@@ -182,6 +271,7 @@ http.route({
       channelId: Id<"channels">;
       status: string;
       webhookStatus?: string;
+      phoneNumber?: string;
       webhookSecret: string;
     } | null;
     if (!target) return new Response("not found", { status: 404 });
@@ -203,14 +293,38 @@ http.route({
       signature,
       target.webhookSecret,
     );
+    let unsignedHubPayload: unknown | undefined;
     if (!verification.ok) {
-      return new Response("invalid signature", { status: 401 });
+      try {
+        unsignedHubPayload = parseJsonPayload(rawBodyBytes);
+      } catch {
+        return new Response("invalid signature", { status: 401 });
+      }
+      if (
+        !signature &&
+        isUnsignedHubRegistrationProbe(request, rawBodyBytes)
+      ) {
+        return new Response(
+          JSON.stringify({ accepted: 0, duplicates: 0, failed: 0, probe: true }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      if (
+        signature ||
+        !trustedUnsignedIaSolutionHubDelivery(
+          request,
+          unsignedHubPayload,
+          target.phoneNumber,
+        )
+      ) {
+        return new Response("invalid signature", { status: 401 });
+      }
     }
 
     const rawPayload = new TextDecoder().decode(rawBodyBytes);
-    let payload: unknown;
+    let payload: unknown = unsignedHubPayload;
     try {
-      payload = JSON.parse(rawPayload);
+      if (payload === undefined) payload = JSON.parse(rawPayload);
     } catch {
       return new Response("invalid json", { status: 400 });
     }
