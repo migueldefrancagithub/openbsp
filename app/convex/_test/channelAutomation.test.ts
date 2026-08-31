@@ -425,6 +425,62 @@ describe("channel-neutral chatbot runtime", () => {
         dispatchId: state.dispatch!._id,
       }),
     ).toBeNull();
+    const nextInbound = await ingestAndDispatch(
+      t,
+      channel,
+      textPayload("wamid.after-human", "Olá outra vez"),
+      "sha-after-human",
+    );
+    expect(nextInbound.result).toEqual({ consumed: false });
+  });
+
+  it("lets an explicit keyword restart a bot on a human-controlled thread", async () => {
+    const t = convexTest(schema);
+    const owner = await seedTenant(t, "OpenBSP keyword resume");
+    const channel = await seedChannel(t, owner, "keyword-resume");
+    await seedBot(t, owner, {
+      channelId: channel,
+      name: "Keyword resume",
+      triggerKind: "keyword",
+      triggerKeywords: ["openbspbot"],
+      nodes: instantFlow,
+    });
+    await ingestAndDispatch(
+      t,
+      channel,
+      textPayload("wamid.keyword-start", "openbspbot"),
+      "sha-keyword-start",
+    );
+    await t.mutation(internal.channelAutomation.pauseForHuman, {
+      tenantId: owner.tenantId,
+      channelId: channel,
+      threadKey: "258840000099",
+    });
+    const ignored = await ingestAndDispatch(
+      t,
+      channel,
+      textPayload("wamid.keyword-ignore", "Olá outra vez"),
+      "sha-keyword-ignore",
+    );
+    expect(ignored.result).toEqual({ consumed: false });
+
+    const resumed = await ingestAndDispatch(
+      t,
+      channel,
+      textPayload("wamid.keyword-resume", "quero openbspbot"),
+      "sha-keyword-resume",
+    );
+    expect(resumed.result).toMatchObject({ consumed: true, status: "active" });
+
+    const state = await t.run(async (ctx) => ({
+      runs: await ctx.db.query("channelAutomationRuns").collect(),
+      thread: await ctx.db.query("channelThreads").first(),
+      dispatches: await ctx.db.query("channelAutomationDispatches").collect(),
+    }));
+    expect(state.runs).toHaveLength(2);
+    expect(state.runs.map((run) => run.status)).toEqual(["stopped", "active"]);
+    expect(state.thread).toMatchObject({ automationMode: "bot" });
+    expect(state.dispatches).toHaveLength(2);
   });
 });
 
