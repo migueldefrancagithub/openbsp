@@ -2,7 +2,14 @@
 
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
-import { AlertTriangle, Loader2, Send, ShieldAlert } from "lucide-react";
+import {
+  AlertTriangle,
+  Loader2,
+  Search,
+  Send,
+  ShieldAlert,
+  Zap,
+} from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { cn } from "@/lib/cn";
@@ -56,10 +63,13 @@ export function ChannelThreadView({
     threadKey,
     limit: 200,
   });
+  const quickReplies = useQuery(api.quickReplies.list);
   const markRead = useMutation(api.channels.markThreadRead);
   const sendText = useAction(api.iaSolutionHub.sendText);
 
   const [draft, setDraft] = useState("");
+  const [showQuickReplies, setShowQuickReplies] = useState(false);
+  const [quickReplySearch, setQuickReplySearch] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const markedRef = useRef<string | null>(null);
@@ -78,6 +88,23 @@ export function ChannelThreadView({
     () => (events ? [...events].reverse() : []),
     [events],
   );
+  const quickReplyNeedle = (
+    quickReplySearch || (draft.startsWith("/") ? draft.slice(1) : "")
+  )
+    .trim()
+    .toLowerCase();
+  const filteredQuickReplies = useMemo(
+    () =>
+      (quickReplies ?? []).filter((reply) => {
+        if (!quickReplyNeedle) return true;
+        return (
+          reply.name.toLowerCase().includes(quickReplyNeedle) ||
+          reply.content.toLowerCase().includes(quickReplyNeedle)
+        );
+      }),
+    [quickReplies, quickReplyNeedle],
+  );
+  const quickRepliesOpen = showQuickReplies || draft.startsWith("/");
 
   const blocked: BlockedReason = useMemo(() => {
     if (!thread) return null;
@@ -136,6 +163,12 @@ export function ChannelThreadView({
     } finally {
       setSending(false);
     }
+  }
+
+  function insertQuickReply(content: string) {
+    setDraft(content);
+    setShowQuickReplies(false);
+    setQuickReplySearch("");
   }
 
   if (thread === undefined || events === undefined) {
@@ -236,28 +269,117 @@ export function ChannelThreadView({
             </div>
           </div>
         ) : (
-          <form onSubmit={submit} className="flex items-center gap-2">
-            <input
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              placeholder="Write a reply…"
-              maxLength={4096}
-              disabled={sending}
-              className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-[13px] outline-none focus:border-slate-400 disabled:opacity-60"
-            />
-            <button
-              type="submit"
-              disabled={sending || !draft.trim()}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-[#0a152d] px-3.5 py-2 text-[13px] font-medium text-white disabled:opacity-40"
-            >
-              {sending ? (
-                <Loader2 size={14} className="animate-spin" />
-              ) : (
-                <Send size={14} />
-              )}
-              Send
-            </button>
-          </form>
+          <>
+            {quickRepliesOpen && (
+              <div className="mb-3 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_18px_60px_-44px_rgba(15,23,42,0.65)]">
+                <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                    Quick replies
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowQuickReplies(false);
+                      setQuickReplySearch("");
+                      if (draft.startsWith("/")) setDraft("");
+                    }}
+                    className="text-[11px] text-slate-500 hover:text-slate-900"
+                  >
+                    Cancel
+                  </button>
+                </div>
+                <div className="border-b border-slate-100 p-2">
+                  <label className="relative block">
+                    <Search
+                      size={13}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                    />
+                    <input
+                      value={quickReplySearch}
+                      onChange={(event) =>
+                        setQuickReplySearch(event.target.value)
+                      }
+                      placeholder="Search shortcut..."
+                      className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50 pl-8 pr-3 text-[12px] text-[#0a1b33] outline-none focus:border-slate-400 focus:bg-white"
+                    />
+                  </label>
+                </div>
+                {quickReplies === undefined ? (
+                  <div className="px-3 py-4 text-center text-[12px] text-slate-500">
+                    Loading quick replies…
+                  </div>
+                ) : quickReplies.length === 0 ? (
+                  <div className="px-3 py-4 text-center text-[12px] text-slate-500">
+                    No quick replies yet.
+                  </div>
+                ) : (
+                  <ul className="max-h-64 divide-y divide-slate-100 overflow-y-auto">
+                    {filteredQuickReplies.map((reply) => (
+                      <li key={reply._id}>
+                        <button
+                          type="button"
+                          onClick={() => insertQuickReply(reply.content)}
+                          className="flex w-full items-start gap-2 px-3 py-2.5 text-left transition-colors hover:bg-slate-50"
+                        >
+                          <Zap
+                            size={12}
+                            className="mt-0.5 flex-shrink-0 text-amber-500"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <div className="font-[var(--font-mono)] text-[12px] font-semibold text-[#0a1b33]">
+                              /{reply.name}
+                            </div>
+                            <div className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-slate-500">
+                              {reply.content}
+                            </div>
+                          </div>
+                        </button>
+                      </li>
+                    ))}
+                    {filteredQuickReplies.length === 0 && (
+                      <li className="px-3 py-4 text-center text-[12px] text-slate-500">
+                        No match
+                      </li>
+                    )}
+                  </ul>
+                )}
+              </div>
+            )}
+            <form onSubmit={submit} className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowQuickReplies((value) => !value)}
+                disabled={sending}
+                title="Quick replies"
+                className="rounded-lg border border-slate-200 p-2 text-slate-500 transition-colors hover:border-slate-300 hover:text-[#0a152d] disabled:opacity-40"
+              >
+                <Zap size={15} />
+              </button>
+              <input
+                value={draft}
+                onChange={(e) => {
+                  setDraft(e.target.value);
+                  if (e.target.value.startsWith("/")) setShowQuickReplies(true);
+                }}
+                placeholder="Write a reply…"
+                maxLength={4096}
+                disabled={sending}
+                className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-[13px] outline-none focus:border-slate-400 disabled:opacity-60"
+              />
+              <button
+                type="submit"
+                disabled={sending || !draft.trim()}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-[#0a152d] px-3.5 py-2 text-[13px] font-medium text-white disabled:opacity-40"
+              >
+                {sending ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <Send size={14} />
+                )}
+                Send
+              </button>
+            </form>
+          </>
         )}
 
         {error && (
