@@ -210,6 +210,57 @@ describe("channel inbox queries", () => {
     expect(serialized).not.toContain("ciphertext-webhook");
   });
 
+  it("surfaces safe CRM context for the channel inbox", async () => {
+    const t = convexTest(schema);
+    const owner = await seedTenant(t, "OpenBSP Lab");
+    const { channelId } = await seedChannel(t, owner);
+    await inbound(t, channelId, ALLOWED, "micro demo", 1);
+
+    await t.run(async (ctx) => {
+      const thread = await ctx.db
+        .query("channelThreads")
+        .withIndex("by_channel_thread", (q) =>
+          q.eq("channelId", channelId).eq("threadKey", ALLOWED),
+        )
+        .unique();
+      expect(thread).not.toBeNull();
+      await ctx.db.patch(thread!._id, {
+        tags: ["campaign_micro", "campaign_intent_demo"],
+        automationMode: "human",
+        automationChangeReason: "campaign_reply",
+      });
+    });
+
+    const as = t.withIdentity({ subject: owner.userId });
+    const [listRow] = await as.query(api.channels.listThreads, { channelId });
+    expect(listRow).toMatchObject({
+      threadKey: ALLOWED,
+      tags: ["campaign_micro", "campaign_intent_demo"],
+      automationMode: "human",
+    });
+
+    const detail = await as.query(api.channels.getThread, {
+      channelId,
+      threadKey: ALLOWED,
+    });
+    expect(detail).toMatchObject({
+      channelDisplayName: "OpenBSP Lab",
+      automationChangeReason: "campaign_reply",
+      recipientAllowlisted: true,
+    });
+
+    const [event] = await as.query(api.channels.listThreadEvents, {
+      channelId,
+      threadKey: ALLOWED,
+    });
+    expect(event).toMatchObject({
+      actorDisplayName: "Dani",
+      actorPhone: ALLOWED,
+      status: "processed",
+    });
+    expect(event.providerTimestamp).toBeDefined();
+  });
+
   it("returns null for a thread that does not exist yet", async () => {
     const t = convexTest(schema);
     const owner = await seedTenant(t, "OpenBSP Lab");
