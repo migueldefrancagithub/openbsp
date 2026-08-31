@@ -1,9 +1,13 @@
 import { convexTest } from "convex-test";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { api, internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import schema from "../schema";
 import { normalizeWebhook } from "../integrations/iaSolutionHub/webhook";
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 async function seedTenant(t: ReturnType<typeof convexTest>, name: string) {
   return await t.run(async (ctx) => {
@@ -167,6 +171,119 @@ describe("isolated iaSolution Hub channel core", () => {
         delete process.env.OPENBSP_PROTECTED_WABA_IDS;
       } else {
         process.env.OPENBSP_PROTECTED_WABA_IDS = previous.waba;
+      }
+    }
+  });
+
+  it("configures from the nested Hub phone info shape", async () => {
+    const t = convexTest(schema);
+    const owner = await seedTenant(t, "OpenBSP nested Hub");
+    const pending = await t
+      .withIdentity({ subject: owner.userId })
+      .mutation(api.iaSolutionHub.createPendingChannel, {
+        displayName: "OpenBSP WhatsApp",
+      });
+    const previous = {
+      allowedChannel: process.env.OPENBSP_ALLOWED_HUB_CHANNEL_IDS,
+      allowedPhone: process.env.OPENBSP_ALLOWED_PHONE_NUMBERS,
+      allowedWaba: process.env.OPENBSP_ALLOWED_WABA_IDS,
+      encryptionKey: process.env.WABA_TOKEN_ENCRYPTION_KEY_V1,
+    };
+    process.env.OPENBSP_ALLOWED_HUB_CHANNEL_IDS = "hub-nested-channel";
+    process.env.OPENBSP_ALLOWED_PHONE_NUMBERS = "258840000098";
+    process.env.OPENBSP_ALLOWED_WABA_IDS = "waba-nested";
+    process.env.WABA_TOKEN_ENCRYPTION_KEY_V1 = "c".repeat(64);
+    vi.stubGlobal(
+      "fetch",
+      async (input: string | URL | Request) => {
+        const url = input.toString();
+        if (url.endsWith("/phone/info")) {
+          return Response.json({
+            success: true,
+            data: {
+              phone_number: {
+                display_phone_number: "+258 84 000 0098",
+                verified_name: "OpenBSP Lab",
+                quality_rating: "GREEN",
+                health_status: {
+                  can_send_message: "AVAILABLE",
+                  entities: [
+                    { entity_type: "PHONE_NUMBER", id: "phone-nested" },
+                    { entity_type: "WABA", id: "waba-nested" },
+                  ],
+                },
+              },
+            },
+          });
+        }
+        if (url.endsWith("/phone/health")) {
+          return Response.json({
+            success: true,
+            data: {
+              health_status: {
+                can_send_message: "AVAILABLE",
+                entities: [
+                  { entity_type: "PHONE_NUMBER", id: "phone-nested" },
+                  { entity_type: "WABA", id: "waba-nested" },
+                ],
+              },
+            },
+          });
+        }
+        return Response.json({ success: false, message: "unexpected route" });
+      },
+    );
+
+    try {
+      const configured = await t.withIdentity({ subject: owner.userId }).action(
+        api.iaSolutionHub.configureChannel,
+        {
+          channelId: pending.channelId,
+          externalChannelId: "hub-nested-channel",
+          displayName: "OpenBSP WhatsApp",
+          phoneNumber: "258840000098",
+          wabaId: "waba-nested",
+          channelToken: "token-long-enough-for-validation",
+          webhookSecret: "webhook-secret-long-enough-for-validation",
+          outboundAllowlist: ["258840000099"],
+        },
+      );
+      expect(configured).toMatchObject({
+        channelId: pending.channelId,
+        sendMode: "disabled",
+        connectionState: "ready",
+      });
+      const channel = await t.run(async (ctx) =>
+        ctx.db.get(pending.channelId),
+      );
+      expect(channel).toMatchObject({
+        externalAccountId: "hub-nested-channel",
+        phoneNumber: "258840000098",
+        wabaId: "waba-nested",
+        status: "active",
+        webhookStatus: "pending",
+        lastHealthStatus: "AVAILABLE",
+      });
+    } finally {
+      if (previous.allowedChannel === undefined) {
+        delete process.env.OPENBSP_ALLOWED_HUB_CHANNEL_IDS;
+      } else {
+        process.env.OPENBSP_ALLOWED_HUB_CHANNEL_IDS = previous.allowedChannel;
+      }
+      if (previous.allowedPhone === undefined) {
+        delete process.env.OPENBSP_ALLOWED_PHONE_NUMBERS;
+      } else {
+        process.env.OPENBSP_ALLOWED_PHONE_NUMBERS = previous.allowedPhone;
+      }
+      if (previous.allowedWaba === undefined) {
+        delete process.env.OPENBSP_ALLOWED_WABA_IDS;
+      } else {
+        process.env.OPENBSP_ALLOWED_WABA_IDS = previous.allowedWaba;
+      }
+      if (previous.encryptionKey === undefined) {
+        delete process.env.WABA_TOKEN_ENCRYPTION_KEY_V1;
+      } else {
+        process.env.WABA_TOKEN_ENCRYPTION_KEY_V1 = previous.encryptionKey;
       }
     }
   });

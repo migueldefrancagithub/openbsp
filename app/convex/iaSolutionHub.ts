@@ -325,12 +325,48 @@ function validateConfiguredInput(args: {
 
 function hubPhone(info: unknown): string | undefined {
   const row = asObject(info);
-  return nonEmptyString(row?.display_phone_number) ?? nonEmptyString(row?.phone);
+  const phoneNumber = asObject(row?.phone_number);
+  return (
+    nonEmptyString(row?.display_phone_number) ??
+    nonEmptyString(row?.phone) ??
+    nonEmptyString(row?.phoneNumber) ??
+    nonEmptyString(phoneNumber?.display_phone_number) ??
+    nonEmptyString(phoneNumber?.phone)
+  );
 }
 
 function hubWabaId(info: unknown): string | undefined {
   const row = asObject(info);
-  return nonEmptyString(row?.waba_id) ?? nonEmptyString(row?.wabaId);
+  const phoneNumber = asObject(row?.phone_number);
+  const waba = asObject(row?.waba);
+  const healthStatus =
+    asObject(row?.health_status) ?? asObject(phoneNumber?.health_status);
+  const entities = Array.isArray(healthStatus?.entities)
+    ? healthStatus.entities
+    : [];
+  const wabaEntity = entities.find((entity) => {
+    const record = asObject(entity);
+    return String(record?.entity_type ?? "").toUpperCase() === "WABA";
+  });
+  return (
+    nonEmptyString(row?.waba_id) ??
+    nonEmptyString(row?.wabaId) ??
+    nonEmptyString(phoneNumber?.waba_id) ??
+    nonEmptyString(phoneNumber?.wabaId) ??
+    nonEmptyString(waba?.id) ??
+    nonEmptyString(asObject(wabaEntity)?.id)
+  );
+}
+
+function hubHealthStatus(health: unknown): string | undefined {
+  const row = asObject(health);
+  const healthStatus = asObject(row?.health_status);
+  return (
+    nonEmptyString(row?.health_status) ??
+    nonEmptyString(row?.status) ??
+    nonEmptyString(row?.quality_rating) ??
+    nonEmptyString(healthStatus?.can_send_message)
+  );
 }
 
 export const _meTenant = internalQuery({
@@ -571,7 +607,6 @@ export const configureChannel = action({
       encryptSecret(args.channelToken),
       encryptSecret(args.webhookSecret),
     ]);
-    const healthData = asObject(health.data);
     const result = (await ctx.runMutation(
       internal.iaSolutionHub._configureConnection,
       {
@@ -588,7 +623,7 @@ export const configureChannel = action({
         webhookSecretCiphertext: hookSecret.ciphertext,
         webhookSecretKeyVersion: hookSecret.keyVersion,
         encryptedAt: Math.max(tokenSecret.encryptedAt, hookSecret.encryptedAt),
-        healthStatus: nonEmptyString(healthData?.health_status),
+        healthStatus: hubHealthStatus(health.data),
       },
     )) as { channelId: Id<"channels">; publicId: string };
     return {
@@ -726,6 +761,7 @@ export const _loadWebhookTarget = internalQuery({
       channelId: v.id("channels"),
       status: v.string(),
       webhookStatus: v.optional(v.string()),
+      phoneNumber: v.optional(v.string()),
       webhookSecretCiphertext: v.string(),
       webhookSecretKeyVersion: v.number(),
     }),
@@ -747,6 +783,7 @@ export const _loadWebhookTarget = internalQuery({
       channelId: channel._id,
       status: channel.status,
       webhookStatus: channel.webhookStatus,
+      phoneNumber: channel.phoneNumber,
       webhookSecretCiphertext: secret.webhookSecretCiphertext,
       webhookSecretKeyVersion: secret.webhookSecretKeyVersion,
     };
@@ -760,6 +797,7 @@ export const loadWebhookContext = internalAction({
       channelId: v.id("channels"),
       status: v.string(),
       webhookStatus: v.optional(v.string()),
+      phoneNumber: v.optional(v.string()),
       webhookSecret: v.string(),
     }),
     v.null(),
@@ -772,6 +810,7 @@ export const loadWebhookContext = internalAction({
       channelId: Id<"channels">;
       status: string;
       webhookStatus?: string;
+      phoneNumber?: string;
       webhookSecretCiphertext: string;
       webhookSecretKeyVersion: number;
     } | null;
@@ -780,6 +819,7 @@ export const loadWebhookContext = internalAction({
       channelId: target.channelId,
       status: target.status,
       webhookStatus: target.webhookStatus,
+      phoneNumber: target.phoneNumber,
       webhookSecret: await decryptSecret(
         target.webhookSecretCiphertext,
         target.webhookSecretKeyVersion,
