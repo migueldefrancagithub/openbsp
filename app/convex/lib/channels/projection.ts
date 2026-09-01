@@ -21,8 +21,18 @@ import {
 const SERVICE_WINDOW_MS = 24 * 60 * 60 * 1000;
 const PREVIEW_MAX_CHARS = 160;
 const FAILURE_REASON_MAX_CHARS = 500;
+const DEFAULT_NEXT_STEP_MS = 2 * 60 * 60 * 1000;
 
 type CampaignRecipientStatus = "sent" | "delivered" | "read" | "failed";
+type ChannelLeadStatus =
+  | "new"
+  | "interested"
+  | "asked_price"
+  | "wants_booking"
+  | "awaiting_human"
+  | "booked"
+  | "confirmed"
+  | "lost";
 
 const CAMPAIGN_STATUS_RANK: Record<string, number> = {
   pending: 0,
@@ -76,6 +86,78 @@ export function derivePreview(payload: unknown): string | undefined {
   }
 
   return undefined;
+}
+
+function normalizeIntentText(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ");
+}
+
+function deriveInboundText(payload: unknown): string {
+  return normalizeIntentText(derivePreview(payload) ?? "");
+}
+
+function inferLeadStatusFromInbound(
+  payload: unknown,
+): ChannelLeadStatus | undefined {
+  const text = deriveInboundText(payload);
+  if (!text) return "interested";
+  if (
+    /\b(confirmo|confirmado|confirmada|esta confirmado|vou comparecer|estarei la|ok confirmado)\b/.test(
+      text,
+    )
+  ) {
+    return "confirmed";
+  }
+  if (
+    /\b(marcar|agendar|consulta|slot|horario|horario disponivel|disponibilidade|remarcar)\b/.test(
+      text,
+    )
+  ) {
+    return "wants_booking";
+  }
+  if (/\b(preco|precos|valor|quanto custa|custa quanto|plano)\b/.test(text)) {
+    return "asked_price";
+  }
+  if (/\b(humano|atendente|pessoa|equipa|equipe|falar com alguem|assistente)\b/.test(text)) {
+    return "awaiting_human";
+  }
+  if (/\b(cancelar|nao quero|sem interesse|parar|sair|stop)\b/.test(text)) {
+    return "lost";
+  }
+  return "interested";
+}
+
+function nextStepFor(status: ChannelLeadStatus): string {
+  if (status === "asked_price") return "Responder com servico, condicoes e proximo horario possivel.";
+  if (status === "wants_booking") return "Consultar agenda real antes de propor ou confirmar horario.";
+  if (status === "awaiting_human") return "Atribuir a equipa e responder com contexto da conversa.";
+  if (status === "confirmed") return "Confirmacao recebida. Rever se existe agendamento associado.";
+  if (status === "booked") return "Acompanhar confirmacao e comparecimento.";
+  if (status === "lost") return "Encerrar sem novo disparo, exceto se o cliente voltar.";
+  return "Qualificar pedido e definir proxima acao.";
+}
+
+function shouldAdvanceLeadStatus(
+  current: ChannelLeadStatus | undefined,
+  next: ChannelLeadStatus,
+): boolean {
+  if (!current) return true;
+  const rank: Record<ChannelLeadStatus, number> = {
+    new: 0,
+    interested: 1,
+    asked_price: 2,
+    wants_booking: 3,
+    awaiting_human: 4,
+    booked: 5,
+    confirmed: 6,
+    lost: 7,
+  };
+  return rank[next] >= rank[current] || next === "awaiting_human";
 }
 
 /**
@@ -251,6 +333,10 @@ export async function projectThreadFromEvent(
   const eventAt = event.providerTimestamp ?? now;
   const incoming = event.direction === "incoming";
   const preview = derivePreview(event.payload);
+  const inferredLeadStatus =
+    incoming && event.eventKind.startsWith("message.")
+      ? inferLeadStatusFromInbound(event.payload)
+      : undefined;
 
   const existing = await ctx.db
     .query("channelThreads")
@@ -274,6 +360,12 @@ export async function projectThreadFromEvent(
       serviceWindowExpiresAt: incoming
         ? eventAt + SERVICE_WINDOW_MS
         : undefined,
+      leadSource: incoming ? "organic" : undefined,
+      leadStatus: inferredLeadStatus ?? "new",
+      nextStep: inferredLeadStatus
+        ? nextStepFor(inferredLeadStatus)
+        : "Aguardar primeira resposta do paciente.",
+      nextStepDueAt: incoming ? eventAt + DEFAULT_NEXT_STEP_MS : undefined,
       createdAt: now,
       updatedAt: now,
     });
@@ -297,6 +389,20 @@ export async function projectThreadFromEvent(
     if (eventAt >= (existing.lastInboundAt ?? 0)) {
       patch.lastInboundAt = eventAt;
       patch.serviceWindowExpiresAt = eventAt + SERVICE_WINDOW_MS;
+    }
+    if (
+      inferredLeadStatus &&
+      shouldAdvanceLeadStatus(existing.leadStatus, inferredLeadStatus)
+    ) {
+      patch.leadStatus = inferredLeadStatus;
+      patch.nextStep = nextStepFor(inferredLeadStatus);
+      patch.nextStepDueAt =
+        inferredLeadStatus === "confirmed" || inferredLeadStatus === "lost"
+          ? undefined
+          : eventAt + DEFAULT_NEXT_STEP_MS;
+    } else if (!existing.nextStep) {
+      patch.nextStep = nextStepFor(existing.leadStatus ?? "interested");
+      patch.nextStepDueAt = existing.nextStepDueAt ?? eventAt + DEFAULT_NEXT_STEP_MS;
     }
   } else if (eventAt >= (existing.lastOutboundAt ?? 0)) {
     patch.lastOutboundAt = eventAt;

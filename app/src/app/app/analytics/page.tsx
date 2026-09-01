@@ -18,7 +18,6 @@ import {
 import {
   RANGE_LABELS,
   dateWindow,
-  formatMoney,
   formatNumber,
   formatPercent,
   formatUpdatedAt,
@@ -126,11 +125,8 @@ export default function AnalyticsPage() {
                       ),
                     },
                     {
-                      label: "Spend",
-                      value: formatMoney(
-                        summary!.totalCostMinor,
-                        summary!.costCurrency,
-                      ),
+                      label: "Failed",
+                      value: formatNumber(summary!.failed),
                     },
                   ]}
                 />
@@ -154,12 +150,8 @@ export default function AnalyticsPage() {
                         )}
                       />
                       <StatLine
-                        label="Cost per delivered"
-                        value={formatMoney(
-                          summary!.costPerDeliveredMinor,
-                          summary!.costCurrency,
-                          summary!.delivered > 0,
-                        )}
+                        label="Readiness"
+                        value={summary!.failed === 0 ? "Stable" : "Needs review"}
                       />
                       <div className="flex items-center justify-between gap-3 px-4 py-2">
                         <span className="text-[13px] text-slate-500">
@@ -201,47 +193,6 @@ export default function AnalyticsPage() {
                     only={["delivered", "failed"]}
                   />
                 </Module>
-              </div>
-            </TabPanel>
-
-            <TabPanel id="costs" active={tab}>
-              <div className="flex min-w-0 flex-col gap-4">
-                <KpiStrip
-                  items={[
-                    {
-                      label: "Total spend",
-                      value: formatMoney(
-                        summary!.totalCostMinor,
-                        summary!.costCurrency,
-                      ),
-                    },
-                    {
-                      label: "Cost per delivered",
-                      value: formatMoney(
-                        summary!.costPerDeliveredMinor,
-                        summary!.costCurrency,
-                        summary!.delivered > 0,
-                      ),
-                    },
-                    {
-                      label: "Delivered",
-                      value: formatNumber(summary!.delivered),
-                    },
-                    {
-                      label: "Currency",
-                      value: summary!.costCurrency || "—",
-                    },
-                  ]}
-                />
-                <Breakdown
-                  title="By category"
-                  rows={report.categoryBreakdown.map((row) => ({
-                    key: row.category,
-                    label: row.category,
-                    sent: row.sent,
-                    value: formatMoney(row.costMinor, row.costCurrency),
-                  }))}
-                />
               </div>
             </TabPanel>
 

@@ -175,7 +175,7 @@ const FLOW_TEMPLATES: FlowTemplate[] = [
     slug: "clinic_lead_capture",
     name: "Clinic lead capture",
     description:
-      "Captures name, service interest, budget, then hands off to the clinic team.",
+      "Captures name, service interest, preferred time, then hands off to the clinic team.",
     triggerKind: "ctwa",
     entryNodeKey: "start",
     nodes: [
@@ -207,17 +207,17 @@ const FLOW_TEMPLATES: FlowTemplate[] = [
         title: "Service menu",
         body: "Que tipo de serviço procuras?",
         buttons: [
-          { replyId: "skin", label: "Pele", nextKey: "ask_budget" },
-          { replyId: "body", label: "Corpo", nextKey: "ask_budget" },
-          { replyId: "other", label: "Outro", nextKey: "ask_budget" },
+          { replyId: "skin", label: "Pele", nextKey: "ask_time" },
+          { replyId: "body", label: "Corpo", nextKey: "ask_time" },
+          { replyId: "other", label: "Outro", nextKey: "ask_time" },
         ],
       },
       {
-        key: "ask_budget",
+        key: "ask_time",
         type: "collect_input",
-        title: "Collect budget",
-        body: "Qual é o orçamento aproximado em MT?",
-        variableKey: "budget_mt",
+        title: "Collect preferred time",
+        body: "Tens preferência de dia ou horário para a consulta?",
+        variableKey: "preferred_time",
         nextKey: "tag_qualified",
       },
       {
@@ -232,7 +232,7 @@ const FLOW_TEMPLATES: FlowTemplate[] = [
         type: "handoff",
         title: "Human handoff",
         body:
-          "Lead qualificado pelo bot. Rever nome, serviço e orçamento antes de responder.",
+          "Lead qualificado pelo bot. Rever nome, serviço e preferência de horário antes de responder.",
       },
     ],
   },
@@ -267,8 +267,8 @@ const FLOW_TEMPLATES: FlowTemplate[] = [
       {
         key: "prices",
         type: "send_message",
-        title: "Pricing reply",
-        body: "Os preços variam por serviço. Um consultor vai confirmar contigo em MT.",
+        title: "Service conditions reply",
+        body: "As condições variam por serviço. A equipa confirma o melhor caminho contigo.",
         nextKey: "handoff",
       },
       {

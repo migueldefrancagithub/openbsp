@@ -2051,13 +2051,13 @@ function FlowInspectorPanel({
                 label="Node key"
                 value={selectedNode.key}
                 onChange={(value) => onUpdate({ key: value })}
-                placeholder="ask_budget"
+                placeholder="ask_time"
               />
               <TextInput
                 label="Title"
                 value={selectedNode.title}
                 onChange={(value) => onUpdate({ title: value })}
-                placeholder="Ask budget"
+                placeholder="Perguntar horário"
               />
               <SelectBox
                 label="Type"
@@ -2116,7 +2116,7 @@ function FlowInspectorPanel({
                   label="Variable key"
                   value={selectedNode.variableKey ?? ""}
                   onChange={(value) => onUpdate({ variableKey: value })}
-                  placeholder="budget_mt"
+                  placeholder="preferred_time"
                 />
               </div>
             )}
@@ -2158,7 +2158,7 @@ function FlowInspectorPanel({
                       },
                     })
                   }
-                  placeholder="budget_mt"
+                  placeholder="preferred_time"
                 />
                 <SelectBox
                   label="Operator"
@@ -2861,13 +2861,13 @@ function FlowNodeCard({
           label="Node key"
           value={node.key}
           onChange={(value) => onUpdate({ key: value })}
-          placeholder="ask_budget"
+          placeholder="ask_time"
         />
         <TextInput
           label="Title"
           value={node.title}
           onChange={(value) => onUpdate({ title: value })}
-          placeholder="Ask budget"
+          placeholder="Perguntar horário"
         />
         <SelectBox
           label="Type"
@@ -2919,7 +2919,7 @@ function FlowNodeCard({
             label="Variable key"
             value={node.variableKey ?? ""}
             onChange={(value) => onUpdate({ variableKey: value })}
-            placeholder="budget_mt"
+            placeholder="preferred_time"
           />
         </div>
       )}
@@ -3059,7 +3059,7 @@ function FlowNodeCard({
                 },
               })
             }
-            placeholder="budget_mt"
+            placeholder="preferred_time"
           />
           <SelectBox
             label="Operator"

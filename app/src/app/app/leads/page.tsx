@@ -10,31 +10,37 @@ import {
   MousePointerClick,
   Target,
   Timer,
-  Banknote,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { PageHeader } from "@/components/app/EmptyState";
 import { ConvexQueryFallback } from "@/components/app/ConvexQueryFallback";
 import { api } from "../../../../convex/_generated/api";
 import { relativeTime } from "@/lib/relativeTime";
-import { DEFAULT_CURRENCY, formatMoney } from "@/lib/money";
+import { useI18n } from "@/lib/i18n";
 
-const STATUS_LABELS: Record<string, string> = {
-  new: "New",
-  contacted: "Contacted",
-  replied: "Replied",
-  opportunity: "Opportunity",
-  booked: "Booked",
-  lost: "Lost",
+const STATUS_LABELS = {
+  pt: {
+    new: "Novo",
+    contacted: "Contactado",
+    replied: "Respondeu",
+    opportunity: "Quer agendar",
+    booked: "Agendado",
+    lost: "Perdido",
+  },
+  en: {
+    new: "New",
+    contacted: "Contacted",
+    replied: "Replied",
+    opportunity: "Wants booking",
+    booked: "Booked",
+    lost: "Lost",
+  },
 };
 
 type Dashboard = {
   totalReferrals: number;
   openConversations: number;
   booked: number;
-  pipelineValueMinor: number;
-  bookedValueMinor: number;
-  currency: string;
   freeEntryOpen: number;
   freeEntryExpiringSoon: number;
   byOpportunityStatus: Array<{ status: string; count: number }>;
@@ -50,8 +56,6 @@ type Dashboard = {
     clickedAt: number;
     freeEntryWindowExpiresAt: number;
     opportunityStatus?: string;
-    opportunityValueMinor?: number;
-    opportunityCurrency?: string;
     aiState?: string;
   }>;
 };
@@ -60,9 +64,6 @@ const EMPTY_DASHBOARD: Dashboard = {
   totalReferrals: 0,
   openConversations: 0,
   booked: 0,
-  pipelineValueMinor: 0,
-  bookedValueMinor: 0,
-  currency: DEFAULT_CURRENCY,
   freeEntryOpen: 0,
   freeEntryExpiringSoon: 0,
   byOpportunityStatus: [
@@ -77,12 +78,17 @@ const EMPTY_DASHBOARD: Dashboard = {
 };
 
 export default function LeadsPage() {
+  const { locale } = useI18n();
   return (
     <>
       <PageHeader
-        eyebrow="Click-to-WhatsApp"
-        title="Ad leads"
-        description="Track CTWA referrals, the free-entry window, opportunity status, and AI handoff state."
+        eyebrow={locale === "pt" ? "Leads WhatsApp" : "WhatsApp leads"}
+        title={locale === "pt" ? "Leads" : "Leads"}
+        description={
+          locale === "pt"
+            ? "Acompanha origem, conversa, estado, janela de resposta e handoff da IA."
+            : "Track source, conversation, state, response window, and AI handoff."
+        }
       />
 
       <ConvexQueryFallback
@@ -95,13 +101,14 @@ export default function LeadsPage() {
 }
 
 function LeadsContent() {
+  const { locale } = useI18n();
   const dashboard = useQuery(api.ctwa.dashboard, { limit: 50 });
 
   if (dashboard === undefined) {
     return (
       <div className="max-w-7xl space-y-6 px-8 py-8">
         <div className="rounded-2xl border border-slate-200 bg-white p-8 text-sm text-slate-400">
-          Loading leads…
+          {locale === "pt" ? "A carregar leads..." : "Loading leads..."}
         </div>
       </div>
     );
@@ -117,6 +124,7 @@ function LeadsDashboard({
   dashboard: Dashboard;
   degraded?: boolean;
 }) {
+  const { locale } = useI18n();
 
   return (
     <div className="max-w-7xl space-y-6 px-8 py-8">
@@ -124,10 +132,13 @@ function LeadsDashboard({
         <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800">
           <AlertTriangle className="mt-0.5 shrink-0" size={17} />
           <div>
-            <div className="font-medium">Convex backend sync pending</div>
+            <div className="font-medium">
+              {locale === "pt" ? "Sincronização Convex pendente" : "Convex backend sync pending"}
+            </div>
             <div className="mt-0.5 text-amber-700">
-              The CTWA dashboard function is not deployed on this dev backend yet,
-              so this page is showing the safe empty preview instead of crashing.
+              {locale === "pt"
+                ? "A função do painel ainda não está publicada neste backend; mostramos uma prévia vazia segura."
+                : "The dashboard function is not deployed here yet, so this page is showing a safe empty preview."}
             </div>
           </div>
         </div>
@@ -135,30 +146,29 @@ function LeadsDashboard({
             <div className="grid gap-3 md:grid-cols-5">
               <Kpi
                 icon={MousePointerClick}
-                label="Referrals"
+                label={locale === "pt" ? "Entradas" : "Referrals"}
                 value={dashboard.totalReferrals}
               />
               <Kpi
                 icon={MessageCircle}
-                label="Open CTWA chats"
+                label={locale === "pt" ? "Conversas abertas" : "Open chats"}
                 value={dashboard.openConversations}
               />
-              <Kpi icon={Target} label="Booked" value={dashboard.booked} />
+              <Kpi
+                icon={Target}
+                label={locale === "pt" ? "Agendados" : "Booked"}
+                value={dashboard.booked}
+              />
               <Kpi
                 icon={Timer}
-                label="Free entry open"
+                label={locale === "pt" ? "Janela aberta" : "Window open"}
                 value={dashboard.freeEntryOpen}
               />
               <Kpi
                 icon={Timer}
-                label="Expiring soon"
+                label={locale === "pt" ? "A expirar" : "Expiring soon"}
                 value={dashboard.freeEntryExpiringSoon}
                 tone="amber"
-              />
-              <Kpi
-                icon={Banknote}
-                label="Booked value"
-                value={formatMoney(dashboard.bookedValueMinor, dashboard.currency)}
               />
             </div>
 
@@ -166,10 +176,10 @@ function LeadsDashboard({
               <div className="rounded-2xl border border-slate-200 bg-white p-5">
                 <div className="mb-4 flex items-center justify-between">
                   <h2 className="font-[var(--font-outfit)] text-[18px] font-medium text-[#0a1b33]">
-                    Pipeline
+                    {locale === "pt" ? "Funil" : "Pipeline"}
                   </h2>
                   <span className="text-[11px] font-medium uppercase tracking-wider text-slate-400">
-                    CTWA only
+                    {locale === "pt" ? "WhatsApp" : "WhatsApp"}
                   </span>
                 </div>
                 <div className="space-y-2">
@@ -177,7 +187,9 @@ function LeadsDashboard({
                     <div key={item.status}>
                       <div className="mb-1 flex items-center justify-between text-[12px]">
                         <span className="font-medium text-slate-600">
-                          {STATUS_LABELS[item.status] ?? item.status}
+                          {STATUS_LABELS[locale][
+                            item.status as keyof typeof STATUS_LABELS.pt
+                          ] ?? item.status}
                         </span>
                         <span className="text-slate-400">{item.count}</span>
                       </div>
@@ -202,10 +214,12 @@ function LeadsDashboard({
               <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
                 <div className="border-b border-slate-100 px-5 py-4">
                   <h2 className="font-[var(--font-outfit)] text-[18px] font-medium text-[#0a1b33]">
-                    Recent ad entries
+                    {locale === "pt" ? "Entradas recentes" : "Recent entries"}
                   </h2>
                   <p className="mt-0.5 text-sm text-slate-500">
-                    Every row links the Meta referral to the inbox conversation.
+                    {locale === "pt"
+                      ? "Cada linha liga a origem à conversa do paciente."
+                      : "Every row links the source to the patient conversation."}
                   </p>
                 </div>
                 {dashboard.recent.length === 0 ? (
@@ -215,10 +229,12 @@ function LeadsDashboard({
                       className="mx-auto mb-3 text-slate-300"
                     />
                     <h3 className="font-[var(--font-outfit)] text-[18px] font-medium text-[#0a1b33]">
-                      No CTWA leads yet
+                      {locale === "pt" ? "Ainda sem leads" : "No leads yet"}
                     </h3>
                     <p className="mt-1 text-sm text-slate-500">
-                      Referrals will appear after a Click-to-WhatsApp ad opens a chat.
+                      {locale === "pt"
+                        ? "As entradas aparecem quando uma conversa de WhatsApp chega ao sistema."
+                        : "Entries appear when a WhatsApp conversation reaches the system."}
                     </p>
                   </div>
                 ) : (
@@ -248,17 +264,21 @@ function LeadsDashboard({
                               )}
                             </div>
                             <p className="mt-1 text-[12px] text-slate-500">
-                              {lead.headline ?? lead.body ?? "Untitled ad"} · clicked{" "}
+                              {lead.headline ?? lead.body ?? (locale === "pt" ? "Origem sem título" : "Untitled source")} ·{" "}
+                              {locale === "pt" ? "entrou " : "entered "}
                               {relativeTime(lead.clickedAt)}
                             </p>
                             <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
                               <span>
-                                {STATUS_LABELS[lead.opportunityStatus ?? "new"] ??
+                                {STATUS_LABELS[locale][
+                                  (lead.opportunityStatus ?? "new") as keyof typeof STATUS_LABELS.pt
+                                ] ??
                                   lead.opportunityStatus ??
-                                  "New"}
+                                  (locale === "pt" ? "Novo" : "New")}
                               </span>
                               <span>
-                                Free entry until {formatShortDateTime(lead.freeEntryWindowExpiresAt)}
+                                {locale === "pt" ? "Janela até " : "Window until "}
+                                {formatShortDateTime(lead.freeEntryWindowExpiresAt, locale)}
                               </span>
                               {lead.sourceUrl && (
                                 <a
@@ -267,17 +287,9 @@ function LeadsDashboard({
                                   rel="noreferrer"
                                   className="inline-flex items-center gap-1 text-slate-500 hover:text-[#0a1b33]"
                                 >
-                                  Source
+                                  {locale === "pt" ? "Origem" : "Source"}
                                   <ExternalLink size={11} />
                                 </a>
-                              )}
-                              {lead.opportunityValueMinor !== undefined && (
-                                <span>
-                                  {formatMoney(
-                                    lead.opportunityValueMinor,
-                                    lead.opportunityCurrency ?? dashboard.currency,
-                                  )}
-                                </span>
                               )}
                             </div>
                           </div>
@@ -292,8 +304,8 @@ function LeadsDashboard({
   );
 }
 
-function formatShortDateTime(timestamp: number): string {
-  return new Date(timestamp).toLocaleString("en-GB", {
+function formatShortDateTime(timestamp: number, locale: "pt" | "en"): string {
+  return new Date(timestamp).toLocaleString(locale === "pt" ? "pt-PT" : "en-GB", {
     day: "2-digit",
     month: "short",
     hour: "2-digit",

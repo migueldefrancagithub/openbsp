@@ -159,6 +159,17 @@ const opportunityStatusValidator = v.union(
   v.literal("lost"),
 );
 
+const channelLeadStatusValidator = v.union(
+  v.literal("new"),
+  v.literal("interested"),
+  v.literal("asked_price"),
+  v.literal("wants_booking"),
+  v.literal("awaiting_human"),
+  v.literal("booked"),
+  v.literal("confirmed"),
+  v.literal("lost"),
+);
+
 const campaignStatusValidator = v.union(
   v.literal("draft"),
   v.literal("scheduled"),
@@ -664,6 +675,11 @@ export default defineSchema({
     unreadCount: v.number(),
     serviceWindowExpiresAt: v.optional(v.number()),
     tags: v.optional(v.array(v.string())),
+    leadSource: v.optional(leadSourceValidator),
+    leadStatus: v.optional(channelLeadStatusValidator),
+    nextStep: v.optional(v.string()),
+    nextStepDueAt: v.optional(v.number()),
+    responsibleMemberId: v.optional(v.id("members")),
     automationMode: v.optional(
       v.union(
         v.literal("idle"),
@@ -679,7 +695,8 @@ export default defineSchema({
   })
     .index("by_channel_thread", ["channelId", "threadKey"])
     .index("by_channel_last_event", ["channelId", "lastEventAt"])
-    .index("by_tenant_last_event", ["tenantId", "lastEventAt"]),
+    .index("by_tenant_last_event", ["tenantId", "lastEventAt"])
+    .index("by_tenant_lead_status", ["tenantId", "leadStatus", "lastEventAt"]),
 
   // ===== WhatsApp connections =====
   whatsappAccounts: defineTable({
@@ -1186,6 +1203,7 @@ export default defineSchema({
     lastInboundEventId: v.optional(v.id("channelEvents")),
   })
     .index("by_tenant", ["tenantId"])
+    .index("by_tenant_last_advanced", ["tenantId", "lastAdvancedAt"])
     .index("by_thread_status", ["channelId", "threadId", "status"])
     .index("by_chatbot_started", ["chatbotId", "startedAt"])
     .index("by_status_last_advanced", ["status", "lastAdvancedAt"]),

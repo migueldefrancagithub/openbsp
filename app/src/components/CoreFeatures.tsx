@@ -69,7 +69,7 @@ export function CoreFeatures() {
               </div>
               <div className="c1-broadcast-row">
                 <span className="c1-comp-meta">3 skipped (opt-out)</span>
-                <span className="c1-comp-meta">MT 842 estimated</span>
+                <span className="c1-comp-meta">12 replies tracked</span>
               </div>
             </div>
             <div className="c1-card-meta">

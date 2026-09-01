@@ -67,6 +67,10 @@ describe("chatbot studio", () => {
     });
     expect(studio.bots[0].flowValidationIssues).toEqual([]);
     expect(studio.stats).toMatchObject({ total: 1, draft: 1, active: 0 });
+    expect(
+      JSON.stringify(studio.bots[0].flowNodes).toLowerCase(),
+    ).not.toContain("budget");
+    expect(JSON.stringify(studio.bots[0].flowNodes)).not.toContain("MT");
 
     await owner.mutation(chatbotsApi.updateStatus, {
       chatbotId: botId,

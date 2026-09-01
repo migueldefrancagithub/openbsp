@@ -89,7 +89,7 @@ export function RiskBadge({
 
 /**
  * One unified band rather than four bordered cards, so the KPIs read as a
- * single row of facts and cost one border instead of four.
+ * single row of facts with one border instead of four.
  */
 export function KpiStrip({
   items,

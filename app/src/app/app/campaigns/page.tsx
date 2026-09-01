@@ -44,6 +44,7 @@ import { relativeTime } from "@/lib/relativeTime";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { ImportCsvModal } from "../contacts/ImportCsvModal";
 import type { TemplateCategory } from "@/lib/whatsappTemplateAdvisor";
+import { useI18n } from "@/lib/i18n";
 
 const STATUS_STYLES: Record<string, string> = {
   draft: "bg-slate-100 text-slate-700 border-slate-200",
@@ -64,15 +65,14 @@ const BROADCAST_TABS = [
   { key: "failed", label: "Failed", icon: XCircle },
 ] as const;
 
-const MICRO_CAMPAIGN_DEFAULT_TEXT = `✨ Micro Sale OpenBSP
+const MICRO_CAMPAIGN_DEFAULT_TEXT = `✨ Micro agenda da clínica
 
-Hoje abrimos um teste pequeno no WhatsApp:
-setup guiado + inbox multiatendente + automação inicial.
+Temos alguns horários a organizar para esta semana.
 
 Responde:
-1 — Quero ver demo
-2 — Quero preços
-3 — Falar com alguém`;
+1 — Quero agendar
+2 — Quero saber serviços
+3 — Falar com a equipa`;
 
 type BroadcastFilter = (typeof BROADCAST_TABS)[number]["key"];
 type AudienceLogic = "all" | "any";
@@ -104,6 +104,7 @@ type StudioTabKey =
   | "micro";
 
 export default function CampaignsPage() {
+  const { locale } = useI18n();
   const convex = useConvex();
   const campaigns = useQuery(api.campaigns.listCampaigns, {});
   const lists = useQuery(api.campaigns.listContactLists, {});
@@ -198,7 +199,7 @@ export default function CampaignsPage() {
     useState<Id<"campaigns"> | null>(null);
   const [batchSize, setBatchSize] = useState(1000);
   const [microCampaignName, setMicroCampaignName] =
-    useState("Micro Sale WhatsApp");
+    useState("Micro agenda WhatsApp");
   const [microCampaignText, setMicroCampaignText] = useState(
     MICRO_CAMPAIGN_DEFAULT_TEXT,
   );
@@ -573,9 +574,13 @@ export default function CampaignsPage() {
   return (
     <>
       <PageHeader
-        eyebrow="Broadcasts"
-        title="Campaigns"
-        description="Build reusable contact folders, attach approved templates, and materialize recipients for campaign analytics."
+        eyebrow={locale === "pt" ? "Campanhas" : "Broadcasts"}
+        title={locale === "pt" ? "Campanhas" : "Campaigns"}
+        description={
+          locale === "pt"
+            ? "Cria públicos, envia mensagens aprovadas e acompanha entregas, respostas, interações e conversões reais."
+            : "Create audiences, send approved messages, and track real delivery, replies, interactions, and conversions."
+        }
       />
 
       <div className="px-8 py-8 max-w-7xl space-y-6">
@@ -597,38 +602,38 @@ export default function CampaignsPage() {
           items={[
             {
               key: "dashboard",
-              label: "Dashboard",
-              value: `${campaigns?.length ?? 0} runs`,
+              label: locale === "pt" ? "Painel" : "Dashboard",
+              value: `${campaigns?.length ?? 0} ${locale === "pt" ? "envios" : "runs"}`,
               icon: BarChart3,
             },
             {
               key: "copy",
-              label: "Copy",
-              value: `${approvedTemplates.length} approved`,
+              label: locale === "pt" ? "Mensagem" : "Message",
+              value: `${approvedTemplates.length} ${locale === "pt" ? "aprovados" : "approved"}`,
               icon: Copy,
             },
             {
               key: "lists",
-              label: "Lists",
-              value: `${lists?.length ?? 0} folders`,
+              label: locale === "pt" ? "Listas" : "Lists",
+              value: `${lists?.length ?? 0} ${locale === "pt" ? "listas" : "folders"}`,
               icon: Table2,
             },
             {
               key: "audience",
-              label: "Audiences",
-              value: `${audiencePreview?.count ?? 0} matched`,
+              label: locale === "pt" ? "Públicos" : "Audiences",
+              value: `${audiencePreview?.count ?? 0} ${locale === "pt" ? "encontrados" : "matched"}`,
               icon: Filter,
             },
             {
               key: "launch",
-              label: "Launch",
-              value: "Safe send",
+              label: locale === "pt" ? "Enviar" : "Launch",
+              value: locale === "pt" ? "seguro" : "safe send",
               icon: Rocket,
             },
             {
               key: "micro",
-              label: "Micro lab",
-              value: `${microThreads?.length ?? 0} threads`,
+              label: locale === "pt" ? "Teste WhatsApp" : "WhatsApp test",
+              value: `${microThreads?.length ?? 0} ${locale === "pt" ? "conversas" : "threads"}`,
               icon: Zap,
             },
           ]}
@@ -638,36 +643,44 @@ export default function CampaignsPage() {
         <div className="grid gap-4 xl:grid-cols-2">
           <WorkflowPanel
             icon={FolderPlus}
-            title="1. Create folder"
-            subtitle="Use the live's folder/list model as the campaign audience."
+            title={locale === "pt" ? "1. Criar público" : "1. Create audience"}
+            subtitle={
+              locale === "pt"
+                ? "Agrupa pacientes ou leads que devem receber a campanha."
+                : "Group patients or leads that should receive the campaign."
+            }
           >
             <form className="space-y-3" onSubmit={handleCreateList}>
               <TextInput
                 label="List name"
                 value={listName}
                 onChange={setListName}
-                placeholder="Promo Botox"
+                placeholder={locale === "pt" ? "Pacientes interessados" : "Interested patients"}
               />
               <TextInput
                 label="Description"
                 value={listDescription}
                 onChange={setListDescription}
-                placeholder="Optional internal note"
+                placeholder={locale === "pt" ? "Nota interna opcional" : "Optional internal note"}
               />
               <SubmitButton
                 disabled={busy !== null || listName.trim().length < 2}
                 loading={busy === "list"}
                 icon={Plus}
               >
-                Create list
+                {locale === "pt" ? "Criar lista" : "Create list"}
               </SubmitButton>
             </form>
           </WorkflowPanel>
 
           <WorkflowPanel
             icon={Users}
-            title="2. Add contacts"
-            subtitle="Pick existing contacts or import CSV rows straight into this folder."
+            title={locale === "pt" ? "2. Adicionar contactos" : "2. Add contacts"}
+            subtitle={
+              locale === "pt"
+                ? "Escolhe contactos existentes ou importa um CSV para esta lista."
+                : "Pick existing contacts or import CSV rows into this list."
+            }
           >
             <form className="space-y-3" onSubmit={handleAddContact}>
               <SelectBox
@@ -680,7 +693,7 @@ export default function CampaignsPage() {
                   value: list._id,
                   label: `${list.name} (${list.memberCount})`,
                 }))}
-                placeholder="Choose list"
+                placeholder={locale === "pt" ? "Escolher lista" : "Choose list"}
               />
               <SelectBox
                 label="Contact"
@@ -694,10 +707,9 @@ export default function CampaignsPage() {
                     contact.name ??
                     contact.whatsappUsername ??
                     contact.e164 ??
-                    contact.bsuid ??
                     "Unknown contact",
                 }))}
-                placeholder="Choose contact"
+                placeholder={locale === "pt" ? "Escolher contacto" : "Choose contact"}
               />
               <SubmitButton
                 disabled={
@@ -706,7 +718,7 @@ export default function CampaignsPage() {
                 loading={busy === "contact"}
                 icon={ListPlus}
               >
-                Add to list
+                {locale === "pt" ? "Adicionar à lista" : "Add to list"}
               </SubmitButton>
               <button
                 type="button"
@@ -715,7 +727,7 @@ export default function CampaignsPage() {
                 className="w-full inline-flex items-center justify-center gap-2 border border-slate-200 bg-white text-[#0a1b33] text-[13px] font-medium px-4 py-2 rounded-lg hover:border-slate-300 disabled:opacity-50 transition-all"
               >
                 <Upload size={14} />
-                Import CSV to list
+                {locale === "pt" ? "Importar CSV para lista" : "Import CSV to list"}
               </button>
             </form>
           </WorkflowPanel>
@@ -725,18 +737,22 @@ export default function CampaignsPage() {
         {studioTab === "launch" && (
           <WorkflowPanel
             icon={Megaphone}
-            title="Create draft campaign"
-            subtitle="Approved templates without variables are supported in this first build."
+            title={locale === "pt" ? "3. Confirmar envio seguro" : "3. Confirm safe send"}
+            subtitle={
+              locale === "pt"
+                ? "Escolhe público e template aprovado antes de criar o rascunho."
+                : "Choose audience and approved template before creating the draft."
+            }
           >
             <form className="space-y-3" onSubmit={handleCreateCampaign}>
               <TextInput
                 label="Campaign name"
                 value={campaignName}
                 onChange={setCampaignName}
-                placeholder="Campanha Maio"
+                placeholder={locale === "pt" ? "Agenda da semana" : "Weekly agenda"}
               />
               <SelectBox
-                label="Audience"
+                label={locale === "pt" ? "Público" : "Audience"}
                 value={selectedListId}
                 onChange={(value) =>
                   setSelectedListId(value as Id<"contactLists"> | "")
@@ -745,7 +761,7 @@ export default function CampaignsPage() {
                   value: list._id,
                   label: `${list.name} (${list.memberCount})`,
                 }))}
-                placeholder="Choose list"
+                placeholder={locale === "pt" ? "Escolher lista" : "Choose list"}
               />
               <SelectBox
                 label="Template"
@@ -757,7 +773,7 @@ export default function CampaignsPage() {
                   value: template._id,
                   label: `${template.name} · ${template.language}`,
                 }))}
-                placeholder="Choose approved template"
+                placeholder={locale === "pt" ? "Escolher template aprovado" : "Choose approved template"}
               />
               <SubmitButton
                 disabled={
@@ -769,7 +785,7 @@ export default function CampaignsPage() {
                 loading={busy === "campaign"}
                 icon={Send}
               >
-                Create draft
+                {locale === "pt" ? "Criar rascunho" : "Create draft"}
               </SubmitButton>
             </form>
           </WorkflowPanel>
@@ -779,19 +795,23 @@ export default function CampaignsPage() {
           <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
             <WorkflowPanel
               icon={Zap}
-              title="Micro campaign lab"
-              subtitle="Provider-neutral WhatsApp send through the isolated Hub channel."
+              title={locale === "pt" ? "Teste WhatsApp" : "WhatsApp test"}
+              subtitle={
+                locale === "pt"
+                  ? "Envio pequeno pelo canal Hub isolado, só para validar campanha real."
+                  : "Small send through the isolated Hub channel, only to validate a real campaign."
+              }
             >
               <form className="space-y-4" onSubmit={handleSendMicroCampaign}>
                 <div className="grid gap-3 lg:grid-cols-2">
                   <TextInput
-                    label="Campaign name"
+                    label={locale === "pt" ? "Nome da campanha" : "Campaign name"}
                     value={microCampaignName}
                     onChange={setMicroCampaignName}
-                    placeholder="Micro Sale WhatsApp"
+                    placeholder={locale === "pt" ? "Micro agenda WhatsApp" : "Micro agenda WhatsApp"}
                   />
                   <SelectBox
-                    label="Channel"
+                    label={locale === "pt" ? "Canal" : "Channel"}
                     value={microChannelId}
                     onChange={(value) => {
                       setMicroChannelId(value as Id<"channels"> | "");
@@ -801,26 +821,26 @@ export default function CampaignsPage() {
                       value: channel._id,
                       label: `${channel.displayName} · ${channel.sendMode}`,
                     }))}
-                    placeholder="Choose isolated channel"
+                    placeholder={locale === "pt" ? "Escolher canal isolado" : "Choose isolated channel"}
                   />
                 </div>
 
                 <div>
                   <span className="mb-2 block text-[11px] font-medium text-slate-500">
-                    Recipients
+                    {locale === "pt" ? "Destinatários" : "Recipients"}
                   </span>
                   <div className="grid max-h-64 gap-2 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-2">
                     {channels === undefined || microThreads === undefined ? (
                       <div className="rounded-lg bg-white px-3 py-3 text-sm text-slate-400">
-                        Loading recipients...
+                        {locale === "pt" ? "A carregar destinatários..." : "Loading recipients..."}
                       </div>
                     ) : labChannels.length === 0 ? (
                       <div className="rounded-lg bg-white px-3 py-3 text-sm text-slate-500">
-                        No isolated Hub channel connected.
+                        {locale === "pt" ? "Sem canal Hub isolado conectado." : "No isolated Hub channel connected."}
                       </div>
                     ) : microThreads.length === 0 ? (
                       <div className="rounded-lg bg-white px-3 py-3 text-sm text-slate-500">
-                        No inbound threads with message events yet.
+                        {locale === "pt" ? "Ainda não há conversas inbound com mensagens." : "No inbound threads with message events yet."}
                       </div>
                     ) : (
                       microThreads.map((thread) => {
@@ -863,7 +883,13 @@ export default function CampaignsPage() {
                                   : "bg-amber-50 text-amber-700"
                               }`}
                             >
-                              {windowOpen ? "24h open" : "template needed"}
+                              {windowOpen
+                                ? locale === "pt"
+                                  ? "24h aberta"
+                                  : "24h open"
+                                : locale === "pt"
+                                  ? "precisa template"
+                                  : "template needed"}
                             </span>
                           </button>
                         );
@@ -874,7 +900,7 @@ export default function CampaignsPage() {
 
                 <label className="block">
                   <span className="mb-1 block text-[11px] font-medium text-slate-500">
-                    Message
+                    {locale === "pt" ? "Mensagem" : "Message"}
                   </span>
                   <textarea
                     value={microCampaignText}
@@ -885,12 +911,15 @@ export default function CampaignsPage() {
                 </label>
 
                 <div className="grid gap-2 sm:grid-cols-3">
-                  <Metric label="selected" value={selectedMicroThreadKeys.length} />
                   <Metric
-                    label="24h open"
+                    label={locale === "pt" ? "selecionados" : "selected"}
+                    value={selectedMicroThreadKeys.length}
+                  />
+                  <Metric
+                    label={locale === "pt" ? "24h aberta" : "24h open"}
                     value={selectedMicroThreads.filter(isMicroThreadWindowOpen).length}
                   />
-                  <Metric label="chars" value={microCampaignText.length} />
+                  <Metric label={locale === "pt" ? "caracteres" : "chars"} value={microCampaignText.length} />
                 </div>
 
                 {selectedMicroChannel && (
@@ -906,22 +935,24 @@ export default function CampaignsPage() {
                   loading={busy === "micro-campaign"}
                   icon={Zap}
                 >
-                  Send micro campaign
+                  {locale === "pt" ? "Enviar teste" : "Send test"}
                 </SubmitButton>
               </form>
             </WorkflowPanel>
 
             <WhatsAppIosPreview
-              title="Micro campaign preview"
+              title={locale === "pt" ? "Prévia da campanha" : "Campaign preview"}
               subtitle={microCampaignName}
               category="marketing"
               bodyText={
                 microCampaignText.trim() ||
-                "Write the campaign message to preview it here."
+                (locale === "pt"
+                  ? "Escreve a mensagem da campanha para pré-visualizar aqui."
+                  : "Write the campaign message to preview it here.")
               }
               buttons={[]}
               examples={{}}
-              hasMarketingOptIn
+              hasMarketingOptIn={selectedMicroThreads.some(isMicroThreadWindowOpen)}
               serviceWindowOpen={selectedMicroThreads.some(
                 isMicroThreadWindowOpen,
               )}
@@ -933,12 +964,18 @@ export default function CampaignsPage() {
         {studioTab === "copy" && (
         <section className="grid gap-4 xl:grid-cols-[360px_1fr]">
           <WhatsAppIosPreview
-            title="Campaign iOS preview"
-            subtitle="See what the selected template feels like before you launch."
+            title={locale === "pt" ? "Prévia no WhatsApp" : "WhatsApp preview"}
+            subtitle={
+              locale === "pt"
+                ? "Confirma como a mensagem aparece antes do envio."
+                : "Check how the message feels before launch."
+            }
             category={asTemplateCategory(selectedTemplate?.category)}
             bodyText={
               selectedTemplate?.bodyText ??
-              "Choose an approved template to preview the message here."
+              (locale === "pt"
+                ? "Escolhe um template aprovado para pré-visualizar a mensagem."
+                : "Choose an approved template to preview the message here.")
             }
             buttons={selectedTemplate?.buttons ?? []}
             examples={Object.fromEntries(
@@ -954,38 +991,54 @@ export default function CampaignsPage() {
 
           <WorkflowPanel
             icon={AlertTriangle}
-            title="Cost and quality planner"
-            subtitle="Mock the send context before creating a campaign, then choose the cheapest safe path."
+            title={locale === "pt" ? "Mensagem e regras de envio" : "Message and send rules"}
+            subtitle={
+              locale === "pt"
+                ? "Valida consentimento, janela de atendimento e categoria antes de enviar."
+                : "Validate consent, service window, and category before sending."
+            }
           >
             <div className="grid gap-3 md:grid-cols-3">
               <Toggle
-                label="Audience has marketing opt-in"
+                label={locale === "pt" ? "Público aceitou campanha" : "Audience has opt-in"}
                 checked={campaignHasMarketingOptIn}
                 onChange={setCampaignHasMarketingOptIn}
               />
               <Toggle
-                label="Customer 24h window open"
+                label={locale === "pt" ? "Janela 24h aberta" : "Customer 24h window open"}
                 checked={campaignServiceWindowOpen}
                 onChange={setCampaignServiceWindowOpen}
               />
               <Toggle
-                label="CTWA 72h free entry open"
+                label={locale === "pt" ? "Entrada WhatsApp aberta" : "WhatsApp entry window open"}
                 checked={campaignFreeEntryOpen}
                 onChange={setCampaignFreeEntryOpen}
               />
             </div>
             <div className="mt-4 grid gap-3 lg:grid-cols-3">
               <StrategyTile
-                title="Save money first"
-                body="Use utility inside the 24h service window or CTWA free-entry before paying for marketing sends."
+                title={locale === "pt" ? "Janela primeiro" : "Window first"}
+                body={
+                  locale === "pt"
+                    ? "Se o paciente já conversou, responde dentro da janela aberta antes de criar novo envio."
+                    : "If the patient already talked to you, use the open service window before a new broadcast."
+                }
               />
               <StrategyTile
-                title="Ramp, then scale"
-                body="Launch one use case to a small cohort, inspect read/block signals for 7-10 days, then increase volume."
+                title={locale === "pt" ? "Pequeno, depois escala" : "Small, then scale"}
+                body={
+                  locale === "pt"
+                    ? "Começa com poucos contactos, verifica entregas, respostas e bloqueios, depois aumenta."
+                    : "Start with a small cohort, inspect delivery, replies, and blocks, then increase."
+                }
               />
               <StrategyTile
-                title="Segment intent"
-                body="Prioritize CTWA leads, recent responders, booked customers, and cart recovery before broad broadcasts."
+                title={locale === "pt" ? "Segmentar intenção" : "Segment intent"}
+                body={
+                  locale === "pt"
+                    ? "Prioriza interessados, quem pediu preço, quem quer agendar e quem já respondeu."
+                    : "Prioritize interested leads, price requests, booking intent, and recent responders."
+                }
               />
             </div>
           </WorkflowPanel>
@@ -1020,7 +1073,7 @@ export default function CampaignsPage() {
                 label="Search"
                 value={audienceSearch}
                 onChange={setAudienceSearch}
-                placeholder="Name, phone, BSUID, username"
+                placeholder={locale === "pt" ? "Nome, telefone ou username" : "Name, phone, or username"}
               />
             </div>
 
@@ -1211,11 +1264,12 @@ export default function CampaignsPage() {
           <div className="px-5 py-4 border-b border-slate-100 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <h2 className="font-[var(--font-outfit)] text-[18px] font-medium text-[#0a1b33]">
-                Campaign broadcasts
+                {locale === "pt" ? "Campanhas reais" : "Real campaigns"}
               </h2>
               <p className="text-sm text-slate-500 mt-0.5">
-                Batch-aware broadcast cards with per-recipient delivery state,
-                failure recovery, and response tracking.
+                {locale === "pt"
+                  ? "Acompanha estado por destinatário, falhas, respostas, interações e conversões."
+                  : "Track per-recipient state, failures, replies, interactions, and conversions."}
               </p>
             </div>
             <button
@@ -1224,38 +1278,44 @@ export default function CampaignsPage() {
               className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#0a152d] px-3 text-sm font-medium text-white transition-colors hover:bg-[#0a1b33]"
             >
               <Plus size={15} />
-              Create broadcast
+              {locale === "pt" ? "Criar campanha" : "Create campaign"}
             </button>
           </div>
 
           <div className="grid gap-3 border-b border-slate-100 p-5 sm:grid-cols-2 xl:grid-cols-5">
             <DashboardMetric
               icon={Radio}
-              label="Runs"
+              label={locale === "pt" ? "Envios" : "Runs"}
               value={campaignTotals.runs}
-              detail={`${campaignTotals.total.toLocaleString()} recipients`}
+              detail={`${campaignTotals.total.toLocaleString()} ${
+                locale === "pt" ? "destinatários" : "recipients"
+              }`}
             />
             <DashboardMetric
               icon={Send}
-              label="Sent"
+              label={locale === "pt" ? "Enviados" : "Sent"}
               value={campaignTotals.sent}
-              detail={`${rate(campaignTotals.sent, campaignTotals.total).toFixed(1)}% reach`}
+              detail={`${rate(campaignTotals.sent, campaignTotals.total).toFixed(1)}% ${
+                locale === "pt" ? "alcance" : "reach"
+              }`}
             />
             <DashboardMetric
               icon={MousePointerClick}
-              label="Clicks"
+              label={locale === "pt" ? "Interações" : "Clicks"}
               value={campaignTotals.clicked}
               detail={`${rate(campaignTotals.clicked, Math.max(campaignTotals.sent, 1)).toFixed(1)}% CTR`}
             />
             <DashboardMetric
               icon={MessageSquare}
-              label="Replies"
+              label={locale === "pt" ? "Respostas" : "Replies"}
               value={campaignTotals.replied}
-              detail={`${rate(campaignTotals.replied, Math.max(campaignTotals.sent, 1)).toFixed(1)}% response`}
+              detail={`${rate(campaignTotals.replied, Math.max(campaignTotals.sent, 1)).toFixed(1)}% ${
+                locale === "pt" ? "resposta" : "response"
+              }`}
             />
             <DashboardMetric
               icon={BadgeCheck}
-              label="Conversions"
+              label={locale === "pt" ? "Conversões" : "Conversions"}
               value={campaignTotals.converted}
               detail={`${rate(campaignTotals.converted, Math.max(campaignTotals.sent, 1)).toFixed(1)}% CVR`}
             />
@@ -1271,7 +1331,7 @@ export default function CampaignsPage() {
                 <input
                   value={campaignSearch}
                   onChange={(event) => setCampaignSearch(event.target.value)}
-                  placeholder="Search broadcasts..."
+                  placeholder={locale === "pt" ? "Pesquisar campanhas..." : "Search campaigns..."}
                   className="h-11 w-full rounded-lg border border-slate-200 bg-white pl-10 pr-3 text-sm text-[#0a1b33] outline-none transition-colors placeholder:text-slate-400 focus:border-slate-400"
                 />
               </label>
@@ -1300,14 +1360,14 @@ export default function CampaignsPage() {
                     }`}
                   >
                     <Icon size={15} />
-                    {tab.label}
+                    {locale === "pt" ? broadcastTabLabelPt(tab.key) : tab.label}
                   </button>
                 );
               })}
             </div>
             <div className="mt-4 max-w-xs">
               <label className="text-xs font-medium text-slate-500">
-                Manual batch size
+                {locale === "pt" ? "Tamanho do lote manual" : "Manual batch size"}
               </label>
               <input
                 type="number"
@@ -1321,25 +1381,31 @@ export default function CampaignsPage() {
           </div>
 
           {campaigns === undefined ? (
-            <div className="p-8 text-sm text-slate-400">Loading campaigns…</div>
+            <div className="p-8 text-sm text-slate-400">
+              {locale === "pt" ? "A carregar campanhas..." : "Loading campaigns..."}
+            </div>
           ) : campaigns.length === 0 ? (
             <div className="p-10 text-center">
               <Send size={26} className="mx-auto text-slate-300 mb-3" />
               <h3 className="font-[var(--font-outfit)] text-[18px] font-medium text-[#0a1b33]">
-                No campaign drafts yet
+                {locale === "pt" ? "Ainda sem campanhas" : "No campaign drafts yet"}
               </h3>
               <p className="text-sm text-slate-500 mt-1">
-                Create a template broadcast or send a micro lab campaign to start tracking real delivery and conversion events.
+                {locale === "pt"
+                  ? "Cria um rascunho com template ou envia um teste WhatsApp para começar a medir eventos reais."
+                  : "Create a template broadcast or send a WhatsApp test to start tracking real events."}
               </p>
             </div>
           ) : filteredCampaigns.length === 0 ? (
             <div className="p-10 text-center">
               <Search size={26} className="mx-auto text-slate-300 mb-3" />
               <h3 className="font-[var(--font-outfit)] text-[18px] font-medium text-[#0a1b33]">
-                No broadcasts match
+                {locale === "pt" ? "Nenhuma campanha encontrada" : "No campaigns match"}
               </h3>
               <p className="text-sm text-slate-500 mt-1">
-                Clear search or switch status filters.
+                {locale === "pt"
+                  ? "Limpa a pesquisa ou muda o filtro de estado."
+                  : "Clear search or switch status filters."}
               </p>
             </div>
           ) : (
@@ -2037,8 +2103,10 @@ function eventMessage(event: CampaignEvent): string {
 function eventDetail(event: CampaignEvent): string | undefined {
   const parts: string[] = [];
   if (event.recipient) {
+    const identityLabel =
+      event.recipient.identityKind === "bsuid" ? "ID" : event.recipient.identityKind.toUpperCase();
     parts.push(
-      `${event.recipient.identityKind.toUpperCase()}: ${event.recipient.identityValue}`,
+      `${identityLabel}: ${event.recipient.identityValue}`,
     );
     parts.push(`status: ${event.recipient.status}`);
     if (event.recipient.metaErrorCategory) {
@@ -2102,6 +2170,23 @@ function matchesBroadcastFilter(status: string, filter: BroadcastFilter): boolea
   if (filter === "all") return true;
   if (filter === "active") return status === "running" || status === "paused";
   return status === filter;
+}
+
+function broadcastTabLabelPt(filter: BroadcastFilter): string {
+  switch (filter) {
+    case "all":
+      return "Todas";
+    case "active":
+      return "Ativas";
+    case "scheduled":
+      return "Agendadas";
+    case "completed":
+      return "Concluídas";
+    case "cancelled":
+      return "Canceladas";
+    case "failed":
+      return "Falhadas";
+  }
 }
 
 function sentLikeCount(stats: CampaignStats): number {

@@ -2,14 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
-import { Phone, Clock, Megaphone, Bot, Save, UserRound, Users } from "lucide-react";
+import { Phone, Clock, Megaphone, Bot, UserRound, Users } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { MessageBubble } from "./MessageBubble";
 import { Composer } from "./Composer";
 import { relativeTime } from "@/lib/relativeTime";
 import { friendlyId } from "@/lib/friendlyId";
-import { DEFAULT_CURRENCY } from "@/lib/money";
 
 type Props = { conversationId: Id<"conversations"> };
 
@@ -21,7 +20,6 @@ export function ConversationThread({ conversationId }: Props) {
   });
   const setOpportunityStatus = useMutation(api.conversations.setOpportunityStatus);
   const setAiState = useMutation(api.conversations.setAiState);
-  const setOpportunityValue = useMutation(api.conversations.setOpportunityValue);
   const assignTeam = useMutation(api.conversations.assignTeam);
   const assignAgent = useMutation(api.conversations.assignAgent);
   const teams = useQuery(api.teams.list, {});
@@ -31,7 +29,6 @@ export function ConversationThread({ conversationId }: Props) {
     conversationId,
     limit: 5,
   });
-  const [valueInput, setValueInput] = useState("");
   const [assignmentBusy, setAssignmentBusy] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -214,33 +211,6 @@ export function ConversationThread({ conversationId }: Props) {
             <option value="booked">booked</option>
             <option value="lost">lost</option>
           </select>
-          <input
-            value={
-              valueInput ||
-              (conversation.opportunityValueMinor
-                ? String(conversation.opportunityValueMinor / 100)
-                : "")
-            }
-            onChange={(event) => setValueInput(event.target.value)}
-            placeholder="Value (MT)"
-            className="w-24 rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[#0a1b33] outline-none"
-          />
-          <button
-            type="button"
-            onClick={() => {
-              const parsed = Number(valueInput.replace(",", "."));
-              if (Number.isFinite(parsed)) {
-                void setOpportunityValue({
-                  conversationId,
-                  valueMinor: Math.round(parsed * 100),
-                  currency: conversation.opportunityCurrency ?? DEFAULT_CURRENCY,
-                });
-              }
-            }}
-            className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 font-medium text-[#0a1b33] hover:border-slate-300"
-          >
-            <Save size={11} />
-          </button>
           <span className="ml-2 font-medium text-slate-500">AI</span>
           <button
             type="button"

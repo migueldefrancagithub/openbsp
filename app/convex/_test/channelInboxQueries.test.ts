@@ -261,6 +261,25 @@ describe("channel inbox queries", () => {
     expect(event.providerTimestamp).toBeDefined();
   });
 
+  it("turns inbound clinic intent into an operational lead state", async () => {
+    const t = convexTest(schema);
+    const owner = await seedTenant(t, "OpenBSP Clinic");
+    const { channelId } = await seedChannel(t, owner);
+
+    await inbound(t, channelId, ALLOWED, "Quero agendar uma consulta", 1);
+
+    const as = t.withIdentity({ subject: owner.userId });
+    const [thread] = await as.query(api.channels.listThreads, { channelId });
+
+    expect(thread).toMatchObject({
+      threadKey: ALLOWED,
+      leadStatus: "wants_booking",
+    });
+    expect(thread.nextStep).toContain("agenda real");
+    expect(thread.nextStepDueAt).toBeGreaterThan(thread.lastEventAt);
+    expect(thread.serviceWindowExpiresAt).toBeGreaterThan(thread.lastEventAt);
+  });
+
   it("returns null for a thread that does not exist yet", async () => {
     const t = convexTest(schema);
     const owner = await seedTenant(t, "OpenBSP Lab");

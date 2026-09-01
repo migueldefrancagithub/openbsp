@@ -6,7 +6,6 @@ import { cn } from "@/lib/cn";
 import { Module, EmptyRow, RiskBadge } from "./ui";
 import {
   downloadCsv,
-  formatMoney,
   formatNumber,
   formatPercent,
   toCsv,
@@ -21,8 +20,6 @@ export type DetailRow = {
   delivered: number;
   failed: number;
   deliveryRate: number;
-  costMinor: number;
-  costCurrency: string;
   qualityRisk: "low" | "watch" | "high";
   retrySafety: string;
 };
@@ -35,7 +32,6 @@ type ColumnId =
   | "delivered"
   | "failed"
   | "deliveryRate"
-  | "cost"
   | "qualityRisk"
   | "retrySafety";
 
@@ -47,7 +43,6 @@ const COLUMNS: { id: ColumnId; label: string; numeric?: boolean }[] = [
   { id: "delivered", label: "Delivered", numeric: true },
   { id: "failed", label: "Failed", numeric: true },
   { id: "deliveryRate", label: "Delivery rate", numeric: true },
-  { id: "cost", label: "Cost", numeric: true },
   { id: "qualityRisk", label: "Quality" },
   { id: "retrySafety", label: "Retry" },
 ];
@@ -103,8 +98,6 @@ export function ActivityTable({ rows }: { rows: DetailRow[] }) {
         return formatNumber(row.failed);
       case "deliveryRate":
         return formatPercent(row.deliveryRate, hasTraffic);
-      case "cost":
-        return formatMoney(row.costMinor, row.costCurrency);
       case "qualityRisk":
         return <RiskBadge risk={row.qualityRisk} hasTraffic={hasTraffic} />;
       case "retrySafety":
@@ -118,8 +111,6 @@ export function ActivityTable({ rows }: { rows: DetailRow[] }) {
       rows.map((row) =>
         visible.map((column) => {
           switch (column.id) {
-            case "cost":
-              return (row.costMinor / 100).toFixed(2);
             case "deliveryRate":
               return row.sent > 0 ? row.deliveryRate.toFixed(4) : "";
             case "qualityRisk":

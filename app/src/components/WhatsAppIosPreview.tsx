@@ -2,10 +2,10 @@
 
 import {
   AlertTriangle,
-  Banknote,
   CheckCircle2,
   Clock3,
   Info,
+  MessageCircle,
   ShieldCheck,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -53,7 +53,7 @@ export function WhatsAppIosPreview({
   serviceWindowOpen,
   freeEntryWindowOpen,
   title = "iOS WhatsApp preview",
-  subtitle = "Live rendering with Meta category and cost guardrails.",
+  subtitle = "Live rendering with Meta category, consent, and response tracking.",
 }: Props) {
   const analysis = analyzeTemplateStrategy({
     category,
@@ -130,9 +130,9 @@ export function WhatsAppIosPreview({
       <div className="rounded-2xl border border-slate-200 bg-white p-4">
         <div className="grid grid-cols-2 gap-2">
           <Signal
-            icon={Banknote}
-            label="Billing"
-            value={analysis.billing.chargeState === "free" ? "Likely free" : "Billable"}
+            icon={MessageCircle}
+            label="Send path"
+            value={analysis.billing.chargeState === "free" ? "Open window" : "Template"}
             tone={analysis.billing.chargeState === "free" ? "good" : "warn"}
           />
           <Signal
@@ -155,7 +155,9 @@ export function WhatsAppIosPreview({
           />
         </div>
         <p className="mt-3 text-[12px] leading-relaxed text-slate-500">
-          {analysis.billing.reason}
+          {primaryRisk
+            ? primaryRisk.detail
+            : "Ready to track replies, interactions, and operational conversions after send."}
         </p>
       </div>
 

@@ -43,9 +43,9 @@ const PRESETS = [
   },
   {
     name: "pricing",
-    title: "Pricing",
+    title: "Condições do serviço",
     content:
-      "Os valores variam conforme o serviço. Diz-nos o que procuras e a equipa confirma o preço em MT.",
+      "As condições variam conforme o serviço. Diz-nos o que procuras e a equipa confirma o melhor próximo passo contigo.",
   },
   {
     name: "booking",
