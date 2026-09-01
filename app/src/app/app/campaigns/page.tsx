@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useAction, useConvex, useMutation, useQuery } from "convex/react";
 import {
   AlertTriangle,
+  BadgeCheck,
   Ban,
   BarChart3,
   CheckCircle2,
@@ -17,6 +18,7 @@ import {
   Loader2,
   Megaphone,
   MessageSquare,
+  MousePointerClick,
   MoreHorizontal,
   Plus,
   Radio,
@@ -115,6 +117,7 @@ export default function CampaignsPage() {
   const launchCampaign = useMutation(api.campaigns.launchCampaign);
   const sendNextBatch = useMutation(api.campaigns.sendNextBatch);
   const retrySafeFailures = useMutation(api.campaigns.retrySafeFailures);
+  const recordConversion = useMutation(api.campaigns.recordConversion);
   const sendMicroCampaignText = useAction(
     api.iaSolutionHub.sendMicroCampaignText,
   );
@@ -258,6 +261,33 @@ export default function CampaignsPage() {
       );
     });
   }, [campaigns, campaignSearch, campaignStatusFilter]);
+  const campaignTotals = useMemo(() => {
+    const initial = {
+      runs: 0,
+      total: 0,
+      sent: 0,
+      delivered: 0,
+      read: 0,
+      replied: 0,
+      clicked: 0,
+      converted: 0,
+      failed: 0,
+    };
+    return (campaigns ?? []).reduce((totals, campaign) => {
+      const sent = sentLikeCount(campaign.stats);
+      return {
+        runs: totals.runs + 1,
+        total: totals.total + campaign.stats.total,
+        sent: totals.sent + sent,
+        delivered: totals.delivered + deliveredLikeCount(campaign.stats),
+        read: totals.read + readLikeCount(campaign.stats),
+        replied: totals.replied + campaign.stats.replied,
+        clicked: totals.clicked + campaign.stats.clicked,
+        converted: totals.converted + campaign.stats.converted,
+        failed: totals.failed + campaign.stats.failed,
+      };
+    }, initial);
+  }, [campaigns]);
   const logCampaign = useMemo(
     () => (campaigns ?? []).find((campaign) => campaign._id === logCampaignId),
     [campaigns, logCampaignId],
@@ -373,6 +403,7 @@ export default function CampaignsPage() {
       setNotice(
         `Micro campaign sent: ${result.accepted} accepted, ${result.failed} blocked by channel gates.`,
       );
+      setStudioTab("dashboard");
     } catch (err) {
       setError(readError(err));
     } finally {
@@ -469,6 +500,29 @@ export default function CampaignsPage() {
       const result = await retrySafeFailures({ campaignId });
       setNotice(
         `Retry queued: ${result.retried} safe failures retried, ${result.skippedUnsafe} unsafe skipped, ${result.skippedConsent} skipped for consent.`,
+      );
+    } catch (err) {
+      setError(readError(err));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function handleRecordConversion(
+    campaignRecipientId: Id<"campaignRecipients">,
+  ) {
+    setBusy(`convert:${campaignRecipientId}`);
+    setError(null);
+    setNotice(null);
+    try {
+      const result = await recordConversion({
+        campaignRecipientId,
+        label: "Clinic conversion",
+      });
+      setNotice(
+        result.converted
+          ? "Conversion recorded for this campaign."
+          : "This recipient was already marked as converted.",
       );
     } catch (err) {
       setError(readError(err));
@@ -1174,6 +1228,39 @@ export default function CampaignsPage() {
             </button>
           </div>
 
+          <div className="grid gap-3 border-b border-slate-100 p-5 sm:grid-cols-2 xl:grid-cols-5">
+            <DashboardMetric
+              icon={Radio}
+              label="Runs"
+              value={campaignTotals.runs}
+              detail={`${campaignTotals.total.toLocaleString()} recipients`}
+            />
+            <DashboardMetric
+              icon={Send}
+              label="Sent"
+              value={campaignTotals.sent}
+              detail={`${rate(campaignTotals.sent, campaignTotals.total).toFixed(1)}% reach`}
+            />
+            <DashboardMetric
+              icon={MousePointerClick}
+              label="Clicks"
+              value={campaignTotals.clicked}
+              detail={`${rate(campaignTotals.clicked, Math.max(campaignTotals.sent, 1)).toFixed(1)}% CTR`}
+            />
+            <DashboardMetric
+              icon={MessageSquare}
+              label="Replies"
+              value={campaignTotals.replied}
+              detail={`${rate(campaignTotals.replied, Math.max(campaignTotals.sent, 1)).toFixed(1)}% response`}
+            />
+            <DashboardMetric
+              icon={BadgeCheck}
+              label="Conversions"
+              value={campaignTotals.converted}
+              detail={`${rate(campaignTotals.converted, Math.max(campaignTotals.sent, 1)).toFixed(1)}% CVR`}
+            />
+          </div>
+
           <div className="border-b border-slate-100 p-5">
             <div className="grid gap-3 lg:grid-cols-[1fr_auto_auto]">
               <label className="relative block">
@@ -1242,7 +1329,7 @@ export default function CampaignsPage() {
                 No campaign drafts yet
               </h3>
               <p className="text-sm text-slate-500 mt-1">
-                Create a list, add contacts, then attach an approved template.
+                Create a template broadcast or send a micro lab campaign to start tracking real delivery and conversion events.
               </p>
             </div>
           ) : filteredCampaigns.length === 0 ? (
@@ -1279,6 +1366,8 @@ export default function CampaignsPage() {
         <CampaignLogDrawer
           campaign={logCampaign}
           events={campaignEvents}
+          busy={busy}
+          onRecordConversion={handleRecordConversion}
           onClose={() => setLogCampaignId(null)}
         />
       )}
@@ -1305,6 +1394,7 @@ type CampaignStats = {
   read: number;
   replied: number;
   clicked: number;
+  converted: number;
   failed: number;
   skipped: number;
 };
@@ -1312,7 +1402,10 @@ type CampaignStats = {
 type CampaignSummary = {
   _id: Id<"campaigns">;
   name: string;
+  kind: "template_broadcast" | "micro_lab";
   status: string;
+  channelName?: string;
+  contentPreview?: string;
   listName?: string;
   templateName?: string;
   pauseReason?: string;
@@ -1324,6 +1417,8 @@ type CampaignSummary = {
     title: string;
     action: string;
   }>;
+  startedAt?: number;
+  completedAt?: number;
   createdAt: number;
   updatedAt?: number;
 };
@@ -1344,6 +1439,13 @@ type CampaignEvent = {
     failureCode?: string;
     failureReason?: string;
     metaErrorCategory?: string;
+    sentAt?: number;
+    deliveredAt?: number;
+    readAt?: number;
+    repliedAt?: number;
+    clickedAt?: number;
+    convertedAt?: number;
+    conversionLabel?: string;
   };
 };
 
@@ -1367,6 +1469,8 @@ function BroadcastCard({
   const sent = sentLikeCount(campaign.stats);
   const delivered = deliveredLikeCount(campaign.stats);
   const read = readLikeCount(campaign.stats);
+  const clicked = campaign.stats.clicked;
+  const converted = campaign.stats.converted;
   const pendingBatch =
     campaign.stats.pending + campaign.stats.queued + campaign.stats.dispatching;
   const pendingRecipients = campaign.stats.pending;
@@ -1469,20 +1573,35 @@ function BroadcastCard({
             <Radio size={12} />
             Condition tracking
           </span>
+          <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
+            {campaign.kind === "micro_lab" ? "Micro lab" : "Template"}
+          </span>
         </div>
 
         <div className="mt-4 flex items-center gap-2 text-sm font-semibold text-slate-500">
           <FileText size={15} />
           <span className="truncate">
-            {campaign.templateName ?? "No template"}
+            {campaign.kind === "micro_lab"
+              ? campaign.channelName ?? "Micro lab channel"
+              : campaign.templateName ?? "No template"}
           </span>
-          <span className="text-xs">(en)</span>
+          <span className="text-xs">
+            {campaign.kind === "micro_lab" ? "(hub)" : "(template)"}
+          </span>
         </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-2">
+        {campaign.contentPreview && (
+          <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-500">
+            {campaign.contentPreview}
+          </p>
+        )}
+
+        <div className="mt-4 grid grid-cols-2 gap-2 xl:grid-cols-3">
           <BroadcastMetric icon={Send} label="Sent" value={`${sent}/${campaign.stats.total}`} />
           <BroadcastMetric icon={CheckCircle2} label="Delivered" value={delivered} />
           <BroadcastMetric icon={MessageSquare} label="Read" value={read} />
+          <BroadcastMetric icon={MousePointerClick} label="Clicks" value={clicked} />
+          <BroadcastMetric icon={BadgeCheck} label="Converted" value={converted} />
           <BroadcastMetric
             icon={XCircle}
             label="Failed"
@@ -1498,6 +1617,14 @@ function BroadcastCard({
             value={rate(delivered, Math.max(sent, 1))}
           />
           <ProgressRow label="Read Rate" value={rate(read, Math.max(delivered, 1))} />
+          <ProgressRow
+            label="Click Rate"
+            value={rate(clicked, Math.max(sent, 1))}
+          />
+          <ProgressRow
+            label="Conversion Rate"
+            value={rate(converted, Math.max(sent, 1))}
+          />
         </div>
 
         {campaign.failureBreakdown.length > 0 && (
@@ -1534,9 +1661,9 @@ function BroadcastCard({
           >
             <span className="inline-flex items-center gap-2">
               <MessageSquare size={15} />
-              Responses
+              Responses / conversions
             </span>
-            <span>{campaign.stats.replied + campaign.stats.clicked}</span>
+            <span>{campaign.stats.replied + campaign.stats.clicked + converted}</span>
           </button>
         </div>
       </div>
@@ -1569,10 +1696,14 @@ function BroadcastCard({
 function CampaignLogDrawer({
   campaign,
   events,
+  busy,
+  onRecordConversion,
   onClose,
 }: {
   campaign: CampaignSummary;
   events: CampaignEvent[] | undefined;
+  busy: string | null;
+  onRecordConversion: (campaignRecipientId: Id<"campaignRecipients">) => void;
   onClose: () => void;
 }) {
   const sent = sentLikeCount(campaign.stats);
@@ -1604,9 +1735,11 @@ function CampaignLogDrawer({
           </button>
         </div>
 
-        <div className="grid grid-cols-4 border-b border-slate-100 px-6 py-5 text-center">
+        <div className="grid grid-cols-3 gap-y-4 border-b border-slate-100 px-6 py-5 text-center sm:grid-cols-6">
           <DrawerStat label="Total" value={campaign.stats.total} />
           <DrawerStat label="Sent" value={sent} tone="emerald" />
+          <DrawerStat label="Clicks" value={campaign.stats.clicked} tone="blue" />
+          <DrawerStat label="Conv." value={campaign.stats.converted} tone="emerald" />
           <DrawerStat label="Failed" value={campaign.stats.failed} tone="red" />
           <DrawerStat label="Progress" value={`${progress.toFixed(1)}%`} tone="blue" />
         </div>
@@ -1628,6 +1761,15 @@ function CampaignLogDrawer({
           ) : (
             events.map((event) => {
               const tone = eventTone(event);
+              const canConvert =
+                Boolean(event.campaignRecipientId) &&
+                Boolean(event.recipient) &&
+                !event.recipient?.convertedAt &&
+                !["failed", "skipped"].includes(event.recipient?.status ?? "") &&
+                (event.type.includes("clicked") ||
+                  event.type.includes("replied") ||
+                  event.type.includes("read") ||
+                  event.type.includes("delivered"));
               return (
                 <LogEvent
                   key={event._id}
@@ -1636,6 +1778,23 @@ function CampaignLogDrawer({
                   message={eventMessage(event)}
                   detail={eventDetail(event)}
                   tone={tone}
+                  action={
+                    canConvert && event.campaignRecipientId ? (
+                      <button
+                        type="button"
+                        onClick={() => onRecordConversion(event.campaignRecipientId!)}
+                        disabled={busy !== null}
+                        className="mt-3 inline-flex h-8 items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 text-xs font-semibold text-emerald-700 transition-colors hover:border-emerald-300 disabled:opacity-50"
+                      >
+                        {busy === `convert:${event.campaignRecipientId}` ? (
+                          <Loader2 size={13} className="animate-spin" />
+                        ) : (
+                          <BadgeCheck size={13} />
+                        )}
+                        Mark converted
+                      </button>
+                    ) : undefined
+                  }
                 />
               );
             })
@@ -1715,6 +1874,33 @@ function BroadcastMetric({
   );
 }
 
+function DashboardMetric({
+  icon: Icon,
+  label,
+  value,
+  detail,
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: number | string;
+  detail: string;
+}) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+          {label}
+        </span>
+        <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-white text-[#0a1b33]">
+          <Icon size={15} />
+        </span>
+      </div>
+      <div className="mt-2 text-xl font-semibold text-[#0a1b33]">{value}</div>
+      <div className="mt-1 text-xs font-medium text-slate-500">{detail}</div>
+    </div>
+  );
+}
+
 function ProgressRow({ label, value }: { label: string; value: number }) {
   return (
     <div className="mb-3 last:mb-0">
@@ -1763,12 +1949,14 @@ function LogEvent({
   message,
   detail,
   tone,
+  action,
 }: {
   kind: string;
   time: string;
   message: string;
   detail?: string;
   tone: "good" | "warn" | "bad" | "neutral";
+  action?: ReactNode;
 }) {
   const toneClass =
     tone === "bad"
@@ -1792,6 +1980,7 @@ function LogEvent({
           {detail}
         </p>
       )}
+      {action}
     </div>
   );
 }
@@ -1812,7 +2001,8 @@ function eventTone(event: CampaignEvent): "good" | "warn" | "bad" | "neutral" {
     event.type.includes("delivered") ||
     event.type.includes("read") ||
     event.type.includes("replied") ||
-    event.type.includes("clicked")
+    event.type.includes("clicked") ||
+    event.type.includes("converted")
   ) {
     return "good";
   }
@@ -1824,6 +2014,7 @@ function eventKind(event: CampaignEvent): string {
   if (event.type.includes("failed")) return "Failure";
   if (event.type.includes("retry")) return "Retry";
   if (event.type.includes("skipped")) return "Skipped";
+  if (event.type.includes("converted")) return "Conversion";
   if (event.type.includes("replied") || event.type.includes("clicked")) {
     return "Engagement";
   }
@@ -1852,6 +2043,30 @@ function eventDetail(event: CampaignEvent): string | undefined {
     parts.push(`status: ${event.recipient.status}`);
     if (event.recipient.metaErrorCategory) {
       parts.push(`category: ${event.recipient.metaErrorCategory}`);
+    }
+    if (event.recipient.sentAt) {
+      parts.push(`sent: ${new Date(event.recipient.sentAt).toLocaleString()}`);
+    }
+    if (event.recipient.deliveredAt) {
+      parts.push(
+        `delivered: ${new Date(event.recipient.deliveredAt).toLocaleString()}`,
+      );
+    }
+    if (event.recipient.readAt) {
+      parts.push(`read: ${new Date(event.recipient.readAt).toLocaleString()}`);
+    }
+    if (event.recipient.clickedAt) {
+      parts.push(
+        `clicked: ${new Date(event.recipient.clickedAt).toLocaleString()}`,
+      );
+    }
+    if (event.recipient.convertedAt) {
+      parts.push(
+        `converted: ${new Date(event.recipient.convertedAt).toLocaleString()}`,
+      );
+    }
+    if (event.recipient.conversionLabel) {
+      parts.push(`conversion: ${event.recipient.conversionLabel}`);
     }
     if (event.recipient.failureCode) {
       parts.push(`Meta code: ${event.recipient.failureCode}`);

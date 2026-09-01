@@ -757,6 +757,9 @@ describe("isolated iaSolution Hub channel core", () => {
         text: "Micro sale OpenBSP",
       });
       const rows = await t.run(async (ctx) => ({
+        campaigns: await ctx.db.query("campaigns").collect(),
+        recipients: await ctx.db.query("campaignRecipients").collect(),
+        events: await ctx.db.query("campaignEvents").collect(),
         outbox: await ctx.db.query("channelOutbox").collect(),
         threads: await ctx.db.query("channelThreads").collect(),
       }));
@@ -765,6 +768,67 @@ describe("isolated iaSolution Hub channel core", () => {
         status: "accepted",
         providerMessageId: "wamid.micro.1",
       });
+      expect(rows.campaigns).toHaveLength(1);
+      expect(rows.campaigns[0]).toMatchObject({
+        kind: "micro_lab",
+        name: "Micro lab",
+        status: "completed",
+        channelId,
+      });
+      expect(rows.recipients).toHaveLength(2);
+      expect(rows.recipients).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            threadKey: "258840000099",
+            channelOutboxId: rows.outbox[0]._id,
+            status: "sent",
+            providerMessageId: "wamid.micro.1",
+            sentAt: expect.any(Number),
+          }),
+          expect.objectContaining({
+            threadKey: "258840000100",
+            status: "failed",
+          }),
+        ]),
+      );
+      expect(rows.events.map((event) => event.type)).toEqual(
+        expect.arrayContaining([
+          "campaign.micro.created",
+          "campaign.recipient.sent",
+          "campaign.recipient.failed",
+          "campaign.micro.completed",
+        ]),
+      );
+      await ingest(
+        t,
+        channelId,
+        {
+          statuses: [
+            {
+              id: "wamid.micro.1",
+              status: "delivered",
+              recipient_id: "258840000099",
+            },
+          ],
+        },
+        "sha-micro-delivered",
+      );
+      const afterReceipt = await t.run(async (ctx) => ({
+        recipients: await ctx.db.query("campaignRecipients").collect(),
+        events: await ctx.db.query("campaignEvents").collect(),
+      }));
+      expect(afterReceipt.recipients).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            threadKey: "258840000099",
+            status: "delivered",
+            deliveredAt: expect.any(Number),
+          }),
+        ]),
+      );
+      expect(afterReceipt.events.map((event) => event.type)).toContain(
+        "campaign.recipient.delivered",
+      );
       expect(rows.threads.some((thread) => thread.automationMode === "human")).toBe(
         false,
       );

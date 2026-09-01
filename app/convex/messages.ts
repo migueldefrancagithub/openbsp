@@ -837,11 +837,25 @@ async function syncCampaignRecipientFromMessage(
           reason: patch.failureReason ?? recipient.failureReason,
         })
       : recipient.metaErrorCategory;
+  const statusTimestamps: Record<string, number> = {};
+  if (patch.status === "sent" && !recipient.sentAt) {
+    statusTimestamps.sentAt = now;
+  }
+  if (patch.status === "delivered") {
+    if (!recipient.sentAt) statusTimestamps.sentAt = now;
+    if (!recipient.deliveredAt) statusTimestamps.deliveredAt = now;
+  }
+  if (patch.status === "read") {
+    if (!recipient.sentAt) statusTimestamps.sentAt = now;
+    if (!recipient.deliveredAt) statusTimestamps.deliveredAt = now;
+    if (!recipient.readAt) statusTimestamps.readAt = now;
+  }
   await ctx.db.patch(recipient._id, {
     status: patch.status,
     failureCode: patch.failureCode ?? recipient.failureCode,
     failureReason: patch.failureReason ?? recipient.failureReason,
     metaErrorCategory,
+    ...statusTimestamps,
     updatedAt: now,
   });
   if (recipient.status !== patch.status) {
