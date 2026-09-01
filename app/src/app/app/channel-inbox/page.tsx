@@ -1,27 +1,20 @@
-import { Radio } from "lucide-react";
+"use client";
+
+import { MessageCircleMore } from "lucide-react";
+import { useI18n } from "@/lib/i18n";
 
 export default function ChannelInboxIndexPage() {
+  const { t } = useI18n();
   return (
-    <div className="flex-1 flex flex-col items-center justify-center text-center px-6 bg-[#f4f6f9]">
-      <div className="relative mb-5">
-        <div
-          className="absolute inset-0 rounded-2xl opacity-40"
-          style={{
-            background:
-              "linear-gradient(137deg, #FF3D77 0%, #06B6D4 50%, #4361EE 100%)",
-            filter: "blur(28px)",
-          }}
-        />
-        <div className="relative w-14 h-14 rounded-2xl bg-white border border-slate-200 flex items-center justify-center shadow-sm">
-          <Radio size={22} className="text-[#0a1b33]" strokeWidth={2} />
-        </div>
+    <div className="hidden flex-1 flex-col items-center justify-center bg-[#f5f7f9] px-6 text-center sm:flex">
+      <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-slate-200 bg-white text-[#0d6b61] shadow-sm">
+        <MessageCircleMore size={21} />
       </div>
-      <h2 className="font-[var(--font-outfit)] text-[20px] font-medium tracking-tight text-[#0a1b33]">
-        Pick a thread
+      <h2 className="mt-4 text-[18px] font-semibold text-[#0a1b33]">
+        {t("inbox.pickThread")}
       </h2>
-      <p className="text-slate-500 text-sm mt-2 max-w-sm leading-relaxed">
-        Channel-neutral inbox. Threads here come from normalized channel events,
-        separate from the WhatsApp inbox.
+      <p className="mt-1.5 max-w-sm text-[12px] leading-5 text-slate-500">
+        {t("inbox.pickThreadBody")}
       </p>
     </div>
   );

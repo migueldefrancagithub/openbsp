@@ -301,6 +301,88 @@ describe("campaign foundation", () => {
     expect(await t.run(async (ctx) => (await ctx.db.query("messages").collect()).length)).toBe(2);
   });
 
+  it("pauses, resumes, and cancels a campaign without leaking queued sends", async () => {
+    const t = convexTest(schema);
+    const { owner, contactA, contactB, templateId } = await seedTenant(t);
+    const campaignsApi = (api as any).campaigns;
+
+    await t.run(async (ctx) => {
+      const contact = await ctx.db.get(contactB);
+      if (!contact) throw new Error("missing contact");
+      const consentEventId = await ctx.db.insert("consentEvents", {
+        tenantId: contact.tenantId,
+        contactId: contactB,
+        purpose: "marketing",
+        channel: "whatsapp",
+        newStatus: "granted",
+        source: "test",
+        capturedAt: Date.now(),
+      });
+      await ctx.db.insert("currentConsents", {
+        tenantId: contact.tenantId,
+        contactId: contactB,
+        purpose: "marketing",
+        channel: "whatsapp",
+        status: "granted",
+        effectiveAt: Date.now(),
+        lastEventId: consentEventId,
+      });
+    });
+
+    const listId = await owner.mutation(campaignsApi.createContactList, {
+      name: "Durable Lifecycle",
+    });
+    await owner.mutation(campaignsApi.addContactToList, { listId, contactId: contactA });
+    await owner.mutation(campaignsApi.addContactToList, { listId, contactId: contactB });
+    const campaignId = await owner.mutation(campaignsApi.createDraftCampaign, {
+      name: "Pause Resume Cancel",
+      listId,
+      templateId,
+    });
+    await owner.mutation(campaignsApi.launchCampaign, { campaignId, batchSize: 1 });
+
+    expect(await owner.mutation(campaignsApi.pauseCampaign, { campaignId })).toEqual({
+      paused: true,
+    });
+    expect(
+      await t.mutation((internal as any).campaigns._continueCampaign, {
+        campaignId,
+        batchSize: 1,
+      }),
+    ).toEqual({ queued: 0, pendingRemaining: 0 });
+    expect((await owner.query(campaignsApi.getCampaign, { campaignId })).stats.pending).toBe(1);
+
+    expect(await owner.mutation(campaignsApi.resumeCampaign, { campaignId })).toEqual({
+      resumed: true,
+    });
+    expect(await owner.mutation(campaignsApi.cancelCampaign, { campaignId })).toEqual({
+      cancelled: true,
+    });
+    await t.mutation((internal as any).campaigns._cancelQueuedRecipients, {
+      campaignId,
+    });
+
+    const detail = await owner.query(campaignsApi.getCampaign, { campaignId });
+    expect(detail.status).toBe("cancelled");
+    expect(detail.stats.skipped).toBe(2);
+    expect(detail.stats.queued).toBe(0);
+    const messages = await t.run(async (ctx) => await ctx.db.query("messages").collect());
+    expect(messages).toHaveLength(1);
+    expect(messages[0]).toMatchObject({
+      status: "failed",
+      failureReason: "campaign_cancelled_before_dispatch",
+    });
+    const events = await owner.query(campaignsApi.listEvents, { campaignId, limit: 20 });
+    expect(events.map((event: { type: string }) => event.type)).toEqual(
+      expect.arrayContaining([
+        "campaign.paused.manual",
+        "campaign.resumed.manual",
+        "campaign.cancelled.manual",
+        "campaign.cancelled.pending_recipients",
+      ]),
+    );
+  });
+
   it("syncs campaign recipient status from the outbound message lifecycle", async () => {
     const t = convexTest(schema);
     const { owner, contactA, templateId } = await seedTenant(t);

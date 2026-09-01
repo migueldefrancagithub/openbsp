@@ -20,6 +20,8 @@ import {
   MessageSquare,
   MousePointerClick,
   MoreHorizontal,
+  Pause,
+  Play,
   Plus,
   Radio,
   RotateCcw,
@@ -117,6 +119,9 @@ export default function CampaignsPage() {
   const createDraftCampaign = useMutation(api.campaigns.createDraftCampaign);
   const launchCampaign = useMutation(api.campaigns.launchCampaign);
   const sendNextBatch = useMutation(api.campaigns.sendNextBatch);
+  const pauseCampaign = useMutation(api.campaigns.pauseCampaign);
+  const resumeCampaign = useMutation(api.campaigns.resumeCampaign);
+  const cancelCampaign = useMutation(api.campaigns.cancelCampaign);
   const retrySafeFailures = useMutation(api.campaigns.retrySafeFailures);
   const recordConversion = useMutation(api.campaigns.recordConversion);
   const sendMicroCampaignText = useAction(
@@ -486,6 +491,54 @@ export default function CampaignsPage() {
       setNotice(
         `Next batch queued: ${result.queued} queued, ${result.pendingRemaining} still waiting, ${result.skippedConsent} skipped for consent, ${result.skippedUnsuitable} unsuitable.`,
       );
+    } catch (err) {
+      setError(readError(err));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function handlePause(campaignId: Id<"campaigns">) {
+    setBusy(`pause:${campaignId}`);
+    setError(null);
+    setNotice(null);
+    try {
+      await pauseCampaign({ campaignId, reason: "Paused by the clinic team." });
+      setNotice(locale === "pt" ? "Campanha pausada. Nenhum novo lote será criado." : "Campaign paused. No new batch will be created.");
+    } catch (err) {
+      setError(readError(err));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function handleResume(campaignId: Id<"campaigns">) {
+    setBusy(`resume:${campaignId}`);
+    setError(null);
+    setNotice(null);
+    try {
+      await resumeCampaign({ campaignId });
+      setNotice(locale === "pt" ? "Campanha retomada do ponto em que parou." : "Campaign resumed from where it stopped.");
+    } catch (err) {
+      setError(readError(err));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function handleCancel(campaignId: Id<"campaigns">) {
+    const confirmed = window.confirm(
+      locale === "pt"
+        ? "Cancelar esta campanha? Os envios ainda na fila serão bloqueados."
+        : "Cancel this campaign? Sends still queued will be blocked.",
+    );
+    if (!confirmed) return;
+    setBusy(`cancel:${campaignId}`);
+    setError(null);
+    setNotice(null);
+    try {
+      await cancelCampaign({ campaignId, reason: "Cancelled by the clinic team." });
+      setNotice(locale === "pt" ? "Campanha cancelada com segurança." : "Campaign cancelled safely.");
     } catch (err) {
       setError(readError(err));
     } finally {
@@ -1417,6 +1470,9 @@ export default function CampaignsPage() {
                   busy={busy}
                   onLaunch={handleLaunch}
                   onSendNextBatch={handleSendNextBatch}
+                  onPause={handlePause}
+                  onResume={handleResume}
+                  onCancel={handleCancel}
                   onRetrySafe={handleRetrySafe}
                   onCopyFailed={handleCopyFailedContacts}
                   onOpenLog={() => setLogCampaignId(campaign._id)}
@@ -1520,6 +1576,9 @@ function BroadcastCard({
   busy,
   onLaunch,
   onSendNextBatch,
+  onPause,
+  onResume,
+  onCancel,
   onRetrySafe,
   onCopyFailed,
   onOpenLog,
@@ -1528,6 +1587,9 @@ function BroadcastCard({
   busy: string | null;
   onLaunch: (campaignId: Id<"campaigns">) => void;
   onSendNextBatch: (campaignId: Id<"campaigns">) => void;
+  onPause: (campaignId: Id<"campaigns">) => void;
+  onResume: (campaignId: Id<"campaigns">) => void;
+  onCancel: (campaignId: Id<"campaigns">) => void;
   onRetrySafe: (campaignId: Id<"campaigns">) => void;
   onCopyFailed: (campaignId: Id<"campaigns">) => void;
   onOpenLog: () => void;
@@ -1568,13 +1630,7 @@ function BroadcastCard({
               # {friendlyCampaignId(campaign._id)} · {relativeTime(campaign.createdAt)}
             </p>
           </div>
-          <button
-            type="button"
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-[#0a1b33]"
-            aria-label="More broadcast actions"
-          >
-            <MoreHorizontal size={17} />
-          </button>
+          <button type="button" onClick={onOpenLog} className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-[#0a1b33]" aria-label="Open campaign log"><MoreHorizontal size={17} /></button>
         </div>
 
         <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -1596,6 +1652,34 @@ function BroadcastCard({
               onClick={() => onSendNextBatch(campaign._id)}
               disabled={busy !== null}
               tone="orange"
+            />
+          )}
+          {campaign.status === "running" && (
+            <ActionPill
+              icon={Pause}
+              label="Pause"
+              loading={busy === `pause:${campaign._id}`}
+              onClick={() => onPause(campaign._id)}
+              disabled={busy !== null}
+            />
+          )}
+          {campaign.status === "paused" && (
+            <ActionPill
+              icon={Play}
+              label="Resume"
+              loading={busy === `resume:${campaign._id}`}
+              onClick={() => onResume(campaign._id)}
+              disabled={busy !== null}
+              tone="dark"
+            />
+          )}
+          {["draft", "scheduled", "running", "paused"].includes(campaign.status) && (
+            <ActionPill
+              icon={Ban}
+              label="Cancel"
+              loading={busy === `cancel:${campaign._id}`}
+              onClick={() => onCancel(campaign._id)}
+              disabled={busy !== null}
             />
           )}
           {campaign.failureBreakdown.some((failure) => failure.retrySafe) && (
@@ -2209,7 +2293,7 @@ function readLikeCount(stats: CampaignStats): number {
 
 function rate(value: number, total: number): number {
   if (total <= 0) return 0;
-  return (value / total) * 100;
+  return Math.min(100, Math.max(0, (value / total) * 100));
 }
 
 function normalizedBatchSize(value: number): number {

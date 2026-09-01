@@ -168,7 +168,7 @@ export function CommandPalette() {
       id: c._id,
       label: c.contactName ?? c.contactE164,
       hint: friendlyId("CONV", c._id) + " · " + c.contactE164,
-      href: `/app/inbox/${c._id}`,
+      href: "/app/channel-inbox",
       icon: MessageSquare,
       group: "Conversations" as const,
     }));

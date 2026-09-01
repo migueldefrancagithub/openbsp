@@ -1,0 +1,880 @@
+import { makeFunctionReference, paginationOptsValidator } from "convex/server";
+import { ConvexError, v } from "convex/values";
+import type { Doc, Id } from "./_generated/dataModel";
+import { internalMutation } from "./_generated/server";
+import {
+  loadByIdInTenant,
+  tenantMutation,
+  tenantQuery,
+} from "./lib/customFunctions";
+
+const filterValidator = v.union(
+  v.literal("all"),
+  v.literal("unassigned"),
+  v.literal("open"),
+  v.literal("active"),
+  v.literal("awaiting_team"),
+  v.literal("awaiting_patient"),
+  v.literal("starred"),
+  v.literal("snoozed"),
+  v.literal("closed"),
+);
+
+const inboxStatusValidator = v.union(
+  v.literal("open"),
+  v.literal("active"),
+  v.literal("awaiting_team"),
+  v.literal("awaiting_patient"),
+  v.literal("snoozed"),
+  v.literal("closed"),
+);
+
+const leadStatusValidator = v.union(
+  v.literal("new"),
+  v.literal("interested"),
+  v.literal("asked_price"),
+  v.literal("wants_booking"),
+  v.literal("awaiting_human"),
+  v.literal("booked"),
+  v.literal("confirmed"),
+  v.literal("attended"),
+  v.literal("no_show"),
+  v.literal("lost"),
+);
+
+type OperationalStatus =
+  | "open"
+  | "active"
+  | "awaiting_team"
+  | "awaiting_patient"
+  | "snoozed"
+  | "closed";
+
+const markReminderDue = makeFunctionReference<
+  "mutation",
+  { reminderId: Id<"threadReminders"> },
+  null
+>("inboxOperations:_markReminderDue");
+
+function deriveStatus(thread: Doc<"channelThreads">, now: number): OperationalStatus {
+  if (thread.closedAt || thread.inboxStatus === "closed") return "closed";
+  if (
+    thread.inboxStatus === "snoozed" &&
+    thread.snoozedUntil &&
+    thread.snoozedUntil > now
+  ) {
+    return "snoozed";
+  }
+  if (
+    thread.inboxStatus === "awaiting_team" ||
+    thread.leadStatus === "awaiting_human" ||
+    thread.automationMode === "human"
+  ) {
+    return "awaiting_team";
+  }
+  if (thread.inboxStatus === "awaiting_patient") return "awaiting_patient";
+  if (thread.inboxStatus === "active") return "active";
+  if (
+    thread.lastInboundAt &&
+    (!thread.lastOutboundAt || thread.lastInboundAt > thread.lastOutboundAt)
+  ) {
+    return "open";
+  }
+  if (
+    thread.lastOutboundAt &&
+    (!thread.lastInboundAt || thread.lastOutboundAt >= thread.lastInboundAt)
+  ) {
+    return "awaiting_patient";
+  }
+  return "open";
+}
+
+function matchesFilter(
+  thread: Doc<"channelThreads">,
+  filter: string,
+  status: OperationalStatus,
+): boolean {
+  if (filter === "all") return status !== "closed";
+  if (filter === "unassigned") {
+    return status !== "closed" && !thread.responsibleMemberId;
+  }
+  if (filter === "starred") return status !== "closed" && !!thread.starredAt;
+  return status === filter;
+}
+
+function normalizedPhone(value?: string): string | undefined {
+  const digits = value?.replace(/\D/g, "") ?? "";
+  return /^[1-9]\d{7,17}$/.test(digits) ? `+${digits}` : undefined;
+}
+
+async function getThreadIdentity(ctx: { db: any }, thread: Doc<"channelThreads">) {
+  return thread.identityId
+    ? ((await ctx.db.get(thread.identityId)) as Doc<"channelIdentities"> | null)
+    : null;
+}
+
+async function findContact(
+  ctx: { db: any; tenantId: Id<"tenants"> },
+  thread: Doc<"channelThreads">,
+  identity: Doc<"channelIdentities"> | null,
+) {
+  const phone = normalizedPhone(identity?.phone ?? thread.threadKey);
+  if (phone) {
+    const contact = await ctx.db
+      .query("contacts")
+      .withIndex("by_tenant_phone", (q: any) =>
+        q.eq("tenantId", ctx.tenantId).eq("e164", phone),
+      )
+      .unique();
+    if (contact) return contact as Doc<"contacts">;
+  }
+  const scopedId = identity?.providerScopedId ?? thread.threadKey;
+  if (scopedId && !normalizedPhone(scopedId)) {
+    return (await ctx.db
+      .query("contacts")
+      .withIndex("by_tenant_bsuid", (q: any) =>
+        q.eq("tenantId", ctx.tenantId).eq("bsuid", scopedId),
+      )
+      .unique()) as Doc<"contacts"> | null;
+  }
+  return null;
+}
+
+async function hasMessageEvent(ctx: { db: any }, thread: Doc<"channelThreads">) {
+  if (thread.lastEventKind.startsWith("message.")) return true;
+  return (
+    (await ctx.db
+      .query("channelEvents")
+      .withIndex("by_channel_thread_kind", (q: any) =>
+        q
+          .eq("channelId", thread.channelId)
+          .eq("threadKey", thread.threadKey)
+          .gte("eventKind", "message.")
+          .lt("eventKind", "message/"),
+      )
+      .first()) !== null
+  );
+}
+
+async function memberLabel(ctx: { db: any }, memberId?: Id<"members">) {
+  if (!memberId) return undefined;
+  const member = (await ctx.db.get(memberId)) as Doc<"members"> | null;
+  if (!member) return undefined;
+  const user = await ctx.db.get(member.userId);
+  return user?.name ?? user?.email ?? undefined;
+}
+
+async function teamLabel(ctx: { db: any }, teamId?: Id<"teams">) {
+  if (!teamId) return undefined;
+  const team = (await ctx.db.get(teamId)) as Doc<"teams"> | null;
+  return team?.name;
+}
+
+async function audit(
+  ctx: {
+    db: any;
+    tenantId: Id<"tenants">;
+    memberId: Id<"members">;
+  },
+  action: string,
+  threadId: Id<"channelThreads">,
+  payload?: unknown,
+) {
+  await ctx.db.insert("clinicAuditEvents", {
+    tenantId: ctx.tenantId,
+    actorMemberId: ctx.memberId,
+    action,
+    targetType: "channel_thread",
+    targetId: threadId,
+    payload,
+    createdAt: Date.now(),
+  });
+}
+
+const threadSummaryValidator = v.object({
+  _id: v.id("channelThreads"),
+  channelId: v.id("channels"),
+  threadKey: v.string(),
+  displayName: v.optional(v.string()),
+  phone: v.optional(v.string()),
+  lastEventAt: v.number(),
+  lastEventKind: v.string(),
+  lastPreview: v.optional(v.string()),
+  unreadCount: v.number(),
+  serviceWindowExpiresAt: v.optional(v.number()),
+  tags: v.array(v.string()),
+  leadSource: v.optional(v.string()),
+  leadStatus: v.optional(v.string()),
+  nextStep: v.optional(v.string()),
+  nextStepDueAt: v.optional(v.number()),
+  responsibleMemberId: v.optional(v.id("members")),
+  responsibleName: v.optional(v.string()),
+  assignedTeamId: v.optional(v.id("teams")),
+  assignedTeamName: v.optional(v.string()),
+  inboxStatus: inboxStatusValidator,
+  starred: v.boolean(),
+  snoozedUntil: v.optional(v.number()),
+  automationMode: v.optional(v.string()),
+  dnd: v.boolean(),
+});
+
+export const listThreads = tenantQuery({
+  args: {
+    channelId: v.id("channels"),
+    filter: filterValidator,
+    search: v.optional(v.string()),
+    paginationOpts: paginationOptsValidator,
+  },
+  returns: v.object({
+    page: v.array(threadSummaryValidator),
+    isDone: v.boolean(),
+    continueCursor: v.string(),
+  }),
+  handler: async (ctx, args) => {
+    const channel = await ctx.db.get(args.channelId);
+    if (!channel || channel.tenantId !== ctx.tenantId) {
+      throw new ConvexError({ code: "CHANNEL_NOT_FOUND" });
+    }
+    const result = await ctx.db
+      .query("channelThreads")
+      .withIndex("by_channel_last_event", (q) => q.eq("channelId", args.channelId))
+      .order("desc")
+      .paginate({
+        cursor: args.paginationOpts.cursor,
+        numItems: Math.min(Math.max(args.paginationOpts.numItems, 1), 100),
+      });
+    const now = Date.now();
+    const search = args.search?.trim().toLowerCase() ?? "";
+    const page = [];
+    for (const thread of result.page) {
+      if (!(await hasMessageEvent(ctx, thread))) continue;
+      const identity = await getThreadIdentity(ctx, thread);
+      const displayName = identity?.displayName;
+      const phone = identity?.phone ?? normalizedPhone(thread.threadKey);
+      const haystack = `${displayName ?? ""} ${phone ?? ""} ${thread.threadKey} ${thread.lastPreview ?? ""}`.toLowerCase();
+      if (search && !haystack.includes(search)) continue;
+      const inboxStatus = deriveStatus(thread, now);
+      if (!matchesFilter(thread, args.filter, inboxStatus)) continue;
+      page.push({
+        _id: thread._id,
+        channelId: thread.channelId,
+        threadKey: thread.threadKey,
+        displayName,
+        phone,
+        lastEventAt: thread.lastEventAt,
+        lastEventKind: thread.lastEventKind,
+        lastPreview: thread.lastPreview,
+        unreadCount: thread.unreadCount,
+        serviceWindowExpiresAt: thread.serviceWindowExpiresAt,
+        tags: thread.tags ?? [],
+        leadSource: thread.leadSource,
+        leadStatus: thread.leadStatus,
+        nextStep: thread.nextStep,
+        nextStepDueAt: thread.nextStepDueAt,
+        responsibleMemberId: thread.responsibleMemberId,
+        responsibleName: await memberLabel(ctx, thread.responsibleMemberId),
+        assignedTeamId: thread.assignedTeamId,
+        assignedTeamName: await teamLabel(ctx, thread.assignedTeamId),
+        inboxStatus,
+        starred: !!thread.starredAt,
+        snoozedUntil: thread.snoozedUntil,
+        automationMode: thread.automationMode,
+        dnd: thread.dnd ?? false,
+      });
+    }
+    return {
+      page,
+      isDone: result.isDone,
+      continueCursor: result.continueCursor,
+    };
+  },
+});
+
+export const getPatientContext = tenantQuery({
+  args: { threadId: v.id("channelThreads") },
+  returns: v.object({
+    contact: v.optional(
+      v.object({
+        _id: v.id("contacts"),
+        name: v.optional(v.string()),
+        phone: v.optional(v.string()),
+        username: v.optional(v.string()),
+        locale: v.optional(v.string()),
+        tags: v.array(v.string()),
+        customAttributes: v.optional(v.any()),
+      }),
+    ),
+    consents: v.array(
+      v.object({ purpose: v.string(), status: v.string(), effectiveAt: v.number() }),
+    ),
+    notes: v.array(
+      v.object({
+        _id: v.id("threadInternalNotes"),
+        body: v.string(),
+        authorName: v.optional(v.string()),
+        mentionedMemberIds: v.array(v.id("members")),
+        createdAt: v.number(),
+      }),
+    ),
+    reminders: v.array(
+      v.object({
+        _id: v.id("threadReminders"),
+        note: v.string(),
+        dueAt: v.number(),
+        status: v.string(),
+        assignedMemberName: v.optional(v.string()),
+      }),
+    ),
+    attachments: v.array(
+      v.object({
+        _id: v.id("channelAttachments"),
+        fileName: v.string(),
+        contentType: v.string(),
+        size: v.number(),
+        caption: v.optional(v.string()),
+        status: v.string(),
+        url: v.optional(v.string()),
+        createdAt: v.number(),
+      }),
+    ),
+    appointments: v.array(
+      v.object({
+        _id: v.id("clinicAppointments"),
+        serviceName: v.string(),
+        startAt: v.number(),
+        endAt: v.number(),
+        status: v.string(),
+      }),
+    ),
+    campaigns: v.array(
+      v.object({
+        campaignId: v.id("campaigns"),
+        name: v.string(),
+        campaignStatus: v.string(),
+        recipientStatus: v.string(),
+        updatedAt: v.number(),
+      }),
+    ),
+  }),
+  handler: async (ctx, args) => {
+    const thread = await loadByIdInTenant(
+      ctx as Parameters<typeof loadByIdInTenant>[0],
+      "channelThreads",
+      args.threadId,
+    );
+    const identity = await getThreadIdentity(ctx, thread);
+    const contact = await findContact(ctx, thread, identity);
+    const noteRows = await ctx.db
+      .query("threadInternalNotes")
+      .withIndex("by_thread", (q) => q.eq("threadId", thread._id))
+      .order("desc")
+      .take(50);
+    const reminderRows = await ctx.db
+      .query("threadReminders")
+      .withIndex("by_thread", (q) => q.eq("threadId", thread._id))
+      .order("desc")
+      .take(50);
+    const attachmentRows = await ctx.db
+      .query("channelAttachments")
+      .withIndex("by_thread", (q) => q.eq("threadId", thread._id))
+      .order("desc")
+      .take(30);
+    const appointmentRows = await ctx.db
+      .query("clinicAppointments")
+      .withIndex("by_thread", (q) =>
+        q.eq("tenantId", ctx.tenantId).eq("threadId", thread._id),
+      )
+      .order("desc")
+      .take(20);
+    const campaignRows = await ctx.db
+      .query("campaignRecipients")
+      .withIndex("by_tenant_channel_thread", (q) =>
+        q
+          .eq("tenantId", ctx.tenantId)
+          .eq("channelId", thread.channelId)
+          .eq("threadKey", thread.threadKey),
+      )
+      .order("desc")
+      .take(20);
+
+    const consents = [];
+    if (contact) {
+      for (const purpose of ["marketing", "transactional", "authentication"] as const) {
+        const consent = await ctx.db
+          .query("currentConsents")
+          .withIndex("by_tenant_contact_purpose_channel", (q) =>
+            q
+              .eq("tenantId", ctx.tenantId)
+              .eq("contactId", contact._id)
+              .eq("purpose", purpose)
+              .eq("channel", "whatsapp"),
+          )
+          .unique();
+        if (consent) {
+          consents.push({
+            purpose,
+            status: consent.status,
+            effectiveAt: consent.effectiveAt,
+          });
+        }
+      }
+    }
+
+    const notes = [];
+    for (const note of noteRows) {
+      notes.push({
+        _id: note._id,
+        body: note.body,
+        authorName: await memberLabel(ctx, note.createdBy),
+        mentionedMemberIds: note.mentionedMemberIds,
+        createdAt: note.createdAt,
+      });
+    }
+    const reminders = [];
+    for (const reminder of reminderRows) {
+      reminders.push({
+        _id: reminder._id,
+        note: reminder.note,
+        dueAt: reminder.dueAt,
+        status: reminder.status,
+        assignedMemberName: await memberLabel(ctx, reminder.assignedMemberId),
+      });
+    }
+    const attachments = [];
+    for (const attachment of attachmentRows) {
+      attachments.push({
+        _id: attachment._id,
+        fileName: attachment.fileName,
+        contentType: attachment.contentType,
+        size: attachment.size,
+        caption: attachment.caption,
+        status: attachment.status,
+        url: (await ctx.storage.getUrl(attachment.storageId)) ?? undefined,
+        createdAt: attachment.createdAt,
+      });
+    }
+    const appointments = [];
+    for (const appointment of appointmentRows) {
+      const service = await ctx.db.get(appointment.serviceId);
+      appointments.push({
+        _id: appointment._id,
+        serviceName: service?.name ?? "Serviço",
+        startAt: appointment.startAt,
+        endAt: appointment.endAt,
+        status: appointment.status,
+      });
+    }
+    const campaigns = [];
+    for (const recipient of campaignRows) {
+      const campaign = await ctx.db.get(recipient.campaignId);
+      if (!campaign || campaign.tenantId !== ctx.tenantId) continue;
+      campaigns.push({
+        campaignId: campaign._id,
+        name: campaign.name,
+        campaignStatus: campaign.status ?? "draft",
+        recipientStatus: recipient.status,
+        updatedAt: recipient.updatedAt,
+      });
+    }
+
+    return {
+      contact: contact
+        ? {
+            _id: contact._id,
+            name: contact.name,
+            phone: contact.e164,
+            username: contact.whatsappUsername,
+            locale: contact.locale,
+            tags: contact.tags,
+            customAttributes: contact.customAttributes,
+          }
+        : undefined,
+      consents,
+      notes,
+      reminders,
+      attachments,
+      appointments,
+      campaigns,
+    };
+  },
+});
+
+export const listCloseReasons = tenantQuery({
+  args: {},
+  returns: v.array(
+    v.object({ _id: v.id("threadCloseReasons"), name: v.string() }),
+  ),
+  handler: async (ctx) => {
+    const rows = await ctx.db
+      .query("threadCloseReasons")
+      .withIndex("by_tenant", (q) =>
+        q.eq("tenantId", ctx.tenantId).eq("active", true),
+      )
+      .take(100);
+    return rows.map((row) => ({ _id: row._id, name: row.name }));
+  },
+});
+
+export const createCloseReason = tenantMutation({
+  args: { name: v.string() },
+  returns: v.id("threadCloseReasons"),
+  handler: async (ctx, args) => {
+    const name = args.name.trim().replace(/\s+/g, " ").slice(0, 80);
+    if (name.length < 2) throw new ConvexError({ code: "INVALID_CLOSE_REASON" });
+    const existing = await ctx.db
+      .query("threadCloseReasons")
+      .withIndex("by_tenant_name", (q) =>
+        q.eq("tenantId", ctx.tenantId).eq("name", name),
+      )
+      .unique();
+    if (existing) return existing._id;
+    const now = Date.now();
+    return await ctx.db.insert("threadCloseReasons", {
+      tenantId: ctx.tenantId,
+      name,
+      active: true,
+      createdBy: ctx.memberId,
+      createdAt: now,
+      updatedAt: now,
+    });
+  },
+});
+
+export const updateThread = tenantMutation({
+  args: {
+    threadId: v.id("channelThreads"),
+    inboxStatus: v.optional(inboxStatusValidator),
+    starred: v.optional(v.boolean()),
+    snoozedUntil: v.optional(v.number()),
+    closeReasonId: v.optional(v.id("threadCloseReasons")),
+    responsibleMemberId: v.optional(v.id("members")),
+    clearResponsible: v.optional(v.boolean()),
+    assignedTeamId: v.optional(v.id("teams")),
+    clearTeam: v.optional(v.boolean()),
+    leadStatus: v.optional(leadStatusValidator),
+    nextStep: v.optional(v.string()),
+    nextStepDueAt: v.optional(v.number()),
+    tags: v.optional(v.array(v.string())),
+    dnd: v.optional(v.boolean()),
+    automationMode: v.optional(
+      v.union(
+        v.literal("idle"),
+        v.literal("bot"),
+        v.literal("human"),
+        v.literal("stopped"),
+      ),
+    ),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const thread = await loadByIdInTenant(
+      ctx as Parameters<typeof loadByIdInTenant>[0],
+      "channelThreads",
+      args.threadId,
+    );
+    if (args.responsibleMemberId) {
+      await loadByIdInTenant(
+        ctx as Parameters<typeof loadByIdInTenant>[0],
+        "members",
+        args.responsibleMemberId,
+      );
+    }
+    if (args.assignedTeamId) {
+      await loadByIdInTenant(
+        ctx as Parameters<typeof loadByIdInTenant>[0],
+        "teams",
+        args.assignedTeamId,
+      );
+    }
+    if (args.closeReasonId) {
+      await loadByIdInTenant(
+        ctx as Parameters<typeof loadByIdInTenant>[0],
+        "threadCloseReasons",
+        args.closeReasonId,
+      );
+    }
+    const now = Date.now();
+    const patch: Record<string, unknown> = { updatedAt: now };
+    if (args.inboxStatus !== undefined) {
+      patch.inboxStatus = args.inboxStatus;
+      if (args.inboxStatus === "closed") {
+        patch.closedAt = now;
+        patch.closedReasonId = args.closeReasonId;
+        patch.nextStep = undefined;
+        patch.nextStepDueAt = undefined;
+      } else {
+        patch.closedAt = undefined;
+        patch.closedReasonId = undefined;
+        if (args.inboxStatus === "snoozed") {
+          if (!args.snoozedUntil || args.snoozedUntil <= now) {
+            throw new ConvexError({ code: "INVALID_SNOOZE_TIME" });
+          }
+          patch.snoozedUntil = args.snoozedUntil;
+        } else {
+          patch.snoozedUntil = undefined;
+        }
+      }
+    }
+    if (args.starred !== undefined) patch.starredAt = args.starred ? now : undefined;
+    if (args.clearResponsible) {
+      patch.responsibleMemberId = undefined;
+    } else if (args.responsibleMemberId !== undefined) {
+      patch.responsibleMemberId = args.responsibleMemberId;
+    }
+    if (args.clearTeam) {
+      patch.assignedTeamId = undefined;
+    } else if (args.assignedTeamId !== undefined) {
+      patch.assignedTeamId = args.assignedTeamId;
+    }
+    if (args.leadStatus !== undefined) patch.leadStatus = args.leadStatus;
+    if (args.nextStep !== undefined) patch.nextStep = args.nextStep.trim().slice(0, 240);
+    if (args.nextStepDueAt !== undefined) patch.nextStepDueAt = args.nextStepDueAt;
+    if (args.tags !== undefined) {
+      patch.tags = Array.from(
+        new Set(args.tags.map((tag) => tag.trim()).filter(Boolean)),
+      ).slice(0, 30);
+    }
+    if (args.dnd !== undefined) patch.dnd = args.dnd;
+    if (args.automationMode !== undefined) {
+      patch.automationMode = args.automationMode;
+      patch.automationChangedAt = now;
+      patch.automationChangeReason = "manual_inbox_control";
+      if (args.automationMode === "human") {
+        patch.inboxStatus = "awaiting_team";
+        patch.leadStatus = "awaiting_human";
+      }
+    }
+    await ctx.db.patch(thread._id, patch);
+    await audit(ctx, "inbox.thread.updated", thread._id, {
+      inboxStatus: args.inboxStatus,
+      starred: args.starred,
+      responsibleMemberId: args.responsibleMemberId,
+      assignedTeamId: args.assignedTeamId,
+      leadStatus: args.leadStatus,
+      dnd: args.dnd,
+      automationMode: args.automationMode,
+    });
+    return null;
+  },
+});
+
+export const addInternalNote = tenantMutation({
+  args: {
+    threadId: v.id("channelThreads"),
+    body: v.string(),
+    mentionedMemberIds: v.array(v.id("members")),
+  },
+  returns: v.id("threadInternalNotes"),
+  handler: async (ctx, args) => {
+    const thread = await loadByIdInTenant(
+      ctx as Parameters<typeof loadByIdInTenant>[0],
+      "channelThreads",
+      args.threadId,
+    );
+    const body = args.body.trim();
+    if (!body || body.length > 4_000) {
+      throw new ConvexError({ code: "INVALID_INTERNAL_NOTE" });
+    }
+    const mentioned = [];
+    for (const memberId of Array.from(new Set(args.mentionedMemberIds))) {
+      await loadByIdInTenant(
+        ctx as Parameters<typeof loadByIdInTenant>[0],
+        "members",
+        memberId,
+      );
+      mentioned.push(memberId);
+    }
+    const now = Date.now();
+    const noteId = await ctx.db.insert("threadInternalNotes", {
+      tenantId: ctx.tenantId,
+      threadId: thread._id,
+      body,
+      mentionedMemberIds: mentioned,
+      createdBy: ctx.memberId,
+      createdAt: now,
+      updatedAt: now,
+    });
+    await audit(ctx, "inbox.note.created", thread._id, {
+      noteId,
+      mentionedMemberIds: mentioned,
+    });
+    return noteId;
+  },
+});
+
+export const createReminder = tenantMutation({
+  args: {
+    threadId: v.id("channelThreads"),
+    note: v.string(),
+    dueAt: v.number(),
+    assignedMemberId: v.optional(v.id("members")),
+  },
+  returns: v.id("threadReminders"),
+  handler: async (ctx, args) => {
+    const thread = await loadByIdInTenant(
+      ctx as Parameters<typeof loadByIdInTenant>[0],
+      "channelThreads",
+      args.threadId,
+    );
+    const note = args.note.trim();
+    if (!note || note.length > 500 || args.dueAt <= Date.now()) {
+      throw new ConvexError({ code: "INVALID_REMINDER" });
+    }
+    const assignedMemberId = args.assignedMemberId ?? ctx.memberId;
+    await loadByIdInTenant(
+      ctx as Parameters<typeof loadByIdInTenant>[0],
+      "members",
+      assignedMemberId,
+    );
+    const now = Date.now();
+    const reminderId = await ctx.db.insert("threadReminders", {
+      tenantId: ctx.tenantId,
+      threadId: thread._id,
+      note,
+      dueAt: args.dueAt,
+      status: "scheduled",
+      assignedMemberId,
+      createdBy: ctx.memberId,
+      createdAt: now,
+      updatedAt: now,
+    });
+    await ctx.scheduler.runAt(args.dueAt, markReminderDue, {
+      reminderId,
+    });
+    await ctx.db.patch(thread._id, {
+      nextStep: note,
+      nextStepDueAt: args.dueAt,
+      updatedAt: now,
+    });
+    await audit(ctx, "inbox.reminder.created", thread._id, { reminderId, dueAt: args.dueAt });
+    return reminderId;
+  },
+});
+
+export const _markReminderDue = internalMutation({
+  args: { reminderId: v.id("threadReminders") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const reminder = await ctx.db.get(args.reminderId);
+    if (!reminder || reminder.status !== "scheduled") return null;
+    await ctx.db.patch(reminder._id, { status: "due", updatedAt: Date.now() });
+    return null;
+  },
+});
+
+export const setReminderStatus = tenantMutation({
+  args: {
+    reminderId: v.id("threadReminders"),
+    status: v.union(v.literal("completed"), v.literal("cancelled")),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const reminder = await loadByIdInTenant(
+      ctx as Parameters<typeof loadByIdInTenant>[0],
+      "threadReminders",
+      args.reminderId,
+    );
+    if (reminder.status === args.status) return null;
+    await ctx.db.patch(reminder._id, { status: args.status, updatedAt: Date.now() });
+    await audit(ctx, `inbox.reminder.${args.status}`, reminder.threadId, {
+      reminderId: reminder._id,
+    });
+    return null;
+  },
+});
+
+export const generateAttachmentUploadUrl = tenantMutation({
+  args: {},
+  returns: v.string(),
+  handler: async (ctx) => await ctx.storage.generateUploadUrl(),
+});
+
+export const registerAttachment = tenantMutation({
+  args: {
+    threadId: v.id("channelThreads"),
+    storageId: v.id("_storage"),
+    fileName: v.string(),
+    contentType: v.string(),
+    size: v.number(),
+    caption: v.optional(v.string()),
+  },
+  returns: v.object({
+    attachmentId: v.id("channelAttachments"),
+    url: v.string(),
+  }),
+  handler: async (ctx, args) => {
+    const thread = await loadByIdInTenant(
+      ctx as Parameters<typeof loadByIdInTenant>[0],
+      "channelThreads",
+      args.threadId,
+    );
+    const allowedTypes = new Set([
+      "application/pdf",
+      "image/jpeg",
+      "image/png",
+      "audio/mpeg",
+      "audio/ogg",
+      "audio/webm",
+    ]);
+    if (!allowedTypes.has(args.contentType) || args.size <= 0 || args.size > 16 * 1024 * 1024) {
+      throw new ConvexError({ code: "ATTACHMENT_NOT_ALLOWED" });
+    }
+    const url = await ctx.storage.getUrl(args.storageId);
+    if (!url) throw new ConvexError({ code: "ATTACHMENT_NOT_FOUND" });
+    const now = Date.now();
+    const attachmentId = await ctx.db.insert("channelAttachments", {
+      tenantId: ctx.tenantId,
+      threadId: thread._id,
+      storageId: args.storageId,
+      fileName: args.fileName.trim().slice(0, 180) || "ficheiro",
+      contentType: args.contentType,
+      size: args.size,
+      caption: args.caption?.trim().slice(0, 1_024) || undefined,
+      status: "uploaded",
+      createdBy: ctx.memberId,
+      createdAt: now,
+      updatedAt: now,
+    });
+    await audit(ctx, "inbox.attachment.uploaded", thread._id, {
+      attachmentId,
+      contentType: args.contentType,
+      size: args.size,
+    });
+    return { attachmentId, url };
+  },
+});
+
+export const settleAttachment = tenantMutation({
+  args: {
+    attachmentId: v.id("channelAttachments"),
+    status: v.union(v.literal("sent"), v.literal("failed")),
+    outboxId: v.optional(v.id("channelOutbox")),
+    failureReason: v.optional(v.string()),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const attachment = await loadByIdInTenant(
+      ctx as Parameters<typeof loadByIdInTenant>[0],
+      "channelAttachments",
+      args.attachmentId,
+    );
+    if (args.outboxId) {
+      await loadByIdInTenant(
+        ctx as Parameters<typeof loadByIdInTenant>[0],
+        "channelOutbox",
+        args.outboxId,
+      );
+    }
+    await ctx.db.patch(attachment._id, {
+      status: args.status,
+      outboxId: args.outboxId,
+      failureReason: args.failureReason?.slice(0, 500),
+      updatedAt: Date.now(),
+    });
+    await audit(ctx, `inbox.attachment.${args.status}`, attachment.threadId, {
+      attachmentId: attachment._id,
+      outboxId: args.outboxId,
+    });
+    return null;
+  },
+});

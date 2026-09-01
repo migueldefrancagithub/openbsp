@@ -1,3 +1,4 @@
+import { makeFunctionReference } from "convex/server";
 import { ConvexError, v } from "convex/values";
 import { internal } from "./_generated/api";
 import { internalMutation } from "./_generated/server";
@@ -41,6 +42,20 @@ const E164_REGEX = /^\+[1-9]\d{6,14}$/;
 const DEFAULT_BATCH_SIZE = 1000;
 const MAX_BATCH_SIZE = 5000;
 const MICRO_CAMPAIGN_LOOKBACK_MS = 7 * 24 * 60 * 60 * 1_000;
+
+const continueCampaignRef = makeFunctionReference<"mutation">(
+  "campaigns:_continueCampaign",
+);
+const finalizeCampaignRef = makeFunctionReference<"mutation">(
+  "campaigns:_finalizeCampaign",
+);
+const cancelCampaignRecipientsRef = makeFunctionReference<"mutation">(
+  "campaigns:_cancelQueuedRecipients",
+);
+
+function campaignBatchDelay(queued: number): number {
+  return Math.max(5_000, queued * 1_500 + 5_000);
+}
 
 type CampaignRecipientStatus =
   | "pending"
@@ -1120,6 +1135,7 @@ export const launchCampaign = tenantMutation({
       status: batch.queued > 0 ? "running" : "failed",
       startedAt: now,
       updatedAt: now,
+      batchSize,
       pauseReason:
         batch.queued > 0
           ? undefined
@@ -1132,6 +1148,15 @@ export const launchCampaign = tenantMutation({
       payload: { ...batch, batchSize },
       createdAt: now,
     });
+    if (batch.queued > 0) {
+      await ctx.scheduler.runAfter(
+        campaignBatchDelay(batch.queued),
+        batch.pendingRemaining > 0 ? continueCampaignRef : finalizeCampaignRef,
+        batch.pendingRemaining > 0
+          ? { campaignId: campaign._id, batchSize }
+          : { campaignId: campaign._id },
+      );
+    }
     return batch;
   },
 });
@@ -1204,7 +1229,7 @@ export const sendNextBatch = tenantMutation({
       now,
       eventType: "campaign.recipient.next_batch_queued",
     });
-    await ctx.db.patch(campaign._id, { updatedAt: now });
+    await ctx.db.patch(campaign._id, { updatedAt: now, batchSize });
     await ctx.db.insert("campaignEvents", {
       tenantId: ctx.tenantId,
       campaignId: campaign._id,
@@ -1212,7 +1237,306 @@ export const sendNextBatch = tenantMutation({
       payload: { ...batch, batchSize },
       createdAt: now,
     });
+    await ctx.scheduler.runAfter(
+      campaignBatchDelay(batch.queued),
+      batch.pendingRemaining > 0 ? continueCampaignRef : finalizeCampaignRef,
+      batch.pendingRemaining > 0
+        ? { campaignId: campaign._id, batchSize }
+        : { campaignId: campaign._id },
+    );
     return batch;
+  },
+});
+
+export const pauseCampaign = tenantMutation({
+  args: {
+    campaignId: v.id("campaigns"),
+    reason: v.optional(v.string()),
+  },
+  returns: v.object({ paused: v.boolean() }),
+  handler: async (ctx, args) => {
+    requireCapability(ctx.role, "campaigns.start");
+    const campaign = await loadByIdInTenant(
+      ctx as Parameters<typeof loadByIdInTenant>[0],
+      "campaigns",
+      args.campaignId,
+    );
+    if (campaign.status === "paused") return { paused: false };
+    if (campaign.status !== "running") {
+      throw new ConvexError({
+        code: "CAMPAIGN_NOT_RUNNING",
+        status: campaign.status ?? "draft",
+      });
+    }
+    const now = Date.now();
+    const reason = args.reason?.trim().slice(0, 240) || "Paused by the team.";
+    await ctx.db.patch(campaign._id, {
+      status: "paused",
+      pausedAt: now,
+      pauseReason: reason,
+      updatedAt: now,
+    });
+    await ctx.db.insert("campaignEvents", {
+      tenantId: ctx.tenantId,
+      campaignId: campaign._id,
+      type: "campaign.paused.manual",
+      payload: { reason, memberId: ctx.memberId },
+      createdAt: now,
+    });
+    return { paused: true };
+  },
+});
+
+export const resumeCampaign = tenantMutation({
+  args: { campaignId: v.id("campaigns") },
+  returns: v.object({ resumed: v.boolean() }),
+  handler: async (ctx, args) => {
+    requireCapability(ctx.role, "campaigns.start");
+    const campaign = await loadByIdInTenant(
+      ctx as Parameters<typeof loadByIdInTenant>[0],
+      "campaigns",
+      args.campaignId,
+    );
+    if (campaign.status === "running") return { resumed: false };
+    if (campaign.status !== "paused") {
+      throw new ConvexError({
+        code: "CAMPAIGN_NOT_PAUSED",
+        status: campaign.status ?? "draft",
+      });
+    }
+    const now = Date.now();
+    const batchSize = normalizeBatchSize(campaign.batchSize);
+    await ctx.db.patch(campaign._id, {
+      status: "running",
+      pausedAt: undefined,
+      pauseReason: undefined,
+      updatedAt: now,
+    });
+    await ctx.db.insert("campaignEvents", {
+      tenantId: ctx.tenantId,
+      campaignId: campaign._id,
+      type: "campaign.resumed.manual",
+      payload: { memberId: ctx.memberId, batchSize },
+      createdAt: now,
+    });
+    await ctx.scheduler.runAfter(1, continueCampaignRef, {
+      campaignId: campaign._id,
+      batchSize,
+    });
+    return { resumed: true };
+  },
+});
+
+export const cancelCampaign = tenantMutation({
+  args: {
+    campaignId: v.id("campaigns"),
+    reason: v.optional(v.string()),
+  },
+  returns: v.object({ cancelled: v.boolean() }),
+  handler: async (ctx, args) => {
+    requireCapability(ctx.role, "campaigns.start");
+    const campaign = await loadByIdInTenant(
+      ctx as Parameters<typeof loadByIdInTenant>[0],
+      "campaigns",
+      args.campaignId,
+    );
+    if (campaign.status === "cancelled") return { cancelled: false };
+    if (campaign.status === "completed" || campaign.status === "failed") {
+      throw new ConvexError({
+        code: "CAMPAIGN_TERMINAL",
+        status: campaign.status,
+      });
+    }
+    const now = Date.now();
+    const reason = args.reason?.trim().slice(0, 240) || "Cancelled by the team.";
+    await ctx.db.patch(campaign._id, {
+      status: "cancelled",
+      completedAt: now,
+      pauseReason: reason,
+      updatedAt: now,
+    });
+    await ctx.db.insert("campaignEvents", {
+      tenantId: ctx.tenantId,
+      campaignId: campaign._id,
+      type: "campaign.cancelled.manual",
+      payload: { reason, memberId: ctx.memberId },
+      createdAt: now,
+    });
+    await ctx.scheduler.runAfter(1, cancelCampaignRecipientsRef, {
+      campaignId: campaign._id,
+    });
+    return { cancelled: true };
+  },
+});
+
+export const _continueCampaign = internalMutation({
+  args: {
+    campaignId: v.id("campaigns"),
+    batchSize: v.number(),
+  },
+  returns: v.object({ queued: v.number(), pendingRemaining: v.number() }),
+  handler: async (ctx, args) => {
+    const campaign = await ctx.db.get(args.campaignId);
+    if (!campaign || campaign.status !== "running") {
+      return { queued: 0, pendingRemaining: 0 };
+    }
+    if (!campaign.templateId || !campaign.templateVersion) {
+      throw new ConvexError({ code: "CAMPAIGN_TEMPLATE_MISSING" });
+    }
+    const template = await ctx.db.get(campaign.templateId);
+    if (!template || template.tenantId !== campaign.tenantId || template.status !== "approved") {
+      throw new ConvexError({ code: "TEMPLATE_NOT_APPROVED" });
+    }
+    const version = await ctx.db
+      .query("templateVersions")
+      .withIndex("by_template_version", (q) =>
+        q.eq("templateId", template._id).eq("version", campaign.templateVersion!),
+      )
+      .unique();
+    if (!version || version.parameterSchema.length > 0) {
+      throw new ConvexError({ code: version ? "VARIABLE_TEMPLATES_UNSUPPORTED" : "TEMPLATE_VERSION_MISSING" });
+    }
+    const scopedCtx = {
+      db: ctx.db,
+      scheduler: ctx.scheduler,
+      tenantId: campaign.tenantId,
+    };
+    const phoneNumber = await findCampaignPhoneNumber(scopedCtx, template.whatsappAccountId);
+    if (!phoneNumber) throw new ConvexError({ code: "PHONE_NUMBER_NOT_CONNECTED" });
+    const purpose = purposeFromTemplate(template);
+    const batchSize = normalizeBatchSize(args.batchSize);
+    const now = Date.now();
+    const batch = await queuePendingCampaignBatch(scopedCtx, {
+      campaign,
+      template,
+      templateVersion: campaign.templateVersion,
+      phoneNumber,
+      purpose,
+      batchSize,
+      now,
+      eventType: "campaign.recipient.automatic_batch_queued",
+    });
+    await ctx.db.patch(campaign._id, { updatedAt: now, batchSize });
+    await ctx.db.insert("campaignEvents", {
+      tenantId: campaign.tenantId,
+      campaignId: campaign._id,
+      type: "campaign.automatic_batch",
+      payload: { ...batch, batchSize },
+      createdAt: now,
+    });
+    await ctx.scheduler.runAfter(
+      campaignBatchDelay(batch.queued),
+      batch.pendingRemaining > 0 ? continueCampaignRef : finalizeCampaignRef,
+      batch.pendingRemaining > 0
+        ? { campaignId: campaign._id, batchSize }
+        : { campaignId: campaign._id },
+    );
+    return { queued: batch.queued, pendingRemaining: batch.pendingRemaining };
+  },
+});
+
+export const _finalizeCampaign = internalMutation({
+  args: { campaignId: v.id("campaigns") },
+  returns: v.object({ completed: v.boolean(), waiting: v.boolean() }),
+  handler: async (ctx, args) => {
+    const campaign = await ctx.db.get(args.campaignId);
+    if (!campaign || campaign.status !== "running") {
+      return { completed: false, waiting: false };
+    }
+    const pending = await ctx.db
+      .query("campaignRecipients")
+      .withIndex("by_campaign_status", (q) => q.eq("campaignId", campaign._id).eq("status", "pending"))
+      .first();
+    if (pending) {
+      await ctx.scheduler.runAfter(1, continueCampaignRef, {
+        campaignId: campaign._id,
+        batchSize: normalizeBatchSize(campaign.batchSize),
+      });
+      return { completed: false, waiting: true };
+    }
+    const queued = await ctx.db
+      .query("campaignRecipients")
+      .withIndex("by_campaign_status", (q) => q.eq("campaignId", campaign._id).eq("status", "queued"))
+      .first();
+    const dispatching = await ctx.db
+      .query("campaignRecipients")
+      .withIndex("by_campaign_status", (q) => q.eq("campaignId", campaign._id).eq("status", "dispatching"))
+      .first();
+    if (queued || dispatching) {
+      await ctx.scheduler.runAfter(30_000, finalizeCampaignRef, {
+        campaignId: campaign._id,
+      });
+      return { completed: false, waiting: true };
+    }
+    const now = Date.now();
+    await ctx.db.patch(campaign._id, {
+      status: "completed",
+      completedAt: now,
+      pauseReason: undefined,
+      updatedAt: now,
+    });
+    await ctx.db.insert("campaignEvents", {
+      tenantId: campaign.tenantId,
+      campaignId: campaign._id,
+      type: "campaign.completed",
+      createdAt: now,
+    });
+    return { completed: true, waiting: false };
+  },
+});
+
+export const _cancelQueuedRecipients = internalMutation({
+  args: { campaignId: v.id("campaigns") },
+  returns: v.object({ processed: v.number(), remaining: v.boolean() }),
+  handler: async (ctx, args) => {
+    const campaign = await ctx.db.get(args.campaignId);
+    if (!campaign || campaign.status !== "cancelled") {
+      return { processed: 0, remaining: false };
+    }
+    const [pending, queued] = await Promise.all([
+      ctx.db
+        .query("campaignRecipients")
+        .withIndex("by_campaign_status", (q) => q.eq("campaignId", campaign._id).eq("status", "pending"))
+        .take(100),
+      ctx.db
+        .query("campaignRecipients")
+        .withIndex("by_campaign_status", (q) => q.eq("campaignId", campaign._id).eq("status", "queued"))
+        .take(100),
+    ]);
+    const now = Date.now();
+    for (const recipient of [...pending, ...queued]) {
+      if (recipient.messageId) {
+        const message = await ctx.db.get(recipient.messageId);
+        if (message?.status === "queued") {
+          await ctx.db.patch(message._id, {
+            status: "failed",
+            failureReason: "campaign_cancelled_before_dispatch",
+          });
+        }
+      }
+      await ctx.db.patch(recipient._id, {
+        status: "skipped",
+        failureReason: "campaign_cancelled_before_dispatch",
+        updatedAt: now,
+      });
+    }
+    const processed = pending.length + queued.length;
+    const remaining = pending.length === 100 || queued.length === 100;
+    if (remaining) {
+      await ctx.scheduler.runAfter(1, cancelCampaignRecipientsRef, {
+        campaignId: campaign._id,
+      });
+    }
+    if (processed > 0) {
+      await ctx.db.insert("campaignEvents", {
+        tenantId: campaign.tenantId,
+        campaignId: campaign._id,
+        type: "campaign.cancelled.pending_recipients",
+        payload: { processed, remaining },
+        createdAt: now,
+      });
+    }
+    return { processed, remaining };
   },
 });
 
