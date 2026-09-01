@@ -24,11 +24,49 @@ const campaignStatusValidator = v.union(
   v.literal("cancelled"),
 );
 
+const campaignKindValidator = v.union(
+  v.literal("template_broadcast"),
+  v.literal("micro_lab"),
+);
+
+const microCampaignIntentValidator = v.union(
+  v.literal("demo"),
+  v.literal("pricing"),
+  v.literal("human"),
+);
+
 const NAME_MIN = 2;
 const NAME_MAX = 80;
 const E164_REGEX = /^\+[1-9]\d{6,14}$/;
 const DEFAULT_BATCH_SIZE = 1000;
 const MAX_BATCH_SIZE = 5000;
+const MICRO_CAMPAIGN_LOOKBACK_MS = 7 * 24 * 60 * 60 * 1_000;
+
+type CampaignRecipientStatus =
+  | "pending"
+  | "queued"
+  | "dispatching"
+  | "sent"
+  | "delivered"
+  | "read"
+  | "replied"
+  | "clicked"
+  | "failed"
+  | "skipped";
+
+const CAMPAIGN_RECIPIENT_STATUS_RANK: Record<CampaignRecipientStatus, number> =
+  {
+    pending: 0,
+    queued: 1,
+    dispatching: 2,
+    sent: 3,
+    delivered: 4,
+    read: 5,
+    replied: 6,
+    clicked: 7,
+    failed: 8,
+    skipped: 8,
+  };
 
 const failureBreakdownValidator = v.array(
   v.object({
@@ -82,6 +120,150 @@ function getRecipientIdentity(
     code: "CONTACT_NOT_SENDABLE",
     contactId: contact._id,
   });
+}
+
+function compactPreview(value: string, limit = 180): string {
+  return value.trim().replace(/\s+/g, " ").slice(0, limit);
+}
+
+function normalizeChannelE164(value: string | undefined): string | undefined {
+  const digits = value?.replace(/\D/g, "") ?? "";
+  if (!/^[1-9]\d{7,17}$/.test(digits)) return undefined;
+  return `+${digits}`;
+}
+
+function probableBsuid(value: string | undefined): string | undefined {
+  const clean = value?.trim();
+  if (!clean || normalizeChannelE164(clean)) return undefined;
+  return clean;
+}
+
+function mapOutboxStatusToCampaignRecipientStatus(
+  status: string,
+): CampaignRecipientStatus {
+  if (status === "accepted") return "sent";
+  if (status === "delivered") return "delivered";
+  if (status === "read") return "read";
+  if (status === "queued" || status === "dispatching") return status;
+  if (status === "failed" || status === "unknown") return "failed";
+  return "failed";
+}
+
+function applyCampaignRecipientTimeline(
+  recipient: Partial<Doc<"campaignRecipients">> | null,
+  status: CampaignRecipientStatus,
+  at: number,
+  patch: Record<string, unknown>,
+) {
+  if (status === "sent") {
+    if (!recipient?.sentAt) patch.sentAt = at;
+  } else if (status === "delivered") {
+    if (!recipient?.sentAt) patch.sentAt = at;
+    if (!recipient?.deliveredAt) patch.deliveredAt = at;
+  } else if (status === "read") {
+    if (!recipient?.sentAt) patch.sentAt = at;
+    if (!recipient?.deliveredAt) patch.deliveredAt = at;
+    if (!recipient?.readAt) patch.readAt = at;
+  }
+}
+
+function hasCampaignRecipientTimestamp(
+  recipient: Partial<Doc<"campaignRecipients">> | null,
+  status: CampaignRecipientStatus,
+): boolean {
+  if (!recipient) return false;
+  if (status === "sent") return !!recipient.sentAt;
+  if (status === "delivered") return !!recipient.deliveredAt;
+  if (status === "read") return !!recipient.readAt;
+  if (status === "replied") return !!recipient.repliedAt;
+  if (status === "clicked") return !!recipient.clickedAt;
+  if (status === "failed") return recipient.status === "failed";
+  return recipient.status === status;
+}
+
+async function resolveOrCreateChannelCampaignContact(
+  ctx: { db: any; tenantId: Id<"tenants"> },
+  args: { channelId: Id<"channels">; threadKey: string; now: number },
+): Promise<{
+  contactId: Id<"contacts">;
+  identityKind: "phone" | "bsuid";
+  identityValue: string;
+}> {
+  const thread = (await ctx.db
+    .query("channelThreads")
+    .withIndex("by_channel_thread", (q: any) =>
+      q.eq("channelId", args.channelId).eq("threadKey", args.threadKey),
+    )
+    .unique()) as Doc<"channelThreads"> | null;
+  if (!thread || thread.tenantId !== ctx.tenantId) {
+    throw new ConvexError({ code: "THREAD_NOT_FOUND" });
+  }
+
+  const identity = thread.identityId
+    ? ((await ctx.db.get(thread.identityId)) as Doc<"channelIdentities"> | null)
+    : null;
+  const e164 =
+    normalizeChannelE164(identity?.phone) ?? normalizeChannelE164(thread.threadKey);
+  const bsuid =
+    probableBsuid(identity?.providerScopedId) ?? probableBsuid(thread.threadKey);
+  const displayName = identity?.displayName?.trim() || undefined;
+  const username = identity?.username?.trim() || undefined;
+
+  let contact: Doc<"contacts"> | null = null;
+  if (e164) {
+    contact = await ctx.db
+      .query("contacts")
+      .withIndex("by_tenant_phone", (q: any) =>
+        q.eq("tenantId", ctx.tenantId).eq("e164", e164),
+      )
+      .unique();
+  }
+  if (!contact && bsuid) {
+    contact = await ctx.db
+      .query("contacts")
+      .withIndex("by_tenant_bsuid", (q: any) =>
+        q.eq("tenantId", ctx.tenantId).eq("bsuid", bsuid),
+      )
+      .unique();
+  }
+
+  if (contact) {
+    const nextTags = Array.from(new Set([...(contact.tags ?? []), "campaign_micro"]));
+    const patch: Record<string, unknown> = {};
+    if (nextTags.length !== contact.tags.length) patch.tags = nextTags;
+    if (displayName && !contact.name) patch.name = displayName;
+    if (username && !contact.whatsappUsername) patch.whatsappUsername = username;
+    if (e164 && !contact.e164) patch.e164 = e164;
+    if (bsuid && !contact.bsuid) patch.bsuid = bsuid;
+    if (Object.keys(patch).length > 0) {
+      await ctx.db.patch(contact._id, patch);
+    }
+    return {
+      contactId: contact._id,
+      identityKind: e164 ? "phone" : "bsuid",
+      identityValue: e164 ?? contact.bsuid ?? bsuid ?? args.threadKey,
+    };
+  }
+
+  const contactId = await ctx.db.insert("contacts", {
+    tenantId: ctx.tenantId,
+    e164,
+    bsuid: e164 ? bsuid : bsuid ?? args.threadKey,
+    whatsappUsername: username,
+    name: displayName,
+    tags: ["campaign_micro"],
+    customAttributes: {
+      source: "openbsp_micro_campaign",
+      channelId: args.channelId,
+      threadKey: args.threadKey,
+    },
+    createdAt: args.now,
+  });
+  return {
+    contactId,
+    identityKind: e164 ? "phone" : "bsuid",
+    identityValue: e164 ?? bsuid ?? args.threadKey,
+  };
 }
 
 export const createContactList = tenantMutation({
@@ -435,6 +617,7 @@ export const createDraftCampaign = tenantMutation({
     const campaignId = await ctx.db.insert("campaigns", {
       tenantId: ctx.tenantId,
       name,
+      kind: "template_broadcast",
       listId: list._id,
       templateId: template._id,
       templateVersion: template.currentVersion,
@@ -473,6 +656,384 @@ export const createDraftCampaign = tenantMutation({
     });
 
     return campaignId;
+  },
+});
+
+export const _beginMicroCampaign = internalMutation({
+  args: {
+    tenantId: v.id("tenants"),
+    memberId: v.id("members"),
+    channelId: v.id("channels"),
+    clientNonce: v.string(),
+    name: v.string(),
+    text: v.string(),
+  },
+  returns: v.object({
+    campaignId: v.id("campaigns"),
+    existing: v.boolean(),
+  }),
+  handler: async (ctx, args) => {
+    const channel = await ctx.db.get(args.channelId);
+    if (
+      !channel ||
+      channel.tenantId !== args.tenantId ||
+      channel.provider !== "iasolution_hub" ||
+      channel.operationalTerritory !== "openbsp"
+    ) {
+      throw new ConvexError({ code: "HUB_CHANNEL_NOT_FOUND" });
+    }
+    const businessKey = `hub:micro:${args.channelId}:${args.clientNonce}`;
+    const existing = await ctx.db
+      .query("campaigns")
+      .withIndex("by_tenant_business_key", (q) =>
+        q.eq("tenantId", args.tenantId).eq("businessKey", businessKey),
+      )
+      .unique();
+    if (existing) {
+      return { campaignId: existing._id, existing: true };
+    }
+
+    const now = Date.now();
+    const name = assertName(args.name.trim() || "Micro campaign");
+    const campaignId = await ctx.db.insert("campaigns", {
+      tenantId: args.tenantId,
+      name,
+      kind: "micro_lab",
+      businessKey,
+      channelId: channel._id,
+      contentPreview: compactPreview(args.text),
+      status: "running",
+      createdBy: args.memberId,
+      startedAt: now,
+      createdAt: now,
+      updatedAt: now,
+    });
+    await ctx.db.insert("campaignEvents", {
+      tenantId: args.tenantId,
+      campaignId,
+      type: "campaign.micro.created",
+      payload: {
+        channelId: channel._id,
+        channelName: channel.displayName,
+        contentPreview: compactPreview(args.text, 120),
+      },
+      createdAt: now,
+    });
+    return { campaignId, existing: false };
+  },
+});
+
+export const _recordMicroCampaignRecipient = internalMutation({
+  args: {
+    tenantId: v.id("tenants"),
+    campaignId: v.id("campaigns"),
+    channelId: v.id("channels"),
+    threadKey: v.string(),
+    outboxId: v.optional(v.id("channelOutbox")),
+    dispatchStatus: v.string(),
+    providerMessageId: v.optional(v.string()),
+    failureReason: v.optional(v.string()),
+  },
+  returns: v.id("campaignRecipients"),
+  handler: async (ctx, args) => {
+    const campaign = await ctx.db.get(args.campaignId);
+    if (
+      !campaign ||
+      campaign.tenantId !== args.tenantId ||
+      campaign.kind !== "micro_lab" ||
+      campaign.channelId !== args.channelId
+    ) {
+      throw new ConvexError({ code: "CAMPAIGN_NOT_FOUND" });
+    }
+    const now = Date.now();
+    const contact = await resolveOrCreateChannelCampaignContact(
+      { db: ctx.db, tenantId: args.tenantId },
+      { channelId: args.channelId, threadKey: args.threadKey, now },
+    );
+    const nextStatus = mapOutboxStatusToCampaignRecipientStatus(
+      args.dispatchStatus,
+    );
+
+    let recipient: Doc<"campaignRecipients"> | null = null;
+    if (args.outboxId) {
+      recipient = await ctx.db
+        .query("campaignRecipients")
+        .withIndex("by_channel_outbox", (q) =>
+          q.eq("channelOutboxId", args.outboxId),
+        )
+        .first();
+    }
+    if (!recipient) {
+      const candidates = await ctx.db
+        .query("campaignRecipients")
+        .withIndex("by_campaign", (q) => q.eq("campaignId", campaign._id))
+        .collect();
+      recipient =
+        candidates.find(
+          (row) =>
+            row.channelId === args.channelId && row.threadKey === args.threadKey,
+        ) ?? null;
+    }
+
+    if (!recipient) {
+      const patch: Record<string, unknown> = {};
+      applyCampaignRecipientTimeline(null, nextStatus, now, patch);
+      const recipientId = await ctx.db.insert("campaignRecipients", {
+        tenantId: args.tenantId,
+        campaignId: campaign._id,
+        contactId: contact.contactId,
+        channelId: args.channelId,
+        channelOutboxId: args.outboxId,
+        threadKey: args.threadKey,
+        identityKind: contact.identityKind,
+        identityValue: contact.identityValue,
+        status: nextStatus,
+        providerMessageId: args.providerMessageId,
+        failureReason:
+          nextStatus === "failed" ? args.failureReason?.slice(0, 500) : undefined,
+        createdAt: now,
+        updatedAt: now,
+        ...patch,
+      });
+      await ctx.db.insert("campaignEvents", {
+        tenantId: args.tenantId,
+        campaignId: campaign._id,
+        campaignRecipientId: recipientId,
+        type: `campaign.recipient.${nextStatus}`,
+        payload: {
+          channelId: args.channelId,
+          channelOutboxId: args.outboxId,
+          providerMessageId: args.providerMessageId,
+          threadKey: args.threadKey,
+          source: "hub_micro_campaign",
+          ...(nextStatus === "failed"
+            ? { failureReason: args.failureReason?.slice(0, 500) }
+            : {}),
+        },
+        createdAt: now,
+      });
+      await ctx.db.patch(campaign._id, { updatedAt: now });
+      return recipientId;
+    }
+
+    const patch: Record<string, unknown> = {
+      contactId: contact.contactId,
+      identityKind: contact.identityKind,
+      identityValue: contact.identityValue,
+      providerMessageId: args.providerMessageId ?? recipient.providerMessageId,
+      channelOutboxId: args.outboxId ?? recipient.channelOutboxId,
+      updatedAt: now,
+    };
+    const shouldAdvance =
+      CAMPAIGN_RECIPIENT_STATUS_RANK[nextStatus] >
+        CAMPAIGN_RECIPIENT_STATUS_RANK[recipient.status] ||
+      nextStatus === "failed";
+    if (shouldAdvance) patch.status = nextStatus;
+    if (nextStatus === "failed") {
+      patch.failureReason = args.failureReason?.slice(0, 500);
+    }
+    const hadTimestamp = hasCampaignRecipientTimestamp(recipient, nextStatus);
+    applyCampaignRecipientTimeline(recipient, nextStatus, now, patch);
+    await ctx.db.patch(recipient._id, patch);
+    if (shouldAdvance || !hadTimestamp) {
+      await ctx.db.insert("campaignEvents", {
+        tenantId: args.tenantId,
+        campaignId: campaign._id,
+        campaignRecipientId: recipient._id,
+        type: `campaign.recipient.${nextStatus}`,
+        payload: {
+          channelId: args.channelId,
+          channelOutboxId: args.outboxId,
+          providerMessageId: args.providerMessageId,
+          previousStatus: recipient.status,
+          threadKey: args.threadKey,
+          source: "hub_micro_campaign",
+          ...(nextStatus === "failed"
+            ? { failureReason: args.failureReason?.slice(0, 500) }
+            : {}),
+        },
+        createdAt: now,
+      });
+      await ctx.db.patch(campaign._id, { updatedAt: now });
+    }
+    return recipient._id;
+  },
+});
+
+export const _finishMicroCampaignLaunch = internalMutation({
+  args: {
+    tenantId: v.id("tenants"),
+    campaignId: v.id("campaigns"),
+  },
+  returns: v.object({
+    status: campaignStatusValidator,
+    total: v.number(),
+    failed: v.number(),
+  }),
+  handler: async (ctx, args) => {
+    const campaign = await ctx.db.get(args.campaignId);
+    if (!campaign || campaign.tenantId !== args.tenantId) {
+      throw new ConvexError({ code: "CAMPAIGN_NOT_FOUND" });
+    }
+    const recipients = await ctx.db
+      .query("campaignRecipients")
+      .withIndex("by_campaign", (q) => q.eq("campaignId", campaign._id))
+      .collect();
+    const failed = recipients.filter((row) => row.status === "failed").length;
+    const accepted = recipients.length - failed;
+    const status: "completed" | "failed" =
+      accepted > 0 ? "completed" : "failed";
+    const now = Date.now();
+    if (!campaign.completedAt || campaign.status !== status) {
+      await ctx.db.patch(campaign._id, {
+        status,
+        completedAt: now,
+        updatedAt: now,
+        pauseReason:
+          status === "failed"
+            ? "No micro-campaign recipients were accepted by the channel."
+            : undefined,
+      });
+      await ctx.db.insert("campaignEvents", {
+        tenantId: args.tenantId,
+        campaignId: campaign._id,
+        type: "campaign.micro.completed",
+        payload: { total: recipients.length, accepted, failed },
+        createdAt: now,
+      });
+    }
+    return { status, total: recipients.length, failed };
+  },
+});
+
+export const _markChannelMicroCampaignEngagement = internalMutation({
+  args: {
+    tenantId: v.id("tenants"),
+    channelId: v.id("channels"),
+    threadKey: v.string(),
+    receivedAt: v.number(),
+    intent: v.optional(microCampaignIntentValidator),
+  },
+  returns: v.union(
+    v.literal("marked_replied"),
+    v.literal("marked_clicked"),
+    v.literal("noop"),
+  ),
+  handler: async (ctx, args) => {
+    const cutoff = args.receivedAt - MICRO_CAMPAIGN_LOOKBACK_MS;
+    const candidates = await ctx.db
+      .query("campaignRecipients")
+      .withIndex("by_tenant_channel_thread", (q) =>
+        q
+          .eq("tenantId", args.tenantId)
+          .eq("channelId", args.channelId)
+          .eq("threadKey", args.threadKey),
+      )
+      .order("desc")
+      .take(20);
+
+    let recipient: Doc<"campaignRecipients"> | null = null;
+    for (const candidate of candidates) {
+      if (candidate.createdAt > args.receivedAt || candidate.createdAt < cutoff) {
+        continue;
+      }
+      if (candidate.status === "failed" || candidate.status === "skipped") {
+        continue;
+      }
+      const campaign = await ctx.db.get(candidate.campaignId);
+      if (
+        campaign?.tenantId === args.tenantId &&
+        campaign.kind === "micro_lab" &&
+        campaign.channelId === args.channelId
+      ) {
+        recipient = candidate;
+        break;
+      }
+    }
+    if (!recipient) return "noop";
+
+    const clicked = !!args.intent;
+    const nextStatus: CampaignRecipientStatus = clicked ? "clicked" : "replied";
+    const alreadyRecorded = clicked ? !!recipient.clickedAt : !!recipient.repliedAt;
+    if (alreadyRecorded && recipient.status === nextStatus) {
+      return "noop";
+    }
+
+    const patch: Record<string, unknown> = {
+      updatedAt: args.receivedAt,
+    };
+    if (
+      CAMPAIGN_RECIPIENT_STATUS_RANK[nextStatus] >
+      CAMPAIGN_RECIPIENT_STATUS_RANK[recipient.status]
+    ) {
+      patch.status = nextStatus;
+    }
+    if (clicked) {
+      if (!recipient.clickedAt) patch.clickedAt = args.receivedAt;
+      if (!recipient.clickedButtonPayload) {
+        patch.clickedButtonPayload = `intent:${args.intent}`;
+      }
+    }
+    if (!recipient.repliedAt) patch.repliedAt = args.receivedAt;
+
+    await ctx.db.patch(recipient._id, patch);
+    await ctx.db.insert("campaignEvents", {
+      tenantId: args.tenantId,
+      campaignId: recipient.campaignId,
+      campaignRecipientId: recipient._id,
+      type: clicked ? "campaign.recipient.clicked" : "campaign.recipient.replied",
+      payload: clicked ? { intent: args.intent } : undefined,
+      createdAt: args.receivedAt,
+    });
+    await ctx.db.patch(recipient.campaignId, { updatedAt: args.receivedAt });
+    return clicked ? "marked_clicked" : "marked_replied";
+  },
+});
+
+export const recordConversion = tenantMutation({
+  args: {
+    campaignRecipientId: v.id("campaignRecipients"),
+    label: v.optional(v.string()),
+    valueMinor: v.optional(v.number()),
+    currency: v.optional(v.string()),
+  },
+  returns: v.object({ converted: v.boolean() }),
+  handler: async (ctx, args) => {
+    requireCapability(ctx.role, "campaigns.start");
+    const recipient = await ctx.db.get(args.campaignRecipientId);
+    if (!recipient || recipient.tenantId !== ctx.tenantId) {
+      throw new ConvexError({ code: "CAMPAIGN_RECIPIENT_NOT_FOUND" });
+    }
+    const campaign = await ctx.db.get(recipient.campaignId);
+    if (!campaign || campaign.tenantId !== ctx.tenantId) {
+      throw new ConvexError({ code: "CAMPAIGN_NOT_FOUND" });
+    }
+    if (recipient.convertedAt) {
+      return { converted: false };
+    }
+    const now = Date.now();
+    const label = args.label?.trim().slice(0, 80) || "Manual conversion";
+    await ctx.db.patch(recipient._id, {
+      convertedAt: now,
+      conversionLabel: label,
+      conversionValueMinor: args.valueMinor,
+      conversionCurrency: args.currency?.trim().slice(0, 12) || undefined,
+      updatedAt: now,
+    });
+    await ctx.db.insert("campaignEvents", {
+      tenantId: ctx.tenantId,
+      campaignId: campaign._id,
+      campaignRecipientId: recipient._id,
+      type: "campaign.recipient.converted",
+      payload: {
+        label,
+        valueMinor: args.valueMinor,
+        currency: args.currency?.trim().slice(0, 12),
+      },
+      createdAt: now,
+    });
+    await ctx.db.patch(campaign._id, { updatedAt: now });
+    return { converted: true };
   },
 });
 
@@ -839,6 +1400,7 @@ export const _markInboundEngagement = internalMutation({
       clickedButtonPayload: clicked
         ? args.buttonPayload?.slice(0, 500)
         : recipient.clickedButtonPayload,
+      clickedAt: clicked ? (recipient.clickedAt ?? args.receivedAt) : recipient.clickedAt,
       repliedAt: args.receivedAt,
       updatedAt: args.receivedAt,
     });
@@ -860,7 +1422,10 @@ export const listCampaigns = tenantQuery({
     v.object({
       _id: v.id("campaigns"),
       name: v.string(),
+      kind: campaignKindValidator,
       status: campaignStatusValidator,
+      channelName: v.optional(v.string()),
+      contentPreview: v.optional(v.string()),
       listName: v.optional(v.string()),
       templateName: v.optional(v.string()),
       pauseReason: v.optional(v.string()),
@@ -874,10 +1439,13 @@ export const listCampaigns = tenantQuery({
         read: v.number(),
         replied: v.number(),
         clicked: v.number(),
+        converted: v.number(),
         failed: v.number(),
         skipped: v.number(),
       }),
       failureBreakdown: failureBreakdownValidator,
+      startedAt: v.optional(v.number()),
+      completedAt: v.optional(v.number()),
       createdAt: v.number(),
       updatedAt: v.optional(v.number()),
     }),
@@ -901,7 +1469,10 @@ export const getCampaign = tenantQuery({
   returns: v.object({
     _id: v.id("campaigns"),
     name: v.string(),
+    kind: campaignKindValidator,
     status: campaignStatusValidator,
+    channelName: v.optional(v.string()),
+    contentPreview: v.optional(v.string()),
     listName: v.optional(v.string()),
     templateName: v.optional(v.string()),
     pauseReason: v.optional(v.string()),
@@ -915,6 +1486,7 @@ export const getCampaign = tenantQuery({
       read: v.number(),
       replied: v.number(),
       clicked: v.number(),
+      converted: v.number(),
       failed: v.number(),
       skipped: v.number(),
     }),
@@ -930,8 +1502,17 @@ export const getCampaign = tenantQuery({
         failureCode: v.optional(v.string()),
         failureReason: v.optional(v.string()),
         metaErrorCategory: v.optional(v.string()),
+        sentAt: v.optional(v.number()),
+        deliveredAt: v.optional(v.number()),
+        readAt: v.optional(v.number()),
+        repliedAt: v.optional(v.number()),
+        clickedAt: v.optional(v.number()),
+        convertedAt: v.optional(v.number()),
+        conversionLabel: v.optional(v.string()),
       }),
     ),
+    startedAt: v.optional(v.number()),
+    completedAt: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.optional(v.number()),
   }),
@@ -964,6 +1545,13 @@ export const getCampaign = tenantQuery({
         failureCode: recipient.failureCode,
         failureReason: recipient.failureReason,
         metaErrorCategory: recipient.metaErrorCategory,
+        sentAt: recipient.sentAt,
+        deliveredAt: recipient.deliveredAt,
+        readAt: recipient.readAt,
+        repliedAt: recipient.repliedAt,
+        clickedAt: recipient.clickedAt,
+        convertedAt: recipient.convertedAt,
+        conversionLabel: recipient.conversionLabel,
       });
     }
     return { ...summary, recipients: recipientRows };
@@ -993,6 +1581,13 @@ export const listEvents = tenantQuery({
           failureCode: v.optional(v.string()),
           failureReason: v.optional(v.string()),
           metaErrorCategory: v.optional(v.string()),
+          sentAt: v.optional(v.number()),
+          deliveredAt: v.optional(v.number()),
+          readAt: v.optional(v.number()),
+          repliedAt: v.optional(v.number()),
+          clickedAt: v.optional(v.number()),
+          convertedAt: v.optional(v.number()),
+          conversionLabel: v.optional(v.string()),
         }),
       ),
     }),
@@ -1022,6 +1617,13 @@ export const listEvents = tenantQuery({
             failureCode?: string;
             failureReason?: string;
             metaErrorCategory?: string;
+            sentAt?: number;
+            deliveredAt?: number;
+            readAt?: number;
+            repliedAt?: number;
+            clickedAt?: number;
+            convertedAt?: number;
+            conversionLabel?: string;
           }
         | undefined;
       if (event.campaignRecipientId) {
@@ -1042,6 +1644,13 @@ export const listEvents = tenantQuery({
             failureCode: recipient.failureCode,
             failureReason: recipient.failureReason,
             metaErrorCategory: recipient.metaErrorCategory,
+            sentAt: recipient.sentAt,
+            deliveredAt: recipient.deliveredAt,
+            readAt: recipient.readAt,
+            repliedAt: recipient.repliedAt,
+            clickedAt: recipient.clickedAt,
+            convertedAt: recipient.convertedAt,
+            conversionLabel: recipient.conversionLabel,
           };
         }
       }
@@ -1113,9 +1722,10 @@ async function describeCampaign(
   ctx: { db: any; tenantId: Id<"tenants"> },
   campaign: Doc<"campaigns">,
 ) {
-  const [list, template, recipients] = await Promise.all([
+  const [list, template, channel, recipients] = await Promise.all([
     campaign.listId ? ctx.db.get(campaign.listId) : null,
     campaign.templateId ? ctx.db.get(campaign.templateId) : null,
+    campaign.channelId ? ctx.db.get(campaign.channelId) : null,
     ctx.db
       .query("campaignRecipients")
       .withIndex("by_campaign", (q: any) => q.eq("campaignId", campaign._id))
@@ -1124,13 +1734,19 @@ async function describeCampaign(
   return {
     _id: campaign._id,
     name: campaign.name,
+    kind: campaign.kind ?? "template_broadcast",
     status: campaign.status ?? "draft",
+    channelName:
+      channel?.tenantId === ctx.tenantId ? channel.displayName : undefined,
+    contentPreview: campaign.contentPreview,
     listName: list?.tenantId === ctx.tenantId ? list.name : undefined,
     templateName:
       template?.tenantId === ctx.tenantId ? template.name : undefined,
     pauseReason: campaign.pauseReason,
     stats: countRecipientStatuses(recipients),
     failureBreakdown: buildFailureBreakdown(recipients),
+    startedAt: campaign.startedAt,
+    completedAt: campaign.completedAt,
     createdAt: campaign.createdAt,
     updatedAt: campaign.updatedAt,
   };
@@ -1168,10 +1784,12 @@ function countRecipientStatuses(recipients: Array<Doc<"campaignRecipients">>) {
     read: 0,
     replied: 0,
     clicked: 0,
+    converted: 0,
     failed: 0,
     skipped: 0,
   };
   for (const r of recipients) {
+    if (r.convertedAt) stats.converted++;
     if (r.status === "failed") stats.failed++;
     else if (r.status === "skipped") stats.skipped++;
     else if (r.status === "clicked") stats.clicked++;

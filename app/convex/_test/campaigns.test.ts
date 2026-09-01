@@ -325,6 +325,7 @@ describe("campaign foundation", () => {
 
     const afterSent = await owner.query(campaignsApi.getCampaign, { campaignId });
     expect(afterSent.stats.sent).toBe(1);
+    expect(afterSent.recipients[0].sentAt).toEqual(expect.any(Number));
 
     await t.mutation(internal.messages.markStatusFromWebhook, {
       metaMessageId: "wamid.TEST",
@@ -333,6 +334,7 @@ describe("campaign foundation", () => {
 
     const afterRead = await owner.query(campaignsApi.getCampaign, { campaignId });
     expect(afterRead.stats.read).toBe(1);
+    expect(afterRead.recipients[0].readAt).toEqual(expect.any(Number));
 
     const events = await owner.query(campaignsApi.listEvents, {
       campaignId,
@@ -390,6 +392,39 @@ describe("campaign foundation", () => {
     const afterClick = await owner.query(campaignsApi.getCampaign, { campaignId });
     expect(afterClick.stats.clicked).toBe(1);
     expect(afterClick.recipients[0].status).toBe("clicked");
+    expect(afterClick.recipients[0].clickedAt).toEqual(expect.any(Number));
+    expect(afterClick.recipients[0].repliedAt).toEqual(expect.any(Number));
+
+    const conversion = await owner.mutation(campaignsApi.recordConversion, {
+      campaignRecipientId: afterClick.recipients[0]._id,
+      label: "Booked appointment",
+      valueMinor: 250000,
+      currency: "MZN",
+    });
+    expect(conversion).toEqual({ converted: true });
+    const duplicateConversion = await owner.mutation(
+      campaignsApi.recordConversion,
+      {
+        campaignRecipientId: afterClick.recipients[0]._id,
+        label: "Booked appointment again",
+      },
+    );
+    expect(duplicateConversion).toEqual({ converted: false });
+    const afterConversion = await owner.query(campaignsApi.getCampaign, {
+      campaignId,
+    });
+    expect(afterConversion.stats.converted).toBe(1);
+    expect(afterConversion.recipients[0]).toMatchObject({
+      convertedAt: expect.any(Number),
+      conversionLabel: "Booked appointment",
+    });
+    const conversionEvents = await owner.query(campaignsApi.listEvents, {
+      campaignId,
+      limit: 20,
+    });
+    expect(conversionEvents.map((event: { type: string }) => event.type)).toContain(
+      "campaign.recipient.converted",
+    );
   });
 
   it("pauses a running campaign when failure rate crosses the safety threshold", async () => {

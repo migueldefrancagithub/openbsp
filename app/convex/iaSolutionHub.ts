@@ -1772,6 +1772,7 @@ const microCampaignReplyTargetValidator = v.union(
     memberId: v.id("members"),
     channelId: v.id("channels"),
     threadKey: v.string(),
+    receivedAt: v.number(),
     replyToProviderMessageId: v.optional(v.string()),
     campaignName: v.optional(v.string()),
   }),
@@ -1841,6 +1842,7 @@ export const _loadMicroCampaignReplyTarget = internalQuery({
       memberId: member._id,
       channelId: channel._id,
       threadKey: thread.threadKey,
+      receivedAt: event.receivedAt,
       replyToProviderMessageId: event.providerEventId,
       campaignName: nonEmptyString(payload?.campaignName)?.slice(0, 80),
     };
@@ -1862,10 +1864,18 @@ export const dispatchMicroCampaignReply = internalAction({
       memberId: Id<"members">;
       channelId: Id<"channels">;
       threadKey: string;
+      receivedAt: number;
       replyToProviderMessageId?: string;
       campaignName?: string;
     } | null;
     if (!target) return null;
+    await ctx.runMutation(internal.campaigns._markChannelMicroCampaignEngagement, {
+      tenantId: target.tenantId,
+      channelId: target.channelId,
+      threadKey: target.threadKey,
+      receivedAt: target.receivedAt,
+      intent: args.intent,
+    });
     const text = microCampaignReplyText(args.intent);
     await dispatch(ctx, {
       caller: {
@@ -2168,6 +2178,17 @@ export const sendMicroCampaignText = action({
       failureReason?: string;
     }> = [];
     const campaignName = args.campaignName?.trim().slice(0, 80);
+    const campaign = (await ctx.runMutation(
+      internal.campaigns._beginMicroCampaign,
+      {
+        tenantId: caller.tenantId,
+        memberId: caller.memberId,
+        channelId: args.channelId,
+        clientNonce: nonce,
+        name: campaignName || "Micro campaign",
+        text,
+      },
+    )) as { campaignId: Id<"campaigns">; existing: boolean };
 
     for (const [index, threadKey] of threadKeys.entries()) {
       try {
@@ -2193,17 +2214,42 @@ export const sendMicroCampaignText = action({
         });
         if (result.status === "accepted") accepted += 1;
         else failed += 1;
+        await ctx.runMutation(internal.campaigns._recordMicroCampaignRecipient, {
+          tenantId: caller.tenantId,
+          campaignId: campaign.campaignId,
+          channelId: args.channelId,
+          threadKey,
+          outboxId: result.outboxId,
+          dispatchStatus: result.status,
+          providerMessageId: result.providerMessageId,
+          failureReason:
+            result.status === "accepted" ? undefined : `Outbox status: ${result.status}`,
+        });
         results.push({ threadKey, ...result });
       } catch (error) {
         failed += 1;
+        const failureReason =
+          error instanceof Error ? error.message.slice(0, 300) : "Send failed.";
+        await ctx.runMutation(internal.campaigns._recordMicroCampaignRecipient, {
+          tenantId: caller.tenantId,
+          campaignId: campaign.campaignId,
+          channelId: args.channelId,
+          threadKey,
+          dispatchStatus: "failed",
+          failureReason,
+        });
         results.push({
           threadKey,
           status: "failed",
-          failureReason:
-            error instanceof Error ? error.message.slice(0, 300) : "Send failed.",
+          failureReason,
         });
       }
     }
+
+    await ctx.runMutation(internal.campaigns._finishMicroCampaignLaunch, {
+      tenantId: caller.tenantId,
+      campaignId: campaign.campaignId,
+    });
 
     return { accepted, failed, results };
   },

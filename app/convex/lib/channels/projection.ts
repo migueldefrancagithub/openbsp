@@ -22,6 +22,21 @@ const SERVICE_WINDOW_MS = 24 * 60 * 60 * 1000;
 const PREVIEW_MAX_CHARS = 160;
 const FAILURE_REASON_MAX_CHARS = 500;
 
+type CampaignRecipientStatus = "sent" | "delivered" | "read" | "failed";
+
+const CAMPAIGN_STATUS_RANK: Record<string, number> = {
+  pending: 0,
+  queued: 1,
+  dispatching: 2,
+  sent: 3,
+  delivered: 4,
+  read: 5,
+  replied: 6,
+  clicked: 7,
+  failed: 8,
+  skipped: 8,
+};
+
 export type ProjectableEvent = {
   eventKind: string;
   direction: "incoming" | "outgoing";
@@ -102,8 +117,98 @@ export async function reconcileOutboxFromStatus(
   }
   if (Object.keys(patch).length === 0) return;
 
-  patch.updatedAt = Date.now();
+  const settledAt = Date.now();
+  patch.updatedAt = settledAt;
   await ctx.db.patch(row._id, patch);
+  if (nextStatus) {
+    await syncCampaignRecipientFromChannelOutbox(ctx, {
+      outbox: row,
+      nextOutboxStatus: nextStatus,
+      event: args.event,
+      at: settledAt,
+    });
+  }
+}
+
+async function syncCampaignRecipientFromChannelOutbox(
+  ctx: MutationCtx,
+  args: {
+    outbox: Doc<"channelOutbox">;
+    nextOutboxStatus: string;
+    event: ProjectableEvent;
+    at: number;
+  },
+): Promise<void> {
+  const nextStatus = mapOutboxStatusToCampaignRecipientStatus(
+    args.nextOutboxStatus,
+  );
+  if (!nextStatus) return;
+  const recipient = await ctx.db
+    .query("campaignRecipients")
+    .withIndex("by_channel_outbox", (q) =>
+      q.eq("channelOutboxId", args.outbox._id),
+    )
+    .first();
+  if (!recipient) return;
+
+  const patch: Partial<Doc<"campaignRecipients">> = { updatedAt: args.at };
+  const advances =
+    (CAMPAIGN_STATUS_RANK[nextStatus] ?? 0) >
+      (CAMPAIGN_STATUS_RANK[recipient.status] ?? 0) ||
+    nextStatus === "failed";
+  if (advances) patch.status = nextStatus;
+  if (nextStatus === "sent") {
+    if (!recipient.sentAt) patch.sentAt = args.at;
+  } else if (nextStatus === "delivered") {
+    if (!recipient.sentAt) patch.sentAt = args.at;
+    if (!recipient.deliveredAt) patch.deliveredAt = args.at;
+  } else if (nextStatus === "read") {
+    if (!recipient.sentAt) patch.sentAt = args.at;
+    if (!recipient.deliveredAt) patch.deliveredAt = args.at;
+    if (!recipient.readAt) patch.readAt = args.at;
+  } else if (nextStatus === "failed") {
+    patch.failureReason = deriveFailureReason(args.event.payload)?.slice(
+      0,
+      FAILURE_REASON_MAX_CHARS,
+    );
+  }
+
+  const hadTimestamp =
+    nextStatus === "sent"
+      ? !!recipient.sentAt
+      : nextStatus === "delivered"
+        ? !!recipient.deliveredAt
+        : nextStatus === "read"
+          ? !!recipient.readAt
+          : recipient.status === "failed";
+  if (!advances && hadTimestamp) return;
+
+  await ctx.db.patch(recipient._id, patch);
+  await ctx.db.insert("campaignEvents", {
+    tenantId: recipient.tenantId,
+    campaignId: recipient.campaignId,
+    campaignRecipientId: recipient._id,
+    type: `campaign.recipient.${nextStatus}`,
+    payload: {
+      channelOutboxId: args.outbox._id,
+      providerMessageId: args.outbox.providerMessageId,
+      providerStatus: args.event.eventKind,
+      previousStatus: recipient.status,
+      threadKey: args.outbox.threadKey,
+    },
+    createdAt: args.at,
+  });
+  await ctx.db.patch(recipient.campaignId, { updatedAt: args.at });
+}
+
+function mapOutboxStatusToCampaignRecipientStatus(
+  status: string,
+): CampaignRecipientStatus | null {
+  if (status === "accepted") return "sent";
+  if (status === "delivered") return "delivered";
+  if (status === "read") return "read";
+  if (status === "failed") return "failed";
+  return null;
 }
 
 function deriveFailureReason(payload: unknown): string | undefined {

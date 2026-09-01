@@ -1005,9 +1005,13 @@ export default defineSchema({
   campaigns: defineTable({
     tenantId: v.id("tenants"),
     name: v.string(),
+    kind: v.optional(v.union(v.literal("template_broadcast"), v.literal("micro_lab"))),
+    businessKey: v.optional(v.string()),
     listId: v.optional(v.id("contactLists")),
     templateId: v.optional(v.id("templates")),
     templateVersion: v.optional(v.number()),
+    channelId: v.optional(v.id("channels")),
+    contentPreview: v.optional(v.string()),
     status: v.optional(campaignStatusValidator),
     createdBy: v.optional(v.id("members")),
     scheduledAt: v.optional(v.number()),
@@ -1021,28 +1025,48 @@ export default defineSchema({
     updatedAt: v.optional(v.number()),
   })
     .index("by_tenant", ["tenantId"])
-    .index("by_tenant_status", ["tenantId", "status"]),
+    .index("by_tenant_status", ["tenantId", "status"])
+    .index("by_tenant_business_key", ["tenantId", "businessKey"]),
 
   campaignRecipients: defineTable({
     tenantId: v.id("tenants"),
     campaignId: v.id("campaigns"),
     contactId: v.id("contacts"),
     messageId: v.optional(v.id("messages")),
+    channelId: v.optional(v.id("channels")),
+    channelOutboxId: v.optional(v.id("channelOutbox")),
+    threadKey: v.optional(v.string()),
     identityKind: v.union(v.literal("phone"), v.literal("bsuid")),
     identityValue: v.string(),
     status: campaignRecipientStatusValidator,
     failureCode: v.optional(v.string()),
     failureReason: v.optional(v.string()),
     metaErrorCategory: v.optional(v.string()),
+    providerMessageId: v.optional(v.string()),
     clickedButtonPayload: v.optional(v.string()),
+    sentAt: v.optional(v.number()),
+    deliveredAt: v.optional(v.number()),
+    readAt: v.optional(v.number()),
+    clickedAt: v.optional(v.number()),
     repliedAt: v.optional(v.number()),
+    convertedAt: v.optional(v.number()),
+    conversionLabel: v.optional(v.string()),
+    conversionValueMinor: v.optional(v.number()),
+    conversionCurrency: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
     .index("by_campaign", ["campaignId"])
     .index("by_campaign_status", ["campaignId", "status"])
     .index("by_message", ["messageId"])
-    .index("by_contact", ["tenantId", "contactId"]),
+    .index("by_contact", ["tenantId", "contactId"])
+    .index("by_channel_outbox", ["channelOutboxId"])
+    .index("by_tenant_channel_thread", [
+      "tenantId",
+      "channelId",
+      "threadKey",
+      "updatedAt",
+    ]),
 
   campaignEvents: defineTable({
     tenantId: v.id("tenants"),
