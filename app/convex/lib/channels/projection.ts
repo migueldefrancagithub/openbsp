@@ -32,6 +32,8 @@ type ChannelLeadStatus =
   | "awaiting_human"
   | "booked"
   | "confirmed"
+  | "attended"
+  | "no_show"
   | "lost";
 
 const CAMPAIGN_STATUS_RANK: Record<string, number> = {
@@ -138,6 +140,8 @@ function nextStepFor(status: ChannelLeadStatus): string {
   if (status === "awaiting_human") return "Atribuir a equipa e responder com contexto da conversa.";
   if (status === "confirmed") return "Confirmacao recebida. Rever se existe agendamento associado.";
   if (status === "booked") return "Acompanhar confirmacao e comparecimento.";
+  if (status === "attended") return "Atendimento concluido. Registar resultado e proximo cuidado.";
+  if (status === "no_show") return "Contactar para remarcar e registar o motivo da ausencia.";
   if (status === "lost") return "Encerrar sem novo disparo, exceto se o cliente voltar.";
   return "Qualificar pedido e definir proxima acao.";
 }
@@ -155,7 +159,9 @@ function shouldAdvanceLeadStatus(
     awaiting_human: 4,
     booked: 5,
     confirmed: 6,
-    lost: 7,
+    attended: 7,
+    no_show: 7,
+    lost: 8,
   };
   return rank[next] >= rank[current] || next === "awaiting_human";
 }

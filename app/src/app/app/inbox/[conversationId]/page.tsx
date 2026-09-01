@@ -1,13 +1,5 @@
-import { ConversationThread } from "@/components/inbox/ConversationThread";
-import type { Id } from "../../../../../convex/_generated/dataModel";
+import { redirect } from "next/navigation";
 
-type Props = { params: Promise<{ conversationId: string }> };
-
-export default async function ConversationPage({ params }: Props) {
-  const { conversationId } = await params;
-  return (
-    <ConversationThread
-      conversationId={conversationId as Id<"conversations">}
-    />
-  );
+export default function LegacyConversationPage() {
+  redirect("/app/channel-inbox");
 }

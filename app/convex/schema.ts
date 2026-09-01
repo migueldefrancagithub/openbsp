@@ -167,7 +167,31 @@ const channelLeadStatusValidator = v.union(
   v.literal("awaiting_human"),
   v.literal("booked"),
   v.literal("confirmed"),
+  v.literal("attended"),
+  v.literal("no_show"),
   v.literal("lost"),
+);
+
+const channelInboxStatusValidator = v.union(
+  v.literal("open"),
+  v.literal("active"),
+  v.literal("awaiting_team"),
+  v.literal("awaiting_patient"),
+  v.literal("snoozed"),
+  v.literal("closed"),
+);
+
+const threadReminderStatusValidator = v.union(
+  v.literal("scheduled"),
+  v.literal("due"),
+  v.literal("completed"),
+  v.literal("cancelled"),
+);
+
+const channelAttachmentStatusValidator = v.union(
+  v.literal("uploaded"),
+  v.literal("sent"),
+  v.literal("failed"),
 );
 
 const clinicServiceStatusValidator = v.union(
@@ -742,6 +766,13 @@ export default defineSchema({
     nextStep: v.optional(v.string()),
     nextStepDueAt: v.optional(v.number()),
     responsibleMemberId: v.optional(v.id("members")),
+    assignedTeamId: v.optional(v.id("teams")),
+    inboxStatus: v.optional(channelInboxStatusValidator),
+    starredAt: v.optional(v.number()),
+    snoozedUntil: v.optional(v.number()),
+    closedAt: v.optional(v.number()),
+    closedReasonId: v.optional(v.id("threadCloseReasons")),
+    dnd: v.optional(v.boolean()),
     automationMode: v.optional(
       v.union(
         v.literal("idle"),
@@ -758,7 +789,65 @@ export default defineSchema({
     .index("by_channel_thread", ["channelId", "threadKey"])
     .index("by_channel_last_event", ["channelId", "lastEventAt"])
     .index("by_tenant_last_event", ["tenantId", "lastEventAt"])
-    .index("by_tenant_lead_status", ["tenantId", "leadStatus", "lastEventAt"]),
+    .index("by_tenant_lead_status", ["tenantId", "leadStatus", "lastEventAt"])
+    .index("by_tenant_inbox_status", ["tenantId", "inboxStatus", "lastEventAt"])
+    .index("by_tenant_responsible", ["tenantId", "responsibleMemberId", "lastEventAt"])
+    .index("by_tenant_team", ["tenantId", "assignedTeamId", "lastEventAt"]),
+
+  threadInternalNotes: defineTable({
+    tenantId: v.id("tenants"),
+    threadId: v.id("channelThreads"),
+    body: v.string(),
+    mentionedMemberIds: v.array(v.id("members")),
+    createdBy: v.id("members"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_thread", ["threadId", "createdAt"])
+    .index("by_tenant", ["tenantId", "createdAt"]),
+
+  threadReminders: defineTable({
+    tenantId: v.id("tenants"),
+    threadId: v.id("channelThreads"),
+    note: v.string(),
+    dueAt: v.number(),
+    status: threadReminderStatusValidator,
+    assignedMemberId: v.id("members"),
+    createdBy: v.id("members"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_thread", ["threadId", "dueAt"])
+    .index("by_tenant_status_due", ["tenantId", "status", "dueAt"]),
+
+  channelAttachments: defineTable({
+    tenantId: v.id("tenants"),
+    threadId: v.id("channelThreads"),
+    storageId: v.id("_storage"),
+    fileName: v.string(),
+    contentType: v.string(),
+    size: v.number(),
+    caption: v.optional(v.string()),
+    status: channelAttachmentStatusValidator,
+    outboxId: v.optional(v.id("channelOutbox")),
+    failureReason: v.optional(v.string()),
+    createdBy: v.id("members"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_thread", ["threadId", "createdAt"])
+    .index("by_tenant", ["tenantId", "createdAt"]),
+
+  threadCloseReasons: defineTable({
+    tenantId: v.id("tenants"),
+    name: v.string(),
+    active: v.boolean(),
+    createdBy: v.id("members"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_tenant", ["tenantId", "active"])
+    .index("by_tenant_name", ["tenantId", "name"]),
 
   // ===== Clinic operating system =====
   clinicServices: defineTable({
@@ -1230,6 +1319,7 @@ export default defineSchema({
     completedAt: v.optional(v.number()),
     pausedAt: v.optional(v.number()),
     pauseReason: v.optional(v.string()),
+    batchSize: v.optional(v.number()),
     failureRatePausedAt: v.optional(v.number()),
     failureRateThreshold: v.optional(v.number()),
     createdAt: v.number(),

@@ -18,6 +18,8 @@ const leadStatusValidator = v.union(
   v.literal("awaiting_human"),
   v.literal("booked"),
   v.literal("confirmed"),
+  v.literal("attended"),
+  v.literal("no_show"),
   v.literal("lost"),
 );
 
@@ -295,6 +297,8 @@ type LeadStatus =
   | "awaiting_human"
   | "booked"
   | "confirmed"
+  | "attended"
+  | "no_show"
   | "lost";
 
 const LEAD_STATUS_ORDER: LeadStatus[] = [
@@ -305,6 +309,8 @@ const LEAD_STATUS_ORDER: LeadStatus[] = [
   "awaiting_human",
   "booked",
   "confirmed",
+  "attended",
+  "no_show",
   "lost",
 ];
 

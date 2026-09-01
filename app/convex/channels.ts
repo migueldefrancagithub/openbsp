@@ -210,9 +210,16 @@ export const listThreads = tenantQuery({
       unreadCount: v.number(),
       serviceWindowExpiresAt: v.optional(v.number()),
       tags: v.optional(v.array(v.string())),
+      leadSource: v.optional(v.string()),
       leadStatus: v.optional(v.string()),
       nextStep: v.optional(v.string()),
       nextStepDueAt: v.optional(v.number()),
+      responsibleMemberId: v.optional(v.id("members")),
+      assignedTeamId: v.optional(v.id("teams")),
+      inboxStatus: v.optional(v.string()),
+      starredAt: v.optional(v.number()),
+      snoozedUntil: v.optional(v.number()),
+      dnd: v.optional(v.boolean()),
       automationMode: v.optional(v.string()),
     }),
   ),
@@ -266,9 +273,16 @@ export const listThreads = tenantQuery({
           unreadCount: row.unreadCount,
           serviceWindowExpiresAt: row.serviceWindowExpiresAt,
           tags: row.tags,
+          leadSource: row.leadSource,
           leadStatus: row.leadStatus,
           nextStep: row.nextStep,
           nextStepDueAt: row.nextStepDueAt,
+          responsibleMemberId: row.responsibleMemberId,
+          assignedTeamId: row.assignedTeamId,
+          inboxStatus: row.inboxStatus,
+          starredAt: row.starredAt,
+          snoozedUntil: row.snoozedUntil,
+          dnd: row.dnd,
           automationMode: row.automationMode,
         };
       }),
@@ -348,9 +362,17 @@ export const getThread = tenantQuery({
       unreadCount: v.number(),
       serviceWindowExpiresAt: v.optional(v.number()),
       tags: v.optional(v.array(v.string())),
+      leadSource: v.optional(v.string()),
       leadStatus: v.optional(v.string()),
       nextStep: v.optional(v.string()),
       nextStepDueAt: v.optional(v.number()),
+      responsibleMemberId: v.optional(v.id("members")),
+      assignedTeamId: v.optional(v.id("teams")),
+      inboxStatus: v.optional(v.string()),
+      starredAt: v.optional(v.number()),
+      snoozedUntil: v.optional(v.number()),
+      closedAt: v.optional(v.number()),
+      dnd: v.optional(v.boolean()),
       automationMode: v.optional(v.string()),
       automationChangeReason: v.optional(v.string()),
       channelSendMode: v.string(),
@@ -394,9 +416,17 @@ export const getThread = tenantQuery({
       unreadCount: thread.unreadCount,
       serviceWindowExpiresAt: thread.serviceWindowExpiresAt,
       tags: thread.tags,
+      leadSource: thread.leadSource,
       leadStatus: thread.leadStatus,
       nextStep: thread.nextStep,
       nextStepDueAt: thread.nextStepDueAt,
+      responsibleMemberId: thread.responsibleMemberId,
+      assignedTeamId: thread.assignedTeamId,
+      inboxStatus: thread.inboxStatus,
+      starredAt: thread.starredAt,
+      snoozedUntil: thread.snoozedUntil,
+      closedAt: thread.closedAt,
+      dnd: thread.dnd,
       automationMode: thread.automationMode,
       automationChangeReason: thread.automationChangeReason,
       channelSendMode: channel.sendMode,
@@ -407,6 +437,41 @@ export const getThread = tenantQuery({
       channelHealthStatus: channel.lastHealthStatus,
       recipientAllowlisted: channel.outboundAllowlist.includes(recipient),
     };
+  },
+});
+
+export const listTemplates = tenantQuery({
+  args: { channelId: v.id("channels") },
+  returns: v.array(
+    v.object({
+      _id: v.id("channelTemplates"),
+      name: v.string(),
+      languageCode: v.string(),
+      category: v.optional(v.string()),
+      status: v.string(),
+      components: v.optional(v.any()),
+    }),
+  ),
+  handler: async (ctx, args) => {
+    const channel = await ctx.db.get(args.channelId);
+    if (!channel || channel.tenantId !== ctx.tenantId) {
+      throw new ConvexError({ code: "CHANNEL_NOT_FOUND" });
+    }
+    const rows = await ctx.db
+      .query("channelTemplates")
+      .withIndex("by_channel", (q) => q.eq("channelId", args.channelId))
+      .order("desc")
+      .take(200);
+    return rows
+      .filter((row) => ["approved", "active"].includes(row.status.toLowerCase()))
+      .map((row) => ({
+        _id: row._id,
+        name: row.name,
+        languageCode: row.languageCode,
+        category: row.category,
+        status: row.status,
+        components: row.components,
+      }));
   },
 });
 

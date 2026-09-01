@@ -248,7 +248,7 @@ function LeadsDashboard({
                           <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-center gap-2">
                               <Link
-                                href={`/app/inbox/${lead.conversationId}`}
+                                href="/app/channel-inbox"
                                 className="truncate text-[14px] font-semibold text-[#0a1b33] hover:underline"
                               >
                                 {lead.contactName ?? lead.contactE164}
