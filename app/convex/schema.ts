@@ -170,6 +170,68 @@ const channelLeadStatusValidator = v.union(
   v.literal("lost"),
 );
 
+const clinicServiceStatusValidator = v.union(
+  v.literal("active"),
+  v.literal("paused"),
+  v.literal("archived"),
+);
+
+const clinicAppointmentStatusValidator = v.union(
+  v.literal("scheduled"),
+  v.literal("confirmed"),
+  v.literal("cancelled"),
+  v.literal("completed"),
+  v.literal("no_show"),
+);
+
+const clinicKnowledgeKindValidator = v.union(
+  v.literal("faq"),
+  v.literal("service"),
+  v.literal("policy"),
+  v.literal("hours"),
+  v.literal("document"),
+  v.literal("instruction"),
+);
+
+const clinicKnowledgeStatusValidator = v.union(
+  v.literal("draft"),
+  v.literal("active"),
+  v.literal("archived"),
+);
+
+const humanCaseStatusValidator = v.union(
+  v.literal("open"),
+  v.literal("assigned"),
+  v.literal("resolved"),
+);
+
+const humanCaseUrgencyValidator = v.union(
+  v.literal("low"),
+  v.literal("normal"),
+  v.literal("high"),
+  v.literal("urgent"),
+);
+
+const followUpTriggerValidator = v.union(
+  v.literal("no_reply"),
+  v.literal("appointment_unconfirmed"),
+  v.literal("proposal_no_response"),
+  v.literal("no_show"),
+  v.literal("human_case_pending"),
+);
+
+const followUpRuleStatusValidator = v.union(
+  v.literal("active"),
+  v.literal("paused"),
+);
+
+const followUpTaskStatusValidator = v.union(
+  v.literal("scheduled"),
+  v.literal("sent"),
+  v.literal("stopped"),
+  v.literal("failed"),
+);
+
 const campaignStatusValidator = v.union(
   v.literal("draft"),
   v.literal("scheduled"),
@@ -697,6 +759,138 @@ export default defineSchema({
     .index("by_channel_last_event", ["channelId", "lastEventAt"])
     .index("by_tenant_last_event", ["tenantId", "lastEventAt"])
     .index("by_tenant_lead_status", ["tenantId", "leadStatus", "lastEventAt"]),
+
+  // ===== Clinic operating system =====
+  clinicServices: defineTable({
+    tenantId: v.id("tenants"),
+    name: v.string(),
+    durationMinutes: v.number(),
+    professionalName: v.optional(v.string()),
+    bufferBeforeMinutes: v.number(),
+    bufferAfterMinutes: v.number(),
+    availability: v.array(
+      v.object({
+        weekday: v.number(),
+        start: v.string(),
+        end: v.string(),
+      }),
+    ),
+    status: clinicServiceStatusValidator,
+    createdBy: v.id("members"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_tenant", ["tenantId"])
+    .index("by_tenant_status", ["tenantId", "status"]),
+
+  clinicAppointments: defineTable({
+    tenantId: v.id("tenants"),
+    serviceId: v.id("clinicServices"),
+    threadId: v.optional(v.id("channelThreads")),
+    patientName: v.optional(v.string()),
+    patientHandle: v.optional(v.string()),
+    startAt: v.number(),
+    endAt: v.number(),
+    status: clinicAppointmentStatusValidator,
+    confirmationReadAt: v.optional(v.number()),
+    createdBy: v.id("members"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_tenant_start", ["tenantId", "startAt"])
+    .index("by_service_start", ["serviceId", "startAt"])
+    .index("by_thread", ["tenantId", "threadId", "startAt"]),
+
+  clinicKnowledgeItems: defineTable({
+    tenantId: v.id("tenants"),
+    kind: clinicKnowledgeKindValidator,
+    title: v.string(),
+    body: v.string(),
+    status: clinicKnowledgeStatusValidator,
+    currentVersion: v.number(),
+    createdBy: v.id("members"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_tenant", ["tenantId", "updatedAt"])
+    .index("by_tenant_kind", ["tenantId", "kind", "updatedAt"]),
+
+  clinicKnowledgeRevisions: defineTable({
+    tenantId: v.id("tenants"),
+    itemId: v.id("clinicKnowledgeItems"),
+    version: v.number(),
+    title: v.string(),
+    body: v.string(),
+    changedBy: v.id("members"),
+    createdAt: v.number(),
+  })
+    .index("by_item_version", ["itemId", "version"])
+    .index("by_tenant", ["tenantId", "createdAt"]),
+
+  humanCases: defineTable({
+    tenantId: v.id("tenants"),
+    threadId: v.optional(v.id("channelThreads")),
+    reason: v.string(),
+    urgency: humanCaseUrgencyValidator,
+    question: v.string(),
+    status: humanCaseStatusValidator,
+    responsibleMemberId: v.optional(v.id("members")),
+    slaDueAt: v.number(),
+    decision: v.optional(v.string()),
+    resolvedAt: v.optional(v.number()),
+    createdBy: v.id("members"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_tenant_status_sla", ["tenantId", "status", "slaDueAt"])
+    .index("by_thread", ["tenantId", "threadId", "createdAt"])
+    .index("by_responsible", ["tenantId", "responsibleMemberId", "status"]),
+
+  followUpRules: defineTable({
+    tenantId: v.id("tenants"),
+    name: v.string(),
+    trigger: followUpTriggerValidator,
+    delayMinutes: v.number(),
+    message: v.string(),
+    stopOnReply: v.boolean(),
+    status: followUpRuleStatusValidator,
+    createdBy: v.id("members"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_tenant", ["tenantId"])
+    .index("by_tenant_status", ["tenantId", "status"]),
+
+  followUpTasks: defineTable({
+    tenantId: v.id("tenants"),
+    ruleId: v.id("followUpRules"),
+    threadId: v.optional(v.id("channelThreads")),
+    humanCaseId: v.optional(v.id("humanCases")),
+    businessKey: v.string(),
+    dueAt: v.number(),
+    status: followUpTaskStatusValidator,
+    attempts: v.number(),
+    lastAttemptAt: v.optional(v.number()),
+    stoppedReason: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_business_key", ["tenantId", "businessKey"])
+    .index("by_status_due", ["status", "dueAt"])
+    .index("by_thread_status", ["tenantId", "threadId", "status"])
+    .index("by_rule_thread", ["ruleId", "threadId", "status"]),
+
+  clinicAuditEvents: defineTable({
+    tenantId: v.id("tenants"),
+    actorMemberId: v.id("members"),
+    action: v.string(),
+    targetType: v.string(),
+    targetId: v.string(),
+    payload: v.optional(v.any()),
+    createdAt: v.number(),
+  })
+    .index("by_tenant", ["tenantId", "createdAt"])
+    .index("by_target", ["tenantId", "targetType", "targetId"]),
 
   // ===== WhatsApp connections =====
   whatsappAccounts: defineTable({

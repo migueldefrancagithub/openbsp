@@ -24,6 +24,7 @@ import Link from "next/link";
 import { api } from "../../../convex/_generated/api";
 import { relativeTime } from "@/lib/relativeTime";
 import { useI18n, type TranslationKey } from "@/lib/i18n";
+import { ClinicOpsPanel } from "@/components/operation/ClinicOpsPanel";
 
 type LeadStatus =
   | "new"
@@ -74,19 +75,19 @@ const QUICK_CREATORS = [
   },
   {
     labelKey: "op.creatorKnowledge",
-    href: "/app/chatbots",
+    href: "/app#clinic-center",
     icon: FilePlus2,
     detail: { pt: "FAQ, serviços, políticas", en: "FAQ, services, policies" },
   },
   {
     labelKey: "op.creatorService",
-    href: "/app/settings",
+    href: "/app#clinic-center",
     icon: CalendarDays,
     detail: { pt: "Duração, equipa, disponibilidade", en: "Duration, team, availability" },
   },
   {
     labelKey: "op.creatorFollowup",
-    href: "/app/chatbots",
+    href: "/app#clinic-center",
     icon: Clock3,
     detail: { pt: "Regra, pausa, próxima tentativa", en: "Rule, stop, next attempt" },
   },
@@ -447,6 +448,8 @@ export default function AppOverview() {
             })}
           </div>
         </section>
+
+        <ClinicOpsPanel />
       </div>
     </main>
   );

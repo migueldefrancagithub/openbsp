@@ -283,6 +283,28 @@ async function syncCampaignRecipientFromChannelOutbox(
   await ctx.db.patch(recipient.campaignId, { updatedAt: args.at });
 }
 
+async function stopScheduledFollowUpsForReply(
+  ctx: MutationCtx,
+  args: { thread: Doc<"channelThreads">; now: number },
+): Promise<void> {
+  const tasks = await ctx.db
+    .query("followUpTasks")
+    .withIndex("by_thread_status", (q) =>
+      q
+        .eq("tenantId", args.thread.tenantId)
+        .eq("threadId", args.thread._id)
+        .eq("status", "scheduled"),
+    )
+    .take(20);
+  for (const task of tasks) {
+    await ctx.db.patch(task._id, {
+      status: "stopped",
+      stoppedReason: "patient_replied",
+      updatedAt: args.now,
+    });
+  }
+}
+
 function mapOutboxStatusToCampaignRecipientStatus(
   status: string,
 ): CampaignRecipientStatus | null {
@@ -409,4 +431,7 @@ export async function projectThreadFromEvent(
   }
 
   await ctx.db.patch(existing._id, patch);
+  if (incoming) {
+    await stopScheduledFollowUpsForReply(ctx, { thread: existing, now });
+  }
 }
