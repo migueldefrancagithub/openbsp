@@ -73,6 +73,9 @@ Required:
 - `SITE_URL` (public https URL of the Next.js app; used by Convex Auth)
 - `JWT_PRIVATE_KEY` and `JWKS` (Convex Auth key pair)
 - `PLATFORM_META_VERIFY_TOKEN`
+- `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY` (AI agents,
+  Phase C; at least one, or let each clinic store its own key in Settings › AI —
+  tenant keys are encrypted with `WABA_TOKEN_ENCRYPTION_KEY_V1`)
 - `WABA_TOKEN_ENCRYPTION_KEY_V1` (32 bytes as 64 hex chars or base64; back it
   up offline)
 - `META_GRAPH_VERSION` (for example `v25.0`)

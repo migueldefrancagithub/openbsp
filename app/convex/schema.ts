@@ -284,6 +284,39 @@ const campaignRecipientStatusValidator = v.union(
   v.literal("skipped"),
 );
 
+const aiProviderValidator = v.union(
+  v.literal("anthropic"),
+  v.literal("openai"),
+  v.literal("google"),
+  v.literal("mock"),
+);
+
+const aiObjectiveValidator = v.union(
+  v.literal("reception"),
+  v.literal("sales"),
+  v.literal("confirmation"),
+  v.literal("support"),
+  v.literal("audit"),
+);
+
+/** Editable agent config; frozen into aiAgentVersions on publish. */
+const aiAgentConfigValidator = v.object({
+  instructions: v.string(),
+  tone: v.union(v.literal("formal"), v.literal("friendly"), v.literal("direct")),
+  knowledgeItemIds: v.array(v.id("clinicKnowledgeItems")),
+  tools: v.array(v.string()),
+  handoff: v.object({
+    keywords: v.array(v.string()),
+    onLowConfidence: v.boolean(),
+    onClinicalQuestion: v.boolean(),
+    message: v.string(),
+  }),
+  fallbackMessage: v.string(),
+  maxRepliesPerThread: v.number(),
+  greeting: v.optional(v.string()),
+  workingHoursOnly: v.optional(v.boolean()),
+});
+
 const chatbotStatusValidator = v.union(
   v.literal("draft"),
   v.literal("active"),
@@ -955,6 +988,189 @@ export default defineSchema({
   })
     .index("by_tenant_day", ["tenantId", "day"])
     .index("by_tenant_channel_day", ["tenantId", "channelId", "day"]),
+
+  // ===== AI agents (Phase C) =====
+  /** Per-tenant AI configuration: provider, models, budget, own keys. */
+  aiSettings: defineTable({
+    tenantId: v.id("tenants"),
+    provider: aiProviderValidator,
+    routerModel: v.string(),
+    specialistModel: v.string(),
+    fallbackProvider: v.optional(aiProviderValidator),
+    fallbackModel: v.optional(v.string()),
+    effort: v.union(v.literal("low"), v.literal("medium"), v.literal("high")),
+    extendedThinking: v.optional(v.boolean()),
+    dailyBudgetUsdCents: v.number(),
+    maxTurnsPerThreadPerDay: v.number(),
+    maxToolCallsPerTurn: v.number(),
+    replyLanguage: v.union(v.literal("pt"), v.literal("en")),
+    /** Tenant-owned keys (encrypted). Absent → platform env key for that provider. */
+    keys: v.array(
+      v.object({
+        provider: aiProviderValidator,
+        ciphertext: v.string(),
+        keyVersion: v.number(),
+        last4: v.string(),
+        encryptedAt: v.number(),
+      }),
+    ),
+    providerStatus: v.array(
+      v.object({
+        provider: aiProviderValidator,
+        model: v.string(),
+        ok: v.boolean(),
+        checkedAt: v.number(),
+        latencyMs: v.optional(v.number()),
+        error: v.optional(v.string()),
+        keySource: v.union(v.literal("tenant"), v.literal("platform"), v.literal("none")),
+      }),
+    ),
+    updatedBy: v.id("members"),
+    updatedAt: v.number(),
+  }).index("by_tenant", ["tenantId"]),
+
+  aiAgents: defineTable({
+    tenantId: v.id("tenants"),
+    name: v.string(),
+    objective: aiObjectiveValidator,
+    channelId: v.optional(v.id("channels")),
+    status: v.union(v.literal("draft"), v.literal("active"), v.literal("paused")),
+    config: aiAgentConfigValidator,
+    currentVersion: v.number(),
+    publishedVersionId: v.optional(v.id("aiAgentVersions")),
+    lastValidation: v.optional(v.any()),
+    createdBy: v.id("members"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_tenant", ["tenantId", "updatedAt"])
+    .index("by_tenant_channel_status", ["tenantId", "channelId", "status"]),
+
+  /** Immutable snapshot of an agent + its knowledge at publish time. */
+  aiAgentVersions: defineTable({
+    tenantId: v.id("tenants"),
+    agentId: v.id("aiAgents"),
+    version: v.number(),
+    config: aiAgentConfigValidator,
+    knowledgeSnapshot: v.array(
+      v.object({
+        itemId: v.id("clinicKnowledgeItems"),
+        version: v.number(),
+        kind: v.string(),
+        title: v.string(),
+        body: v.string(),
+      }),
+    ),
+    checksum: v.string(),
+    publishedBy: v.id("members"),
+    publishedAt: v.number(),
+  }).index("by_agent_version", ["agentId", "version"]),
+
+  /** One AI run per thread per published agent; paused on human takeover. */
+  aiRuns: defineTable({
+    tenantId: v.id("tenants"),
+    agentId: v.id("aiAgents"),
+    versionId: v.id("aiAgentVersions"),
+    channelId: v.id("channels"),
+    threadId: v.id("channelThreads"),
+    threadKey: v.string(),
+    status: v.union(
+      v.literal("active"),
+      v.literal("paused"),
+      v.literal("handed_off"),
+      v.literal("completed"),
+      v.literal("failed"),
+    ),
+    turnsCount: v.number(),
+    costUsdMicros: v.number(),
+    lastTurnAt: v.optional(v.number()),
+    pausedReason: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_thread_status", ["threadId", "status"])
+    .index("by_tenant_status_last", ["tenantId", "status", "lastTurnAt"])
+    .index("by_agent_created", ["agentId", "createdAt"]),
+
+  /** One inbound → one turn: router → specialist → guards → dispatch. */
+  aiTurns: defineTable({
+    tenantId: v.id("tenants"),
+    runId: v.id("aiRuns"),
+    threadId: v.id("channelThreads"),
+    sourceEventId: v.optional(v.id("channelEvents")),
+    businessKey: v.string(),
+    status: v.union(
+      v.literal("queued"),
+      v.literal("processing"),
+      v.literal("awaiting_send"),
+      v.literal("completed"),
+      v.literal("failed"),
+      v.literal("skipped"),
+    ),
+    stage: v.optional(v.string()),
+    routerDecision: v.optional(v.any()),
+    providerAttempts: v.array(
+      v.object({
+        provider: v.string(),
+        model: v.string(),
+        stage: v.string(),
+        attempt: v.number(),
+        ok: v.boolean(),
+        kind: v.optional(v.string()),
+        status: v.optional(v.number()),
+        latencyMs: v.number(),
+      }),
+    ),
+    inputTokens: v.number(),
+    outputTokens: v.number(),
+    costUsdMicros: v.number(),
+    toolCallCount: v.number(),
+    replyText: v.optional(v.string()),
+    dispatchId: v.optional(v.id("channelAutomationDispatches")),
+    outboxId: v.optional(v.id("channelOutbox")),
+    providerMessageId: v.optional(v.string()),
+    failureCode: v.optional(v.string()),
+    failureReason: v.optional(v.string()),
+    startedAt: v.optional(v.number()),
+    completedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_run", ["runId", "createdAt"])
+    .index("by_run_business_key", ["runId", "businessKey"])
+    .index("by_status_created", ["status", "createdAt"])
+    .index("by_tenant_created", ["tenantId", "createdAt"]),
+
+  /** Every tool call the AI makes, with input/output and its verdict. */
+  aiToolInvocations: defineTable({
+    tenantId: v.id("tenants"),
+    turnId: v.id("aiTurns"),
+    runId: v.id("aiRuns"),
+    threadId: v.id("channelThreads"),
+    name: v.string(),
+    businessKey: v.string(),
+    input: v.any(),
+    output: v.optional(v.any()),
+    status: v.union(v.literal("ok"), v.literal("error"), v.literal("denied"), v.literal("dry_run")),
+    errorCode: v.optional(v.string()),
+    durationMs: v.number(),
+    createdAt: v.number(),
+  })
+    .index("by_turn", ["turnId", "createdAt"])
+    .index("by_tenant_business_key", ["tenantId", "businessKey"]),
+
+  /** Daily spend per provider/model (budget enforcement + reports). */
+  aiCostLedger: defineTable({
+    tenantId: v.id("tenants"),
+    day: v.string(),
+    provider: v.string(),
+    model: v.string(),
+    inputTokens: v.number(),
+    outputTokens: v.number(),
+    costUsdMicros: v.number(),
+    turns: v.number(),
+    updatedAt: v.number(),
+  }).index("by_tenant_day", ["tenantId", "day"]),
 
   /** Heartbeat per member (every 30 s from the app shell). Online < 90 s. */
   presence: defineTable({
@@ -1870,6 +2086,9 @@ export default defineSchema({
       v.literal("wait_input"),
       v.literal("terminal"),
     ),
+    /** Phase C: replies produced by the AI runtime carry their turn. */
+    origin: v.optional(v.union(v.literal("automation"), v.literal("ai"))),
+    aiTurnId: v.optional(v.id("aiTurns")),
     autoDispatch: v.boolean(),
     nextNodeKey: v.optional(v.string()),
     waitNodeKey: v.optional(v.string()),

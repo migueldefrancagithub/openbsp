@@ -77,6 +77,13 @@ for (const name of hubLabReadinessEnv) {
   }
 }
 
+const aiProviderEnv = ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY"];
+if (!aiProviderEnv.some((name) => process.env[name])) {
+  warnings.push(
+    `AI agents not ready for ${target}: none of ${aiProviderEnv.join(", ")} is set (clinics can still store their own key).`,
+  );
+}
+
 if (!process.env.CONVEX_DEPLOY_KEY) {
   warnings.push(
     "CONVEX_DEPLOY_KEY is absent. This is OK for local Convex deploys; set it only if CI/Vercel deploys Convex.",

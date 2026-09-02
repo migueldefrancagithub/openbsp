@@ -9,6 +9,8 @@
  */
 
 import type * as ai from "../ai.js";
+import type * as aiProviders from "../aiProviders.js";
+import type * as aiSettings from "../aiSettings.js";
 import type * as analytics from "../analytics.js";
 import type * as analyticsRollups from "../analyticsRollups.js";
 import type * as api_ from "../api.js";
@@ -42,6 +44,19 @@ import type * as integrations_leoHub_client from "../integrations/leoHub/client.
 import type * as integrations_leoHub_webhook from "../integrations/leoHub/webhook.js";
 import type * as leads from "../leads.js";
 import type * as leoHubLab from "../leoHubLab.js";
+import type * as lib_ai_guards from "../lib/ai/guards.js";
+import type * as lib_ai_prerouter from "../lib/ai/prerouter.js";
+import type * as lib_ai_pricing from "../lib/ai/pricing.js";
+import type * as lib_ai_prompts from "../lib/ai/prompts.js";
+import type * as lib_ai_provider from "../lib/ai/provider.js";
+import type * as lib_ai_providers_anthropic from "../lib/ai/providers/anthropic.js";
+import type * as lib_ai_providers_google from "../lib/ai/providers/google.js";
+import type * as lib_ai_providers_mock from "../lib/ai/providers/mock.js";
+import type * as lib_ai_providers_openai from "../lib/ai/providers/openai.js";
+import type * as lib_ai_resilience from "../lib/ai/resilience.js";
+import type * as lib_ai_settings from "../lib/ai/settings.js";
+import type * as lib_ai_toolRegistry from "../lib/ai/toolRegistry.js";
+import type * as lib_ai_validators from "../lib/ai/validators.js";
 import type * as lib_aiControl from "../lib/aiControl.js";
 import type * as lib_apiAuth from "../lib/apiAuth.js";
 import type * as lib_assignment from "../lib/assignment.js";
@@ -103,6 +118,8 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   ai: typeof ai;
+  aiProviders: typeof aiProviders;
+  aiSettings: typeof aiSettings;
   analytics: typeof analytics;
   analyticsRollups: typeof analyticsRollups;
   api: typeof api_;
@@ -136,6 +153,19 @@ declare const fullApi: ApiFromModules<{
   "integrations/leoHub/webhook": typeof integrations_leoHub_webhook;
   leads: typeof leads;
   leoHubLab: typeof leoHubLab;
+  "lib/ai/guards": typeof lib_ai_guards;
+  "lib/ai/prerouter": typeof lib_ai_prerouter;
+  "lib/ai/pricing": typeof lib_ai_pricing;
+  "lib/ai/prompts": typeof lib_ai_prompts;
+  "lib/ai/provider": typeof lib_ai_provider;
+  "lib/ai/providers/anthropic": typeof lib_ai_providers_anthropic;
+  "lib/ai/providers/google": typeof lib_ai_providers_google;
+  "lib/ai/providers/mock": typeof lib_ai_providers_mock;
+  "lib/ai/providers/openai": typeof lib_ai_providers_openai;
+  "lib/ai/resilience": typeof lib_ai_resilience;
+  "lib/ai/settings": typeof lib_ai_settings;
+  "lib/ai/toolRegistry": typeof lib_ai_toolRegistry;
+  "lib/ai/validators": typeof lib_ai_validators;
   "lib/aiControl": typeof lib_aiControl;
   "lib/apiAuth": typeof lib_apiAuth;
   "lib/assignment": typeof lib_assignment;

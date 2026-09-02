@@ -45,6 +45,11 @@ export const CAPABILITIES = [
   "logs.read",
   "analytics.read",
   "presence.view",
+  "ai.configure",
+  "ai.publish",
+  "ai.compose",
+  "ai.view_runs",
+  "integrations.manage",
 ] as const;
 export type Capability = (typeof CAPABILITIES)[number];
 
@@ -81,6 +86,11 @@ const CAPABILITY_MATRIX: Record<Role, Set<Capability>> = {
     "logs.read",
     "analytics.read",
     "presence.view",
+    "ai.configure",
+    "ai.publish",
+    "ai.compose",
+    "ai.view_runs",
+    "integrations.manage",
   ]),
   marketing: new Set<Capability>([
     "campaigns.create",
@@ -90,6 +100,7 @@ const CAPABILITY_MATRIX: Record<Role, Set<Capability>> = {
     "templates.submit",
     "contacts.import",
     "analytics.read",
+    "ai.view_runs",
   ]),
   agent: new Set<Capability>([
     "messages.send",
@@ -104,6 +115,8 @@ const CAPABILITY_MATRIX: Record<Role, Set<Capability>> = {
     "quick_replies.manage",
     "clinic.manage_agenda",
     "presence.view",
+    "ai.compose",
+    "ai.view_runs",
   ]),
 };
 
