@@ -129,3 +129,40 @@ Nenhum: marcações antigas continuam válidas (`businessKey`/`professionalId` o
    `stopped`, evento "Consulta confirmada" na timeline.
 5. Remarcar → duas linhas ligadas; cancelar → lead volta a "Interessado".
 6. Desfecho "faltou" com regra `no_show` activa → tarefa de follow-up criada.
+
+## B5 — Executor de follow-ups + alertas operacionais
+
+### Rotinas (crons)
+| Cron | Cadência | Função | O que faz |
+|---|---|---|---|
+| follow-up executor | 1 min | `followUps:runDue` | reclama ≤10 tarefas vencidas (≤5 se houver campanha `running` no tenant), valida a conversa (DND, opt-out, perdido, caso humano aberto, marcação cancelada/confirmada), decide texto (janela aberta) ou template (fechada); sem template → `failed` `SERVICE_WINDOW_EXPIRED` + próximo passo na conversa; senão `claimed` + 1 job `dispatchOutboundJob` |
+| follow-up stale claim sweep | 10 min | `followUps:sweepStaleClaims` | claims sem settle há >15 min voltam a `scheduled` (ou `failed` após 3) |
+| ops unknown outbox sweep | 10 min | `ops:sweepUnknownOutbox` | 1 alerta/dia por tenant com envios `unknown` (crítico ≥5) |
+| ops sla breach sweep | 5 min | `ops:sweepSlaBreaches` | 1 alerta por caso humano fora do SLA, com link para a conversa |
+
+Regras de retry (iguais às campanhas): `CHANNEL_RATE_LIMITED` → reagenda pelo `retryAfterMs`
+(não conta tentativa); erro transitório/kill switch → backoff 1→2→4 min (máx. 3);
+`unknown` → `failed/OUTBOX_UNKNOWN` **sem reenvio**; gates do piloto → `failed` definitivo.
+Paragens: resposta do paciente, opt-out, DND, caso humano aberto, marcação
+confirmada/cancelada/remarcada, "Parar" no painel do paciente.
+
+### Backfills
+Nenhum. Tarefas antigas (`scheduled`, sem `kind`) são tratadas como regras e usam
+`followUpRules.message` (`runDue` lê `task.message` → se ausente, falha com
+`SERVICE_WINDOW_EXPIRED`; para tarefas antigas correr uma vez):
+```bash
+# opcional: preencher message nas tarefas antigas (dev/prod), se existirem
+npx convex data followUpTasks --limit 5
+```
+
+### Verificações
+1. Criar regra `no_reply` (0 min) e agendar follow-up numa conversa allowlisted com
+   janela aberta → em ≤1 min a tarefa passa a `sent`, aparece "Follow-up enviado" na
+   timeline e o painel do paciente mostra "Enviado há…".
+2. Mesma regra numa conversa com janela fechada e sem template configurado → `failed`
+   com próximo passo "janela de 24h fechada"; com template de lembrete configurado
+   (Definições › Clínica) o lembrete de consulta sai como template.
+3. Responder do telemóvel com follow-up pendente → tarefa `stopped/patient_replied`.
+4. Marcar DND na conversa → pendentes param com `dnd`.
+5. Operação mostra o painel de alertas; "Visto" retira o alerta; caso humano fora do
+   SLA aparece como crítico com link para a conversa.

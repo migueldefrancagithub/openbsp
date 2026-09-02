@@ -1,3 +1,4 @@
+import { stopThreadFollowUps } from "../followUpControl";
 import { autoConfirmFromReply } from "../clinicAgenda";
 import { bumpCampaignStats, markCampaignReply } from "../campaignAttribution";
 import type { CampaignRecipientStatus as CampaignRowStatus } from "../campaignStats";
@@ -280,24 +281,13 @@ async function syncCampaignRecipientFromChannelOutbox(
 
 async function stopScheduledFollowUpsForReply(
   ctx: MutationCtx,
-  args: { thread: Doc<"channelThreads">; now: number },
+  args: { thread: Doc<"channelThreads">; now: number; optOut?: boolean },
 ): Promise<void> {
-  const tasks = await ctx.db
-    .query("followUpTasks")
-    .withIndex("by_thread_status", (q) =>
-      q
-        .eq("tenantId", args.thread.tenantId)
-        .eq("threadId", args.thread._id)
-        .eq("status", "scheduled"),
-    )
-    .take(20);
-  for (const task of tasks) {
-    await ctx.db.patch(task._id, {
-      status: "stopped",
-      stoppedReason: "patient_replied",
-      updatedAt: args.now,
-    });
-  }
+  await stopThreadFollowUps(ctx, {
+    thread: args.thread,
+    reason: args.optOut ? "opt_out" : "patient_replied",
+    now: args.now,
+  });
 }
 
 function mapOutboxStatusToCampaignRecipientStatus(

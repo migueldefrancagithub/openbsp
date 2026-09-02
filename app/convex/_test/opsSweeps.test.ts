@@ -106,4 +106,52 @@ describe("operational sweeps", () => {
     expect(await t.withIdentity({ subject: s.userId }).query(api.ops.listAlerts, {})).toHaveLength(0);
     expect(await t.withIdentity({ subject: s.userId }).query(api.ops.listAlerts, { status: "acknowledged" })).toHaveLength(1);
   });
+
+  it("raises alerts for unknown outbox rows and human-case SLA breaches", async () => {
+    const t = convexTest(schema);
+    const s = await seed(t);
+    const now = Date.now();
+    await t.run(async (ctx) => {
+      for (let i = 0; i < 5; i += 1) {
+        await ctx.db.insert("channelOutbox", {
+          tenantId: s.tenantId,
+          channelId: s.channelId,
+          businessKey: `hub:text:unknown-${i}`,
+          recipient: "258840000020",
+          threadKey: "258840000020",
+          messageKind: "text",
+          payload: { text: "x" },
+          status: "unknown",
+          dispatchAttempts: 1,
+          unknownSince: now - 60_000,
+          createdBy: s.memberId,
+          createdAt: now - 120_000,
+          updatedAt: now - 60_000,
+        });
+      }
+      await ctx.db.insert("humanCases", {
+        tenantId: s.tenantId,
+        threadId: s.threadId,
+        reason: "Pedido de orçamento complexo",
+        urgency: "urgent",
+        question: "?",
+        status: "open",
+        slaDueAt: now - 10 * 60_000,
+        createdBy: s.memberId,
+        createdAt: now - 60 * 60_000,
+        updatedAt: now - 60 * 60_000,
+      } as never);
+    });
+    expect(await t.mutation(internal.ops.sweepUnknownOutbox, {})).toEqual({ rows: 5, tenants: 1 });
+    expect(await t.mutation(internal.ops.sweepUnknownOutbox, {})).toEqual({ rows: 5, tenants: 1 });
+    const sla = await t.mutation(internal.ops.sweepSlaBreaches, {});
+    expect(sla).toMatchObject({ breached: 1, isDone: true });
+    await t.mutation(internal.ops.sweepSlaBreaches, {});
+    const alerts = await t.withIdentity({ subject: s.userId }).query(api.ops.listAlerts, {});
+    expect(alerts.map((a) => a.kind).sort()).toEqual(["outbox.unknown", "sla.human_case"]);
+    expect(alerts.find((a) => a.kind === "outbox.unknown")?.severity).toBe("critical");
+    expect(alerts.find((a) => a.kind === "sla.human_case")?.href).toContain("/app/channel-inbox/258840000020");
+    const summary = await t.withIdentity({ subject: s.userId }).query(api.ops.summary, {});
+    expect(summary).toEqual({ open: 2, critical: 2, warn: 0 });
+  });
 });

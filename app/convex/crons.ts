@@ -66,4 +66,14 @@ crons.daily(
   {},
 );
 
+// Durable follow-ups: claim due tasks every minute (≤10, ≤5 during campaigns).
+crons.interval("follow-up executor", { minutes: 1 }, internal.followUps.runDue, {});
+
+// Claims whose dispatch job never settled are requeued (or failed after 3).
+crons.interval("follow-up stale claim sweep", { minutes: 10 }, internal.followUps.sweepStaleClaims, {});
+
+// Ops alerts: unconfirmed outbox rows and human-case SLA breaches.
+crons.interval("ops unknown outbox sweep", { minutes: 10 }, internal.ops.sweepUnknownOutbox, {});
+crons.interval("ops sla breach sweep", { minutes: 5 }, internal.ops.sweepSlaBreaches, {});
+
 export default crons;

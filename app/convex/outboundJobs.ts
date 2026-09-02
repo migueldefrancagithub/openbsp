@@ -9,6 +9,7 @@ import {
   loadRecipientDispatchTarget,
   settleRecipientDispatch,
 } from "./lib/channelCampaignEngine";
+import { loadFollowUpDispatchTarget, settleFollowUpDispatch } from "./lib/followUpEngine";
 
 /**
  * Router between `iaSolutionHub.dispatchOutboundJob` (the only place that
@@ -23,8 +24,7 @@ export const loadJob = internalQuery({
       case "campaign_recipient":
         return await loadRecipientDispatchTarget(ctx, args.job.recipientId);
       case "follow_up":
-        // Follow-up executor lands in slice B5.
-        return null;
+        return await loadFollowUpDispatchTarget(ctx, args.job.taskId);
     }
   },
 });
@@ -50,6 +50,13 @@ export const settleJob = internalMutation({
         });
         return null;
       case "follow_up":
+        await settleFollowUpDispatch(ctx, {
+          taskId: args.job.taskId,
+          status: args.status,
+          outboxId: args.outboxId,
+          providerMessageId: args.providerMessageId,
+          failureReason: args.failureReason,
+        });
         return null;
     }
   },

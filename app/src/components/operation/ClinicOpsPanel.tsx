@@ -510,8 +510,13 @@ export function ClinicOpsPanel() {
             empty={isPt ? "Sem follow-ups ainda." : "No follow-ups yet."}
             rows={workspace.followUpTasks.slice(0, 4).map((task) => ({
               key: task._id,
-              title: isPt ? "Próximo disparo" : "Next send",
-              detail: relativeTime(task.dueAt, Date.now(), locale),
+              title:
+                task.kind === "appointment_confirmation"
+                  ? (isPt ? "Pedido de confirmação" : "Confirmation request")
+                  : task.kind === "appointment_reminder"
+                    ? (isPt ? "Lembrete de consulta" : "Appointment reminder")
+                    : (isPt ? "Próximo disparo" : "Next send"),
+              detail: `${relativeTime(task.nextAttemptAt ?? task.dueAt, Date.now(), locale)}${task.attempts > 0 ? ` · ${task.attempts}× ${isPt ? "tentativas" : "attempts"}` : ""}`,
             }))}
           />
         </Panel>

@@ -223,6 +223,9 @@ export function PatientContextPanel({
   const createCloseReason = useMutation(inboxApi.createCloseReason);
   const [tool, setTool] = useState<Tool>(null);
   const [activeTab, setActiveTab] = useState<PanelTab>("summary");
+  const followUps = useQuery(api.followUps.listForThread, activeTab === "tasks" ? { threadId: thread._id } : "skip");
+  const stopFollowUps = useMutation(api.followUps.stopForThread);
+  const stopFollowUpTask = useMutation(api.followUps.stopTask);
   const history = useQuery(
     inboxApi.listThreadHistory,
     activeTab === "history" ? { threadId: thread._id, limit: 40 } : "skip",
@@ -650,6 +653,60 @@ export function PatientContextPanel({
               ))}
             </div>
           ) : <p className="text-[10px] text-slate-400">{t("inbox.noReminders")}</p>}
+        </Section>
+
+        <Section
+          title={tr("Follow-ups automáticos", "Automatic follow-ups")}
+          icon={Clock3}
+          action={
+            followUps && followUps.some((task) => task.status === "scheduled" || task.status === "claimed") ? (
+              <button type="button" onClick={() => void stopFollowUps({ threadId: thread._id })} className="text-[10px] font-bold text-[#b3261e]">
+                {tr("Parar todos", "Stop all")}
+              </button>
+            ) : undefined
+          }
+        >
+          {followUps === undefined ? (
+            <Loader2 size={13} className="animate-spin text-slate-300" />
+          ) : followUps.length === 0 ? (
+            <p className="text-[10px] text-slate-400">{tr("Sem follow-ups nesta conversa.", "No follow-ups on this conversation.")}</p>
+          ) : (
+            <div className="space-y-1.5">
+              {followUps.slice(0, 5).map((task) => {
+                const pending = task.status === "scheduled" || task.status === "claimed";
+                const label =
+                  task.kind === "appointment_confirmation"
+                    ? tr("Pedido de confirmação", "Confirmation request")
+                    : task.kind === "appointment_reminder"
+                      ? tr("Lembrete de consulta", "Appointment reminder")
+                      : task.ruleName ?? tr("Regra de follow-up", "Follow-up rule");
+                const state =
+                  task.status === "scheduled"
+                    ? `${tr("Dispara", "Fires")} ${relativeTime(task.nextAttemptAt ?? task.dueAt, Date.now(), locale)}`
+                    : task.status === "claimed"
+                      ? tr("A enviar…", "Sending…")
+                      : task.status === "sent"
+                        ? `${tr("Enviado", "Sent")} ${relativeTime(task.sentAt ?? task.updatedAt, Date.now(), locale)}`
+                        : task.status === "failed"
+                          ? `${tr("Falhou", "Failed")}${task.failureCode ? ` · ${task.failureCode}` : ""}`
+                          : `${tr("Parado", "Stopped")}${task.stoppedReason ? ` · ${task.stoppedReason}` : ""}`;
+                return (
+                  <div key={task._id} className="flex items-start gap-2">
+                    <span className={cn("mt-1 h-1.5 w-1.5 shrink-0 rounded-full", pending ? "bg-[#2b4f8a]" : task.status === "sent" ? "bg-[#0d6b61]" : task.status === "failed" ? "bg-[#e0533d]" : "bg-slate-300")} />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[11px] text-slate-700">{label}{task.attempts > 1 ? ` · ${task.attempts}×` : ""}</p>
+                      <span className="text-[9px] text-slate-400">{state}</span>
+                    </div>
+                    {pending && (
+                      <button type="button" onClick={() => void stopFollowUpTask({ taskId: task._id })} className="text-[9px] font-semibold text-slate-400 hover:text-[#b3261e]">
+                        {tr("Parar", "Stop")}
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </Section>
 
         <Section title={t("inbox.appointments")} icon={CalendarDays}>

@@ -1,3 +1,4 @@
+import { stopThreadFollowUps } from "../followUpControl";
 import { ConvexError, v } from "convex/values";
 import type { Doc, Id } from "../../_generated/dataModel";
 import { hasCapability, type Capability, type Role } from "../roles";
@@ -240,6 +241,9 @@ export async function applyThreadUpdate(
     patch.customFields = mergeCustomFieldValues(definitions, thread.customFields, args.customFields);
   }
   if (args.dnd !== undefined) patch.dnd = args.dnd;
+  if (args.dnd === true && !thread.dnd) {
+    await stopThreadFollowUps(ctx, { thread, reason: "dnd", now, actorMemberId: ctx.memberId });
+  }
   if (args.automationMode !== undefined) {
     patch.automationMode = args.automationMode;
     patch.automationChangedAt = now;

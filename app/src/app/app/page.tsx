@@ -26,6 +26,7 @@ import { api } from "../../../convex/_generated/api";
 import { relativeTime } from "@/lib/relativeTime";
 import { useI18n, type TranslationKey } from "@/lib/i18n";
 import { ClinicOpsPanel } from "@/components/operation/ClinicOpsPanel";
+import { OpsAlertsPanel } from "@/components/operation/OpsAlertsPanel";
 import { SegmentedTabs } from "@/components/app/SegmentedTabs";
 
 type LeadStatus =
@@ -219,6 +220,8 @@ export default function AppOverview() {
             }
           />
         </section>
+
+        <OpsAlertsPanel compact />
 
         <SegmentedTabs
           items={[
