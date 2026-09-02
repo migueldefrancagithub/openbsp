@@ -32,6 +32,7 @@ import type { Id } from "../../../convex/_generated/dataModel";
 import { cn } from "@/lib/cn";
 import { formatTime, relativeTime } from "@/lib/relativeTime";
 import { useI18n, type TranslationKey } from "@/lib/i18n";
+import { templateCategoryLabel } from "@/lib/operationalLabels";
 import { PatientContextPanel } from "@/components/channel-inbox/PatientContextPanel";
 
 type BlockedReason = { title: string; detail: string } | null;
@@ -141,6 +142,28 @@ function titleize(value: string): string {
     .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
+function eventLabel(value: string, locale: "pt" | "en"): string {
+  const normalized = value.replace(/^[^.]+\./, "").replace(/_/g, " ").toLowerCase();
+  const labels: Record<string, [string, string]> = {
+    text: ["Texto", "Text"],
+    image: ["Imagem", "Image"],
+    audio: ["Áudio", "Audio"],
+    video: ["Vídeo", "Video"],
+    document: ["Documento", "Document"],
+    sticker: ["Sticker", "Sticker"],
+    interactive: ["Interação", "Interactive"],
+    reaction: ["Reação", "Reaction"],
+    sent: ["Enviada", "Sent"],
+    delivered: ["Entregue", "Delivered"],
+    read: ["Lida", "Read"],
+    failed: ["Falhou", "Failed"],
+    accepted: ["Aceite", "Accepted"],
+    processed: ["Processada", "Processed"],
+  };
+  const translated = labels[normalized];
+  return translated ? translated[locale === "pt" ? 0 : 1] : titleize(value);
+}
+
 function durationLabel(ms: number): string {
   const minute = 60_000;
   const hour = 60 * minute;
@@ -241,26 +264,27 @@ function eventText(
   if (mediaCaption) {
     return {
       primary: mediaCaption,
-      detail: titleize(messageType),
-      label: titleize(messageType),
+      detail: eventLabel(messageType, locale),
+      label: eventLabel(messageType, locale),
     };
   }
 
   if (eventKind.startsWith("message.")) {
-    return { primary: null, label: titleize(eventKind) };
+    return { primary: null, label: eventLabel(eventKind, locale) };
   }
 
   return { primary: null };
 }
 
-function statusText(payload: unknown, eventKind: string): string {
+function statusText(payload: unknown, eventKind: string, locale: "pt" | "en"): string {
   const root = object(payload);
   const status = object(root?.status);
   const reason =
     text(status?.reason) ??
     text(status?.error_message) ??
     text(object(Array.isArray(status?.errors) ? status.errors[0] : null)?.title);
-  return reason ? `${titleize(eventKind)} · ${reason}` : titleize(eventKind);
+  const label = eventLabel(eventKind, locale);
+  return reason ? `${label} · ${reason}` : label;
 }
 
 function windowInfo(expiresAt: number | undefined, locale: "pt" | "en"):
@@ -345,9 +369,9 @@ function ChannelMessageBubble({ event, locale }: { event: ThreadEvent; locale: "
           title={event.lastError}
         >
           <Info size={10} />
-          {statusText(event.payload, event.eventKind)}
+          {statusText(event.payload, event.eventKind, locale)}
           <span className="text-slate-300">·</span>
-          {formatTime(eventAt)}
+          {formatTime(eventAt, locale)}
         </div>
       </div>
     );
@@ -386,7 +410,7 @@ function ChannelMessageBubble({ event, locale }: { event: ThreadEvent; locale: "
           </p>
         ) : (
           <p className={cn("italic", incoming ? "text-slate-400" : "text-white/60")}>
-            {titleize(event.eventKind)}
+            {eventLabel(event.eventKind, locale)}
           </p>
         )}
         {rendered.detail && (
@@ -415,7 +439,7 @@ function ChannelMessageBubble({ event, locale }: { event: ThreadEvent; locale: "
             incoming ? "text-slate-400" : "text-white/50",
           )}
         >
-          <span>{formatTime(eventAt)}</span>
+          <span>{formatTime(eventAt, locale)}</span>
           {!incoming && <ChannelStatusIcon status={event.status} />}
         </div>
       </div>
@@ -745,7 +769,7 @@ export function ChannelThreadView({
               <button
                 type="button"
                 onClick={() => setPatientPanelOpen(true)}
-                className="rounded-md p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-[#0a1b33] 2xl:hidden"
+                className="rounded-md p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-[#0a1b33] xl:hidden"
                 title={t("inbox.patient")}
               >
                 <PanelRightOpen size={15} />
@@ -920,7 +944,7 @@ export function ChannelThreadView({
                         )}
                       >
                         <div className="truncate text-[11px] font-semibold text-[#0a1b33]">{template.name}</div>
-                        <div className="mt-0.5 text-[9px] uppercase text-slate-400">{template.languageCode}{template.category ? ` · ${template.category}` : ""}</div>
+                        <div className="mt-0.5 text-[9px] uppercase text-slate-400">{template.languageCode}{template.category ? ` · ${templateCategoryLabel(template.category, locale)}` : ""}</div>
                       </button>
                     ))}
                   </div>
@@ -1005,7 +1029,7 @@ export function ChannelThreadView({
                   type="button"
                   onClick={() => setPatientPanelOpen(true)}
                   title={t("inbox.createReminder")}
-                  className="rounded-md p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-[#0a152d] 2xl:hidden"
+                  className="rounded-md p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-[#0a152d] xl:hidden"
                 >
                   <Bell size={15} />
                 </button>
@@ -1047,10 +1071,10 @@ export function ChannelThreadView({
         </div>
       </section>
 
-      <PatientContextPanel thread={summary} className="hidden 2xl:flex" />
+      <PatientContextPanel thread={summary} className="hidden xl:flex" />
       {patientPanelOpen && (
         <div
-          className="fixed inset-0 z-50 flex justify-end bg-slate-950/30 2xl:hidden"
+          className="fixed inset-0 z-50 flex justify-end bg-slate-950/30 xl:hidden"
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) setPatientPanelOpen(false);
           }}

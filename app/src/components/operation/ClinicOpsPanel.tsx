@@ -19,6 +19,7 @@ import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { useI18n } from "@/lib/i18n";
 import { relativeTime } from "@/lib/relativeTime";
+import { SegmentedTabs } from "@/components/app/SegmentedTabs";
 
 type Notice = { tone: "success" | "error"; text: string } | null;
 type KnowledgeKind = "faq" | "service" | "policy" | "hours" | "document" | "instruction";
@@ -29,6 +30,7 @@ type FollowUpTrigger =
   | "no_show"
   | "human_case_pending";
 type HumanUrgency = "low" | "normal" | "high" | "urgent";
+type ClinicTab = "services" | "knowledge" | "followup" | "human";
 
 function todayInputValue() {
   return new Intl.DateTimeFormat("en-CA", {
@@ -51,6 +53,7 @@ export function ClinicOpsPanel() {
   const isPt = locale === "pt";
   const [notice, setNotice] = useState<Notice>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [clinicTab, setClinicTab] = useState<ClinicTab>("services");
 
   const [serviceName, setServiceName] = useState(isPt ? "Consulta inicial" : "Initial consult");
   const [serviceDuration, setServiceDuration] = useState(45);
@@ -118,7 +121,7 @@ export function ClinicOpsPanel() {
 
   if (workspace === undefined) {
     return (
-      <section className="rounded-2xl border border-slate-200 bg-white p-5">
+      <section className="rounded-lg border border-slate-200 bg-white p-5">
         <div className="flex items-center gap-2 text-sm text-slate-500">
           <Loader2 size={16} className="animate-spin" />
           {isPt ? "A carregar centro da clínica..." : "Loading clinic center..."}
@@ -128,7 +131,7 @@ export function ClinicOpsPanel() {
   }
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white" id="clinic-center">
+    <section className="rounded-lg border border-slate-200 bg-white" id="clinic-center">
       <div className="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
@@ -160,32 +163,36 @@ export function ClinicOpsPanel() {
         </button>
       </div>
 
-      <div className="grid gap-px bg-slate-100 md:grid-cols-4">
-        <ReadinessTile
-          ready={workspace.readiness.hasActiveService}
-          title={isPt ? "Serviços" : "Services"}
-          detail={`${workspace.services.filter((service) => service.status === "active").length} ${
-            isPt ? "ativos" : "active"
-          }`}
-        />
-        <ReadinessTile
-          ready={workspace.readiness.hasActiveKnowledge}
-          title={isPt ? "Conhecimento" : "Knowledge"}
-          detail={`${workspace.knowledge.filter((item) => item.status === "active").length} ${
-            isPt ? "fontes" : "sources"
-          }`}
-        />
-        <ReadinessTile
-          ready={workspace.readiness.hasActiveFollowUp}
-          title="Follow-up"
-          detail={`${workspace.followUpRules.filter((rule) => rule.status === "active").length} ${
-            isPt ? "regras" : "rules"
-          }`}
-        />
-        <ReadinessTile
-          ready={workspace.readiness.openHumanCases === 0}
-          title={isPt ? "Casos humanos" : "Human cases"}
-          detail={`${workspace.readiness.openHumanCases} ${isPt ? "abertos" : "open"}`}
+      <div className="border-b border-slate-100 px-5 py-4">
+        <SegmentedTabs
+          items={[
+            {
+              key: "services",
+              label: isPt ? "Serviço e agenda" : "Service and schedule",
+              value: `${workspace.services.filter((service) => service.status === "active").length} ${isPt ? "ativos" : "active"}`,
+              icon: Stethoscope,
+            },
+            {
+              key: "knowledge",
+              label: isPt ? "Conhecimento" : "Knowledge",
+              value: `${workspace.knowledge.filter((item) => item.status === "active").length} ${isPt ? "fontes" : "sources"}`,
+              icon: BookOpenText,
+            },
+            {
+              key: "followup",
+              label: "Follow-up",
+              value: `${workspace.followUpRules.filter((rule) => rule.status === "active").length} ${isPt ? "regras" : "rules"}`,
+              icon: Clock3,
+            },
+            {
+              key: "human",
+              label: isPt ? "Ajuda humana" : "Human help",
+              value: `${workspace.readiness.openHumanCases} ${isPt ? "abertos" : "open"}`,
+              icon: LifeBuoy,
+            },
+          ]}
+          selected={clinicTab}
+          onChange={(key) => setClinicTab(key as ClinicTab)}
         />
       </div>
 
@@ -201,7 +208,8 @@ export function ClinicOpsPanel() {
         </div>
       )}
 
-      <div className="grid gap-5 p-5 xl:grid-cols-2">
+      <div className="p-5">
+        {clinicTab === "services" && (
         <Panel
           icon={Stethoscope}
           title={isPt ? "Serviço e agenda" : "Service and schedule"}
@@ -251,7 +259,7 @@ export function ClinicOpsPanel() {
             {isPt ? "Criar serviço" : "Create service"}
           </button>
 
-          <div className="mt-3 rounded-xl bg-[#f8fafc] p-3">
+          <div className="mt-3 rounded-lg bg-[#f8fafc] p-3">
             <div className="grid gap-3 sm:grid-cols-[1fr_150px]">
               <label className="text-xs font-semibold text-slate-500">
                 {isPt ? "Serviço" : "Service"}
@@ -317,7 +325,9 @@ export function ClinicOpsPanel() {
             </div>
           </div>
         </Panel>
+        )}
 
+        {clinicTab === "knowledge" && (
         <Panel
           icon={BookOpenText}
           title={isPt ? "Ensinar agente" : "Teach agent"}
@@ -383,7 +393,9 @@ export function ClinicOpsPanel() {
             }))}
           />
         </Panel>
+        )}
 
+        {clinicTab === "followup" && (
         <Panel
           icon={Clock3}
           title="Follow-up"
@@ -457,11 +469,13 @@ export function ClinicOpsPanel() {
             rows={workspace.followUpTasks.slice(0, 4).map((task) => ({
               key: task._id,
               title: isPt ? "Próximo disparo" : "Next send",
-              detail: relativeTime(task.dueAt),
+              detail: relativeTime(task.dueAt, Date.now(), locale),
             }))}
           />
         </Panel>
+        )}
 
+        {clinicTab === "human" && (
         <Panel
           icon={LifeBuoy}
           title={isPt ? "Ajuda humana" : "Human help"}
@@ -524,10 +538,13 @@ export function ClinicOpsPanel() {
               title: humanCase.reason,
               detail: `${urgencyLabel(humanCase.urgency as HumanUrgency, isPt)} · ${relativeTime(
                 humanCase.slaDueAt,
+                Date.now(),
+                locale,
               )}`,
             }))}
           />
         </Panel>
+        )}
       </div>
 
       <div className="border-t border-slate-100 px-5 py-4">
@@ -553,30 +570,6 @@ export function ClinicOpsPanel() {
   );
 }
 
-function ReadinessTile({
-  ready,
-  title,
-  detail,
-}: {
-  ready: boolean;
-  title: string;
-  detail: string;
-}) {
-  return (
-    <div className="bg-white px-5 py-4">
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-sm font-semibold text-[#0a1b33]">{title}</span>
-        {ready ? (
-          <CheckCircle2 size={16} className="text-emerald-600" />
-        ) : (
-          <AlertTriangle size={16} className="text-amber-600" />
-        )}
-      </div>
-      <p className="mt-1 text-xs text-slate-500">{detail}</p>
-    </div>
-  );
-}
-
 function Panel({
   icon: Icon,
   title,
@@ -589,7 +582,7 @@ function Panel({
   children: ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-slate-100 bg-[#fbfcfe] p-4">
+    <div className="rounded-lg border border-slate-100 bg-[#fbfcfe] p-4">
       <div className="mb-4 flex items-start gap-3">
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-[#0f766e] shadow-sm">
           <Icon size={17} />

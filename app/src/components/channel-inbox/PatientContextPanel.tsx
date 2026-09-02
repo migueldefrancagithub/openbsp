@@ -10,14 +10,13 @@ import {
   ChevronRight,
   CircleUserRound,
   Clock3,
-  FileText,
+  History,
+  ListTodo,
   Loader2,
   Megaphone,
   MessageSquareText,
+  Paperclip,
   ShieldCheck,
-  Tags,
-  UserRound,
-  UsersRound,
   X,
 } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
@@ -25,6 +24,7 @@ import type { Id } from "../../../convex/_generated/dataModel";
 import { cn } from "@/lib/cn";
 import { relativeTime } from "@/lib/relativeTime";
 import { useI18n, type TranslationKey } from "@/lib/i18n";
+import { roleLabel } from "@/lib/operationalLabels";
 
 type ThreadContext = {
   _id: Id<"channelThreads">;
@@ -45,6 +45,7 @@ type ThreadContext = {
 };
 
 type Tool = "note" | "reminder" | "close" | null;
+type PanelTab = "summary" | "tasks" | "history";
 type LeadStatus =
   | "new"
   | "interested"
@@ -58,6 +59,43 @@ type LeadStatus =
   | "lost";
 
 const inboxApi = api.inboxOperations;
+
+const STATE_LABELS: Record<string, TranslationKey> = {
+  new: "status.new",
+  interested: "status.interested",
+  asked_price: "status.asked_price",
+  wants_booking: "status.wants_booking",
+  awaiting_human: "status.awaiting_human",
+  booked: "status.booked",
+  confirmed: "status.confirmed",
+  attended: "status.attended",
+  no_show: "status.no_show",
+  lost: "status.lost",
+  scheduled: "state.scheduled",
+  triggered: "state.triggered",
+  completed: "state.completed",
+  cancelled: "state.cancelled",
+  failed: "state.failed",
+  pending: "state.pending",
+  queued: "state.queued",
+  sent: "state.sent",
+  delivered: "state.delivered",
+  read: "state.read",
+  replied: "state.replied",
+  converted: "state.converted",
+  granted: "state.granted",
+  denied: "state.denied",
+  withdrawn: "state.withdrawn",
+  expired: "state.expired",
+};
+
+function stateLabel(
+  value: string,
+  translate: (key: TranslationKey) => string,
+) {
+  const key = STATE_LABELS[value];
+  return key ? translate(key) : value.replace(/_/g, " ");
+}
 
 function formatMoment(timestamp: number, locale: "pt" | "en") {
   return new Intl.DateTimeFormat(locale === "pt" ? "pt-MZ" : "en-GB", {
@@ -107,7 +145,7 @@ export function PatientContextPanel({
   className?: string;
   onClose?: () => void;
 }) {
-  const { locale, t } = useI18n();
+  const { locale, t, tr } = useI18n();
   const context = useQuery(inboxApi.getPatientContext, { threadId: thread._id }) as any;
   const members = useQuery(api.memberInvites.listMembers, {});
   const teams = useQuery(api.teams.list, {});
@@ -120,6 +158,7 @@ export function PatientContextPanel({
   const setReminderStatus = useMutation(inboxApi.setReminderStatus);
   const createCloseReason = useMutation(inboxApi.createCloseReason);
   const [tool, setTool] = useState<Tool>(null);
+  const [activeTab, setActiveTab] = useState<PanelTab>("summary");
   const [note, setNote] = useState("");
   const [nextStep, setNextStep] = useState(thread.nextStep ?? "");
   const [closeReason, setCloseReason] = useState("");
@@ -207,7 +246,31 @@ export function PatientContextPanel({
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="grid grid-cols-3 border-b border-slate-200 bg-slate-50 p-1.5">
+        {([
+          ["summary", t("inbox.summary"), CircleUserRound],
+          ["tasks", t("inbox.tasks"), ListTodo],
+          ["history", t("inbox.history"), History],
+        ] as const).map(([value, label, Icon]) => (
+          <button
+            key={value}
+            type="button"
+            onClick={() => setActiveTab(value)}
+            className={cn(
+              "flex h-9 min-w-0 items-center justify-center gap-1.5 rounded text-[10px] font-semibold transition-colors",
+              activeTab === value
+                ? "bg-white text-[#0a1b33] shadow-sm"
+                : "text-slate-500 hover:text-[#0a1b33]",
+            )}
+          >
+            <Icon size={13} />
+            <span className="truncate">{label}</span>
+          </button>
+        ))}
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        {activeTab === "summary" && <>
         <Section title={t("inbox.flow")} icon={ChevronRight}>
           <div className="grid grid-cols-2 gap-2">
             <label className="text-[10px] font-semibold text-slate-400">
@@ -233,7 +296,7 @@ export function PatientContextPanel({
               >
                 <option value="">{t("inbox.unassignedShort")}</option>
                 {(members ?? []).filter((member) => member.status === "active").map((member) => (
-                  <option key={member._id} value={member._id}>{member.email ?? member.role}</option>
+                  <option key={member._id} value={member._id}>{member.email ?? roleLabel(member.role, locale)}</option>
                 ))}
               </select>
             </label>
@@ -281,7 +344,7 @@ export function PatientContextPanel({
               onClick={() => void updateThread({ threadId: thread._id, dnd: !thread.dnd })}
               className={cn("rounded-md border px-2 py-2 text-left font-semibold", thread.dnd ? "border-rose-200 bg-rose-50 text-rose-700" : "border-slate-200 text-slate-600")}
             >
-              DND {thread.dnd ? "ON" : "OFF"}
+              DND · {thread.dnd ? tr("Ativo", "On") : tr("Inativo", "Off")}
             </button>
             <button
               type="button"
@@ -291,31 +354,66 @@ export function PatientContextPanel({
               })}
               className="rounded-md border border-slate-200 px-2 py-2 text-left font-semibold text-slate-600"
             >
-              IA {thread.automationMode === "bot" ? "ON" : "OFF"}
+              IA · {thread.automationMode === "bot" ? tr("Ativa", "On") : tr("Pausada", "Paused")}
             </button>
           </div>
-          {tags.length > 0 && (
+          {tags.length > 0 ? (
             <div className="mt-2 flex flex-wrap gap-1">
               {tags.slice(0, 8).map((tag) => (
                 <span key={tag} className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[9px] font-semibold text-slate-500">{tag}</span>
               ))}
             </div>
+          ) : <p className="mt-2 text-[10px] text-slate-400">{t("inbox.noTags")}</p>}
+          {context?.contact?.locale && (
+            <div className="mt-2 text-[10px] text-slate-400">
+              {tr("Idioma do paciente", "Patient language")}: <span className="font-semibold text-slate-600">{context.contact.locale}</span>
+            </div>
           )}
         </Section>
 
+        <Section title={t("inbox.consent")} icon={ShieldCheck}>
+          <div className="space-y-1.5">
+            {(context?.consents ?? []).map((item: any) => (
+              <div key={item.purpose} className="flex items-center justify-between text-[10px]">
+                <span className="capitalize text-slate-500">
+                  {item.purpose === "marketing"
+                    ? tr("Marketing", "Marketing")
+                    : item.purpose === "transactional"
+                      ? tr("Atendimento", "Service")
+                      : tr("Autenticação", "Authentication")}
+                </span>
+                <span className={cn("font-bold", item.status === "granted" ? "text-emerald-600" : "text-rose-600")}>
+                  {stateLabel(item.status, t)}
+                </span>
+              </div>
+            ))}
+            {context?.consents?.length === 0 && <span className="text-[10px] text-slate-400">{t("inbox.noConsents")}</span>}
+          </div>
+        </Section>
+
+        <Section title={t("inbox.actions")} icon={Archive}>
+          {thread.closedAt || thread.inboxStatus === "closed" ? (
+            <button type="button" onClick={() => void updateThread({ threadId: thread._id, inboxStatus: "open", automationMode: "human" })} className="w-full rounded-md border border-slate-200 py-2 text-[11px] font-semibold text-slate-600">{t("inbox.reopen")}</button>
+          ) : (
+            <button type="button" onClick={() => setTool("close")} className="w-full rounded-md border border-rose-200 py-2 text-[11px] font-semibold text-rose-600">{t("inbox.close")}</button>
+          )}
+        </Section>
+        </>}
+
+        {activeTab === "tasks" && <>
         <Section
           title={t("inbox.notes")}
           icon={MessageSquareText}
           action={<button type="button" onClick={() => setTool("note")} className="text-[10px] font-bold text-[#0d6b61]">+ {t("inbox.addNote")}</button>}
         >
           {context === undefined ? <Loader2 size={13} className="animate-spin text-slate-300" /> : context.notes.length === 0 ? (
-            <p className="text-[10px] text-slate-400">-</p>
+            <p className="text-[10px] text-slate-400">{t("inbox.noNotes")}</p>
           ) : (
             <div className="space-y-2">
               {context.notes.slice(0, 4).map((item: any) => (
                 <div key={item._id} className="border-l-2 border-amber-300 pl-2">
                   <p className="text-[11px] leading-4 text-slate-700">{item.body}</p>
-                  <span className="text-[9px] text-slate-400">{item.authorName ?? "Equipa"} · {relativeTime(item.createdAt)}</span>
+                  <span className="text-[9px] text-slate-400">{item.authorName ?? t("inbox.team")} · {relativeTime(item.createdAt, Date.now(), locale)}</span>
                 </div>
               ))}
             </div>
@@ -341,48 +439,50 @@ export function PatientContextPanel({
                   </button>
                   <div className="min-w-0">
                     <p className="truncate text-[11px] text-slate-700">{item.note}</p>
-                    <span className="text-[9px] text-slate-400">{formatMoment(item.dueAt, locale)} · {item.status}</span>
+                    <span className="text-[9px] text-slate-400">{formatMoment(item.dueAt, locale)} · {stateLabel(item.status, t)}</span>
                   </div>
                 </div>
               ))}
             </div>
-          ) : <p className="text-[10px] text-slate-400">-</p>}
+          ) : <p className="text-[10px] text-slate-400">{t("inbox.noReminders")}</p>}
         </Section>
 
         <Section title={t("inbox.appointments")} icon={CalendarDays}>
           {context?.appointments?.length ? context.appointments.slice(0, 3).map((item: any) => (
             <div key={item._id} className="mb-2 flex items-center gap-2 last:mb-0">
               <div className="flex h-8 w-8 items-center justify-center rounded-md bg-blue-50 text-blue-600"><CalendarDays size={13} /></div>
-              <div className="min-w-0"><p className="truncate text-[11px] font-semibold text-slate-700">{item.serviceName}</p><p className="text-[9px] text-slate-400">{formatMoment(item.startAt, locale)} · {item.status}</p></div>
+              <div className="min-w-0"><p className="truncate text-[11px] font-semibold text-slate-700">{item.serviceName}</p><p className="text-[9px] text-slate-400">{formatMoment(item.startAt, locale)} · {stateLabel(item.status, t)}</p></div>
             </div>
-          )) : <p className="text-[10px] text-slate-400">-</p>}
+          )) : <p className="text-[10px] text-slate-400">{t("inbox.noAppointments")}</p>}
         </Section>
+        </>}
 
+        {activeTab === "history" && <>
         <Section title={t("inbox.campaigns")} icon={Megaphone}>
           {context?.campaigns?.length ? context.campaigns.slice(0, 4).map((item: any) => (
             <div key={`${item.campaignId}-${item.updatedAt}`} className="mb-1.5 flex items-center justify-between gap-2 text-[10px] last:mb-0">
               <span className="min-w-0 truncate font-semibold text-slate-600">{item.name}</span>
-              <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-slate-500">{item.recipientStatus}</span>
+              <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-slate-500">{stateLabel(item.recipientStatus, t)}</span>
             </div>
-          )) : <p className="text-[10px] text-slate-400">-</p>}
+          )) : <p className="text-[10px] text-slate-400">{t("inbox.noCampaigns")}</p>}
         </Section>
 
-        <Section title={t("inbox.consent")} icon={ShieldCheck}>
-          <div className="space-y-1">
-            {(context?.consents ?? []).map((item: any) => (
-              <div key={item.purpose} className="flex items-center justify-between text-[10px]"><span className="text-slate-500">{item.purpose}</span><span className={cn("font-bold", item.status === "granted" ? "text-emerald-600" : "text-rose-600")}>{item.status}</span></div>
-            ))}
-            {context?.consents?.length === 0 && <span className="text-[10px] text-slate-400">-</span>}
-          </div>
+        <Section title={tr("Ficheiros", "Files")} icon={Paperclip}>
+          {context?.attachments?.length ? context.attachments.slice(0, 8).map((item: any) => (
+            item.url ? (
+              <a key={item._id} href={item.url} target="_blank" rel="noreferrer" className="mb-1.5 flex items-center gap-2 text-[10px] text-slate-600 last:mb-0 hover:text-[#0d6b61]">
+                <Paperclip size={11} className="shrink-0" />
+                <span className="min-w-0 flex-1 truncate font-semibold">{item.fileName}</span>
+                <span className="shrink-0 text-[9px] text-slate-400">{relativeTime(item.createdAt, Date.now(), locale)}</span>
+              </a>
+            ) : (
+              <div key={item._id} className="mb-1.5 flex items-center gap-2 text-[10px] text-slate-400 last:mb-0">
+                <Paperclip size={11} /><span className="truncate">{item.fileName}</span>
+              </div>
+            )
+          )) : <p className="text-[10px] text-slate-400">{tr("Sem ficheiros nesta conversa", "No files in this conversation")}</p>}
         </Section>
-
-        <Section title={t("inbox.actions")} icon={Archive}>
-          {thread.closedAt || thread.inboxStatus === "closed" ? (
-            <button type="button" onClick={() => void updateThread({ threadId: thread._id, inboxStatus: "open", automationMode: "human" })} className="w-full rounded-md border border-slate-200 py-2 text-[11px] font-semibold text-slate-600">{t("inbox.reopen")}</button>
-          ) : (
-            <button type="button" onClick={() => setTool("close")} className="w-full rounded-md border border-rose-200 py-2 text-[11px] font-semibold text-rose-600">{t("inbox.close")}</button>
-          )}
-        </Section>
+        </>}
       </div>
 
       {tool && (

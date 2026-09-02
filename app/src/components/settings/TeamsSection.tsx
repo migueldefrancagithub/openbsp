@@ -5,8 +5,11 @@ import { useMutation, useQuery } from "convex/react";
 import { Check, Loader2, Shield, Users, UserRoundCog } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
+import { useI18n } from "@/lib/i18n";
+import { roleLabel } from "@/lib/operationalLabels";
 
 export function TeamsSection() {
+  const { locale, tr } = useI18n();
   const teams = useQuery(api.teams.list, {});
   const members = useQuery(api.memberInvites.listMembers, {});
   const createTeam = useMutation(api.teams.create);
@@ -50,54 +53,56 @@ export function TeamsSection() {
       setName("");
       setSelectedMemberIds([]);
       setLeadMemberId("");
-      setNotice("Team created.");
+      setNotice(tr("Equipa criada.", "Team created."));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not create team.");
+      setError(err instanceof Error ? err.message : tr("Não foi possível criar a equipa.", "Could not create team."));
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+    <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
       <div className="flex flex-col gap-3 border-b border-slate-100 px-6 py-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h2 className="text-[15px] font-semibold text-[#0a1b33]">
-            Teams &amp; queues
+            {tr("Equipas e filas", "Teams & queues")}
           </h2>
           <p className="mt-0.5 text-xs text-slate-500">
-            Route conversations by company team while team leads keep visibility
-            over their members.
+            {tr(
+              "Encaminhe conversas por equipa e mantenha responsáveis e SLAs visíveis.",
+              "Route conversations by team while leads keep members and SLAs visible.",
+            )}
           </p>
         </div>
       </div>
 
       <div className="grid gap-5 p-6 xl:grid-cols-[1fr_1.15fr]">
-        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+        <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
           <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-[#0a1b33]">
             <UserRoundCog size={16} />
-            Create team
+            {tr("Criar equipa", "Create team")}
           </div>
           <label className="block">
             <span className="text-[11px] font-medium text-slate-500">
-              Team name
+              {tr("Nome da equipa", "Team name")}
             </span>
             <input
               value={name}
               onChange={(event) => setName(event.target.value)}
-              placeholder="Sales Team"
+              placeholder={tr("Equipa comercial", "Sales team")}
               className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-[#0a1b33] outline-none focus:border-slate-400"
             />
           </label>
 
           <div className="mt-4">
             <div className="mb-2 text-[11px] font-medium text-slate-500">
-              Members
+              {tr("Membros", "Members")}
             </div>
-            <div className="max-h-56 space-y-1 overflow-y-auto">
+            <div className="grid gap-1 sm:grid-cols-2">
               {activeMembers.length === 0 ? (
                 <div className="rounded-lg border border-dashed border-slate-200 bg-white px-3 py-4 text-center text-xs text-slate-500">
-                  Invite members before creating teams.
+                  {tr("Convide membros antes de criar equipas.", "Invite members before creating teams.")}
                 </div>
               ) : (
                 activeMembers.map((member) => {
@@ -116,16 +121,16 @@ export function TeamsSection() {
                             ? "border-[#0a152d] bg-[#0a152d] text-white"
                             : "border-slate-300 bg-white"
                         }`}
-                        aria-label={`Toggle ${member.email ?? member.role}`}
+                        aria-label={`${tr("Selecionar", "Toggle")} ${member.email ?? roleLabel(member.role, locale)}`}
                       >
                         {checked && <Check size={12} />}
                       </button>
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-[13px] font-medium text-[#0a1b33]">
-                          {member.email ?? member.role}
+                          {member.email ?? roleLabel(member.role, locale)}
                         </div>
                         <div className="text-[10px] uppercase tracking-wider text-slate-400">
-                          {member.role}
+                          {roleLabel(member.role, locale)}
                         </div>
                       </div>
                       {checked && (
@@ -138,7 +143,7 @@ export function TeamsSection() {
                               : "border-slate-200 bg-slate-50 text-slate-500"
                           }`}
                         >
-                          Lead
+                          {tr("Líder", "Lead")}
                         </button>
                       )}
                     </div>
@@ -167,34 +172,36 @@ export function TeamsSection() {
             className="mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-[#0a152d] px-3 text-[13px] font-medium text-white transition-colors hover:bg-[#0a1b33] disabled:opacity-50"
           >
             {busy ? <Loader2 size={14} className="animate-spin" /> : <Users size={14} />}
-            Create team
+            {tr("Criar equipa", "Create team")}
           </button>
         </div>
 
         <div>
           <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-[#0a1b33]">
             <Shield size={16} />
-            Active teams
+            {tr("Equipas ativas", "Active teams")}
           </div>
           {teams === undefined ? (
-            <div className="h-28 animate-pulse rounded-xl border border-slate-100 bg-slate-50" />
+            <div className="h-28 animate-pulse rounded-lg border border-slate-100 bg-slate-50" />
           ) : teams.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500">
-              No teams yet.
+            <div className="rounded-lg border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500">
+              {tr("Ainda não existem equipas.", "No teams yet.")}
             </div>
           ) : (
             <div className="space-y-2">
               {teams.map((team) => (
                 <div
                   key={team._id}
-                  className="rounded-xl border border-slate-200 px-4 py-3"
+                  className="rounded-lg border border-slate-200 px-4 py-3"
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div className="font-semibold text-[#0a1b33]">
                       {team.name}
                     </div>
                     <span className="rounded-md bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-500">
-                      {team.members.length} members
+                      {team.members.length} {locale === "pt"
+                        ? team.members.length === 1 ? "membro" : "membros"
+                        : team.members.length === 1 ? "member" : "members"}
                     </span>
                   </div>
                   <div className="mt-3 flex flex-wrap gap-1.5">
@@ -203,8 +210,8 @@ export function TeamsSection() {
                         key={member.memberId}
                         className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-600"
                       >
-                        {member.email ?? member.name ?? member.role}
-                        {member.teamRole === "lead" ? " · lead" : ""}
+                        {member.email ?? member.name ?? roleLabel(member.role, locale)}
+                        {member.teamRole === "lead" ? ` · ${tr("líder", "lead")}` : ""}
                       </span>
                     ))}
                   </div>

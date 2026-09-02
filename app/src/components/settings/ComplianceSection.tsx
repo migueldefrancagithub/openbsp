@@ -4,8 +4,9 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { CheckCircle2, Loader2, ShieldCheck } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
+import { useI18n, type Locale } from "@/lib/i18n";
 
-function errorMessage(error: unknown): string {
+function errorMessage(error: unknown, locale: Locale): string {
   const data =
     error && typeof error === "object" && "data" in error
       ? (error as { data?: unknown }).data
@@ -16,17 +17,20 @@ function errorMessage(error: unknown): string {
   if (data && typeof data === "object" && "code" in data) {
     return String((data as { code: unknown }).code);
   }
-  return error instanceof Error ? error.message : "Could not save.";
+  return error instanceof Error
+    ? error.message
+    : locale === "pt" ? "Não foi possível guardar." : "Could not save.";
 }
 
-function formatDate(timestamp: number) {
-  return new Intl.DateTimeFormat("en-GB", {
+function formatDate(timestamp: number, locale: Locale) {
+  return new Intl.DateTimeFormat(locale === "pt" ? "pt-MZ" : "en-GB", {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(timestamp);
 }
 
 export function ComplianceSection() {
+  const { locale, tr } = useI18n();
   const status = useQuery(api.compliance.status, {});
   const accept = useMutation(api.compliance.acceptDataProcessingTerms);
 
@@ -45,33 +49,35 @@ export function ComplianceSection() {
 
   if (status === undefined) {
     return (
-      <div className="h-40 animate-pulse rounded-xl border border-slate-200 bg-white" />
+      <div className="h-40 animate-pulse rounded-lg border border-slate-200 bg-white" />
     );
   }
 
   if (status.ready) {
     return (
-      <section className="rounded-xl border border-slate-200 bg-white">
+      <section className="rounded-lg border border-slate-200 bg-white">
         <header className="flex items-center gap-2.5 border-b border-slate-100 px-4 py-3">
           <ShieldCheck size={16} className="text-emerald-600" />
           <h2 className="font-[var(--font-display)] text-[14px] font-medium text-[#0a1b33]">
-            Data protection
+            {tr("Proteção de dados", "Data protection")}
           </h2>
         </header>
         <div className="space-y-1 px-4 py-3 text-[13px]">
-          <Row label="Controller" value={status.controllerName} />
-          <Row label="Contact" value={status.controllerEmail} />
+          <Row label={tr("Responsável", "Controller")} value={status.controllerName} />
+          <Row label={tr("Contacto", "Contact")} value={status.controllerEmail} />
           <Row
-            label="Agreement accepted"
-            value={formatDate(status.dpaSignedAt!)}
+            label={tr("Acordo aceite", "Agreement accepted")}
+            value={formatDate(status.dpaSignedAt!, locale)}
           />
           <Row
-            label="Impact assessment"
-            value={formatDate(status.dpiaCompletedAt!)}
+            label={tr("Avaliação de impacto", "Impact assessment")}
+            value={formatDate(status.dpiaCompletedAt!, locale)}
           />
           <p className="pt-2 text-[12px] text-slate-500">
-            Channels can be connected. Acceptance is recorded once and is not
-            re-dated when this page is reopened.
+            {tr(
+              "Os canais já podem ser ligados. A aceitação é registada uma única vez e não muda ao reabrir esta página.",
+              "Channels can be connected. Acceptance is recorded once and is not re-dated when this page is reopened.",
+            )}
           </p>
         </div>
       </section>
@@ -91,7 +97,7 @@ export function ComplianceSection() {
         confirmDpiaCompleted: confirmDpia,
       });
     } catch (err) {
-      setError(errorMessage(err));
+      setError(errorMessage(err, locale));
     } finally {
       setSaving(false);
     }
@@ -104,28 +110,28 @@ export function ComplianceSection() {
     /^[^@\s]+@[^@\s.]+\.[^@\s]+$/.test(controllerEmail.trim());
 
   return (
-    <section className="rounded-xl border border-amber-200 bg-white">
+    <section className="rounded-lg border border-amber-200 bg-white">
       <header className="flex items-center gap-2.5 border-b border-slate-100 px-4 py-3">
         <ShieldCheck size={16} className="text-amber-600" />
         <div>
           <h2 className="font-[var(--font-display)] text-[14px] font-medium text-[#0a1b33]">
-            Data protection
+            {tr("Proteção de dados", "Data protection")}
           </h2>
           <p className="text-[12px] text-slate-500">
-            Required before any channel can be connected.
+            {tr("Obrigatório antes de ligar qualquer canal.", "Required before any channel can be connected.")}
           </p>
         </div>
       </header>
 
       <form onSubmit={submit} className="space-y-3 px-4 py-3">
         <Field
-          label="Data controller"
+          label={tr("Responsável pelo tratamento", "Data controller")}
           value={controllerName}
           onChange={setControllerName}
-          placeholder="Legal entity responsible for the data"
+          placeholder={tr("Entidade legal responsável pelos dados", "Legal entity responsible for the data")}
         />
         <Field
-          label="Controller contact email"
+          label={tr("Email do responsável", "Controller contact email")}
           value={controllerEmail}
           onChange={setControllerEmail}
           type="email"
@@ -135,17 +141,23 @@ export function ComplianceSection() {
         <Check
           checked={acceptDpa}
           onChange={setAcceptDpa}
-          label="I accept the Data Processing Agreement on behalf of this controller."
+          label={tr(
+            "Aceito o Acordo de Tratamento de Dados em nome desta entidade.",
+            "I accept the Data Processing Agreement on behalf of this controller.",
+          )}
         />
         <Check
           checked={confirmDpia}
           onChange={setConfirmDpia}
-          label="I confirm a Data Protection Impact Assessment has been completed for this use of messaging data."
+          label={tr(
+            "Confirmo que foi concluída uma Avaliação de Impacto de Proteção de Dados para este uso de mensagens.",
+            "I confirm a Data Protection Impact Assessment has been completed for this use of messaging data.",
+          )}
         />
 
         {!status.canAccept && (
           <p className="text-[12px] text-amber-700">
-            Only the workspace owner can accept these terms.
+            {tr("Apenas o proprietário do espaço pode aceitar estes termos.", "Only the workspace owner can accept these terms.")}
           </p>
         )}
         {error && <p className="text-[12px] text-red-700">{error}</p>}
@@ -160,7 +172,7 @@ export function ComplianceSection() {
           ) : (
             <CheckCircle2 size={14} />
           )}
-          Record acceptance
+          {tr("Registar aceitação", "Record acceptance")}
         </button>
       </form>
     </section>

@@ -13,6 +13,7 @@ import {
   Loader2,
   MessageCircleMore,
   Search,
+  SlidersHorizontal,
   Star,
   UserRound,
   UsersRound,
@@ -77,6 +78,16 @@ const FILTERS: FilterItem[] = [
   { value: "closed", labelKey: "inbox.closed", icon: Archive },
 ];
 
+const PRIMARY_FILTERS = FILTERS.filter((item) =>
+  ["all", "unassigned", "awaiting_team", "awaiting_patient", "closed"].includes(
+    item.value,
+  ),
+);
+
+const MORE_FILTERS = FILTERS.filter((item) =>
+  ["open", "active", "starred", "snoozed"].includes(item.value),
+);
+
 function isFilter(value: string | null): value is InboxFilter {
   return FILTERS.some((item) => item.value === value);
 }
@@ -115,7 +126,7 @@ function routeWithState(
 }
 
 export function ChannelThreadList() {
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const channels = useQuery(api.channels.list, {});
   const params = useParams<{ threadKey?: string }>();
   const searchParams = useSearchParams();
@@ -153,40 +164,11 @@ export function ChannelThreadList() {
   return (
     <div
       className={cn(
-        "min-h-0 shrink-0 border-r border-slate-200 bg-white lg:h-full",
+        "min-h-0 w-full shrink-0 border-r border-slate-200 bg-white sm:w-auto lg:h-full",
         selectedThreadKey ? "hidden sm:flex" : "flex",
       )}
     >
-      <aside className="hidden w-[188px] shrink-0 border-r border-slate-200 bg-[#f7f9fb] xl:flex xl:flex-col">
-        <div className="border-b border-slate-200 px-4 py-4">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
-            WhatsApp
-          </div>
-          <h1 className="mt-1 text-[15px] font-semibold text-[#0a1b33]">{t("inbox.title")}</h1>
-        </div>
-        <nav className="space-y-0.5 p-2" aria-label={t("inbox.title")}>
-          {FILTERS.map((item) => {
-            const Icon = item.icon;
-            return (
-              <Link
-                key={item.value}
-                href={routeWithState("/app/channel-inbox", activeChannelId ?? "", item.value, search)}
-                className={cn(
-                  "flex h-9 items-center gap-2 rounded-md px-2.5 text-[12px] font-medium transition-colors",
-                  filter === item.value
-                    ? "bg-white text-[#0a1b33] shadow-sm ring-1 ring-slate-200"
-                    : "text-slate-500 hover:bg-white hover:text-[#0a1b33]",
-                )}
-              >
-                <Icon size={14} />
-                <span className="truncate">{t(item.labelKey)}</span>
-              </Link>
-            );
-          })}
-        </nav>
-      </aside>
-
-      <aside className="flex h-full w-full min-w-0 flex-col bg-white sm:w-[330px] sm:shrink-0">
+      <aside className="flex h-full w-full min-w-0 flex-col bg-white sm:w-[360px] sm:shrink-0">
         <div className="border-b border-slate-200 p-3">
           <div className="flex items-center gap-2">
             {channels && channels.length > 1 ? (
@@ -229,25 +211,59 @@ export function ChannelThreadList() {
               className="h-9 w-full rounded-md border border-slate-200 bg-slate-50 pl-9 pr-3 text-[12px] text-[#0a1b33] outline-none transition-colors focus:border-slate-400 focus:bg-white"
             />
           </label>
-          <div className="mt-2 flex gap-1 overflow-x-auto pb-0.5 xl:hidden">
-            {FILTERS.map((item) => (
+          <nav
+            className="mt-2 grid grid-cols-5 gap-1 rounded-md bg-slate-100 p-1"
+            aria-label={t("inbox.title")}
+          >
+            {PRIMARY_FILTERS.map((item) => {
+              const Icon = item.icon;
+              return (
               <Link
                 key={item.value}
                 href={routeWithState("/app/channel-inbox", activeChannelId ?? "", item.value, search)}
                 className={cn(
-                  "shrink-0 rounded-md border px-2 py-1 text-[10px] font-semibold",
+                  "flex h-11 min-w-0 flex-col items-center justify-center gap-0.5 rounded px-1 text-[9px] font-semibold transition-colors",
                   filter === item.value
-                    ? "border-[#0a1b33] bg-[#0a1b33] text-white"
-                    : "border-slate-200 bg-white text-slate-500",
+                    ? "bg-white text-[#0a1b33] shadow-sm"
+                    : "text-slate-500 hover:bg-white/70 hover:text-[#0a1b33]",
                 )}
+                title={t(item.labelKey)}
               >
-                {t(item.labelKey)}
+                <Icon size={13} />
+                <span className="w-full truncate text-center">{t(item.labelKey)}</span>
               </Link>
-            ))}
-          </div>
+              );
+            })}
+          </nav>
+          <label className="mt-2 flex items-center gap-2">
+            <SlidersHorizontal size={13} className="shrink-0 text-slate-400" />
+            <span className="shrink-0 text-[10px] font-semibold text-slate-500">
+              {t("inbox.moreFilters")}
+            </span>
+            <select
+              value={MORE_FILTERS.some((item) => item.value === filter) ? filter : ""}
+              onChange={(event) => {
+                if (!event.target.value) return;
+                window.location.href = routeWithState(
+                  "/app/channel-inbox",
+                  activeChannelId ?? "",
+                  event.target.value as InboxFilter,
+                  search,
+                );
+              }}
+              className="h-8 min-w-0 flex-1 rounded-md border border-slate-200 bg-white px-2 text-[10px] font-semibold text-slate-600 outline-none focus:border-slate-400"
+            >
+              <option value="">{t("inbox.moreFilters")}</option>
+              {MORE_FILTERS.map((item) => (
+                <option key={item.value} value={item.value}>
+                  {t(item.labelKey)}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
 
-        {channels === undefined || status === "LoadingFirstPage" ? (
+        {channels === undefined ? (
           <div className="flex flex-1 items-center justify-center gap-2 text-[12px] text-slate-400">
             <Loader2 size={14} className="animate-spin" />
             {t("inbox.loading")}
@@ -255,6 +271,11 @@ export function ChannelThreadList() {
         ) : channels.length === 0 || !activeChannelId ? (
           <div className="flex flex-1 items-center justify-center px-8 text-center text-[12px] leading-5 text-slate-400">
             {t("inbox.noChannel")}
+          </div>
+        ) : status === "LoadingFirstPage" ? (
+          <div className="flex flex-1 items-center justify-center gap-2 text-[12px] text-slate-400">
+            <Loader2 size={14} className="animate-spin" />
+            {t("inbox.loading")}
           </div>
         ) : threads.length === 0 ? (
           <div className="flex flex-1 items-center justify-center px-8 text-center text-[12px] text-slate-400">
@@ -298,7 +319,7 @@ export function ChannelThreadList() {
                             {label}
                           </span>
                           {thread.starred && <Star size={11} className="fill-amber-400 text-amber-400" />}
-                          <span className="shrink-0 text-[9px] text-slate-400">{relativeTime(thread.lastEventAt)}</span>
+                          <span className="shrink-0 text-[9px] text-slate-400">{relativeTime(thread.lastEventAt, Date.now(), locale)}</span>
                         </div>
                         <div className="mt-0.5 flex items-center gap-2">
                           <span className="min-w-0 flex-1 truncate text-[11px] text-slate-500">

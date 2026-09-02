@@ -47,6 +47,7 @@ import type { Id } from "../../../../convex/_generated/dataModel";
 import { ImportCsvModal } from "../contacts/ImportCsvModal";
 import type { TemplateCategory } from "@/lib/whatsappTemplateAdvisor";
 import { useI18n } from "@/lib/i18n";
+import { channelStateLabel, sendModeLabel } from "@/lib/operationalLabels";
 
 const STATUS_STYLES: Record<string, string> = {
   draft: "bg-slate-100 text-slate-700 border-slate-200",
@@ -364,7 +365,7 @@ export default function CampaignsPage() {
       setSelectedListId(listId);
       setListName("");
       setListDescription("");
-      setNotice("Contact list created.");
+      setNotice(locale === "pt" ? "Lista de contactos criada." : "Contact list created.");
     } catch (err) {
       setError(readError(err));
     } finally {
@@ -384,7 +385,9 @@ export default function CampaignsPage() {
         contactId: selectedContactId,
       });
       setSelectedContactId("");
-      setNotice(result.added ? "Contact added to list." : "Contact was already in this list.");
+      setNotice(result.added
+        ? locale === "pt" ? "Contacto adicionado à lista." : "Contact added to list."
+        : locale === "pt" ? "O contacto já estava nesta lista." : "Contact was already in this list.");
     } catch (err) {
       setError(readError(err));
     } finally {
@@ -407,7 +410,9 @@ export default function CampaignsPage() {
         clientNonce: crypto.randomUUID(),
       });
       setNotice(
-        `Micro campaign sent: ${result.accepted} accepted, ${result.failed} blocked by channel gates.`,
+        locale === "pt"
+          ? `Teste enviado: ${result.accepted} aceites e ${result.failed} bloqueados pelas regras do canal.`
+          : `WhatsApp test sent: ${result.accepted} accepted, ${result.failed} blocked by channel gates.`,
       );
       setStudioTab("dashboard");
     } catch (err) {
@@ -430,7 +435,7 @@ export default function CampaignsPage() {
         templateId: selectedTemplateId,
       });
       setCampaignName("");
-      setNotice("Draft campaign created with recipients ready for launch.");
+      setNotice(locale === "pt" ? "Rascunho criado com os destinatários prontos para envio." : "Draft campaign created with recipients ready for launch.");
     } catch (err) {
       setError(readError(err));
     } finally {
@@ -451,7 +456,9 @@ export default function CampaignsPage() {
       setSelectedListId(result.listId);
       setAudienceName("");
       setNotice(
-        `Audience saved with ${result.added} contacts. ${result.excludedMarketingRevoked} marketing opt-outs excluded.`,
+        locale === "pt"
+          ? `Público guardado com ${result.added} contactos. ${result.excludedMarketingRevoked} recusas de marketing excluídas.`
+          : `Audience saved with ${result.added} contacts. ${result.excludedMarketingRevoked} marketing opt-outs excluded.`,
       );
     } catch (err) {
       setError(readError(err));
@@ -470,7 +477,9 @@ export default function CampaignsPage() {
         batchSize: normalizedBatchSize(batchSize),
       });
       setNotice(
-        `Campaign launched: ${result.queued} queued, ${result.pendingRemaining} waiting, ${result.skippedConsent} skipped for consent, ${result.skippedUnsuitable} unsuitable.`,
+        locale === "pt"
+          ? `Campanha iniciada: ${result.queued} na fila, ${result.pendingRemaining} a aguardar, ${result.skippedConsent} sem consentimento e ${result.skippedUnsuitable} incompatíveis.`
+          : `Campaign launched: ${result.queued} queued, ${result.pendingRemaining} waiting, ${result.skippedConsent} skipped for consent, ${result.skippedUnsuitable} unsuitable.`,
       );
     } catch (err) {
       setError(readError(err));
@@ -489,7 +498,9 @@ export default function CampaignsPage() {
         batchSize: normalizedBatchSize(batchSize),
       });
       setNotice(
-        `Next batch queued: ${result.queued} queued, ${result.pendingRemaining} still waiting, ${result.skippedConsent} skipped for consent, ${result.skippedUnsuitable} unsuitable.`,
+        locale === "pt"
+          ? `Próximo lote em fila: ${result.queued} preparados, ${result.pendingRemaining} ainda a aguardar, ${result.skippedConsent} sem consentimento e ${result.skippedUnsuitable} incompatíveis.`
+          : `Next batch queued: ${result.queued} queued, ${result.pendingRemaining} still waiting, ${result.skippedConsent} skipped for consent, ${result.skippedUnsuitable} unsuitable.`,
       );
     } catch (err) {
       setError(readError(err));
@@ -553,7 +564,9 @@ export default function CampaignsPage() {
     try {
       const result = await retrySafeFailures({ campaignId });
       setNotice(
-        `Retry queued: ${result.retried} safe failures retried, ${result.skippedUnsafe} unsafe skipped, ${result.skippedConsent} skipped for consent.`,
+        locale === "pt"
+          ? `Repetição em fila: ${result.retried} falhas seguras, ${result.skippedUnsafe} falhas não seguras ignoradas e ${result.skippedConsent} sem consentimento.`
+          : `Retry queued: ${result.retried} safe failures retried, ${result.skippedUnsafe} unsafe skipped, ${result.skippedConsent} skipped for consent.`,
       );
     } catch (err) {
       setError(readError(err));
@@ -575,8 +588,8 @@ export default function CampaignsPage() {
       });
       setNotice(
         result.converted
-          ? "Conversion recorded for this campaign."
-          : "This recipient was already marked as converted.",
+          ? locale === "pt" ? "Conversão registada nesta campanha." : "Conversion recorded for this campaign."
+          : locale === "pt" ? "Este destinatário já estava marcado como convertido." : "This recipient was already marked as converted.",
       );
     } catch (err) {
       setError(readError(err));
@@ -616,7 +629,7 @@ export default function CampaignsPage() {
         ]),
       ]);
       await navigator.clipboard.writeText(csv);
-      setNotice(`Copied ${rows.length} failed contacts as CSV.`);
+      setNotice(locale === "pt" ? `${rows.length} contactos com falha copiados como CSV.` : `Copied ${rows.length} failed contacts as CSV.`);
     } catch (err) {
       setError(readError(err));
     } finally {
@@ -636,7 +649,7 @@ export default function CampaignsPage() {
         }
       />
 
-      <div className="px-8 py-8 max-w-7xl space-y-6">
+      <div className="mx-auto max-w-7xl space-y-5 px-4 py-5 sm:px-6 xl:px-8">
         {(notice || error) && (
           <div
             className={`rounded-lg border px-4 py-3 text-sm ${
@@ -705,13 +718,13 @@ export default function CampaignsPage() {
           >
             <form className="space-y-3" onSubmit={handleCreateList}>
               <TextInput
-                label="List name"
+                label={locale === "pt" ? "Nome da lista" : "List name"}
                 value={listName}
                 onChange={setListName}
                 placeholder={locale === "pt" ? "Pacientes interessados" : "Interested patients"}
               />
               <TextInput
-                label="Description"
+                label={locale === "pt" ? "Descrição" : "Description"}
                 value={listDescription}
                 onChange={setListDescription}
                 placeholder={locale === "pt" ? "Nota interna opcional" : "Optional internal note"}
@@ -737,7 +750,7 @@ export default function CampaignsPage() {
           >
             <form className="space-y-3" onSubmit={handleAddContact}>
               <SelectBox
-                label="Target list"
+                label={locale === "pt" ? "Lista de destino" : "Target list"}
                 value={selectedListId}
                 onChange={(value) =>
                   setSelectedListId(value as Id<"contactLists"> | "")
@@ -749,7 +762,7 @@ export default function CampaignsPage() {
                 placeholder={locale === "pt" ? "Escolher lista" : "Choose list"}
               />
               <SelectBox
-                label="Contact"
+                label={locale === "pt" ? "Contacto" : "Contact"}
                 value={selectedContactId}
                 onChange={(value) =>
                   setSelectedContactId(value as Id<"contacts"> | "")
@@ -760,7 +773,7 @@ export default function CampaignsPage() {
                     contact.name ??
                     contact.whatsappUsername ??
                     contact.e164 ??
-                    "Unknown contact",
+                    (locale === "pt" ? "Contacto desconhecido" : "Unknown contact"),
                 }))}
                 placeholder={locale === "pt" ? "Escolher contacto" : "Choose contact"}
               />
@@ -799,7 +812,7 @@ export default function CampaignsPage() {
           >
             <form className="space-y-3" onSubmit={handleCreateCampaign}>
               <TextInput
-                label="Campaign name"
+                label={locale === "pt" ? "Nome da campanha" : "Campaign name"}
                 value={campaignName}
                 onChange={setCampaignName}
                 placeholder={locale === "pt" ? "Agenda da semana" : "Weekly agenda"}
@@ -872,7 +885,7 @@ export default function CampaignsPage() {
                     }}
                     options={labChannels.map((channel) => ({
                       value: channel._id,
-                      label: `${channel.displayName} · ${channel.sendMode}`,
+                      label: `${channel.displayName} · ${sendModeLabel(channel.sendMode, locale)}`,
                     }))}
                     placeholder={locale === "pt" ? "Escolher canal isolado" : "Choose isolated channel"}
                   />
@@ -978,8 +991,8 @@ export default function CampaignsPage() {
                 {selectedMicroChannel && (
                   <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-800">
                     {selectedMicroChannel.displayName} ·{" "}
-                    {selectedMicroChannel.connectionState ?? "unknown"} ·{" "}
-                    {selectedMicroChannel.webhookStatus ?? "webhook unknown"}
+                    {channelStateLabel(selectedMicroChannel.connectionState, locale)} ·{" "}
+                    Webhook {channelStateLabel(selectedMicroChannel.webhookStatus, locale)}
                   </div>
                 )}
 
@@ -1101,29 +1114,29 @@ export default function CampaignsPage() {
         {studioTab === "audience" && (
         <WorkflowPanel
           icon={SlidersHorizontal}
-          title="Audience Builder"
-          subtitle="Build reusable lead segments from consent, tags, CTWA intent, pipeline stage, and campaign behavior."
+          title={locale === "pt" ? "Construtor de públicos" : "Audience builder"}
+          subtitle={locale === "pt" ? "Cria segmentos reutilizáveis por consentimento, tags, origem, etapa e comportamento em campanhas." : "Build reusable lead segments from consent, tags, source, pipeline stage, and campaign behavior."}
         >
           <form className="space-y-4" onSubmit={handleSaveAudience}>
             <div className="grid gap-3 lg:grid-cols-[1.2fr_0.7fr_1.1fr]">
               <TextInput
-                label="Saved list name"
+                label={locale === "pt" ? "Nome do público" : "Saved list name"}
                 value={audienceName}
                 onChange={setAudienceName}
-                placeholder="VIP clicked retargeting"
+                placeholder={locale === "pt" ? "Interessados em agendamento" : "Booking intent audience"}
               />
               <SelectBox
-                label="Match mode"
+                label={locale === "pt" ? "Combinação" : "Match mode"}
                 value={audienceLogic}
                 onChange={(value) => setAudienceLogic(value as AudienceLogic)}
                 options={[
-                  { value: "all", label: "All filters" },
-                  { value: "any", label: "Any filter" },
+                  { value: "all", label: locale === "pt" ? "Todos os filtros" : "All filters" },
+                  { value: "any", label: locale === "pt" ? "Qualquer filtro" : "Any filter" },
                 ]}
-                placeholder="Match mode"
+                placeholder={locale === "pt" ? "Como combinar" : "Match mode"}
               />
               <TextInput
-                label="Search"
+                label={locale === "pt" ? "Pesquisa" : "Search"}
                 value={audienceSearch}
                 onChange={setAudienceSearch}
                 placeholder={locale === "pt" ? "Nome, telefone ou username" : "Name, phone, or username"}
@@ -1132,118 +1145,118 @@ export default function CampaignsPage() {
 
             <div className="grid gap-3 md:grid-cols-3">
               <TextInput
-                label="Include tags"
+                label={locale === "pt" ? "Incluir tags" : "Include tags"}
                 value={audienceIncludeTags}
                 onChange={setAudienceIncludeTags}
-                placeholder="vip, injectables"
+                placeholder={locale === "pt" ? "vip, interessados" : "vip, interested"}
               />
               <TextInput
-                label="Exclude tags"
+                label={locale === "pt" ? "Excluir tags" : "Exclude tags"}
                 value={audienceExcludeTags}
                 onChange={setAudienceExcludeTags}
-                placeholder="do_not_promote, minor"
+                placeholder={locale === "pt" ? "não_contactar, menor" : "do_not_contact, minor"}
               />
               <SelectBox
-                label="Marketing consent"
+                label={locale === "pt" ? "Consentimento de marketing" : "Marketing consent"}
                 value={audienceMarketingConsent}
                 onChange={(value) =>
                   setAudienceMarketingConsent(value as ConsentFilter)
                 }
                 options={[
-                  { value: "any", label: "Any" },
-                  { value: "granted", label: "Granted" },
-                  { value: "unknown", label: "Unknown" },
-                  { value: "revoked", label: "Revoked" },
+                  { value: "any", label: locale === "pt" ? "Qualquer" : "Any" },
+                  { value: "granted", label: locale === "pt" ? "Concedido" : "Granted" },
+                  { value: "unknown", label: locale === "pt" ? "Desconhecido" : "Unknown" },
+                  { value: "revoked", label: locale === "pt" ? "Revogado" : "Revoked" },
                 ]}
-                placeholder="Any"
+                placeholder={locale === "pt" ? "Qualquer" : "Any"}
               />
             </div>
 
             <div className="grid gap-3 md:grid-cols-4">
               <SelectBox
-                label="Transactional consent"
+                label={locale === "pt" ? "Consentimento de atendimento" : "Service consent"}
                 value={audienceTransactionalConsent}
                 onChange={(value) =>
                   setAudienceTransactionalConsent(value as ConsentFilter)
                 }
                 options={[
-                  { value: "any", label: "Any" },
-                  { value: "granted", label: "Granted" },
-                  { value: "unknown", label: "Unknown" },
-                  { value: "revoked", label: "Revoked" },
+                  { value: "any", label: locale === "pt" ? "Qualquer" : "Any" },
+                  { value: "granted", label: locale === "pt" ? "Concedido" : "Granted" },
+                  { value: "unknown", label: locale === "pt" ? "Desconhecido" : "Unknown" },
+                  { value: "revoked", label: locale === "pt" ? "Revogado" : "Revoked" },
                 ]}
-                placeholder="Any"
+                placeholder={locale === "pt" ? "Qualquer" : "Any"}
               />
               <SelectBox
-                label="Lead source"
+                label={locale === "pt" ? "Origem do lead" : "Lead source"}
                 value={audienceLeadSource}
                 onChange={(value) =>
                   setAudienceLeadSource(value as LeadSourceFilter)
                 }
                 options={[
-                  { value: "ctwa", label: "CTWA ad lead" },
-                  { value: "organic", label: "Organic inbound" },
-                  { value: "campaign_reply", label: "Campaign reply" },
-                  { value: "unknown", label: "Unknown" },
+                  { value: "ctwa", label: locale === "pt" ? "Anúncio WhatsApp" : "CTWA ad lead" },
+                  { value: "organic", label: locale === "pt" ? "Entrada orgânica" : "Organic inbound" },
+                  { value: "campaign_reply", label: locale === "pt" ? "Resposta de campanha" : "Campaign reply" },
+                  { value: "unknown", label: locale === "pt" ? "Desconhecida" : "Unknown" },
                 ]}
-                placeholder="Any source"
+                placeholder={locale === "pt" ? "Qualquer origem" : "Any source"}
               />
               <SelectBox
-                label="Pipeline status"
+                label={locale === "pt" ? "Etapa do lead" : "Lead stage"}
                 value={audienceOpportunityStatus}
                 onChange={(value) =>
                   setAudienceOpportunityStatus(value as OpportunityStatusFilter)
                 }
                 options={[
-                  { value: "new", label: "New" },
-                  { value: "contacted", label: "Contacted" },
-                  { value: "replied", label: "Replied" },
-                  { value: "opportunity", label: "Opportunity" },
-                  { value: "booked", label: "Booked" },
-                  { value: "lost", label: "Lost" },
+                  { value: "new", label: locale === "pt" ? "Novo" : "New" },
+                  { value: "contacted", label: locale === "pt" ? "Contactado" : "Contacted" },
+                  { value: "replied", label: locale === "pt" ? "Respondeu" : "Replied" },
+                  { value: "opportunity", label: locale === "pt" ? "Oportunidade" : "Opportunity" },
+                  { value: "booked", label: locale === "pt" ? "Agendado" : "Booked" },
+                  { value: "lost", label: locale === "pt" ? "Perdido" : "Lost" },
                 ]}
-                placeholder="Any status"
+                placeholder={locale === "pt" ? "Qualquer etapa" : "Any stage"}
               />
               <SelectBox
-                label="CTWA window"
+                label={locale === "pt" ? "Janela do anúncio" : "CTWA window"}
                 value={audienceCtwaWindow}
                 onChange={(value) =>
                   setAudienceCtwaWindow(value as CtwaWindowFilter)
                 }
                 options={[
-                  { value: "any", label: "Any" },
-                  { value: "open", label: "Open" },
-                  { value: "expiring_6h", label: "Expiring 6h" },
-                  { value: "expired", label: "Expired" },
+                  { value: "any", label: locale === "pt" ? "Qualquer" : "Any" },
+                  { value: "open", label: locale === "pt" ? "Aberta" : "Open" },
+                  { value: "expiring_6h", label: locale === "pt" ? "Expira em 6h" : "Expiring in 6h" },
+                  { value: "expired", label: locale === "pt" ? "Expirada" : "Expired" },
                 ]}
-                placeholder="Any"
+                placeholder={locale === "pt" ? "Qualquer" : "Any"}
               />
             </div>
 
             <div className="grid gap-3 md:grid-cols-[1fr_1fr_1fr]">
               <SelectBox
-                label="Campaign behavior"
+                label={locale === "pt" ? "Comportamento na campanha" : "Campaign behavior"}
                 value={audienceCampaignOutcome}
                 onChange={(value) =>
                   setAudienceCampaignOutcome(value as CampaignOutcomeFilter)
                 }
                 options={[
-                  { value: "clicked", label: "Clicked" },
-                  { value: "replied", label: "Replied" },
-                  { value: "failed", label: "Failed" },
-                  { value: "read", label: "Read" },
-                  { value: "delivered", label: "Delivered" },
-                  { value: "sent", label: "Sent" },
+                  { value: "clicked", label: locale === "pt" ? "Interagiu" : "Clicked" },
+                  { value: "replied", label: locale === "pt" ? "Respondeu" : "Replied" },
+                  { value: "failed", label: locale === "pt" ? "Falhou" : "Failed" },
+                  { value: "read", label: locale === "pt" ? "Leu" : "Read" },
+                  { value: "delivered", label: locale === "pt" ? "Recebeu" : "Delivered" },
+                  { value: "sent", label: locale === "pt" ? "Enviado" : "Sent" },
                 ]}
-                placeholder="Any outcome"
+                placeholder={locale === "pt" ? "Qualquer resultado" : "Any outcome"}
               />
               <DateInput
-                label="Created after"
+                label={locale === "pt" ? "Criado depois de" : "Created after"}
                 value={audienceCreatedAfter}
                 onChange={setAudienceCreatedAfter}
               />
               <DateInput
-                label="Last message after"
+                label={locale === "pt" ? "Última mensagem depois de" : "Last message after"}
                 value={audienceLastMessageAfter}
                 onChange={setAudienceLastMessageAfter}
               />
@@ -1251,7 +1264,7 @@ export default function CampaignsPage() {
 
             <div className="grid gap-3 lg:grid-cols-[1fr_2fr_auto] lg:items-stretch">
               <Toggle
-                label="Exclude marketing opt-outs"
+                label={locale === "pt" ? "Excluir recusas de marketing" : "Exclude marketing opt-outs"}
                 checked={audienceExcludeMarketingRevoked}
                 onChange={setAudienceExcludeMarketingRevoked}
               />
@@ -1259,15 +1272,15 @@ export default function CampaignsPage() {
                 <div className="flex flex-wrap items-center gap-3 text-sm">
                   <span className="inline-flex items-center gap-2 font-semibold text-[#0a1b33]">
                     <Users size={15} />
-                    {audiencePreview?.count ?? 0} matched
+                    {audiencePreview?.count ?? 0} {locale === "pt" ? "encontrados" : "matched"}
                   </span>
                   <span className="inline-flex items-center gap-2 font-medium text-emerald-700">
                     <ShieldCheck size={15} />
-                    {audiencePreview?.excludedMarketingRevoked ?? 0} opt-outs excluded
+                    {audiencePreview?.excludedMarketingRevoked ?? 0} {locale === "pt" ? "recusas excluídas" : "opt-outs excluded"}
                   </span>
                   <span className="inline-flex items-center gap-2 font-medium text-slate-500">
                     <Filter size={15} />
-                    {audiencePreview?.activeFilters ?? 0} filters
+                    {audiencePreview?.activeFilters ?? 0} {locale === "pt" ? "filtros" : "filters"}
                   </span>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
@@ -1289,7 +1302,7 @@ export default function CampaignsPage() {
                   ))}
                   {audiencePreview && audiencePreview.sample.length === 0 && (
                     <span className="text-xs font-medium text-slate-400">
-                      No matching contacts yet.
+                      {locale === "pt" ? "Ainda sem contactos correspondentes." : "No matching contacts yet."}
                     </span>
                   )}
                 </div>
@@ -1304,7 +1317,7 @@ export default function CampaignsPage() {
                   loading={busy === "audience"}
                   icon={ListPlus}
                 >
-                  Save audience
+                  {locale === "pt" ? "Guardar público" : "Save audience"}
                 </SubmitButton>
               </div>
             </div>
@@ -1313,7 +1326,7 @@ export default function CampaignsPage() {
         )}
 
         {studioTab === "dashboard" && (
-        <section className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+        <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
           <div className="px-5 py-4 border-b border-slate-100 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <h2 className="font-[var(--font-outfit)] text-[18px] font-medium text-[#0a1b33]">
@@ -1392,9 +1405,9 @@ export default function CampaignsPage() {
                 <span className="h-3 w-3 rounded-full bg-emerald-500" />
               </span>
               <select className="h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-[#0a1b33] outline-none focus:border-slate-400">
-                <option>6 per page</option>
-                <option>12 per page</option>
-                <option>24 per page</option>
+                <option>{locale === "pt" ? "6 por página" : "6 per page"}</option>
+                <option>{locale === "pt" ? "12 por página" : "12 per page"}</option>
+                <option>{locale === "pt" ? "24 por página" : "24 per page"}</option>
               </select>
             </div>
             <div className="mt-4 flex flex-wrap gap-2">
@@ -1594,6 +1607,7 @@ function BroadcastCard({
   onCopyFailed: (campaignId: Id<"campaigns">) => void;
   onOpenLog: () => void;
 }) {
+  const { locale } = useI18n();
   const sent = sentLikeCount(campaign.stats);
   const delivered = deliveredLikeCount(campaign.stats);
   const read = readLikeCount(campaign.stats);
@@ -1613,12 +1627,12 @@ function BroadcastCard({
           : "border-l-slate-300";
   const statusLabel =
     campaign.status === "paused" && pendingBatch > 0
-      ? "partially sent"
-      : campaign.status;
+      ? locale === "pt" ? "envio parcial" : "partially sent"
+      : campaignStatusLabel(campaign.status, locale);
 
   return (
     <article
-      className={`flex min-h-[520px] flex-col rounded-2xl border border-l-4 border-slate-200 bg-white shadow-[0_18px_70px_-48px_rgba(15,23,42,0.55)] ${stripe}`}
+      className={`flex min-h-[520px] flex-col rounded-lg border border-l-4 border-slate-200 bg-white shadow-[0_18px_70px_-48px_rgba(15,23,42,0.55)] ${stripe}`}
     >
       <div className="flex flex-1 flex-col p-5">
         <div className="flex items-start justify-between gap-3">
@@ -1627,17 +1641,17 @@ function BroadcastCard({
               {campaign.name}
             </h3>
             <p className="mt-1 text-xs font-medium text-slate-500">
-              # {friendlyCampaignId(campaign._id)} · {relativeTime(campaign.createdAt)}
+              # {friendlyCampaignId(campaign._id)} · {relativeTime(campaign.createdAt, Date.now(), locale)}
             </p>
           </div>
-          <button type="button" onClick={onOpenLog} className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-[#0a1b33]" aria-label="Open campaign log"><MoreHorizontal size={17} /></button>
+          <button type="button" onClick={onOpenLog} className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-[#0a1b33]" aria-label={locale === "pt" ? "Abrir log da campanha" : "Open campaign log"}><MoreHorizontal size={17} /></button>
         </div>
 
         <div className="mt-4 flex flex-wrap items-center gap-2">
           {campaign.status === "draft" && (
             <ActionPill
               icon={Send}
-              label="Launch"
+              label={locale === "pt" ? "Iniciar" : "Launch"}
               loading={busy === `launch:${campaign._id}`}
               onClick={() => onLaunch(campaign._id)}
               disabled={busy !== null}
@@ -1647,7 +1661,7 @@ function BroadcastCard({
           {campaign.status === "running" && pendingRecipients > 0 && (
             <ActionPill
               icon={Radio}
-              label="Send Next Batch"
+              label={locale === "pt" ? "Enviar próximo lote" : "Send next batch"}
               loading={busy === `next:${campaign._id}`}
               onClick={() => onSendNextBatch(campaign._id)}
               disabled={busy !== null}
@@ -1657,7 +1671,7 @@ function BroadcastCard({
           {campaign.status === "running" && (
             <ActionPill
               icon={Pause}
-              label="Pause"
+              label={locale === "pt" ? "Pausar" : "Pause"}
               loading={busy === `pause:${campaign._id}`}
               onClick={() => onPause(campaign._id)}
               disabled={busy !== null}
@@ -1666,7 +1680,7 @@ function BroadcastCard({
           {campaign.status === "paused" && (
             <ActionPill
               icon={Play}
-              label="Resume"
+              label={locale === "pt" ? "Retomar" : "Resume"}
               loading={busy === `resume:${campaign._id}`}
               onClick={() => onResume(campaign._id)}
               disabled={busy !== null}
@@ -1676,7 +1690,7 @@ function BroadcastCard({
           {["draft", "scheduled", "running", "paused"].includes(campaign.status) && (
             <ActionPill
               icon={Ban}
-              label="Cancel"
+              label={locale === "pt" ? "Cancelar" : "Cancel"}
               loading={busy === `cancel:${campaign._id}`}
               onClick={() => onCancel(campaign._id)}
               disabled={busy !== null}
@@ -1685,13 +1699,13 @@ function BroadcastCard({
           {campaign.failureBreakdown.some((failure) => failure.retrySafe) && (
             <ActionPill
               icon={RotateCcw}
-              label="Retry safe"
+              label={locale === "pt" ? "Repetir falhas seguras" : "Retry safe failures"}
               loading={busy === `retry:${campaign._id}`}
               onClick={() => onRetrySafe(campaign._id)}
               disabled={busy !== null}
             />
           )}
-          <ActionPill icon={BarChart3} label="Log" onClick={onOpenLog} />
+          <ActionPill icon={BarChart3} label={locale === "pt" ? "Atividade" : "Activity"} onClick={onOpenLog} />
         </div>
 
         {(pendingRecipients > 0 || campaign.pauseReason) && (
@@ -1700,11 +1714,13 @@ function BroadcastCard({
               <AlertTriangle size={15} className="mt-0.5 shrink-0 text-orange-600" />
               <div>
                 <div className="text-sm font-semibold text-orange-800">
-                  Batch control
+                  {locale === "pt" ? "Controlo de lotes" : "Batch control"}
                 </div>
                 <p className="mt-1 text-sm leading-6 text-orange-700">
                   {campaign.pauseReason ??
-                    `${(campaign.stats.total - pendingRecipients).toLocaleString()} of ${campaign.stats.total.toLocaleString()} contacts processed. ${pendingRecipients.toLocaleString()} waiting for the next manual batch.`}
+                    (locale === "pt"
+                      ? `${(campaign.stats.total - pendingRecipients).toLocaleString()} de ${campaign.stats.total.toLocaleString()} contactos processados. ${pendingRecipients.toLocaleString()} aguardam o próximo lote.`
+                      : `${(campaign.stats.total - pendingRecipients).toLocaleString()} of ${campaign.stats.total.toLocaleString()} contacts processed. ${pendingRecipients.toLocaleString()} waiting for the next manual batch.`)}
                 </p>
               </div>
             </div>
@@ -1721,10 +1737,10 @@ function BroadcastCard({
           </span>
           <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
             <Radio size={12} />
-            Condition tracking
+            {locale === "pt" ? "Medição real" : "Real tracking"}
           </span>
           <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
-            {campaign.kind === "micro_lab" ? "Micro lab" : "Template"}
+            {campaign.kind === "micro_lab" ? (locale === "pt" ? "Teste WhatsApp" : "WhatsApp test") : "Template"}
           </span>
         </div>
 
@@ -1732,8 +1748,8 @@ function BroadcastCard({
           <FileText size={15} />
           <span className="truncate">
             {campaign.kind === "micro_lab"
-              ? campaign.channelName ?? "Micro lab channel"
-              : campaign.templateName ?? "No template"}
+              ? campaign.channelName ?? (locale === "pt" ? "Canal de teste" : "Test channel")
+              : campaign.templateName ?? (locale === "pt" ? "Sem template" : "No template")}
           </span>
           <span className="text-xs">
             {campaign.kind === "micro_lab" ? "(hub)" : "(template)"}
@@ -1747,32 +1763,32 @@ function BroadcastCard({
         )}
 
         <div className="mt-4 grid grid-cols-2 gap-2 xl:grid-cols-3">
-          <BroadcastMetric icon={Send} label="Sent" value={`${sent}/${campaign.stats.total}`} />
-          <BroadcastMetric icon={CheckCircle2} label="Delivered" value={delivered} />
-          <BroadcastMetric icon={MessageSquare} label="Read" value={read} />
-          <BroadcastMetric icon={MousePointerClick} label="Clicks" value={clicked} />
-          <BroadcastMetric icon={BadgeCheck} label="Converted" value={converted} />
+          <BroadcastMetric icon={Send} label={locale === "pt" ? "Enviados" : "Sent"} value={`${sent}/${campaign.stats.total}`} />
+          <BroadcastMetric icon={CheckCircle2} label={locale === "pt" ? "Entregues" : "Delivered"} value={delivered} />
+          <BroadcastMetric icon={MessageSquare} label={locale === "pt" ? "Lidos" : "Read"} value={read} />
+          <BroadcastMetric icon={MousePointerClick} label={locale === "pt" ? "Interações" : "Clicks"} value={clicked} />
+          <BroadcastMetric icon={BadgeCheck} label={locale === "pt" ? "Conversões" : "Converted"} value={converted} />
           <BroadcastMetric
             icon={XCircle}
-            label="Failed"
+            label={locale === "pt" ? "Falhas" : "Failed"}
             value={campaign.stats.failed}
             danger
           />
         </div>
 
         <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
-          <ProgressRow label="Sent Rate" value={rate(sent, campaign.stats.total)} />
+          <ProgressRow label={locale === "pt" ? "Taxa de envio" : "Sent rate"} value={rate(sent, campaign.stats.total)} />
           <ProgressRow
-            label="Delivery Rate"
+            label={locale === "pt" ? "Taxa de entrega" : "Delivery rate"}
             value={rate(delivered, Math.max(sent, 1))}
           />
-          <ProgressRow label="Read Rate" value={rate(read, Math.max(delivered, 1))} />
+          <ProgressRow label={locale === "pt" ? "Taxa de leitura" : "Read rate"} value={rate(read, Math.max(delivered, 1))} />
           <ProgressRow
-            label="Click Rate"
+            label={locale === "pt" ? "Taxa de interação" : "Click rate"}
             value={rate(clicked, Math.max(sent, 1))}
           />
           <ProgressRow
-            label="Conversion Rate"
+            label={locale === "pt" ? "Taxa de conversão" : "Conversion rate"}
             value={rate(converted, Math.max(sent, 1))}
           />
         </div>
@@ -1802,7 +1818,7 @@ function BroadcastCard({
 
         <div className="mt-auto pt-4">
           <div className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-3 text-sm font-semibold text-blue-700">
-            created {relativeTime(campaign.createdAt)}
+            {locale === "pt" ? "criada" : "created"} {relativeTime(campaign.createdAt, Date.now(), locale)}
           </div>
           <button
             type="button"
@@ -1811,7 +1827,7 @@ function BroadcastCard({
           >
             <span className="inline-flex items-center gap-2">
               <MessageSquare size={15} />
-              Responses / conversions
+              {locale === "pt" ? "Respostas e conversões" : "Replies and conversions"}
             </span>
             <span>{campaign.stats.replied + campaign.stats.clicked + converted}</span>
           </button>
@@ -1819,7 +1835,7 @@ function BroadcastCard({
       </div>
 
       <div className="border-t border-slate-100 px-5 py-3 text-xs font-medium text-slate-500">
-        Created: {new Date(campaign.createdAt).toLocaleString()}
+        {locale === "pt" ? "Criada" : "Created"}: {new Date(campaign.createdAt).toLocaleString(locale === "pt" ? "pt-MZ" : "en-GB")}
       </div>
 
       {campaign.stats.failed > 0 && (
@@ -1835,7 +1851,7 @@ function BroadcastCard({
             ) : (
               <Download size={13} />
             )}
-            Copy failed CSV
+            {locale === "pt" ? "Copiar falhas em CSV" : "Copy failed CSV"}
           </button>
         </div>
       )}
@@ -1856,6 +1872,7 @@ function CampaignLogDrawer({
   onRecordConversion: (campaignRecipientId: Id<"campaignRecipients">) => void;
   onClose: () => void;
 }) {
+  const { locale } = useI18n();
   const sent = sentLikeCount(campaign.stats);
   const progress = rate(sent + campaign.stats.failed + campaign.stats.skipped, campaign.stats.total);
   return (
@@ -1872,7 +1889,7 @@ function CampaignLogDrawer({
                 {campaign.name}
               </h2>
               <p className="mt-1 text-sm text-slate-500">
-                Real-time activity log · ID: {friendlyCampaignId(campaign._id)}
+                {locale === "pt" ? "Atividade em tempo real" : "Real-time activity"} · ID: {friendlyCampaignId(campaign._id)}
               </p>
             </div>
           </div>
@@ -1887,25 +1904,25 @@ function CampaignLogDrawer({
 
         <div className="grid grid-cols-3 gap-y-4 border-b border-slate-100 px-6 py-5 text-center sm:grid-cols-6">
           <DrawerStat label="Total" value={campaign.stats.total} />
-          <DrawerStat label="Sent" value={sent} tone="emerald" />
-          <DrawerStat label="Clicks" value={campaign.stats.clicked} tone="blue" />
+          <DrawerStat label={locale === "pt" ? "Enviados" : "Sent"} value={sent} tone="emerald" />
+          <DrawerStat label={locale === "pt" ? "Interações" : "Clicks"} value={campaign.stats.clicked} tone="blue" />
           <DrawerStat label="Conv." value={campaign.stats.converted} tone="emerald" />
-          <DrawerStat label="Failed" value={campaign.stats.failed} tone="red" />
-          <DrawerStat label="Progress" value={`${progress.toFixed(1)}%`} tone="blue" />
+          <DrawerStat label={locale === "pt" ? "Falhas" : "Failed"} value={campaign.stats.failed} tone="red" />
+          <DrawerStat label={locale === "pt" ? "Progresso" : "Progress"} value={`${progress.toFixed(1)}%`} tone="blue" />
         </div>
 
         <div className="max-h-[calc(100vh-260px)] space-y-3 overflow-y-auto p-6 pb-28">
           {events === undefined ? (
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm font-medium text-slate-500">
-              Loading campaign events...
+              {locale === "pt" ? "A carregar eventos da campanha..." : "Loading campaign events..."}
             </div>
           ) : events.length === 0 ? (
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
               <div className="text-sm font-semibold text-[#0a1b33]">
-                No events recorded yet
+                {locale === "pt" ? "Ainda sem eventos registados" : "No events recorded yet"}
               </div>
               <p className="mt-1 text-sm leading-6 text-slate-500">
-                Launch or process this campaign to populate the event stream.
+                {locale === "pt" ? "Inicia ou processa a campanha para preencher esta atividade." : "Launch or process this campaign to populate the event stream."}
               </p>
             </div>
           ) : (
@@ -1923,10 +1940,10 @@ function CampaignLogDrawer({
               return (
                 <LogEvent
                   key={event._id}
-                  kind={eventKind(event)}
+                  kind={eventKind(event, locale)}
                   time={new Date(event.createdAt).toLocaleTimeString()}
-                  message={eventMessage(event)}
-                  detail={eventDetail(event)}
+                  message={eventMessage(event, locale)}
+                  detail={eventDetail(event, locale)}
                   tone={tone}
                   action={
                     canConvert && event.campaignRecipientId ? (
@@ -1941,7 +1958,7 @@ function CampaignLogDrawer({
                         ) : (
                           <BadgeCheck size={13} />
                         )}
-                        Mark converted
+                        {locale === "pt" ? "Marcar conversão" : "Mark converted"}
                       </button>
                     ) : undefined
                   }
@@ -1953,9 +1970,9 @@ function CampaignLogDrawer({
 
         <div className="absolute bottom-0 right-0 flex w-full max-w-xl items-center justify-between border-t border-slate-100 bg-white px-6 py-4 text-sm text-slate-500">
           <span>
-            {events === undefined ? "Loading events" : `${events.length} events`}
+            {events === undefined ? (locale === "pt" ? "A carregar eventos" : "Loading events") : `${events.length} ${locale === "pt" ? "eventos" : "events"}`}
           </span>
-          <span>Last update: {new Date(campaign.updatedAt ?? campaign.createdAt).toLocaleTimeString()}</span>
+          <span>{locale === "pt" ? "Última atualização" : "Last update"}: {new Date(campaign.updatedAt ?? campaign.createdAt).toLocaleTimeString(locale === "pt" ? "pt-MZ" : "en-GB")}</span>
         </div>
       </aside>
     </div>
@@ -2159,32 +2176,32 @@ function eventTone(event: CampaignEvent): "good" | "warn" | "bad" | "neutral" {
   return "neutral";
 }
 
-function eventKind(event: CampaignEvent): string {
-  if (event.type.includes("auto_paused")) return "Safety pause";
-  if (event.type.includes("failed")) return "Failure";
-  if (event.type.includes("retry")) return "Retry";
-  if (event.type.includes("skipped")) return "Skipped";
-  if (event.type.includes("converted")) return "Conversion";
+function eventKind(event: CampaignEvent, locale: "pt" | "en"): string {
+  if (event.type.includes("auto_paused")) return locale === "pt" ? "Pausa de segurança" : "Safety pause";
+  if (event.type.includes("failed")) return locale === "pt" ? "Falha" : "Failure";
+  if (event.type.includes("retry")) return locale === "pt" ? "Repetição" : "Retry";
+  if (event.type.includes("skipped")) return locale === "pt" ? "Ignorado" : "Skipped";
+  if (event.type.includes("converted")) return locale === "pt" ? "Conversão" : "Conversion";
   if (event.type.includes("replied") || event.type.includes("clicked")) {
-    return "Engagement";
+    return locale === "pt" ? "Interação" : "Engagement";
   }
   if (
     event.type.includes("sent") ||
     event.type.includes("delivered") ||
     event.type.includes("read")
   ) {
-    return "Delivery";
+    return locale === "pt" ? "Entrega" : "Delivery";
   }
-  return "Event";
+  return locale === "pt" ? "Evento" : "Event";
 }
 
-function eventMessage(event: CampaignEvent): string {
-  const label = humanizeEventType(event.type);
+function eventMessage(event: CampaignEvent, locale: "pt" | "en"): string {
+  const label = humanizeEventType(event.type, locale);
   if (!event.recipient) return label;
   return `${label} · ${event.recipient.displayName}`;
 }
 
-function eventDetail(event: CampaignEvent): string | undefined {
+function eventDetail(event: CampaignEvent, locale: "pt" | "en"): string | undefined {
   const parts: string[] = [];
   if (event.recipient) {
     const identityLabel =
@@ -2192,33 +2209,33 @@ function eventDetail(event: CampaignEvent): string | undefined {
     parts.push(
       `${identityLabel}: ${event.recipient.identityValue}`,
     );
-    parts.push(`status: ${event.recipient.status}`);
+    parts.push(`${locale === "pt" ? "estado" : "status"}: ${campaignStatusLabel(event.recipient.status, locale)}`);
     if (event.recipient.metaErrorCategory) {
-      parts.push(`category: ${event.recipient.metaErrorCategory}`);
+      parts.push(`${locale === "pt" ? "categoria" : "category"}: ${event.recipient.metaErrorCategory}`);
     }
     if (event.recipient.sentAt) {
-      parts.push(`sent: ${new Date(event.recipient.sentAt).toLocaleString()}`);
+      parts.push(`${locale === "pt" ? "enviado" : "sent"}: ${new Date(event.recipient.sentAt).toLocaleString(locale === "pt" ? "pt-MZ" : "en-GB")}`);
     }
     if (event.recipient.deliveredAt) {
       parts.push(
-        `delivered: ${new Date(event.recipient.deliveredAt).toLocaleString()}`,
+        `${locale === "pt" ? "entregue" : "delivered"}: ${new Date(event.recipient.deliveredAt).toLocaleString(locale === "pt" ? "pt-MZ" : "en-GB")}`,
       );
     }
     if (event.recipient.readAt) {
-      parts.push(`read: ${new Date(event.recipient.readAt).toLocaleString()}`);
+      parts.push(`${locale === "pt" ? "lido" : "read"}: ${new Date(event.recipient.readAt).toLocaleString(locale === "pt" ? "pt-MZ" : "en-GB")}`);
     }
     if (event.recipient.clickedAt) {
       parts.push(
-        `clicked: ${new Date(event.recipient.clickedAt).toLocaleString()}`,
+        `${locale === "pt" ? "interação" : "clicked"}: ${new Date(event.recipient.clickedAt).toLocaleString(locale === "pt" ? "pt-MZ" : "en-GB")}`,
       );
     }
     if (event.recipient.convertedAt) {
       parts.push(
-        `converted: ${new Date(event.recipient.convertedAt).toLocaleString()}`,
+        `${locale === "pt" ? "convertido" : "converted"}: ${new Date(event.recipient.convertedAt).toLocaleString(locale === "pt" ? "pt-MZ" : "en-GB")}`,
       );
     }
     if (event.recipient.conversionLabel) {
-      parts.push(`conversion: ${event.recipient.conversionLabel}`);
+      parts.push(`${locale === "pt" ? "conversão" : "conversion"}: ${event.recipient.conversionLabel}`);
     }
     if (event.recipient.failureCode) {
       parts.push(`Meta code: ${event.recipient.failureCode}`);
@@ -2232,13 +2249,49 @@ function eventDetail(event: CampaignEvent): string | undefined {
   return parts.length ? parts.join(" · ") : undefined;
 }
 
-function humanizeEventType(type: string): string {
+function humanizeEventType(type: string, locale: "pt" | "en"): string {
   const clean = type
     .replace(/^campaign\./, "")
     .replace(/^recipient\./, "")
     .replace(/\./g, " ")
     .replace(/_/g, " ");
-  return clean.charAt(0).toUpperCase() + clean.slice(1);
+  const normalized = clean.toLowerCase();
+  const labels: Record<string, [string, string]> = {
+    sent: ["Mensagem enviada", "Message sent"],
+    delivered: ["Mensagem entregue", "Message delivered"],
+    read: ["Mensagem lida", "Message read"],
+    replied: ["Paciente respondeu", "Patient replied"],
+    clicked: ["Paciente interagiu", "Patient clicked"],
+    converted: ["Conversão registada", "Conversion recorded"],
+    failed: ["Envio falhou", "Send failed"],
+    queued: ["Envio na fila", "Send queued"],
+  };
+  const translated = labels[normalized];
+  return translated ? translated[locale === "pt" ? 0 : 1] : clean.charAt(0).toUpperCase() + clean.slice(1);
+}
+
+function campaignStatusLabel(status: string, locale: "pt" | "en"): string {
+  const labels: Record<string, [string, string]> = {
+    draft: ["rascunho", "draft"],
+    scheduled: ["agendada", "scheduled"],
+    running: ["em execução", "running"],
+    paused: ["pausada", "paused"],
+    completed: ["concluída", "completed"],
+    cancelled: ["cancelada", "cancelled"],
+    failed: ["falhou", "failed"],
+    pending: ["pendente", "pending"],
+    queued: ["na fila", "queued"],
+    dispatching: ["a enviar", "sending"],
+    sent: ["enviada", "sent"],
+    delivered: ["entregue", "delivered"],
+    read: ["lida", "read"],
+    replied: ["respondeu", "replied"],
+    clicked: ["interagiu", "clicked"],
+    converted: ["convertida", "converted"],
+    skipped: ["ignorada", "skipped"],
+  };
+  const translated = labels[status];
+  return translated ? translated[locale === "pt" ? 0 : 1] : status.replace(/_/g, " ");
 }
 
 function compactPayload(payload: unknown): string | undefined {
@@ -2343,7 +2396,7 @@ function WorkflowPanel({
   children: ReactNode;
 }) {
   return (
-    <section id={id} className="scroll-mt-24 bg-white border border-slate-200 rounded-2xl p-5">
+    <section id={id} className="scroll-mt-24 rounded-lg border border-slate-200 bg-white p-5">
       <div className="flex items-start gap-3 mb-4">
         <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center text-[#0a1b33]">
           <Icon size={17} />

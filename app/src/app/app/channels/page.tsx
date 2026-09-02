@@ -26,6 +26,7 @@ import type { LucideIcon } from "lucide-react";
 import { PageHeader } from "@/components/app/EmptyState";
 import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
+import { useI18n, type Locale } from "@/lib/i18n";
 
 type Tone = "good" | "warn" | "bad" | "neutral";
 
@@ -99,6 +100,7 @@ type ChannelHealth = {
 };
 
 export default function ChannelsPage() {
+  const { locale, tr } = useI18n();
   const accounts = useQuery(api.whatsappAccounts.listForTenant) as
     | WabaAccount[]
     | undefined;
@@ -131,7 +133,7 @@ export default function ChannelsPage() {
   }, [selectedAccount, selectedPhoneId]);
 
   const channelHealth = selectedAccount
-    ? evaluateChannelHealth(selectedAccount, selectedPhone)
+    ? evaluateChannelHealth(selectedAccount, selectedPhone, locale)
     : undefined;
 
   async function copyValue(value: string, label: string) {
@@ -151,7 +153,7 @@ export default function ChannelsPage() {
       });
       setLastRefreshAt(Date.now());
     } catch (error) {
-      setRefreshError(error instanceof Error ? error.message : "Refresh failed.");
+      setRefreshError(error instanceof Error ? error.message : tr("A atualização falhou.", "Refresh failed."));
     } finally {
       setRefreshing(false);
     }
@@ -160,27 +162,27 @@ export default function ChannelsPage() {
   return (
     <>
       <PageHeader
-        eyebrow="Meta channels"
-        title="Channels"
-        description="Manage WhatsApp business accounts, phone health, and coexistence readiness."
+        eyebrow={tr("Ligações WhatsApp", "WhatsApp connections")}
+        title={tr("Canais", "Channels")}
+        description={tr("Estado dos números, ligação à Meta e segurança de envio.", "Phone health, Meta connection and send safety.")}
       />
 
       <div className="grid min-h-[calc(100vh-105px)] border-t border-slate-100 bg-white lg:grid-cols-[310px_330px_1fr]">
         <aside className="border-b border-slate-200 p-4 lg:border-b-0 lg:border-r">
-          <SectionLabel label={`Business accounts (${accounts?.length ?? 0})`} />
+          <SectionLabel label={`${tr("Contas empresariais", "Business accounts")} (${accounts?.length ?? 0})`} />
           {accounts === undefined ? (
             <SkeletonRows />
           ) : accounts.length === 0 ? (
             <EmptyPanel
               icon={Building2}
-              title="No WABA connected"
-              body="Connect a WhatsApp Business Account in Settings to unlock channel health."
+              title={tr("Nenhuma WABA ligada", "No WABA connected")}
+              body={tr("Ligue uma conta WhatsApp Business nas Configurações para acompanhar o canal.", "Connect a WhatsApp Business Account in Settings to monitor the channel.")}
             />
           ) : (
             <div className="space-y-2">
               {accounts.map((account) => {
                 const active = selectedAccount?._id === account._id;
-                const accountHealth = evaluateChannelHealth(account);
+                const accountHealth = evaluateChannelHealth(account, undefined, locale);
                 return (
                   <button
                     key={account._id}
@@ -189,14 +191,14 @@ export default function ChannelsPage() {
                       setSelectedAccountId(account._id);
                       setSelectedPhoneId(account.phoneNumbers[0]?._id ?? null);
                     }}
-                    className={`flex w-full items-center gap-3 rounded-xl border px-3 py-3 text-left transition-all ${
+                    className={`flex w-full items-center gap-3 rounded-lg border px-3 py-3 text-left transition-all ${
                       active
                         ? "border-slate-300 bg-slate-50"
                         : "border-transparent hover:border-slate-200 hover:bg-slate-50"
                     }`}
                   >
                     <span
-                      className={`flex h-10 w-10 items-center justify-center rounded-xl ${toneIconClass(
+                      className={`flex h-10 w-10 items-center justify-center rounded-lg ${toneIconClass(
                         accountHealth.tone,
                       )}`}
                     >
@@ -207,8 +209,10 @@ export default function ChannelsPage() {
                         WABA {account.wabaId}
                       </span>
                       <span className="mt-0.5 block truncate text-xs text-slate-500">
-                        {accountHealth.label} · {account.phoneNumbers.length} channel
-                        {account.phoneNumbers.length === 1 ? "" : "s"}
+                        {accountHealth.label} · {account.phoneNumbers.length}{" "}
+                        {locale === "pt"
+                          ? account.phoneNumbers.length === 1 ? "canal" : "canais"
+                          : account.phoneNumbers.length === 1 ? "channel" : "channels"}
                       </span>
                     </span>
                     <HealthDot tone={accountHealth.tone} />
@@ -221,38 +225,38 @@ export default function ChannelsPage() {
 
         <aside className="border-b border-slate-200 p-4 lg:border-b-0 lg:border-r">
           <SectionLabel
-            label={`Channels (${selectedAccount?.phoneNumbers.length ?? 0})`}
+            label={`${tr("Canais", "Channels")} (${selectedAccount?.phoneNumbers.length ?? 0})`}
           />
           {!selectedAccount ? (
             <EmptyPanel
               icon={Smartphone}
-              title="No channels yet"
-              body="The channel list appears after a business account is connected."
+              title={tr("Ainda não há canais", "No channels yet")}
+              body={tr("Os canais aparecem depois de ligar uma conta empresarial.", "Channels appear after a business account is connected.")}
             />
           ) : selectedAccount.phoneNumbers.length === 0 ? (
             <EmptyPanel
               icon={Phone}
-              title="No phone numbers"
-              body="This WABA is connected but has no phone number bound yet."
+              title={tr("Nenhum número associado", "No phone numbers")}
+              body={tr("Esta WABA está ligada, mas ainda não tem um número associado.", "This WABA is connected but has no phone number bound yet.")}
             />
           ) : (
             <div className="space-y-2">
               {selectedAccount.phoneNumbers.map((phone) => {
                 const active = selectedPhone?._id === phone._id;
-                const phoneHealth = evaluateChannelHealth(selectedAccount, phone);
+                const phoneHealth = evaluateChannelHealth(selectedAccount, phone, locale);
                 return (
                   <button
                     key={phone._id}
                     type="button"
                     onClick={() => setSelectedPhoneId(phone._id)}
-                    className={`flex w-full items-center gap-3 rounded-xl border px-3 py-3 text-left transition-all ${
+                    className={`flex w-full items-center gap-3 rounded-lg border px-3 py-3 text-left transition-all ${
                       active
                         ? "border-slate-300 bg-slate-50"
                         : "border-transparent hover:border-slate-200 hover:bg-slate-50"
                     }`}
                   >
                     <span
-                      className={`flex h-10 w-10 items-center justify-center rounded-xl ${toneIconClass(
+                      className={`flex h-10 w-10 items-center justify-center rounded-lg ${toneIconClass(
                         phoneHealth.tone,
                       )}`}
                     >
@@ -270,9 +274,9 @@ export default function ChannelsPage() {
                   </button>
                 );
               })}
-              <div className="rounded-xl border border-dashed border-slate-200 px-3 py-3 text-center text-sm font-medium text-slate-500">
+              <div className="rounded-lg border border-dashed border-slate-200 px-3 py-3 text-center text-sm font-medium text-slate-500">
                 <Link2 size={15} className="mx-auto mb-1 text-slate-400" />
-                Connect channel
+                {tr("Ligar canal", "Connect channel")}
               </div>
             </div>
           )}
@@ -302,15 +306,15 @@ export default function ChannelsPage() {
                     </div>
                     <p className="mt-1 text-sm text-slate-500">
                       {selectedPhone.verifiedName
-                        ? `Verified name: ${selectedPhone.verifiedName}`
-                        : `Connected as ${selectedPhone.displayName}`}
+                        ? `${tr("Nome verificado", "Verified name")}: ${selectedPhone.verifiedName}`
+                        : `${tr("Ligado como", "Connected as")} ${selectedPhone.displayName}`}
                     </p>
                   </div>
                 </div>
                 <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center">
                   {lastRefreshAt && (
                     <span className="text-xs font-medium text-slate-500">
-                      Refreshed {formatRelative(lastRefreshAt)}
+                      {tr("Atualizado", "Refreshed")} {formatRelative(lastRefreshAt, locale)}
                     </span>
                   )}
                   <button
@@ -323,7 +327,7 @@ export default function ChannelsPage() {
                       size={15}
                       className={refreshing ? "animate-spin" : ""}
                     />
-                    {refreshing ? "Refreshing..." : "Refresh health"}
+                    {refreshing ? tr("A atualizar...", "Refreshing...") : tr("Atualizar estado", "Refresh health")}
                   </button>
                 </div>
               </div>
@@ -331,15 +335,15 @@ export default function ChannelsPage() {
               <div className="grid gap-4 p-6 xl:grid-cols-2">
                 {refreshError && (
                   <div className="xl:col-span-2">
-                    <InlineAlert tone="bad" title="Refresh failed">
+                    <InlineAlert tone="bad" title={tr("Atualização falhou", "Refresh failed")}>
                       {cleanError(refreshError)}
                     </InlineAlert>
                   </div>
                 )}
 
-                <ChannelCard icon={ShieldCheck} title="Message status">
+                <ChannelCard icon={ShieldCheck} title={tr("Estado das mensagens", "Message status")}>
                   <div
-                    className={`flex items-start gap-3 rounded-xl border p-4 ${tonePanelClass(
+                    className={`flex items-start gap-3 rounded-lg border p-4 ${tonePanelClass(
                       channelHealth.tone,
                     )}`}
                   >
@@ -367,24 +371,27 @@ export default function ChannelsPage() {
                   </div>
                 </ChannelCard>
 
-                <ChannelCard icon={Activity} title="Channel health status">
+                <ChannelCard icon={Activity} title={tr("Saúde do canal", "Channel health")}>
                   <div className="grid gap-3 sm:grid-cols-3">
                     <HealthMetric
                       label="WABA"
-                      value={selectedAccount.status}
+                      value={stateLabel(selectedAccount.status, locale)}
                       tone={selectedAccount.status === "active" ? "good" : "bad"}
                     />
                     <HealthMetric
                       label="Token"
-                      value={selectedAccount.tokenStatus}
+                      value={stateLabel(selectedAccount.tokenStatus, locale)}
                       tone={tokenTone(selectedAccount.tokenStatus)}
                     />
                     <HealthMetric
-                      label="Quality"
+                      label={tr("Qualidade", "Quality")}
                       value={
-                        selectedPhone.qualityRating ??
-                        selectedAccount.qualityRating ??
-                        "unknown"
+                        stateLabel(
+                          selectedPhone.qualityRating ??
+                            selectedAccount.qualityRating ??
+                            "unknown",
+                          locale,
+                        )
                       }
                       tone={qualityTone(
                         selectedPhone.qualityRating ?? selectedAccount.qualityRating,
@@ -393,11 +400,11 @@ export default function ChannelsPage() {
                   </div>
                   <div className="mt-4 grid gap-3 sm:grid-cols-2">
                     <HealthMetric
-                      label="Tier"
+                      label={tr("Nível", "Tier")}
                       value={
                         selectedPhone.messagingTier ??
                         selectedAccount.messagingTier ??
-                        "unknown"
+                        tr("desconhecido", "unknown")
                       }
                       tone={
                         selectedPhone.messagingTier || selectedAccount.messagingTier
@@ -406,12 +413,12 @@ export default function ChannelsPage() {
                       }
                     />
                     <HealthMetric
-                      label="Circuit"
+                      label={tr("Proteção", "Circuit")}
                       value={
                         selectedPhone.circuitBreakerUntil &&
                         selectedPhone.circuitBreakerUntil > Date.now()
-                          ? "paused"
-                          : "clear"
+                          ? tr("pausado", "paused")
+                          : tr("livre", "clear")
                       }
                       tone={
                         selectedPhone.circuitBreakerUntil &&
@@ -425,22 +432,22 @@ export default function ChannelsPage() {
 
                 <ChannelCard
                   icon={Phone}
-                  title="Phone details"
+                  title={tr("Detalhes do número", "Phone details")}
                   action={
                     copied && (
                       <span className="text-xs font-medium text-emerald-600">
-                        Copied {copied}
+                        {tr("Copiado", "Copied")} {copied}
                       </span>
                     )
                   }
                 >
-                  <DetailRow label="Display name" value={selectedPhone.displayName} />
+                  <DetailRow label={tr("Nome de exibição", "Display name")} value={selectedPhone.displayName} />
                   <DetailRow
-                    label="Verified name"
-                    value={selectedPhone.verifiedName ?? "Not synced"}
+                    label={tr("Nome verificado", "Verified name")}
+                    value={selectedPhone.verifiedName ?? tr("Não sincronizado", "Not synced")}
                   />
                   <DetailRow
-                    label="Phone number"
+                    label={tr("Número de telefone", "Phone number")}
                     value={selectedPhone.e164}
                     copy={() => copyValue(selectedPhone.e164, "phone")}
                   />
@@ -453,20 +460,20 @@ export default function ChannelsPage() {
                     }
                   />
                   <DetailRow
-                    label="Business username"
+                    label={tr("Nome de utilizador empresarial", "Business username")}
                     value={
                       selectedPhone.businessUsername
-                        ? `${selectedPhone.businessUsername} (${selectedPhone.businessUsernameStatus ?? "status unknown"})`
-                        : "Not reported"
+                        ? `${selectedPhone.businessUsername} (${selectedPhone.businessUsernameStatus ?? tr("estado desconhecido", "status unknown")})`
+                        : tr("Não informado", "Not reported")
                     }
                   />
                 </ChannelCard>
 
-                <ChannelCard icon={KeyRound} title="Token and Meta access">
+                <ChannelCard icon={KeyRound} title={tr("Token e acesso à Meta", "Token and Meta access")}>
                   <ChecklistRow
                     icon={ShieldCheck}
-                    label="Token storage"
-                    value={formatTokenStorage(selectedAccount.tokenStorage)}
+                    label={tr("Armazenamento do token", "Token storage")}
+                    value={formatTokenStorage(selectedAccount.tokenStorage, locale)}
                     tone={
                       selectedAccount.tokenStorage === "encrypted"
                         ? "good"
@@ -477,14 +484,14 @@ export default function ChannelsPage() {
                   />
                   <ChecklistRow
                     icon={Clock3}
-                    label="Last token check"
-                    value={formatDateTime(selectedAccount.lastTokenHealthCheckAt)}
+                    label={tr("Última verificação do token", "Last token check")}
+                    value={formatDateTime(selectedAccount.lastTokenHealthCheckAt, locale)}
                     tone={selectedAccount.lastTokenHealthCheckAt ? "good" : "warn"}
                   />
                   <ChecklistRow
                     icon={DatabaseZap}
-                    label="Data access"
-                    value={formatExpiry(selectedAccount.dataAccessExpiresAt)}
+                    label={tr("Acesso aos dados", "Data access")}
+                    value={formatExpiry(selectedAccount.dataAccessExpiresAt, locale)}
                     tone={expiryTone(selectedAccount.dataAccessExpiresAt)}
                   />
                   <ChecklistRow
@@ -493,22 +500,22 @@ export default function ChannelsPage() {
                     value={
                       selectedAccount.validatedScopes?.length
                         ? selectedAccount.validatedScopes.join(", ")
-                        : "Not synced"
+                        : tr("Não sincronizadas", "Not synced")
                     }
                     tone={selectedAccount.validatedScopes?.length ? "good" : "warn"}
                   />
                   {selectedAccount.tokenHealthDetail && (
-                    <InlineAlert tone="warn" title="Token detail">
+                    <InlineAlert tone="warn" title={tr("Detalhe do token", "Token detail")}>
                       {selectedAccount.tokenHealthDetail}
                     </InlineAlert>
                   )}
                 </ChannelCard>
 
-                <ChannelCard icon={AlertTriangle} title="Meta events and safety">
+                <ChannelCard icon={AlertTriangle} title={tr("Eventos e segurança Meta", "Meta events and safety")}>
                   <ChecklistRow
                     icon={Building2}
-                    label="Onboarding"
-                    value={formatOnboardingSource(selectedAccount.onboardingSource)}
+                    label={tr("Ligação inicial", "Onboarding")}
+                    value={formatOnboardingSource(selectedAccount.onboardingSource, locale)}
                     tone={
                       selectedAccount.onboardingSource === "embedded_signup"
                         ? "good"
@@ -517,14 +524,14 @@ export default function ChannelsPage() {
                   />
                   <ChecklistRow
                     icon={Activity}
-                    label="Phone sync"
-                    value={formatDateTime(selectedPhone.lastMetaSyncAt)}
+                    label={tr("Sincronização do número", "Phone sync")}
+                    value={formatDateTime(selectedPhone.lastMetaSyncAt, locale)}
                     tone={selectedPhone.lastMetaSyncAt ? "good" : "warn"}
                   />
                   <ChecklistRow
                     icon={ShieldAlert}
-                    label="Last account event"
-                    value={selectedAccount.accountUpdateEvent ?? "None recorded"}
+                    label={tr("Último evento da conta", "Last account event")}
+                    value={selectedAccount.accountUpdateEvent ?? tr("Nenhum registado", "None recorded")}
                     tone={
                       selectedAccount.accountUpdateEvent &&
                       selectedAccount.status !== "active"
@@ -534,21 +541,22 @@ export default function ChannelsPage() {
                   />
                   <ChecklistRow
                     icon={Clock3}
-                    label="Quality event"
+                    label={tr("Evento de qualidade", "Quality event")}
                     value={
                       selectedPhone.lastQualityEvent
                         ? `${selectedPhone.lastQualityEvent} · ${formatDateTime(
                             selectedPhone.lastQualityEventAt,
+                            locale,
                           )}`
-                        : "None recorded"
+                        : tr("Nenhum registado", "None recorded")
                     }
                     tone={qualityTone(selectedPhone.qualityRating)}
                   />
                   {selectedPhone.qualityLastErrorCode && (
-                    <InlineAlert tone="warn" title="Last send error">
-                      Meta code {selectedPhone.qualityLastErrorCode}
+                    <InlineAlert tone="warn" title={tr("Último erro de envio", "Last send error")}>
+                      {tr("Código Meta", "Meta code")} {selectedPhone.qualityLastErrorCode}
                       {selectedPhone.qualityLastErrorAt
-                        ? ` · ${formatDateTime(selectedPhone.qualityLastErrorAt)}`
+                        ? ` · ${formatDateTime(selectedPhone.qualityLastErrorAt, locale)}`
                         : ""}
                     </InlineAlert>
                   )}
@@ -557,16 +565,16 @@ export default function ChannelsPage() {
                 <div className="xl:col-span-2">
                   <ChannelCard
                     icon={Unplug}
-                    title="Coexistence recovery"
+                    title={tr("Recuperação da coexistência", "Coexistence recovery")}
                     action={
                       <StatusBadge tone={selectedAccount.coexRecovery.tone}>
                         {statusIcon(selectedAccount.coexRecovery.tone)}
-                        {formatCoexState(selectedAccount.coexRecovery.state)}
+                        {formatCoexState(selectedAccount.coexRecovery.state, locale)}
                       </StatusBadge>
                     }
                   >
                     <div
-                      className={`flex items-start gap-3 rounded-xl border p-4 ${tonePanelClass(
+                      className={`flex items-start gap-3 rounded-lg border p-4 ${tonePanelClass(
                         selectedAccount.coexRecovery.tone,
                       )}`}
                     >
@@ -585,19 +593,19 @@ export default function ChannelsPage() {
 
                     <div className="mt-4 grid gap-4 lg:grid-cols-2">
                       <RecoverySteps
-                        title="OpenBSP next steps"
+                        title={tr("Próximos passos no OpenBSP", "OpenBSP next steps")}
                         steps={selectedAccount.coexRecovery.operatorSteps}
                       />
                       <RecoverySteps
-                        title="Client phone check"
+                        title={tr("Verificação no telefone do cliente", "Client phone check")}
                         steps={selectedAccount.coexRecovery.customerSteps}
                       />
                     </div>
 
-                    <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50 p-3">
+                    <div className="mt-4 rounded-lg border border-slate-100 bg-slate-50 p-3">
                       <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
                         <ListChecks size={14} />
-                        Meta signals
+                        {tr("Sinais da Meta", "Meta signals")}
                       </div>
                       <div className="flex flex-wrap gap-2">
                         {selectedAccount.coexRecovery.evidence.map((item) => (
@@ -613,7 +621,7 @@ export default function ChannelsPage() {
                   </ChannelCard>
                 </div>
 
-                <ChannelCard icon={Unplug} title="Account identifiers">
+                <ChannelCard icon={Unplug} title={tr("Identificadores da conta", "Account identifiers")}>
                   <DetailRow
                     label="WABA ID"
                     value={selectedAccount.wabaId}
@@ -627,8 +635,8 @@ export default function ChannelsPage() {
                     copy={() => copyValue(selectedAccount.metaAppId, "app ID")}
                   />
                   <DetailRow
-                    label="Business Portfolio ID"
-                    value={selectedAccount.businessPortfolioId ?? "Not captured"}
+                    label={tr("ID do portefólio empresarial", "Business Portfolio ID")}
+                    value={selectedAccount.businessPortfolioId ?? tr("Não capturado", "Not captured")}
                     mono={Boolean(selectedAccount.businessPortfolioId)}
                     copy={
                       selectedAccount.businessPortfolioId
@@ -641,8 +649,8 @@ export default function ChannelsPage() {
                     }
                   />
                   <DetailRow
-                    label="Throughput"
-                    value={selectedPhone.throughputLevel ?? "Not synced"}
+                    label={tr("Capacidade de envio", "Throughput")}
+                    value={selectedPhone.throughputLevel ?? tr("Não sincronizada", "Not synced")}
                   />
                 </ChannelCard>
               </div>
@@ -651,8 +659,8 @@ export default function ChannelsPage() {
             <div className="p-6">
               <EmptyPanel
                 icon={Smartphone}
-                title="Select a channel"
-                body="Pick a connected phone number to inspect its health and Meta identifiers."
+                title={tr("Selecione um canal", "Select a channel")}
+                body={tr("Escolha um número ligado para consultar a saúde e os identificadores Meta.", "Choose a connected number to inspect health and Meta identifiers.")}
               />
             </div>
           )}
@@ -665,7 +673,9 @@ export default function ChannelsPage() {
 function evaluateChannelHealth(
   account: WabaAccount,
   phone?: ChannelPhone,
+  locale: Locale = "en",
 ): ChannelHealth {
+  const pt = locale === "pt";
   const reasons: string[] = [];
   const now = Date.now();
   const circuitActive =
@@ -673,43 +683,45 @@ function evaluateChannelHealth(
     (phone?.circuitBreakerUntil ?? 0) > now;
 
   if (account.status !== "active") {
-    reasons.push(`WABA status is ${account.status}.`);
+    reasons.push(pt ? `O estado da WABA é ${stateLabel(account.status, locale)}.` : `WABA status is ${stateLabel(account.status, locale)}.`);
   }
   if (account.tokenStatus === "revoked") {
-    reasons.push("Meta token is revoked or missing required scopes.");
+    reasons.push(pt ? "O token Meta foi revogado ou não tem as permissões necessárias." : "Meta token is revoked or missing required scopes.");
   } else if (account.tokenStatus === "expiring") {
-    reasons.push("Meta token is close to expiry.");
+    reasons.push(pt ? "O token Meta está próximo de expirar." : "Meta token is close to expiry.");
   }
   if (account.tokenStorage !== "encrypted") {
-    reasons.push(`Token storage is ${formatTokenStorage(account.tokenStorage)}.`);
+    reasons.push(pt ? `O armazenamento do token é ${formatTokenStorage(account.tokenStorage, locale)}.` : `Token storage is ${formatTokenStorage(account.tokenStorage, locale)}.`);
   }
   if (circuitActive) {
     reasons.push(
       phone?.circuitBreakerReason
-        ? `${phone.circuitBreakerReason} until ${formatDateTime(
+        ? `${phone.circuitBreakerReason} ${pt ? "até" : "until"} ${formatDateTime(
             phone.circuitBreakerUntil,
+            locale,
           )}.`
-        : `Circuit breaker active until ${formatDateTime(
+        : `${pt ? "Proteção temporária ativa até" : "Circuit breaker active until"} ${formatDateTime(
             phone?.circuitBreakerUntil,
+            locale,
           )}.`,
     );
   }
   if ((phone?.qualityRating ?? account.qualityRating) === "red") {
-    reasons.push("Meta quality rating is red.");
+    reasons.push(pt ? "A classificação de qualidade da Meta está vermelha." : "Meta quality rating is red.");
   } else if ((phone?.qualityRating ?? account.qualityRating) === "yellow") {
-    reasons.push("Meta quality rating is yellow.");
+    reasons.push(pt ? "A classificação de qualidade da Meta está amarela." : "Meta quality rating is yellow.");
   }
   if (account.lastDisconnectionReason) {
     reasons.push(
-      `Last disconnect: ${account.lastDisconnectionReason}${
+      `${pt ? "Última desconexão" : "Last disconnect"}: ${account.lastDisconnectionReason}${
         account.lastDisconnectionInitiatedBy
-          ? ` by ${account.lastDisconnectionInitiatedBy}`
+          ? ` ${pt ? "por" : "by"} ${account.lastDisconnectionInitiatedBy}`
           : ""
       }.`,
     );
   }
   if (account.banState) {
-    reasons.push(`Ban state: ${account.banState}.`);
+    reasons.push(`${pt ? "Estado de bloqueio" : "Ban state"}: ${stateLabel(account.banState, locale)}.`);
   }
 
   if (
@@ -719,11 +731,12 @@ function evaluateChannelHealth(
     (phone?.qualityRating ?? account.qualityRating) === "red"
   ) {
     return {
-      label: "Blocked",
+      label: pt ? "Bloqueado" : "Blocked",
       tone: "bad",
-      headline: "Outbound should stay paused",
-      body:
-        "This channel has a Meta-side blocker or a local circuit breaker. Campaigns and manual sends should not rely on it until the issue clears.",
+      headline: pt ? "Os envios devem continuar pausados" : "Outbound should stay paused",
+      body: pt
+        ? "Este canal tem um bloqueio da Meta ou uma proteção local ativa. Não use em campanhas ou envios manuais até resolver."
+        : "This channel has a Meta-side blocker or a local circuit breaker. Campaigns and manual sends should not rely on it until the issue clears.",
       reasons,
     };
   }
@@ -736,27 +749,29 @@ function evaluateChannelHealth(
     !phone?.lastMetaSyncAt
   ) {
     if (!account.lastTokenHealthCheckAt) {
-      reasons.push("Token health has not been checked yet.");
+      reasons.push(pt ? "A saúde do token ainda não foi verificada." : "Token health has not been checked yet.");
     }
     if (phone && !phone.lastMetaSyncAt) {
-      reasons.push("Phone quality/tier has not been synced yet.");
+      reasons.push(pt ? "A qualidade e o nível do número ainda não foram sincronizados." : "Phone quality/tier has not been synced yet.");
     }
     return {
-      label: "Needs review",
+      label: pt ? "Precisa de revisão" : "Needs review",
       tone: "warn",
-      headline: "Send only after review",
-      body:
-        "The channel is not hard-blocked, but the operator should refresh Meta health before high-volume campaigns.",
+      headline: pt ? "Enviar apenas depois de rever" : "Send only after review",
+      body: pt
+        ? "O canal não está bloqueado, mas deve atualizar a saúde Meta antes de campanhas de maior volume."
+        : "The channel is not hard-blocked, but the operator should refresh Meta health before high-volume campaigns.",
       reasons,
     };
   }
 
   return {
-    label: "Available",
+    label: pt ? "Disponível" : "Available",
     tone: "good",
-    headline: "Ready for controlled sends",
-    body:
-      "WABA status, token health, quality and local circuit breaker are clear for normal operation.",
+    headline: pt ? "Pronto para envios controlados" : "Ready for controlled sends",
+    body: pt
+      ? "O estado da WABA, token, qualidade e proteção local permitem a operação normal."
+      : "WABA status, token health, quality and local circuit breaker are clear for normal operation.",
     reasons,
   };
 }
@@ -779,7 +794,7 @@ function EmptyPanel({
   body: string;
 }) {
   return (
-    <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-6 text-center">
+    <div className="rounded-lg border border-dashed border-slate-200 bg-white p-6 text-center">
       <Icon size={24} className="mx-auto text-slate-300" />
       <div className="mt-3 text-sm font-semibold text-[#0a1b33]">{title}</div>
       <p className="mt-1 text-sm leading-6 text-slate-500">{body}</p>
@@ -793,7 +808,7 @@ function SkeletonRows() {
       {[0, 1, 2].map((index) => (
         <div
           key={index}
-          className="h-[68px] animate-pulse rounded-xl border border-slate-100 bg-slate-50"
+          className="h-[68px] animate-pulse rounded-lg border border-slate-100 bg-slate-50"
         />
       ))}
     </div>
@@ -834,7 +849,7 @@ function ChannelCard({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-5">
+    <section className="rounded-lg border border-slate-200 bg-white p-5">
       <div className="mb-4 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <Icon size={17} className="text-slate-500" />
@@ -860,6 +875,8 @@ function DetailRow({
   mono?: boolean;
   copy?: () => void;
 }) {
+  const { tr } = useI18n();
+
   return (
     <div className="border-b border-slate-100 py-3 last:border-b-0">
       <div className="text-xs font-medium text-slate-500">{label}</div>
@@ -876,7 +893,7 @@ function DetailRow({
             type="button"
             onClick={copy}
             className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-[#0a1b33]"
-            aria-label={`Copy ${label}`}
+            aria-label={`${tr("Copiar", "Copy")} ${label}`}
           >
             <Copy size={14} />
           </button>
@@ -896,7 +913,7 @@ function HealthMetric({
   tone: Tone;
 }) {
   return (
-    <div className={`rounded-xl border p-3 ${metricClass(tone)}`}>
+    <div className={`rounded-lg border p-3 ${metricClass(tone)}`}>
       <div className="text-[11px] font-semibold uppercase tracking-[0.12em] opacity-75">
         {label}
       </div>
@@ -939,7 +956,7 @@ function ChecklistRow({
 
 function RecoverySteps({ title, steps }: { title: string; steps: string[] }) {
   return (
-    <div className="rounded-xl border border-slate-100 bg-white p-4">
+    <div className="rounded-lg border border-slate-100 bg-white p-4">
       <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-[#0a1b33]">
         <ListChecks size={15} className="text-slate-500" />
         {title}
@@ -969,7 +986,7 @@ function InlineAlert({
 }) {
   const Icon = tone === "bad" ? XCircle : tone === "warn" ? AlertTriangle : CheckCircle2;
   return (
-    <div className={`mt-3 flex items-start gap-3 rounded-xl border p-3 ${tonePanelClass(tone)}`}>
+    <div className={`mt-3 flex items-start gap-3 rounded-lg border p-3 ${tonePanelClass(tone)}`}>
       <Icon size={16} className="mt-0.5 shrink-0" />
       <div>
         <div className="text-sm font-semibold">{title}</div>
@@ -1049,48 +1066,90 @@ function tonePanelClass(tone: Tone) {
   return "border-slate-200 bg-slate-50 text-slate-700";
 }
 
-function formatDateTime(value?: number) {
-  if (!value) return "Not recorded";
-  return new Intl.DateTimeFormat("en", {
+function formatDateTime(value?: number, locale: Locale = "en") {
+  if (!value) return locale === "pt" ? "Não registado" : "Not recorded";
+  return new Intl.DateTimeFormat(locale === "pt" ? "pt-MZ" : "en-GB", {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));
 }
 
-function formatRelative(value: number) {
+function formatRelative(value: number, locale: Locale = "en") {
   const seconds = Math.max(1, Math.floor((Date.now() - value) / 1000));
-  if (seconds < 60) return "just now";
+  if (seconds < 60) return locale === "pt" ? "agora" : "just now";
   const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
+  if (minutes < 60) return locale === "pt" ? `há ${minutes} min` : `${minutes}m ago`;
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return formatDateTime(value);
+  if (hours < 24) return locale === "pt" ? `há ${hours} h` : `${hours}h ago`;
+  return formatDateTime(value, locale);
 }
 
-function formatExpiry(value?: number) {
-  if (!value) return "No expiry reported";
-  if (value <= Date.now()) return `Expired ${formatDateTime(value)}`;
-  return `Expires ${formatDateTime(value)}`;
+function formatExpiry(value?: number, locale: Locale = "en") {
+  if (!value) return locale === "pt" ? "Sem validade informada" : "No expiry reported";
+  if (value <= Date.now()) {
+    return locale === "pt"
+      ? `Expirou em ${formatDateTime(value, locale)}`
+      : `Expired ${formatDateTime(value, locale)}`;
+  }
+  return locale === "pt"
+    ? `Expira em ${formatDateTime(value, locale)}`
+    : `Expires ${formatDateTime(value, locale)}`;
 }
 
-function formatTokenStorage(value: WabaAccount["tokenStorage"]) {
-  if (value === "encrypted") return "Encrypted";
-  if (value === "legacy_plaintext") return "Legacy plaintext";
-  return "Missing";
+function formatTokenStorage(
+  value: WabaAccount["tokenStorage"],
+  locale: Locale = "en",
+) {
+  if (value === "encrypted") return locale === "pt" ? "Encriptado" : "Encrypted";
+  if (value === "legacy_plaintext") {
+    return locale === "pt" ? "Texto simples legado" : "Legacy plaintext";
+  }
+  return locale === "pt" ? "Em falta" : "Missing";
 }
 
-function formatOnboardingSource(value?: WabaAccount["onboardingSource"]) {
+function formatOnboardingSource(
+  value?: WabaAccount["onboardingSource"],
+  locale: Locale = "en",
+) {
   if (value === "embedded_signup") return "Embedded Signup";
-  if (value === "manual") return "Manual connection";
-  if (value === "api") return "API connection";
-  return "Unknown";
+  if (value === "manual") return locale === "pt" ? "Ligação manual" : "Manual connection";
+  if (value === "api") return locale === "pt" ? "Ligação por API" : "API connection";
+  return locale === "pt" ? "Desconhecida" : "Unknown";
 }
 
-function formatCoexState(state: WabaAccount["coexRecovery"]["state"]) {
-  if (state === "connected") return "Connected";
-  if (state === "needs_reconnect") return "Reconnect required";
-  if (state === "watch") return "Watch";
-  return "Manual review";
+function formatCoexState(
+  state: WabaAccount["coexRecovery"]["state"],
+  locale: Locale = "en",
+) {
+  if (state === "connected") return locale === "pt" ? "Ligado" : "Connected";
+  if (state === "needs_reconnect") {
+    return locale === "pt" ? "Religação necessária" : "Reconnect required";
+  }
+  if (state === "watch") return locale === "pt" ? "Em observação" : "Watch";
+  return locale === "pt" ? "Revisão manual" : "Manual review";
+}
+
+function stateLabel(value: string, locale: Locale = "en") {
+  if (locale !== "pt") return value.replaceAll("_", " ");
+  const labels: Record<string, string> = {
+    active: "ativo",
+    blocked: "bloqueado",
+    clear: "livre",
+    connected: "ligado",
+    disconnected: "desligado",
+    encrypted: "encriptado",
+    expiring: "a expirar",
+    green: "verde",
+    missing: "em falta",
+    ok: "válido",
+    paused: "pausado",
+    pending: "pendente",
+    red: "vermelha",
+    revoked: "revogado",
+    unknown: "desconhecida",
+    yellow: "amarela",
+  };
+  return labels[value] ?? value.replaceAll("_", " ");
 }
 
 function cleanError(value: string) {

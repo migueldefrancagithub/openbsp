@@ -4,21 +4,34 @@ import { useCallback, useMemo } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 export const TABS = [
-  { id: "overview", label: "Overview" },
-  { id: "delivery", label: "Delivery" },
-  { id: "audience", label: "Audience" },
-  { id: "activity", label: "Activity" },
+  { id: "overview" },
+  { id: "delivery" },
+  { id: "audience" },
+  { id: "activity" },
 ] as const;
 
 export type TabId = (typeof TABS)[number]["id"];
 export type RangeKey = "today" | "7d" | "30d";
 export type Granularity = "hour" | "day";
 
-export const RANGE_LABELS: Record<RangeKey, string> = {
-  today: "Today",
-  "7d": "Last 7 days",
-  "30d": "Last 30 days",
-};
+export function tabLabel(tab: TabId, locale: "pt" | "en") {
+  const labels: Record<TabId, [string, string]> = {
+    overview: ["Visão geral", "Overview"],
+    delivery: ["Entrega", "Delivery"],
+    audience: ["Público", "Audience"],
+    activity: ["Atividade", "Activity"],
+  };
+  return labels[tab][locale === "pt" ? 0 : 1];
+}
+
+export function rangeLabel(range: RangeKey, locale: "pt" | "en") {
+  const labels: Record<RangeKey, [string, string]> = {
+    today: ["Hoje", "Today"],
+    "7d": ["Últimos 7 dias", "Last 7 days"],
+    "30d": ["Últimos 30 dias", "Last 30 days"],
+  };
+  return labels[range][locale === "pt" ? 0 : 1];
+}
 
 const TAB_IDS = TABS.map((t) => t.id) as readonly string[];
 const RANGES: readonly string[] = ["today", "7d", "30d"];
@@ -94,8 +107,8 @@ export function dateWindow(range: RangeKey, now: number) {
 /** Em dash, not "0", wherever a value has no traffic behind it. */
 export const NO_DATA = "—";
 
-export function formatNumber(value: number) {
-  return new Intl.NumberFormat("en-US").format(value);
+export function formatNumber(value: number, locale: "pt" | "en" = "en") {
+  return new Intl.NumberFormat(locale === "pt" ? "pt-PT" : "en-US").format(value);
 }
 
 export function formatPercent(value: number, hasTraffic: boolean) {
@@ -115,8 +128,8 @@ export function formatMoney(
   }).format(valueMinor / 100);
 }
 
-export function formatUpdatedAt(timestamp: number) {
-  return new Intl.DateTimeFormat("en-GB", {
+export function formatUpdatedAt(timestamp: number, locale: "pt" | "en" = "en") {
+  return new Intl.DateTimeFormat(locale === "pt" ? "pt-PT" : "en-GB", {
     hour: "2-digit",
     minute: "2-digit",
   }).format(timestamp);

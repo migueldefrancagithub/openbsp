@@ -17,6 +17,7 @@ import {
 import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { relativeTime } from "@/lib/relativeTime";
+import { useI18n } from "@/lib/i18n";
 
 type QuickReply = {
   _id: Id<"quickReplies">;
@@ -37,43 +38,44 @@ const VARIABLE_CHIPS = [
 const PRESETS = [
   {
     name: "greeting",
-    title: "Greeting",
+    title: ["Saudação", "Greeting"],
     content:
       "Olá {{contact.name}}! Obrigado pelo contacto. Como podemos ajudar hoje?",
   },
   {
     name: "pricing",
-    title: "Condições do serviço",
+    title: ["Condições do serviço", "Service details"],
     content:
       "As condições variam conforme o serviço. Diz-nos o que procuras e a equipa confirma o melhor próximo passo contigo.",
   },
   {
     name: "booking",
-    title: "Booking",
+    title: ["Agendamento", "Booking"],
     content:
       "Perfeito. Envia o serviço pretendido e o melhor horário para marcarmos a tua consulta.",
   },
   {
     name: "after_hours",
-    title: "After hours",
+    title: ["Fora do horário", "After hours"],
     content:
       "Obrigado pela mensagem. A equipa está offline agora e responde assim que voltar ao atendimento.",
   },
   {
     name: "handoff",
-    title: "Handoff",
+    title: ["Passar à equipa", "Handoff"],
     content:
       "Vou passar o teu atendimento para uma pessoa da equipa. Fica só um momento, por favor.",
   },
   {
     name: "stop_ack",
-    title: "Opt-out",
+    title: ["Cancelar comunicações", "Opt-out"],
     content:
       "Pedido recebido. Não vais receber mais mensagens nossas por WhatsApp.",
   },
 ];
 
 export default function QuickRepliesPage() {
+  const { locale, tr } = useI18n();
   const items = useQuery(api.quickReplies.list, {}) as QuickReply[] | undefined;
   const create = useMutation(api.quickReplies.create);
   const update = useMutation(api.quickReplies.update);
@@ -148,7 +150,7 @@ export default function QuickRepliesPage() {
         await update({ quickReplyId: selectedId, content: content.trim() });
       }
     } catch (err) {
-      setError(formatError(err));
+      setError(formatError(err, tr("Erro desconhecido", "Unknown error")));
     } finally {
       setBusy(false);
     }
@@ -156,7 +158,7 @@ export default function QuickRepliesPage() {
 
   async function handleDelete() {
     if (!selectedId || !selected) return;
-    if (!confirm(`Delete /${selected.name}?`)) return;
+    if (!confirm(tr(`Eliminar /${selected.name}?`, `Delete /${selected.name}?`))) return;
     setBusy(true);
     try {
       await remove({ quickReplyId: selectedId });
@@ -164,7 +166,7 @@ export default function QuickRepliesPage() {
       if (next) selectItem(next);
       else startCreate();
     } catch (err) {
-      setError(formatError(err));
+      setError(formatError(err, tr("Erro desconhecido", "Unknown error")));
     } finally {
       setBusy(false);
     }
@@ -189,10 +191,10 @@ export default function QuickRepliesPage() {
             </span>
             <div className="min-w-0">
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
-                Inbox tools
+                {tr("Ferramentas da Inbox", "Inbox tools")}
               </p>
               <h1 className="truncate font-[var(--font-outfit)] text-2xl font-semibold text-[#0a1b33]">
-                Quick replies
+                {tr("Respostas rápidas", "Quick replies")}
               </h1>
             </div>
           </div>
@@ -202,7 +204,7 @@ export default function QuickRepliesPage() {
             className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-[#0a152d] px-4 text-sm font-semibold text-white hover:bg-[#0a1b33]"
           >
             <Plus size={15} />
-            New reply
+            {tr("Nova resposta", "New reply")}
           </button>
         </header>
 
@@ -217,15 +219,15 @@ export default function QuickRepliesPage() {
                 <input
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Search replies..."
+                  placeholder={tr("Pesquisar respostas...", "Search replies...")}
                   className="h-10 w-full rounded-md border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm text-[#0a1b33] outline-none focus:border-slate-400 focus:bg-white"
                 />
               </label>
               <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-                <Metric label="Total" value={items?.length ?? 0} />
-                <Metric label="Shown" value={filtered.length} />
+                <Metric label={tr("Total", "Total")} value={items?.length ?? 0} />
+                <Metric label={tr("Visíveis", "Shown")} value={filtered.length} />
                 <Metric
-                  label="Chars"
+                  label={tr("Caracteres", "Characters")}
                   value={(items ?? []).reduce(
                     (sum, item) => sum + item.content.length,
                     0,
@@ -238,13 +240,13 @@ export default function QuickRepliesPage() {
               {items === undefined ? (
                 <div className="flex items-center gap-2 rounded-md bg-slate-50 px-3 py-3 text-sm text-slate-500">
                   <Loader2 size={14} className="animate-spin" />
-                  Loading
+                  {tr("A carregar", "Loading")}
                 </div>
               ) : filtered.length === 0 ? (
                 <div className="p-8 text-center">
                   <MessageSquare size={24} className="mx-auto text-slate-300" />
                   <p className="mt-3 text-sm font-semibold text-[#0a1b33]">
-                    No replies found
+                    {tr("Nenhuma resposta encontrada", "No replies found")}
                   </p>
                 </div>
               ) : (
@@ -271,7 +273,7 @@ export default function QuickRepliesPage() {
                               : "text-slate-400"
                           }`}
                         >
-                          {relativeTime(item.updatedAt)}
+                          {relativeTime(item.updatedAt, Date.now(), locale)}
                         </span>
                       </div>
                       <p
@@ -294,10 +296,12 @@ export default function QuickRepliesPage() {
             <div className="flex flex-col gap-3 border-b border-slate-100 px-4 py-4 md:flex-row md:items-center md:justify-between">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-                  {mode === "create" ? "New snippet" : "Edit snippet"}
+                  {mode === "create"
+                    ? tr("Nova resposta", "New reply")
+                    : tr("Editar resposta", "Edit reply")}
                 </p>
                 <h2 className="mt-1 text-lg font-semibold text-[#0a1b33]">
-                  {mode === "create" ? "Draft quick reply" : `/${name}`}
+                  {mode === "create" ? tr("Rascunho", "Draft quick reply") : `/${name}`}
                 </h2>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -307,14 +311,14 @@ export default function QuickRepliesPage() {
                     onClick={() =>
                       startCreate({
                         name: `${name}_copy`,
-                        title: "Copy",
+                        title: ["Cópia", "Copy"],
                         content,
                       })
                     }
                     className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-200 px-3 text-sm font-semibold text-[#0a1b33] hover:bg-slate-50"
                   >
                     <Copy size={14} />
-                    Duplicate
+                    {tr("Duplicar", "Duplicate")}
                   </button>
                 )}
                 {mode === "edit" && (
@@ -325,7 +329,7 @@ export default function QuickRepliesPage() {
                     className="inline-flex h-9 items-center gap-2 rounded-md border border-red-100 bg-red-50 px-3 text-sm font-semibold text-red-700 hover:bg-red-100 disabled:opacity-50"
                   >
                     <Trash2 size={14} />
-                    Delete
+                    {tr("Eliminar", "Delete")}
                   </button>
                 )}
                 <button
@@ -339,7 +343,7 @@ export default function QuickRepliesPage() {
                   ) : (
                     <Save size={14} />
                   )}
-                  Save
+                  {tr("Guardar", "Save")}
                 </button>
               </div>
             </div>
@@ -348,7 +352,7 @@ export default function QuickRepliesPage() {
               <section className="space-y-4">
                 <label className="block">
                   <span className="mb-1 block text-[11px] font-medium text-slate-500">
-                    Shortcut
+                    {tr("Atalho", "Shortcut")}
                   </span>
                   <div className="flex h-11 items-center rounded-md border border-slate-200 bg-white px-3 focus-within:border-slate-400">
                     <span className="font-[var(--font-mono)] text-sm text-slate-400">
@@ -366,7 +370,7 @@ export default function QuickRepliesPage() {
 
                 <div>
                   <p className="mb-2 text-[11px] font-medium text-slate-500">
-                    Presets
+                    {tr("Modelos prontos", "Presets")}
                   </p>
                   <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                     {PRESETS.map((preset) => (
@@ -376,7 +380,7 @@ export default function QuickRepliesPage() {
                         onClick={() => startCreate(preset)}
                         className="flex items-center justify-between gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm font-semibold text-[#0a1b33] hover:bg-white"
                       >
-                        {preset.title}
+                        {preset.title[locale === "pt" ? 0 : 1]}
                         <Sparkles size={13} className="text-emerald-600" />
                       </button>
                     ))}
@@ -387,7 +391,7 @@ export default function QuickRepliesPage() {
               <section className="space-y-3">
                 <label className="block">
                   <span className="mb-1 block text-[11px] font-medium text-slate-500">
-                    Message
+                    {tr("Mensagem", "Message")}
                   </span>
                   <textarea
                     value={content}
@@ -449,6 +453,7 @@ function QuickReplyPreview({
   name: string;
   content: string;
 }) {
+  const { tr } = useI18n();
   return (
     <aside className="rounded-lg border border-slate-200 bg-[#eef3f8] p-4">
       <div className="mb-3 flex items-center gap-2">
@@ -456,7 +461,9 @@ function QuickReplyPreview({
           <MessageSquare size={15} />
         </span>
         <div>
-          <h3 className="text-sm font-semibold text-[#0a1b33]">Preview</h3>
+          <h3 className="text-sm font-semibold text-[#0a1b33]">
+            {tr("Pré-visualização", "Preview")}
+          </h3>
           <p className="font-[var(--font-mono)] text-xs text-slate-500">
             /{cleanShortcut(name) || "shortcut"}
           </p>
@@ -477,7 +484,7 @@ function QuickReplyPreview({
           }}
         >
           <div className="ml-auto max-w-[88%] rounded-lg bg-[#0b7a5f] px-3 py-2 text-sm leading-5 text-white">
-            {content.trim() || "Message preview..."}
+            {content.trim() || tr("Pré-visualização da mensagem...", "Message preview...")}
             <div className="mt-1 text-right text-[10px] text-white/70">9:42</div>
           </div>
         </div>
@@ -496,7 +503,7 @@ function cleanShortcut(value: string): string {
     .slice(0, 40);
 }
 
-function formatError(err: unknown): string {
+function formatError(err: unknown, fallback = "Unknown error"): string {
   if (err && typeof err === "object" && "data" in err) {
     const data = (err as { data: unknown }).data;
     if (typeof data === "object" && data !== null) {
@@ -505,5 +512,5 @@ function formatError(err: unknown): string {
       if (typeof d.code === "string") return d.code;
     }
   }
-  return err instanceof Error ? err.message : "Unknown error";
+  return err instanceof Error ? err.message : fallback;
 }

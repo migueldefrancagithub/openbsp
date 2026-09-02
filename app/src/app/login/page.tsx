@@ -5,8 +5,11 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { BrandLogo } from "@/components/Brand";
+import { LanguageSwitcher, useI18n } from "@/lib/i18n";
+import { authErrorMessage } from "@/lib/authErrorMessage";
 
 export default function LoginPage() {
+  const { locale, tr } = useI18n();
   const { signIn } = useAuthActions();
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -22,16 +25,15 @@ export default function LoginPage() {
       await signIn("password", { email, password, flow: "signIn" });
       router.push("/app");
     } catch (err: unknown) {
-      const msg =
-        err instanceof Error ? err.message : "Não foi possível entrar.";
-      setError(msg.includes("Invalid") ? "Email ou password incorrectos." : msg);
+      setError(authErrorMessage(err, locale, "signIn"));
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#f9fafb] px-4">
+    <div className="relative flex min-h-screen items-center justify-center bg-[#f9fafb] px-4">
+      <LanguageSwitcher compact className="absolute right-4 top-4" />
       <div className="w-full max-w-sm">
         <Link
           href="/"
@@ -40,12 +42,12 @@ export default function LoginPage() {
           <BrandLogo />
         </Link>
 
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-[0_20px_60px_-30px_rgba(0,0,0,0.15)] p-8">
+        <div className="rounded-lg border border-slate-200 bg-white p-8 shadow-[0_20px_60px_-30px_rgba(0,0,0,0.15)]">
           <h1 className="font-[var(--font-outfit)] text-[26px] font-medium tracking-tight text-[#0a1b33]">
-            Welcome back
+            {tr("Bem-vindo de volta", "Welcome back")}
           </h1>
           <p className="text-slate-500 text-sm mt-1">
-            Sign in to continue to your workspace.
+            {tr("Entre para continuar para o seu espaço de trabalho.", "Sign in to continue to your workspace.")}
           </p>
 
           <form onSubmit={onSubmit} className="mt-6 space-y-4">
@@ -72,7 +74,7 @@ export default function LoginPage() {
                 htmlFor="password"
                 className="block text-xs font-medium text-slate-700 mb-1.5"
               >
-                Password
+                {tr("Palavra-passe", "Password")}
               </label>
               <input
                 id="password"
@@ -98,17 +100,17 @@ export default function LoginPage() {
               disabled={busy}
               className="w-full bg-[#0a152d] text-white text-sm font-medium px-4 py-2.5 rounded-lg shadow-[0_8px_24px_-8px_rgba(10,21,45,0.5)] hover:bg-[#0a1b33] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >
-              {busy ? "Signing in…" : "Sign in"}
+              {busy ? tr("A entrar…", "Signing in…") : tr("Entrar", "Sign in")}
             </button>
           </form>
 
           <p className="text-center text-sm text-slate-500 mt-6">
-            Don&apos;t have an account?{" "}
+            {tr("Ainda não tem uma conta?", "Don't have an account?")}{" "}
             <Link
               href="/signup"
               className="text-[#0a1b33] font-medium hover:underline"
             >
-              Create one
+              {tr("Criar conta", "Create one")}
             </Link>
           </p>
         </div>

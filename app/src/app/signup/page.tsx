@@ -7,8 +7,11 @@ import { useAuthActions } from "@convex-dev/auth/react";
 import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { BrandLogo } from "@/components/Brand";
+import { LanguageSwitcher, useI18n } from "@/lib/i18n";
+import { authErrorMessage } from "@/lib/authErrorMessage";
 
 export default function SignupPage() {
+  const { locale, tr } = useI18n();
   const { signIn } = useAuthActions();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -46,16 +49,15 @@ export default function SignupPage() {
       }
       router.push("/onboarding");
     } catch (err: unknown) {
-      const msg =
-        err instanceof Error ? err.message : "Não foi possível criar a conta.";
-      setError(msg);
+      setError(authErrorMessage(err, locale, "signUp"));
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#f9fafb] px-4">
+    <div className="relative flex min-h-screen items-center justify-center bg-[#f9fafb] px-4">
+      <LanguageSwitcher compact className="absolute right-4 top-4" />
       <div className="w-full max-w-sm">
         <Link
           href="/"
@@ -64,14 +66,14 @@ export default function SignupPage() {
           <BrandLogo />
         </Link>
 
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-[0_20px_60px_-30px_rgba(0,0,0,0.15)] p-8">
+        <div className="rounded-lg border border-slate-200 bg-white p-8 shadow-[0_20px_60px_-30px_rgba(0,0,0,0.15)]">
           <h1 className="font-[var(--font-outfit)] text-[26px] font-medium tracking-tight text-[#0a1b33]">
-            {inviteToken ? "Accept invite" : "Create your workspace"}
+            {inviteToken ? tr("Aceitar convite", "Accept invite") : tr("Criar espaço de trabalho", "Create your workspace")}
           </h1>
           <p className="text-slate-500 text-sm mt-1">
             {inviteToken
-              ? "Create an account to join the workspace you were invited to."
-              : "Free during MVP. No credit card required."}
+              ? tr("Crie uma conta para entrar no espaço de trabalho para o qual recebeu convite.", "Create an account to join the workspace you were invited to.")
+              : tr("Comece sem cartão de crédito.", "Start without a credit card.")}
           </p>
 
           <form onSubmit={onSubmit} className="mt-6 space-y-4">
@@ -80,7 +82,7 @@ export default function SignupPage() {
                 htmlFor="email"
                 className="block text-xs font-medium text-slate-700 mb-1.5"
               >
-                Work email
+                {tr("Email profissional", "Work email")}
               </label>
               <input
                 id="email"
@@ -98,7 +100,7 @@ export default function SignupPage() {
                 htmlFor="password"
                 className="block text-xs font-medium text-slate-700 mb-1.5"
               >
-                Password
+                {tr("Palavra-passe", "Password")}
               </label>
               <input
                 id="password"
@@ -109,10 +111,10 @@ export default function SignupPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm text-[#0a1b33] focus:outline-none focus:ring-2 focus:ring-[#0a152d]/10 focus:border-[#0a152d] transition-all"
-                placeholder="At least 8 characters"
+                placeholder={tr("Pelo menos 8 caracteres", "At least 8 characters")}
               />
               <p className="text-[11px] text-slate-400 mt-1.5">
-                Mínimo 8 caracteres.
+                {tr("Mínimo de 8 caracteres.", "At least 8 characters.")}
               </p>
             </div>
 
@@ -127,21 +129,21 @@ export default function SignupPage() {
               disabled={busy}
               className="w-full bg-[#0a152d] text-white text-sm font-medium px-4 py-2.5 rounded-lg shadow-[0_8px_24px_-8px_rgba(10,21,45,0.5)] hover:bg-[#0a1b33] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >
-              {busy ? "Creating…" : "Create account"}
+              {busy ? tr("A criar…", "Creating…") : tr("Criar conta", "Create account")}
             </button>
           </form>
 
           <p className="text-[11px] text-slate-400 mt-4 leading-relaxed">
-            Ao criar conta concordas com os Termos e a Política de Privacidade.
+            {tr("Ao criar a conta, concorda com os Termos e a Política de Privacidade.", "By creating an account, you agree to the Terms and Privacy Policy.")}
           </p>
 
           <p className="text-center text-sm text-slate-500 mt-6">
-            Already have an account?{" "}
+            {tr("Já tem uma conta?", "Already have an account?")}{" "}
             <Link
               href="/login"
               className="text-[#0a1b33] font-medium hover:underline"
             >
-              Sign in
+              {tr("Entrar", "Sign in")}
             </Link>
           </p>
         </div>

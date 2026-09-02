@@ -23,6 +23,7 @@ import { api } from "../../../../../convex/_generated/api";
 import type { Id } from "../../../../../convex/_generated/dataModel";
 import type { TemplateCategory } from "@/lib/whatsappTemplateAdvisor";
 import { BRAND_NAME } from "@/components/Brand";
+import { useI18n } from "@/lib/i18n";
 
 type TemplateButton =
   | { type: "quick_reply"; text: string }
@@ -31,7 +32,7 @@ type TemplateButton =
 type TemplateTabKey = "setup" | "message" | "buttons" | "guardrails";
 
 const TEMPLATE_PRESETS: Array<{
-  label: string;
+  label: [string, string];
   name: string;
   category: TemplateCategory;
   bodyText: string;
@@ -39,7 +40,7 @@ const TEMPLATE_PRESETS: Array<{
   buttons: TemplateButton[];
 }> = [
   {
-    label: "Utility reminder",
+    label: ["Lembrete de consulta", "Appointment reminder"],
     name: "appointment_reminder",
     category: "utility",
     bodyText:
@@ -51,7 +52,7 @@ const TEMPLATE_PRESETS: Array<{
     ],
   },
   {
-    label: "Marketing offer",
+    label: ["Reativação de paciente", "Patient reactivation"],
     name: "reactivation_offer",
     category: "marketing",
     bodyText:
@@ -63,7 +64,7 @@ const TEMPLATE_PRESETS: Array<{
     ],
   },
   {
-    label: "Authentication OTP",
+    label: ["Código de autenticação", "Authentication code"],
     name: "login_code",
     category: "authentication",
     bodyText: `{{1}} e o seu codigo ${BRAND_NAME}. Valido por 10 minutos. Nao partilhe este codigo.`,
@@ -73,6 +74,7 @@ const TEMPLATE_PRESETS: Array<{
 ];
 
 export default function NewTemplatePage() {
+  const { locale, tr } = useI18n();
   const router = useRouter();
   const accounts = useQuery(api.whatsappAccounts.listForTenant);
   const create = useMutation(api.templates.createDraft);
@@ -148,7 +150,7 @@ export default function NewTemplatePage() {
           ? String((data as { message: unknown }).message)
           : err instanceof Error
             ? err.message
-            : "Could not create template";
+            : tr("Não foi possível criar o template", "Could not create template");
       setError(msg);
     } finally {
       setBusy(null);
@@ -165,7 +167,7 @@ export default function NewTemplatePage() {
         return;
       }
       const reason = encodeURIComponent(
-        result.submissionError ?? "Meta submission failed.",
+        result.submissionError ?? tr("A submissão à Meta falhou.", "Meta submission failed."),
       );
       router.push(
         `/app/templates/${result.templateId}?submission=draft_saved&reason=${reason}`,
@@ -180,7 +182,7 @@ export default function NewTemplatePage() {
           ? String((data as { message: unknown }).message)
           : err instanceof Error
             ? err.message
-            : "Could not create and submit template";
+            : tr("Não foi possível criar e submeter o template", "Could not create and submit template");
       setError(msg);
     } finally {
       setBusy(null);
@@ -200,12 +202,12 @@ export default function NewTemplatePage() {
 
   function defaultButton(type: TemplateButton["type"]): TemplateButton {
     if (type === "url") {
-      return { type, text: "Abrir link", url: "https://example.com" };
+      return { type, text: tr("Abrir link", "Open link"), url: "https://example.com" };
     }
     if (type === "phone_number") {
-      return { type, text: "Ligar", phoneNumber: "+351912000000" };
+      return { type, text: tr("Ligar", "Call"), phoneNumber: "+258840000000" };
     }
-    return { type, text: "Responder" };
+    return { type, text: tr("Responder", "Reply") };
   }
 
   function updateButton(index: number, next: TemplateButton) {
@@ -221,14 +223,14 @@ export default function NewTemplatePage() {
   if (accounts && accounts.length === 0) {
     return (
       <>
-        <PageHeader eyebrow="Templates" title="New template" description="" />
-        <div className="px-8 py-8 max-w-2xl">
-          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-            Connect a WhatsApp Business Account in{" "}
+        <PageHeader eyebrow="Templates" title={tr("Novo template", "New template")} description="" />
+        <div className="max-w-2xl px-4 py-5 sm:px-6">
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+            {tr("Ligue uma conta WhatsApp Business em", "Connect a WhatsApp Business Account in")}{" "}
             <Link href="/app/settings" className="underline font-medium">
-              Settings
+              {tr("Configurações", "Settings")}
             </Link>{" "}
-            before creating templates.
+            {tr("antes de criar templates.", "before creating templates.")}
           </div>
         </div>
       </>
@@ -239,41 +241,41 @@ export default function NewTemplatePage() {
     <>
       <PageHeader
         eyebrow="Templates"
-        title="New template"
-        description="Create a WhatsApp template draft or submit it straight to Meta with safe fallback."
+        title={tr("Novo template", "New template")}
+        description={tr("Crie uma mensagem aprovada para iniciar atendimentos fora da janela de 24 horas.", "Create an approved message for starting conversations outside the 24-hour window.")}
         action={
           <Link
             href="/app/templates"
             className="inline-flex items-center gap-1 text-[13px] text-slate-600 hover:text-[#0a1b33] transition-colors"
           >
             <ChevronLeft size={14} />
-            Back
+            {tr("Voltar", "Back")}
           </Link>
         }
       />
-      <div className="grid gap-6 px-8 py-8 xl:grid-cols-[minmax(0,760px)_360px]">
+      <div className="grid gap-5 px-4 py-5 sm:px-6 xl:grid-cols-[minmax(0,760px)_360px]">
         <form onSubmit={onSubmit} className="space-y-5">
           <SegmentedTabs
             selected={templateTab}
             onChange={(key) => setTemplateTab(key as TemplateTabKey)}
             items={[
-              { key: "setup", label: "Setup", value: category, icon: ShieldCheck },
+              { key: "setup", label: tr("Configuração", "Setup"), value: category, icon: ShieldCheck },
               {
                 key: "message",
-                label: "Message",
-                value: `${detectedIndices.length} vars`,
+                label: tr("Mensagem", "Message"),
+                value: `${detectedIndices.length} ${tr("variáveis", "variables")}`,
                 icon: MessageSquare,
               },
               {
                 key: "buttons",
-                label: "Buttons",
+                label: tr("Botões", "Buttons"),
                 value: `${buttons.length}/3`,
                 icon: MousePointerClick,
               },
               {
                 key: "guardrails",
-                label: "Guardrails",
-                value: hasMarketingOptIn ? "Opt-in" : "Review",
+                label: tr("Segurança", "Guardrails"),
+                value: hasMarketingOptIn ? "Opt-in" : tr("Rever", "Review"),
                 icon: SlidersHorizontal,
               },
             ]}
@@ -281,17 +283,17 @@ export default function NewTemplatePage() {
 
           {templateTab === "setup" && (
           <>
-          <section className="rounded-2xl border border-slate-200 bg-white p-5">
+          <section className="rounded-lg border border-slate-200 bg-white p-5">
             <div className="mb-4 flex items-start gap-3">
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-[#0a1b33]">
                 <ShieldCheck size={17} />
               </div>
               <div>
                 <h2 className="font-[var(--font-outfit)] text-[17px] font-medium text-[#0a1b33]">
-                  Mock scenarios
+                  {tr("Cenários prontos", "Ready scenarios")}
                 </h2>
                 <p className="mt-0.5 text-[12px] text-slate-500">
-                  Start from utility, marketing, or authentication examples and tune the copy with live guardrails.
+                  {tr("Comece com um caso clínico real e ajuste a mensagem com validação imediata.", "Start from a real clinic use case and adjust the message with immediate validation.")}
                 </p>
               </div>
             </div>
@@ -303,13 +305,13 @@ export default function NewTemplatePage() {
                   onClick={() => applyPreset(preset)}
                   className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-left text-[12px] font-medium text-[#0a1b33] transition-colors hover:border-slate-300 hover:bg-white"
                 >
-                  {preset.label}
+                  {preset.label[locale === "pt" ? 0 : 1]}
                 </button>
               ))}
             </div>
           </section>
 
-          <Field label="Name (3-40 chars, lowercase, _)">
+          <Field label={tr("Nome (3-40 caracteres, minúsculas, _)", "Name (3-40 characters, lowercase, _)")}>
             <input
               type="text"
               value={name}
@@ -319,20 +321,20 @@ export default function NewTemplatePage() {
             />
           </Field>
 
-          <div className="grid grid-cols-2 gap-4">
-            <Field label="Language">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label={tr("Idioma", "Language")}>
               <select
                 value={language}
                 onChange={(e) => setLanguage(e.target.value)}
                 className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm text-[#0a1b33] focus:outline-none focus:ring-2 focus:ring-[#0a152d]/10 focus:border-[#0a152d]"
               >
-                <option value="pt_PT">pt_PT - Portuguese (Portugal)</option>
-                <option value="pt_BR">pt_BR - Portuguese (Brazil)</option>
-                <option value="en_US">en_US - English</option>
-                <option value="es_ES">es_ES - Spanish</option>
+                <option value="pt_PT">pt_PT - {tr("Português (Portugal)", "Portuguese (Portugal)")}</option>
+                <option value="pt_BR">pt_BR - {tr("Português (Brasil)", "Portuguese (Brazil)")}</option>
+                <option value="en_US">en_US - {tr("Inglês", "English")}</option>
+                <option value="es_ES">es_ES - {tr("Espanhol", "Spanish")}</option>
               </select>
             </Field>
-            <Field label="Category">
+            <Field label={tr("Categoria", "Category")}>
               <select
                 value={category}
                 onChange={(e) => {
@@ -342,14 +344,14 @@ export default function NewTemplatePage() {
                 }}
                 className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm text-[#0a1b33] focus:outline-none focus:ring-2 focus:ring-[#0a152d]/10 focus:border-[#0a152d]"
               >
-                <option value="utility">Utility (transactional)</option>
-                <option value="marketing">Marketing (requires opt-in)</option>
-                <option value="authentication">Authentication (OTP)</option>
+                <option value="utility">{tr("Utilidade (transacional)", "Utility (transactional)")}</option>
+                <option value="marketing">{tr("Marketing (exige opt-in)", "Marketing (requires opt-in)")}</option>
+                <option value="authentication">{tr("Autenticação (OTP)", "Authentication (OTP)")}</option>
               </select>
             </Field>
           </div>
 
-          <Field label="WhatsApp Business Account">
+          <Field label={tr("Conta WhatsApp Business", "WhatsApp Business Account")}>
             <select
               value={whatsappAccountId}
               onChange={(e) => setWhatsappAccountId(e.target.value)}
@@ -367,21 +369,21 @@ export default function NewTemplatePage() {
           )}
 
           {templateTab === "message" && (
-          <section className="rounded-2xl border border-slate-200 bg-white p-5">
+          <section className="rounded-lg border border-slate-200 bg-white p-5">
             <div className="mb-4 flex items-start gap-3">
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-[#0a1b33]">
                 <FileText size={17} />
               </div>
               <div>
                 <h2 className="font-[var(--font-outfit)] text-[17px] font-medium text-[#0a1b33]">
-                  Message body
+                  {tr("Conteúdo da mensagem", "Message body")}
                 </h2>
                 <p className="mt-0.5 text-[12px] text-slate-500">
-                  Variables and examples are sent to Meta with the template.
+                  {tr("As variáveis e os exemplos são enviados à Meta com o template.", "Variables and examples are sent to Meta with the template.")}
                 </p>
               </div>
             </div>
-          <Field label="Body text (use {{1}}, {{2}}, ... for variables)">
+          <Field label={tr("Texto (use {{1}}, {{2}}, ... para variáveis)", "Body text (use {{1}}, {{2}}, ... for variables)")}>
             <textarea
               rows={5}
               value={bodyText}
@@ -390,13 +392,15 @@ export default function NewTemplatePage() {
               className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm text-[#0a1b33] focus:outline-none focus:ring-2 focus:ring-[#0a152d]/10 focus:border-[#0a152d] resize-none font-mono"
             />
             <p className="text-[11px] text-slate-400 mt-1.5">
-              {bodyText.length} / 1024 chars · {detectedIndices.length} variable
-              {detectedIndices.length === 1 ? "" : "s"} detected
+              {bodyText.length} / 1024 {tr("caracteres", "characters")} · {detectedIndices.length}{" "}
+              {locale === "pt"
+                ? detectedIndices.length === 1 ? "variável detetada" : "variáveis detetadas"
+                : detectedIndices.length === 1 ? "variable detected" : "variables detected"}
             </p>
           </Field>
 
           {detectedIndices.length > 0 && (
-            <Field label="Example values (Meta requires one example per variable)">
+            <Field label={tr("Exemplos (a Meta exige um por variável)", "Examples (Meta requires one per variable)")}>
               <div className="space-y-2">
                 {detectedIndices.map((i) => (
                   <div key={i} className="flex items-center gap-2">
@@ -410,7 +414,7 @@ export default function NewTemplatePage() {
                         setExamples((prev) => ({ ...prev, [i]: e.target.value }))
                       }
                       required
-                      placeholder="Example value"
+                      placeholder={tr("Valor de exemplo", "Example value")}
                       className="flex-1 px-3 py-2 rounded-lg border border-slate-200 text-sm text-[#0a1b33] focus:outline-none focus:ring-2 focus:ring-[#0a152d]/10 focus:border-[#0a152d]"
                     />
                   </div>
@@ -422,14 +426,14 @@ export default function NewTemplatePage() {
           )}
 
           {templateTab === "buttons" && (
-          <section className="rounded-2xl border border-slate-200 bg-white p-5">
+          <section className="rounded-lg border border-slate-200 bg-white p-5">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
                 <h2 className="font-[var(--font-outfit)] text-[17px] font-medium text-[#0a1b33]">
-                  Template buttons
+                  {tr("Botões do template", "Template buttons")}
                 </h2>
                 <p className="mt-0.5 text-[12px] text-slate-500">
-                  Quick replies, links, and phone CTAs are sent with the template approval request.
+                  {tr("Respostas, links e chamadas são enviados com o pedido de aprovação.", "Replies, links and calls are sent with the approval request.")}
                 </p>
               </div>
               <button
@@ -439,22 +443,22 @@ export default function NewTemplatePage() {
                 }
                 disabled={buttons.length >= 3}
                 className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-[#0a1b33] transition-colors hover:bg-white disabled:opacity-40"
-                title="Add button"
+                title={tr("Adicionar botão", "Add button")}
               >
                 <Plus size={15} />
               </button>
             </div>
 
             {buttons.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-center text-[12px] text-slate-500">
-                No buttons on this template.
+              <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-center text-[12px] text-slate-500">
+                {tr("Este template não tem botões.", "This template has no buttons.")}
               </div>
             ) : (
               <div className="space-y-3">
                 {buttons.map((button, index) => (
                   <div
                     key={`${button.type}-${index}`}
-                    className="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 md:grid-cols-[150px_1fr_auto]"
+                    className="grid gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 md:grid-cols-[150px_1fr_auto]"
                   >
                     <select
                       value={button.type}
@@ -466,9 +470,9 @@ export default function NewTemplatePage() {
                       }
                       className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-[12px] text-[#0a1b33] outline-none focus:border-slate-400"
                     >
-                      <option value="quick_reply">Quick reply</option>
+                      <option value="quick_reply">{tr("Resposta rápida", "Quick reply")}</option>
                       <option value="url">URL</option>
-                      <option value="phone_number">Phone</option>
+                      <option value="phone_number">{tr("Telefone", "Phone")}</option>
                     </select>
                     <div className="grid gap-2 md:grid-cols-2">
                       <input
@@ -478,7 +482,7 @@ export default function NewTemplatePage() {
                           updateButtonText(index, event.target.value)
                         }
                         maxLength={25}
-                        placeholder="Button text"
+                        placeholder={tr("Texto do botão", "Button text")}
                         className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-[12px] text-[#0a1b33] outline-none focus:border-slate-400"
                       />
                       {button.type === "url" && (
@@ -516,7 +520,7 @@ export default function NewTemplatePage() {
                         setButtons((prev) => prev.filter((_, i) => i !== index))
                       }
                       className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:text-red-600"
-                      title="Remove button"
+                      title={tr("Remover botão", "Remove button")}
                     >
                       <Trash2 size={14} />
                     </button>
@@ -528,23 +532,23 @@ export default function NewTemplatePage() {
           )}
 
           {templateTab === "guardrails" && (
-          <section className="rounded-2xl border border-slate-200 bg-white p-5">
+          <section className="rounded-lg border border-slate-200 bg-white p-5">
             <h2 className="font-[var(--font-outfit)] text-[17px] font-medium text-[#0a1b33]">
-              Sending context
+              {tr("Condições de envio", "Sending context")}
             </h2>
             <div className="mt-4 grid gap-3 md:grid-cols-3">
               <Toggle
-                label="Marketing opt-in"
+                label={tr("Consentimento de marketing", "Marketing opt-in")}
                 checked={hasMarketingOptIn}
                 onChange={setHasMarketingOptIn}
               />
               <Toggle
-                label="24h service window"
+                label={tr("Janela de atendimento de 24h", "24h service window")}
                 checked={serviceWindowOpen}
                 onChange={setServiceWindowOpen}
               />
               <Toggle
-                label="72h CTWA free entry"
+                label={tr("Entrada gratuita CTWA de 72h", "72h CTWA free entry")}
                 checked={freeEntryWindowOpen}
                 onChange={setFreeEntryWindowOpen}
               />
@@ -559,14 +563,14 @@ export default function NewTemplatePage() {
             </div>
           )}
 
-          <div className="flex flex-wrap gap-2 rounded-2xl border border-slate-200 bg-white p-3">
+          <div className="flex flex-wrap gap-2 rounded-lg border border-slate-200 bg-white p-3">
             <button
               type="submit"
               disabled={busy !== null}
               className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-[13px] font-medium text-[#0a1b33] transition-all hover:border-slate-300 disabled:opacity-50"
             >
               {busy === "draft" && <Loader2 size={14} className="animate-spin" />}
-              Save draft
+              {tr("Guardar rascunho", "Save draft")}
             </button>
             <button
               type="button"
@@ -575,7 +579,7 @@ export default function NewTemplatePage() {
               className="inline-flex items-center gap-2 rounded-lg bg-[#0a152d] px-4 py-2.5 text-[13px] font-medium text-white transition-all hover:bg-[#0a1b33] disabled:opacity-50"
             >
               {busy === "submit" && <Loader2 size={14} className="animate-spin" />}
-              Create &amp; submit to Meta
+              {tr("Criar e submeter à Meta", "Create and submit to Meta")}
             </button>
           </div>
         </form>
@@ -617,7 +621,7 @@ function Toggle({
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <label className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] font-medium text-[#0a1b33]">
+    <label className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] font-medium text-[#0a1b33]">
       <span>{label}</span>
       <input
         type="checkbox"

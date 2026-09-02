@@ -24,6 +24,7 @@ import type { Id } from "../../../../../convex/_generated/dataModel";
 import { friendlyId } from "@/lib/friendlyId";
 import { relativeTime } from "@/lib/relativeTime";
 import type { TemplateCategory } from "@/lib/whatsappTemplateAdvisor";
+import { useI18n, type Locale } from "@/lib/i18n";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -44,6 +45,7 @@ function StatusIcon({ status }: { status: string }) {
 }
 
 export default function TemplateDetailPage({ params }: Props) {
+  const { locale, tr } = useI18n();
   const { id } = use(params);
   const searchParams = useSearchParams();
   const templateId = id as Id<"templates">;
@@ -59,7 +61,7 @@ export default function TemplateDetailPage({ params }: Props) {
     setBusy(true);
     try {
       const r = await submit({ templateId });
-      setSuccess(`Submitted to Meta · status: ${r.status}`);
+      setSuccess(`${tr("Submetido à Meta", "Submitted to Meta")} · ${tr("estado", "status")}: ${statusLabel(r.status, locale)}`);
     } catch (err: unknown) {
       const data =
         err && typeof err === "object" && "data" in err
@@ -70,7 +72,7 @@ export default function TemplateDetailPage({ params }: Props) {
           ? String((data as { message: unknown }).message)
           : err instanceof Error
             ? err.message
-            : "Submit failed";
+            : tr("A submissão falhou", "Submission failed");
       setError(msg);
     } finally {
       setBusy(false);
@@ -79,12 +81,12 @@ export default function TemplateDetailPage({ params }: Props) {
 
   if (tpl === undefined) {
     return (
-      <div className="px-8 py-12 text-slate-400 text-sm">Loading…</div>
+      <div className="px-4 py-12 text-sm text-slate-400 sm:px-6">{tr("A carregar...", "Loading...")}</div>
     );
   }
   if (tpl === null) {
     return (
-      <div className="px-8 py-12 text-slate-500 text-sm">Template not found.</div>
+      <div className="px-4 py-12 text-sm text-slate-500 sm:px-6">{tr("Template não encontrado.", "Template not found.")}</div>
     );
   }
 
@@ -98,32 +100,32 @@ export default function TemplateDetailPage({ params }: Props) {
       <PageHeader
         eyebrow={`Template · ${friendlyId("TPL", tpl._id)}`}
         title={tpl.name}
-        description={`${tpl.category} · ${tpl.language} · v${tpl.currentVersion}`}
+        description={`${categoryLabel(tpl.category, locale)} · ${tpl.language} · v${tpl.currentVersion}`}
         action={
           <Link
             href="/app/templates"
             className="inline-flex items-center gap-1 text-[13px] text-slate-600 hover:text-[#0a1b33] transition-colors"
           >
             <ChevronLeft size={14} />
-            Back
+            {tr("Voltar", "Back")}
           </Link>
         }
       />
 
-      <div className="grid gap-6 px-8 py-8 xl:grid-cols-[minmax(0,760px)_360px]">
+      <div className="grid gap-5 px-4 py-5 sm:px-6 xl:grid-cols-[minmax(0,760px)_360px]">
         <div className="space-y-6">
-        <section className="bg-white rounded-2xl border border-slate-200 p-5">
+        <section className="rounded-lg border border-slate-200 bg-white p-5">
           {submissionNotice === "submitted" && (
             <div className="mb-4 flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[12px] text-emerald-700">
               <CheckCircle2 size={12} className="mt-0.5 flex-shrink-0" />
-              <span>Template created and submitted to Meta.</span>
+              <span>{tr("Template criado e submetido à Meta.", "Template created and submitted to Meta.")}</span>
             </div>
           )}
           {submissionNotice === "draft_saved" && (
             <div className="mb-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-800">
               <AlertCircle size={12} className="mt-0.5 flex-shrink-0" />
               <span>
-                Draft saved, but Meta did not accept the submission
+                {tr("Rascunho guardado, mas a Meta não aceitou a submissão", "Draft saved, but Meta did not accept the submission")}
                 {submissionReason ? `: ${submissionReason}` : "."}
               </span>
             </div>
@@ -134,19 +136,19 @@ export default function TemplateDetailPage({ params }: Props) {
               <div>
                 <div className="flex items-center gap-2">
                   <span className="font-semibold text-[#0a1b33] text-sm">
-                    Status
+                    {tr("Estado", "Status")}
                   </span>
                   <span
                     className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium border ${STATUS_STYLES[tpl.status] ?? STATUS_STYLES.draft}`}
                   >
-                    {tpl.status}
+                    {statusLabel(tpl.status, locale)}
                   </span>
                 </div>
                 <div className="text-[11px] text-slate-500 mt-0.5">
                   {tpl.syncedAt
-                    ? `Last synced ${relativeTime(tpl.syncedAt)}`
-                    : "Not yet submitted to Meta"}
-                  {tpl.qualityScore && ` · Quality: ${tpl.qualityScore}`}
+                    ? `${tr("Última sincronização", "Last synced")} ${relativeTime(tpl.syncedAt, Date.now(), locale)}`
+                    : tr("Ainda não submetido à Meta", "Not yet submitted to Meta")}
+                  {tpl.qualityScore && ` · ${tr("Qualidade", "Quality")}: ${tpl.qualityScore}`}
                 </div>
               </div>
             </div>
@@ -162,7 +164,7 @@ export default function TemplateDetailPage({ params }: Props) {
                 ) : (
                   <Send size={14} strokeWidth={2.5} />
                 )}
-                Submit to Meta
+                {tr("Submeter à Meta", "Submit to Meta")}
               </button>
             )}
           </div>
@@ -191,33 +193,34 @@ export default function TemplateDetailPage({ params }: Props) {
           qualityScore={tpl.qualityScore}
           rejectionReason={tpl.rejectionReason}
           syncedAt={tpl.syncedAt}
+          locale={locale}
         />
 
         {currentVersion && (
-          <section className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+          <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
             <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
               <h3 className="font-semibold text-[#0a1b33] text-sm">
-                Meta payload (v{currentVersion.version})
+                {tr("Conteúdo enviado à Meta", "Meta payload")} (v{currentVersion.version})
               </h3>
               <span className="text-[11px] text-slate-400">
-                {currentVersion.isLocked ? "Locked (submitted)" : "Editable"}
+                {currentVersion.isLocked ? tr("Bloqueado (submetido)", "Locked (submitted)") : tr("Editável", "Editable")}
               </span>
             </div>
             <div className="p-5 space-y-4">
               <div className="grid gap-3 sm:grid-cols-3">
                 <PayloadMetric
                   icon={FileText}
-                  label="Language"
+                  label={tr("Idioma", "Language")}
                   value={tpl.language}
                 />
                 <PayloadMetric
                   icon={ShieldCheck}
-                  label="Category"
-                  value={tpl.category}
+                  label={tr("Categoria", "Category")}
+                  value={categoryLabel(tpl.category, locale)}
                 />
                 <PayloadMetric
                   icon={MessageSquare}
-                  label="Buttons"
+                  label={tr("Botões", "Buttons")}
                   value={String(currentVersion.buttons?.length ?? 0)}
                 />
               </div>
@@ -225,7 +228,7 @@ export default function TemplateDetailPage({ params }: Props) {
                 {currentVersion.bodyText}
               </pre>
               <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-3 text-[13px] leading-6 text-emerald-800">
-                <span className="font-semibold">Rendered with examples:</span>{" "}
+                <span className="font-semibold">{tr("Resultado com exemplos:", "Rendered with examples:")}</span>{" "}
                 {renderTemplateText(
                   currentVersion.bodyText,
                   examplesFromSchema(currentVersion.parameterSchema),
@@ -234,7 +237,7 @@ export default function TemplateDetailPage({ params }: Props) {
               {currentVersion.parameterSchema.length > 0 && (
                 <div>
                   <div className="text-[11px] uppercase tracking-wider text-slate-400 mb-2">
-                    Variables
+                    {tr("Variáveis", "Variables")}
                   </div>
                   <ul className="space-y-1.5">
                     {currentVersion.parameterSchema.map((p) => (
@@ -258,8 +261,8 @@ export default function TemplateDetailPage({ params }: Props) {
 
         {currentVersion && (
           <WhatsAppIosPreview
-            title="Exact WhatsApp preview"
-            subtitle="Rendered with the examples submitted to Meta."
+            title={tr("Pré-visualização no WhatsApp", "WhatsApp preview")}
+            subtitle={tr("Resultado com os exemplos submetidos à Meta.", "Rendered with the examples submitted to Meta.")}
             category={tpl.category as TemplateCategory}
             bodyText={currentVersion.bodyText}
             buttons={currentVersion.buttons ?? []}
@@ -279,18 +282,21 @@ function ApprovalReadinessCard({
   qualityScore,
   rejectionReason,
   syncedAt,
+  locale,
 }: {
   status: string;
   qualityScore?: string;
   rejectionReason?: string;
   syncedAt?: number;
+  locale: Locale;
 }) {
-  const readiness = approvalReadiness(status, rejectionReason);
+  const { tr } = useI18n();
+  const readiness = approvalReadiness(status, rejectionReason, locale);
   const Icon = readiness.tone === "good" ? CheckCircle2 : readiness.tone === "bad" ? XCircle : AlertTriangle;
   return (
-    <section className={`rounded-2xl border p-5 ${readinessClass(readiness.tone)}`}>
+    <section className={`rounded-lg border p-5 ${readinessClass(readiness.tone)}`}>
       <div className="flex items-start gap-3">
-        <span className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/80">
+        <span className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/80">
           <Icon size={18} />
         </span>
         <div>
@@ -300,13 +306,13 @@ function ApprovalReadinessCard({
           <p className="mt-1 text-sm leading-6">{readiness.body}</p>
           <div className="mt-3 grid gap-2 text-xs font-semibold sm:grid-cols-3">
             <span className="rounded-lg bg-white/70 px-2.5 py-2">
-              Status: {status}
+              {tr("Estado", "Status")}: {statusLabel(status, locale)}
             </span>
             <span className="rounded-lg bg-white/70 px-2.5 py-2">
-              Quality: {qualityScore ?? "unknown"}
+              {tr("Qualidade", "Quality")}: {qualityScore ?? tr("desconhecida", "unknown")}
             </span>
             <span className="rounded-lg bg-white/70 px-2.5 py-2">
-              Sync: {syncedAt ? relativeTime(syncedAt) : "not synced"}
+              {tr("Sincronização", "Sync")}: {syncedAt ? relativeTime(syncedAt, Date.now(), locale) : tr("não sincronizado", "not synced")}
             </span>
           </div>
         </div>
@@ -325,7 +331,7 @@ function PayloadMetric({
   value: string;
 }) {
   return (
-    <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
+    <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
       <div className="mb-2 flex h-8 w-8 items-center justify-center rounded-lg bg-white text-slate-500">
         <Icon size={15} />
       </div>
@@ -339,46 +345,76 @@ function PayloadMetric({
   );
 }
 
-function approvalReadiness(status: string, rejectionReason?: string) {
+function approvalReadiness(status: string, rejectionReason: string | undefined, locale: Locale) {
+  const pt = locale === "pt";
   if (status === "approved") {
     return {
       tone: "good" as const,
-      title: "Ready to use",
-      body:
-        "Meta approved this template. It can be used for campaigns and conversations outside the 24h service window.",
+      title: pt ? "Pronto para usar" : "Ready to use",
+      body: pt
+        ? "A Meta aprovou este template. Pode ser usado em campanhas e atendimentos fora da janela de 24 horas."
+        : "Meta approved this template. It can be used for campaigns and conversations outside the 24h service window.",
     };
   }
   if (status === "pending") {
     return {
       tone: "warn" as const,
-      title: "Waiting for Meta review",
-      body:
-        "Do not attach this template to a campaign yet. Sync from Meta or wait for the status webhook before launch.",
+      title: pt ? "A aguardar revisão da Meta" : "Waiting for Meta review",
+      body: pt
+        ? "Ainda não associe este template a uma campanha. Aguarde o estado da Meta antes do envio."
+        : "Do not attach this template to a campaign yet. Sync from Meta or wait for the status webhook before launch.",
     };
   }
   if (status === "draft") {
     return {
       tone: "warn" as const,
-      title: "Draft only",
-      body:
-        "This template still needs Meta approval before production sends. Review the preview and submit it when ready.",
+      title: pt ? "Apenas rascunho" : "Draft only",
+      body: pt
+        ? "Este template precisa de aprovação da Meta antes de ser enviado. Reveja e submeta quando estiver pronto."
+        : "This template still needs Meta approval before production sends. Review the preview and submit it when ready.",
     };
   }
   if (status === "rejected") {
     return {
       tone: "bad" as const,
-      title: "Rejected by Meta",
+      title: pt ? "Rejeitado pela Meta" : "Rejected by Meta",
       body:
         rejectionReason ??
-        "Fix policy/category/copy issues, then create or submit a corrected version before using it.",
+        (pt
+          ? "Corrija os problemas de política, categoria ou texto e submeta uma nova versão."
+          : "Fix policy/category/copy issues, then create or submit a corrected version before using it."),
     };
   }
   return {
     tone: "bad" as const,
-    title: "Not safe for campaigns",
-    body:
-      "Meta has paused or disabled this template. Remove it from active campaign plans until it is approved again.",
+    title: pt ? "Não é seguro para campanhas" : "Not safe for campaigns",
+    body: pt
+      ? "A Meta pausou ou desativou este template. Retire-o das campanhas até voltar a ser aprovado."
+      : "Meta has paused or disabled this template. Remove it from active campaign plans until it is approved again.",
   };
+}
+
+function statusLabel(status: string, locale: Locale) {
+  const labels: Record<string, [string, string]> = {
+    draft: ["Rascunho", "Draft"],
+    pending: ["Em análise", "Pending"],
+    approved: ["Aprovado", "Approved"],
+    rejected: ["Rejeitado", "Rejected"],
+    paused: ["Pausado", "Paused"],
+    disabled: ["Desativado", "Disabled"],
+  };
+  const label = labels[status];
+  return label ? label[locale === "pt" ? 0 : 1] : status;
+}
+
+function categoryLabel(category: string, locale: Locale) {
+  const labels: Record<string, [string, string]> = {
+    marketing: ["Marketing", "Marketing"],
+    utility: ["Utilidade", "Utility"],
+    authentication: ["Autenticação", "Authentication"],
+  };
+  const label = labels[category];
+  return label ? label[locale === "pt" ? 0 : 1] : category;
 }
 
 function readinessClass(tone: "good" | "warn" | "bad") {

@@ -107,7 +107,7 @@ function LeadsContent() {
   if (dashboard === undefined) {
     return (
       <div className="max-w-7xl space-y-6 px-8 py-8">
-        <div className="rounded-2xl border border-slate-200 bg-white p-8 text-sm text-slate-400">
+        <div className="rounded-lg border border-slate-200 bg-white p-8 text-sm text-slate-400">
           {locale === "pt" ? "A carregar leads..." : "Loading leads..."}
         </div>
       </div>
@@ -129,7 +129,7 @@ function LeadsDashboard({
   return (
     <div className="max-w-7xl space-y-6 px-8 py-8">
       {degraded && (
-        <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800">
+        <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800">
           <AlertTriangle className="mt-0.5 shrink-0" size={17} />
           <div>
             <div className="font-medium">
@@ -173,7 +173,7 @@ function LeadsDashboard({
             </div>
 
             <section className="grid gap-6 xl:grid-cols-[0.75fr_1.25fr]">
-              <div className="rounded-2xl border border-slate-200 bg-white p-5">
+              <div className="rounded-lg border border-slate-200 bg-white p-5">
                 <div className="mb-4 flex items-center justify-between">
                   <h2 className="font-[var(--font-outfit)] text-[18px] font-medium text-[#0a1b33]">
                     {locale === "pt" ? "Funil" : "Pipeline"}
@@ -211,7 +211,7 @@ function LeadsDashboard({
                 </div>
               </div>
 
-              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+              <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
                 <div className="border-b border-slate-100 px-5 py-4">
                   <h2 className="font-[var(--font-outfit)] text-[18px] font-medium text-[#0a1b33]">
                     {locale === "pt" ? "Entradas recentes" : "Recent entries"}
@@ -325,7 +325,7 @@ function Kpi({
   tone?: "amber";
 }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4">
+    <div className="rounded-lg border border-slate-200 bg-white p-4">
       <div
         className={`mb-3 flex h-9 w-9 items-center justify-center rounded-lg ${
           tone === "amber"

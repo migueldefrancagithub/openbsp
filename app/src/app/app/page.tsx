@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "convex/react";
+import { useState } from "react";
 import {
   AlertTriangle,
   ArrowRight,
@@ -25,6 +26,7 @@ import { api } from "../../../convex/_generated/api";
 import { relativeTime } from "@/lib/relativeTime";
 import { useI18n, type TranslationKey } from "@/lib/i18n";
 import { ClinicOpsPanel } from "@/components/operation/ClinicOpsPanel";
+import { SegmentedTabs } from "@/components/app/SegmentedTabs";
 
 type LeadStatus =
   | "new"
@@ -37,6 +39,7 @@ type LeadStatus =
   | "lost";
 
 type ActionTone = "good" | "warn" | "action";
+type OperationTab = "today" | "pipeline" | "clinic";
 
 const LEAD_STATUSES: LeadStatus[] = [
   "new",
@@ -76,18 +79,21 @@ const QUICK_CREATORS = [
   {
     labelKey: "op.creatorKnowledge",
     href: "/app#clinic-center",
+    tab: "clinic",
     icon: FilePlus2,
     detail: { pt: "FAQ, serviços, políticas", en: "FAQ, services, policies" },
   },
   {
     labelKey: "op.creatorService",
     href: "/app#clinic-center",
+    tab: "clinic",
     icon: CalendarDays,
     detail: { pt: "Duração, equipa, disponibilidade", en: "Duration, team, availability" },
   },
   {
     labelKey: "op.creatorFollowup",
     href: "/app#clinic-center",
+    tab: "clinic",
     icon: Clock3,
     detail: { pt: "Regra, pausa, próxima tentativa", en: "Rule, stop, next attempt" },
   },
@@ -96,22 +102,24 @@ const QUICK_CREATORS = [
   href: string;
   icon: LucideIcon;
   detail: Record<"pt" | "en", string>;
+  tab?: OperationTab;
 }>;
 
 export default function AppOverview() {
   const tenant = useQuery(api.tenantsQueries.getActive);
   const dashboard = useQuery(api.operation.dashboard, {});
   const { locale, t } = useI18n();
+  const [operationTab, setOperationTab] = useState<OperationTab>("today");
 
   if (!tenant || !dashboard) {
     return (
       <main className="min-h-screen bg-[#f6f8fb] p-6">
         <div className="mx-auto max-w-7xl space-y-4">
-          <div className="h-28 rounded-2xl border border-slate-200 bg-white animate-pulse" />
+          <div className="h-28 rounded-lg border border-slate-200 bg-white animate-pulse" />
           <div className="grid gap-3 md:grid-cols-3">
-            <div className="h-28 rounded-2xl border border-slate-200 bg-white animate-pulse" />
-            <div className="h-28 rounded-2xl border border-slate-200 bg-white animate-pulse" />
-            <div className="h-28 rounded-2xl border border-slate-200 bg-white animate-pulse" />
+            <div className="h-28 rounded-lg border border-slate-200 bg-white animate-pulse" />
+            <div className="h-28 rounded-lg border border-slate-200 bg-white animate-pulse" />
+            <div className="h-28 rounded-lg border border-slate-200 bg-white animate-pulse" />
           </div>
         </div>
       </main>
@@ -161,7 +169,7 @@ export default function AppOverview() {
       </header>
 
       <div className="mx-auto max-w-7xl space-y-5 px-4 py-6 sm:px-6 lg:px-8">
-        <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+        <section className="grid grid-cols-2 gap-2 [&>*:last-child]:col-span-2 sm:gap-3 md:grid-cols-3 md:[&>*:last-child]:col-span-1 xl:grid-cols-5">
           <AttentionCard
             icon={MessageCircle}
             label={t("op.attention")}
@@ -206,8 +214,34 @@ export default function AppOverview() {
           />
         </section>
 
-        <section className="grid gap-5 xl:grid-cols-[1.05fr_0.95fr]">
-          <section className="rounded-2xl border border-slate-200 bg-white">
+        <SegmentedTabs
+          items={[
+            {
+              key: "today",
+              label: locale === "pt" ? "Hoje" : "Today",
+              value: `${dashboard.attention.threads} ${locale === "pt" ? "pedidos" : "requests"}`,
+              icon: Inbox,
+            },
+            {
+              key: "pipeline",
+              label: locale === "pt" ? "Funil e resultados" : "Pipeline and results",
+              value: `${dashboard.leads.total} leads`,
+              icon: MousePointerClick,
+            },
+            {
+              key: "clinic",
+              label: locale === "pt" ? "Clínica" : "Clinic",
+              value: locale === "pt" ? "Agenda, IA e seguimento" : "Schedule, AI, and follow-up",
+              icon: CalendarDays,
+            },
+          ]}
+          selected={operationTab}
+          onChange={(key) => setOperationTab(key as OperationTab)}
+        />
+
+        <div className="grid gap-5 xl:grid-cols-2">
+        <section className="contents">
+          <section className={operationTab === "pipeline" ? "rounded-lg border border-slate-200 bg-white" : "hidden"}>
             <div className="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h2 className="font-[var(--font-outfit)] text-lg font-medium text-[#0a1b33]">
@@ -249,7 +283,7 @@ export default function AppOverview() {
             </div>
           </section>
 
-          <section className="rounded-2xl border border-slate-200 bg-white">
+          <section className={operationTab === "today" ? "rounded-lg border border-slate-200 bg-white" : "hidden"}>
             <div className="border-b border-slate-100 px-5 py-4">
               <h2 className="font-[var(--font-outfit)] text-lg font-medium text-[#0a1b33]">
                 {t("op.actionQueue")}
@@ -293,8 +327,8 @@ export default function AppOverview() {
           </section>
         </section>
 
-        <section className="grid gap-5 xl:grid-cols-[1fr_1fr]">
-          <section className="rounded-2xl border border-slate-200 bg-white">
+        <section className="contents">
+          <section className={operationTab === "today" ? "rounded-lg border border-slate-200 bg-white" : "hidden"}>
             <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
               <div>
                 <h2 className="font-[var(--font-outfit)] text-lg font-medium text-[#0a1b33]">
@@ -351,7 +385,7 @@ export default function AppOverview() {
                         )}
                       </div>
                       <span className="shrink-0 text-xs text-slate-400">
-                        {relativeTime(thread.lastEventAt)}
+                        {relativeTime(thread.lastEventAt, Date.now(), locale)}
                       </span>
                     </div>
                   </Link>
@@ -360,7 +394,7 @@ export default function AppOverview() {
             )}
           </section>
 
-          <section className="rounded-2xl border border-slate-200 bg-white">
+          <section className={operationTab === "pipeline" ? "rounded-lg border border-slate-200 bg-white" : "hidden"}>
             <div className="border-b border-slate-100 px-5 py-4">
               <h2 className="font-[var(--font-outfit)] text-lg font-medium text-[#0a1b33]">
                 {t("op.campaignHealth")}
@@ -411,8 +445,10 @@ export default function AppOverview() {
             </div>
           </section>
         </section>
+        </div>
 
-        <section className="rounded-2xl border border-slate-200 bg-white p-5">
+        {operationTab === "today" && (
+        <section className="rounded-lg border border-slate-200 bg-white p-5">
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>
               <h2 className="font-[var(--font-outfit)] text-lg font-medium text-[#0a1b33]">
@@ -428,12 +464,8 @@ export default function AppOverview() {
           <div className="grid gap-3 md:grid-cols-5">
             {QUICK_CREATORS.map((creator) => {
               const Icon = creator.icon;
-              return (
-                <Link
-                  key={creator.labelKey}
-                  href={creator.href}
-                  className="group rounded-xl border border-slate-100 bg-[#f8fafc] p-4 transition-colors hover:border-slate-200 hover:bg-white"
-                >
+              const content = (
+                <>
                   <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-white text-[#0f766e] shadow-sm">
                     <Icon size={17} />
                   </span>
@@ -443,13 +475,29 @@ export default function AppOverview() {
                   <p className="mt-1 text-xs leading-5 text-slate-500">
                     {creator.detail[locale]}
                   </p>
+                </>
+              );
+              const className = "group rounded-lg border border-slate-100 bg-[#f8fafc] p-4 text-left transition-colors hover:border-slate-200 hover:bg-white";
+              return creator.tab ? (
+                <button
+                  key={creator.labelKey}
+                  type="button"
+                  onClick={() => setOperationTab(creator.tab!)}
+                  className={className}
+                >
+                  {content}
+                </button>
+              ) : (
+                <Link key={creator.labelKey} href={creator.href} className={className}>
+                  {content}
                 </Link>
               );
             })}
           </div>
         </section>
+        )}
 
-        <ClinicOpsPanel />
+        {operationTab === "clinic" && <ClinicOpsPanel />}
       </div>
     </main>
   );
@@ -469,21 +517,21 @@ function AttentionCard({
   urgent?: boolean;
 }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4">
+    <div className="rounded-lg border border-slate-200 bg-white p-3 sm:p-4">
       <span
-        className={`inline-flex h-9 w-9 items-center justify-center rounded-lg ${
+        className={`inline-flex h-8 w-8 items-center justify-center rounded-lg sm:h-9 sm:w-9 ${
           urgent ? "bg-amber-50 text-amber-600" : "bg-emerald-50 text-[#0f766e]"
         }`}
       >
         <Icon size={17} />
       </span>
-      <p className="mt-5 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+      <p className="mt-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400 sm:mt-5 sm:text-[11px] sm:tracking-[0.14em]">
         {label}
       </p>
-      <p className="mt-1 font-[var(--font-outfit)] text-3xl font-medium text-[#0a1b33]">
+      <p className="mt-1 font-[var(--font-outfit)] text-2xl font-medium text-[#0a1b33] sm:text-3xl">
         {value}
       </p>
-      <p className="mt-1 truncate text-sm text-slate-500">{note}</p>
+      <p className="mt-1 truncate text-xs text-slate-500 sm:text-sm">{note}</p>
     </div>
   );
 }
@@ -546,7 +594,7 @@ function CompactHealth({
   urgent?: boolean;
 }) {
   return (
-    <div className="rounded-xl border border-slate-100 bg-[#f8fafc] p-4">
+    <div className="rounded-lg border border-slate-100 bg-[#f8fafc] p-4">
       <div className="flex items-start justify-between gap-3">
         <Icon size={17} className={urgent ? "text-amber-600" : "text-[#0f766e]"} />
         <span className="font-[var(--font-outfit)] text-xl font-medium text-[#0a1b33]">

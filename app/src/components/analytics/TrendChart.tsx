@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { EmptyRow } from "./ui";
 import { formatNumber } from "./lib";
+import { useI18n } from "@/lib/i18n";
 
 export type SeriesPoint = {
   bucketStart: number;
@@ -12,12 +13,12 @@ export type SeriesPoint = {
   failed: number;
 };
 
-type Line = { key: "sent" | "delivered" | "failed"; label: string; color: string };
+type Line = { key: "sent" | "delivered" | "failed"; color: string };
 
 const LINES: Line[] = [
-  { key: "sent", label: "Sent", color: "#3d52d5" },
-  { key: "delivered", label: "Delivered", color: "#0f9d7a" },
-  { key: "failed", label: "Failed", color: "#d1495b" },
+  { key: "sent", color: "#3d52d5" },
+  { key: "delivered", color: "#0f9d7a" },
+  { key: "failed", color: "#d1495b" },
 ];
 
 // Internal coordinate space. The SVG stretches to its container with
@@ -35,6 +36,7 @@ export function TrendChart({
   /** Restrict to one metric, e.g. on the Delivery tab. */
   only?: Line["key"][];
 }) {
+  const { locale, tr } = useI18n();
   const lines = only ? LINES.filter((l) => only.includes(l.key)) : LINES;
 
   const { paths, max, labels } = useMemo(() => {
@@ -70,8 +72,8 @@ export function TrendChart({
     <div className="min-w-0 px-4 pb-3 pt-4">
       <div className="flex min-w-0 gap-3">
         <div className="flex w-10 shrink-0 flex-col justify-between py-0.5 text-right text-[10px] tabular-nums text-slate-400">
-          <span>{formatNumber(max)}</span>
-          <span>{formatNumber(Math.round(max / 2))}</span>
+          <span>{formatNumber(max, locale)}</span>
+          <span>{formatNumber(Math.round(max / 2), locale)}</span>
           <span>0</span>
         </div>
 
@@ -85,7 +87,7 @@ export function TrendChart({
             viewBox={`0 0 ${VW} ${VH}`}
             preserveAspectRatio="none"
             role="img"
-            aria-label={`Messaging trend: ${lines.map((l) => l.label).join(", ")}`}
+            aria-label={`${tr("Tendência de mensagens", "Messaging trend")}: ${lines.map((line) => lineLabel(line.key, locale)).join(", ")}`}
             className="block h-[180px] w-full @lg:h-[220px]"
           >
             {paths.map((line) => (
@@ -128,10 +130,19 @@ export function TrendChart({
               className="h-0.5 w-3 rounded-full"
               style={{ background: line.color }}
             />
-            {line.label}
+            {lineLabel(line.key, locale)}
           </span>
         ))}
       </div>
     </div>
   );
+}
+
+function lineLabel(key: Line["key"], locale: "pt" | "en") {
+  const labels: Record<Line["key"], [string, string]> = {
+    sent: ["Enviadas", "Sent"],
+    delivered: ["Entregues", "Delivered"],
+    failed: ["Falharam", "Failed"],
+  };
+  return labels[key][locale === "pt" ? 0 : 1];
 }
