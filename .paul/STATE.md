@@ -7,7 +7,7 @@
 ## Current Position
 
 Milestone: v0.2 Clinic operating system (handoff 2026-09-02)
-Phase: 0 of 4 (Preparation) — In progress
+Phase: A of 4 (Inbox end-to-end) — Code complete, awaiting review + production deploy
 Previous milestone v0.1 (channel-neutral core, Phases 1–4) is complete; see
 ROADMAP.md. Phases 5–6 of v0.1 (Instagram adapter, Meta direct completion)
 are deferred behind v0.2.
@@ -16,14 +16,24 @@ Status: Plan approved by the owner on 2026-09-02. Executing Phase 0 + Phase A
 B (campaigns/agenda/follow-ups/RBAC/analytics/admin), C (AI agents,
 multi-provider) and D (QA/polish/contraction/production) wait for review.
 Plan file: ~/.claude/plans/handoff-openbsp-fonte-de-structured-cocke.md
-Last activity: 2026-09-02 — production audit + plan approval
+Last activity: 2026-09-02 — Phase 0 + Phase A (A1–A6) committed on claude/openbsp-handoff-production-cb7326; 53 test files / 301 tests, typecheck and build green
 
 Working checkout: /Users/sidneychambal/openbsp/.claude/worktrees/hungry-lamarr-9b49ab
 Branch: claude/openbsp-handoff-production-cb7326 (off main @ 00744e6)
 
 Progress:
-- Milestone v0.2: [░░░░░░░░░░] 0%
-- Phase 0: [██░░░░░░░░] 20%
+- Milestone v0.2: [███░░░░░░░] 30%
+- Phase 0: [██████████] 100%
+- Phase A: [█████████░] 90% (code done; prod deploy + smoke pending)
+
+## Phase A delivery (2026-09-02)
+
+Slices A1–A6 on branch `claude/openbsp-handoff-production-cb7326` (one commit
+each). Release protocol: merge → `cd app && npx convex deploy` → run the
+three backfills (`leads:_backfillLeadStatus`, `leads:_backfillOrigin`,
+`clinic:_backfillOpenHumanCases`) → Vercel builds main → run
+`app/scripts/smoke-phase-a.md`. Deferred to Phase B: hash-chained auditLog
+writer (seam `lib/audit.ts` is in place), presence, assignment rules.
 
 ## Production facts (verified 2026-09-02)
 
