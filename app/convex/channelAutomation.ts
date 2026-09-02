@@ -6,6 +6,10 @@ import {
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { tenantQuery } from "./lib/customFunctions";
+import {
+  extractErrorCode,
+  recordThreadSystemEvent,
+} from "./lib/channels/systemEvents";
 
 const PROVIDER = "iasolution_hub" as const;
 const MAX_RUNTIME_STEPS = 24;
@@ -153,6 +157,16 @@ export const dispatchInbound = internalMutation({
         });
       }
       await setThreadMode(ctx, thread, "stopped", "contact_stop_keyword");
+      await recordThreadSystemEvent(ctx, {
+        thread,
+        kind: "automation.stopped",
+        severity: "info",
+        code: "contact_stop_keyword",
+        actorType: "system",
+        chatbotId: activeRun?.chatbotId,
+        runId: activeRun?._id,
+        dedupeKey: `event:${event._id}:stopped`,
+      });
       return {
         consumed: true,
         runId: activeRun?._id,
@@ -225,6 +239,16 @@ export const dispatchInbound = internalMutation({
     });
     const run = (await ctx.db.get(runId))!;
     await setThreadMode(ctx, thread, "bot", `chatbot:${bot._id}`);
+    await recordThreadSystemEvent(ctx, {
+      thread,
+      kind: "automation.started",
+      severity: "info",
+      actorType: "automation",
+      chatbotId: bot._id,
+      runId,
+      payload: { botName: bot.name, triggerKind: bot.triggerKind },
+      dedupeKey: `run:${runId}:started`,
+    });
     await addEvent(ctx, {
       run,
       eventType: "started",
@@ -281,6 +305,16 @@ export const pauseForHuman = internalMutation({
         eventType: "stopped",
         nodeKey: run.currentNodeKey,
         payload: { reason: "human_operator_reply" },
+      });
+      await recordThreadSystemEvent(ctx, {
+        thread,
+        kind: "automation.paused_by_operator",
+        severity: "info",
+        code: "human_operator_reply",
+        actorType: "system",
+        chatbotId: run.chatbotId,
+        runId: run._id,
+        dedupeKey: `run:${run._id}:paused`,
       });
     }
     await setThreadMode(ctx, thread, "human", "human_operator_reply");
@@ -385,12 +419,48 @@ export const settleDispatch = internalMutation({
       },
     });
     if (args.status !== "accepted") {
+      const reason = `outbound_${args.status}`;
+      const code = extractErrorCode(args.failureReason) ?? reason;
+      const thread = await ctx.db.get(run.threadId);
       if (run.status === "active") {
-        await failRun(ctx, run, `outbound_${args.status}`, now);
-        const thread = await ctx.db.get(run.threadId);
+        await failRun(ctx, run, reason, now, {
+          code,
+          detail: args.failureReason,
+        });
         if (thread) {
-          await setThreadMode(ctx, thread, "human", `outbound_${args.status}`);
+          await setThreadMode(ctx, thread, "human", reason);
         }
+      } else if (thread) {
+        // Terminal dispatches (e.g. the handoff copy) fail after the run has
+        // already ended; the operator still needs to see it.
+        await recordThreadSystemEvent(ctx, {
+          thread,
+          kind: "automation.failed",
+          severity: "error",
+          code,
+          actorType: "automation",
+          chatbotId: run.chatbotId,
+          runId: run._id,
+          payload: {
+            reason,
+            detail: args.failureReason?.slice(0, 160),
+            nodeKey: dispatch.nodeKey,
+          },
+          dedupeKey: `dispatch:${dispatch._id}:failed`,
+        });
+      }
+      if (thread && code === "RECIPIENT_NOT_ALLOWLISTED") {
+        await recordThreadSystemEvent(ctx, {
+          thread,
+          kind: "pilot.recipient_not_allowlisted",
+          severity: "warning",
+          code,
+          actorType: "system",
+          chatbotId: run.chatbotId,
+          runId: run._id,
+          dedupeKey: `pilot:${thread._id}:not_allowlisted`,
+        });
+        await ctx.db.patch(thread._id, { pilotBlockedAt: now, updatedAt: now });
       }
       return null;
     }
@@ -708,6 +778,16 @@ async function enterFlow(
         sourceEventId: sourceEvent._id,
         nodeKey: node.key,
         payload: { tag: HANDOFF_TAG },
+      });
+      await recordThreadSystemEvent(ctx, {
+        thread,
+        kind: "automation.handoff",
+        severity: "info",
+        actorType: "automation",
+        chatbotId: bot._id,
+        runId: run._id,
+        payload: { botName: bot.name, nodeKey: node.key },
+        dedupeKey: `run:${run._id}:handoff`,
       });
       if (
         thread.serviceWindowExpiresAt &&
@@ -1044,6 +1124,16 @@ async function completeRun(
     payload: { reason },
   });
   await setThreadMode(ctx, thread, "idle", reason);
+  await recordThreadSystemEvent(ctx, {
+    thread,
+    kind: "automation.completed",
+    severity: "info",
+    actorType: "automation",
+    chatbotId: run.chatbotId,
+    runId: run._id,
+    payload: { reason },
+    dedupeKey: `run:${run._id}:completed`,
+  });
 }
 
 async function failRun(
@@ -1051,6 +1141,7 @@ async function failRun(
   run: Doc<"channelAutomationRuns">,
   reason: string,
   now: number,
+  extra?: { code?: string; detail?: string },
 ) {
   await ctx.db.patch(run._id, {
     status: "failed",
@@ -1065,6 +1156,25 @@ async function failRun(
     nodeKey: run.currentNodeKey,
     payload: { reason: reason.slice(0, 200) },
   });
+  const thread = (await ctx.db.get(run.threadId)) as Doc<"channelThreads"> | null;
+  if (thread) {
+    await recordThreadSystemEvent(ctx, {
+      thread,
+      kind: "automation.failed",
+      severity: "error",
+      code: extra?.code ?? reason,
+      actorType: "automation",
+      chatbotId: run.chatbotId,
+      runId: run._id,
+      payload: {
+        reason: reason.slice(0, 200),
+        detail: extra?.detail?.slice(0, 160),
+        nodeKey: run.currentNodeKey,
+      },
+      dedupeKey: `run:${run._id}:failed`,
+      now,
+    });
+  }
 }
 
 async function stopRun(

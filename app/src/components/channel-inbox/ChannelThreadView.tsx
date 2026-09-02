@@ -34,8 +34,17 @@ import { formatTime, relativeTime } from "@/lib/relativeTime";
 import { useI18n, type TranslationKey } from "@/lib/i18n";
 import { templateCategoryLabel } from "@/lib/operationalLabels";
 import { PatientContextPanel } from "@/components/channel-inbox/PatientContextPanel";
+import { PilotBanner } from "@/components/channel-inbox/PilotBanner";
+import {
+  SystemEventRow,
+  type TimelineSystemItem,
+} from "@/components/channel-inbox/SystemEventRow";
 
-type BlockedReason = { title: string; detail: string } | null;
+type BlockedReason = {
+  kind: "legacy" | "disabled" | "allowlist" | "window";
+  title: string;
+  detail: string;
+} | null;
 
 type ThreadSummary = {
   _id: Id<"channelThreads">;
@@ -63,6 +72,7 @@ type ThreadSummary = {
   dnd?: boolean;
   automationMode?: string;
   automationChangeReason?: string;
+  pilotBlockedAt?: number;
   channelSendMode: string;
   channelProvider: string;
   channelDisplayName: string;
@@ -95,6 +105,10 @@ type ThreadEvent = {
   receivedAt: number;
   providerTimestamp?: number;
 };
+
+type TimelineItem =
+  | { type: "event"; at: number; event: ThreadEvent }
+  | { type: "system"; at: number; system: TimelineSystemItem };
 
 function errorMessage(error: unknown, locale: "pt" | "en"): string {
   const data =
@@ -461,6 +475,11 @@ export function ChannelThreadView({
     threadKey,
     limit: 200,
   });
+  const timelineExtras = useQuery(
+    inboxApi.listThreadTimelineExtras,
+    thread ? { threadId: thread._id } : "skip",
+  );
+  const workspace = useQuery(api.tenantsQueries.getActiveOptional);
   const quickReplies = useQuery(api.quickReplies.list);
   const members = useQuery(api.memberInvites.listMembers, {});
   const templates = useQuery(api.channels.listTemplates, { channelId }) as
@@ -502,11 +521,52 @@ export function ChannelThreadView({
     [events],
   );
 
+  const timeline = useMemo<TimelineItem[]>(() => {
+    const items: TimelineItem[] = ordered.map((event) => ({
+      type: "event",
+      at: event.receivedAt,
+      event,
+    }));
+    for (const row of timelineExtras?.systemEvents ?? []) {
+      const payload = (row.payload ?? {}) as { detail?: unknown };
+      items.push({
+        type: "system",
+        at: row.createdAt,
+        system: {
+          id: row._id,
+          kind: row.kind,
+          severity: row.severity as TimelineSystemItem["severity"],
+          code: row.code,
+          botName: row.botName,
+          actorName: row.actorName,
+          detail: typeof payload.detail === "string" ? payload.detail : undefined,
+          at: row.createdAt,
+        },
+      });
+    }
+    for (const row of timelineExtras?.failedOutbox ?? []) {
+      items.push({
+        type: "system",
+        at: row.updatedAt,
+        system: {
+          id: row._id,
+          kind: row.status === "unknown" ? "outbox.unknown" : "outbox.failed",
+          severity: row.status === "unknown" ? "warning" : "error",
+          code: row.code,
+          detail: row.preview,
+          at: row.updatedAt,
+        },
+      });
+    }
+    items.sort((a, b) => a.at - b.at);
+    return items;
+  }, [ordered, timelineExtras]);
+
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
     el.scrollTop = el.scrollHeight;
-  }, [ordered.length, threadKey]);
+  }, [timeline.length, threadKey]);
 
   const quickReplyNeedle = (
     quickReplySearch || (draft.startsWith("/") ? draft.slice(1) : "")
@@ -530,18 +590,21 @@ export function ChannelThreadView({
     if (!thread) return null;
     if (thread.channelProvider !== "iasolution_hub") {
       return {
+        kind: "legacy",
         title: t("inbox.blockedLegacyTitle"),
         detail: t("inbox.blockedLegacyDetail"),
       };
     }
     if (thread.channelSendMode === "disabled") {
       return {
+        kind: "disabled",
         title: t("inbox.blockedDisabledTitle"),
         detail: t("inbox.blockedDisabledDetail"),
       };
     }
     if (!thread.recipientAllowlisted) {
       return {
+        kind: "allowlist",
         title: t("inbox.blockedAllowlistTitle"),
         detail: t("inbox.blockedAllowlistDetail"),
       };
@@ -551,6 +614,7 @@ export function ChannelThreadView({
       thread.serviceWindowExpiresAt > Date.now();
     if (!windowOpen) {
       return {
+        kind: "window",
         title: t("inbox.blockedWindowTitle"),
         detail: t("inbox.blockedWindowDetail"),
       };
@@ -801,19 +865,30 @@ export function ChannelThreadView({
           ref={scrollRef}
           className="flex-1 space-y-2 overflow-y-auto px-6 py-5"
         >
-          {ordered.length === 0 ? (
+          {timeline.length === 0 ? (
             <div className="py-10 text-center text-sm text-slate-400">
               {t("inbox.noMessages")}
             </div>
           ) : (
-            ordered.map((event) => (
-              <ChannelMessageBubble key={event._id} event={event} locale={locale} />
-            ))
+            timeline.map((item) =>
+              item.type === "event" ? (
+                <ChannelMessageBubble key={item.event._id} event={item.event} locale={locale} />
+              ) : (
+                <SystemEventRow key={item.system.id} item={item.system} />
+              ),
+            )
           )}
         </div>
 
         <div className="border-t border-slate-200 bg-white px-3 py-3 sm:px-4">
-          {blocked && (
+          {blocked?.kind === "allowlist" && (
+            <PilotBanner
+              threadId={summary._id}
+              recipient={summary.phone ?? summary.threadKey}
+              role={workspace?.role}
+            />
+          )}
+          {blocked && blocked.kind !== "allowlist" && (
             <div className="flex items-start gap-2.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
               <ShieldAlert
                 size={15}

@@ -4,9 +4,15 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { internalMutation } from "./_generated/server";
 import {
   loadByIdInTenant,
+  requireCapability,
   tenantMutation,
   tenantQuery,
 } from "./lib/customFunctions";
+import {
+  extractErrorCode,
+  maskPhone,
+  recordThreadSystemEvent,
+} from "./lib/channels/systemEvents";
 
 const filterValidator = v.union(
   v.literal("all"),
@@ -216,6 +222,8 @@ const threadSummaryValidator = v.object({
   snoozedUntil: v.optional(v.number()),
   automationMode: v.optional(v.string()),
   dnd: v.boolean(),
+  /** An automatic reply was blocked because the number is outside the pilot allowlist. */
+  pilotBlocked: v.boolean(),
 });
 
 export const listThreads = tenantQuery({
@@ -251,6 +259,11 @@ export const listThreads = tenantQuery({
       const identity = await getThreadIdentity(ctx, thread);
       const displayName = identity?.displayName;
       const phone = identity?.phone ?? normalizedPhone(thread.threadKey);
+      // Same recipient derivation as the outbound gate: the allowlist itself
+      // never leaves the server, only the verdict does.
+      const recipient = identity?.phone ?? thread.threadKey;
+      const pilotBlocked =
+        !!thread.pilotBlockedAt && !channel.outboundAllowlist.includes(recipient);
       const haystack = `${displayName ?? ""} ${phone ?? ""} ${thread.threadKey} ${thread.lastPreview ?? ""}`.toLowerCase();
       if (search && !haystack.includes(search)) continue;
       const inboxStatus = deriveStatus(thread, now);
@@ -280,6 +293,7 @@ export const listThreads = tenantQuery({
         snoozedUntil: thread.snoozedUntil,
         automationMode: thread.automationMode,
         dnd: thread.dnd ?? false,
+        pilotBlocked,
       });
     }
     return {
@@ -287,6 +301,185 @@ export const listThreads = tenantQuery({
       isDone: result.isDone,
       continueCursor: result.continueCursor,
     };
+  },
+});
+
+const timelineSystemEventValidator = v.object({
+  _id: v.id("threadSystemEvents"),
+  kind: v.string(),
+  severity: v.string(),
+  code: v.optional(v.string()),
+  actorType: v.string(),
+  actorName: v.optional(v.string()),
+  botName: v.optional(v.string()),
+  humanCaseId: v.optional(v.id("humanCases")),
+  payload: v.optional(v.any()),
+  createdAt: v.number(),
+});
+
+const timelineOutboxValidator = v.object({
+  _id: v.id("channelOutbox"),
+  status: v.string(),
+  messageKind: v.string(),
+  preview: v.optional(v.string()),
+  code: v.optional(v.string()),
+  failureReason: v.optional(v.string()),
+  createdAt: v.number(),
+  updatedAt: v.number(),
+});
+
+function outboxPreview(payload: unknown): string | undefined {
+  if (!payload || typeof payload !== "object") return undefined;
+  const record = payload as Record<string, unknown>;
+  if (typeof record.text === "string") return record.text.slice(0, 160);
+  if (typeof record.templateName === "string") return `Template: ${record.templateName}`;
+  if (typeof record.filename === "string") return record.filename.slice(0, 120);
+  return undefined;
+}
+
+/**
+ * Everything the thread timeline shows that is NOT a provider event: system
+ * events (automation outcomes, pilot blocks, handoffs) and outbox rows that
+ * never became a provider event because the send was rejected or never
+ * confirmed. Each list is take-limited; the client merges by timestamp.
+ */
+export const listThreadTimelineExtras = tenantQuery({
+  args: {
+    threadId: v.id("channelThreads"),
+    limit: v.optional(v.number()),
+  },
+  returns: v.object({
+    systemEvents: v.array(timelineSystemEventValidator),
+    failedOutbox: v.array(timelineOutboxValidator),
+  }),
+  handler: async (ctx, args) => {
+    const thread = await loadByIdInTenant(ctx, "channelThreads", args.threadId);
+    const limit = Math.min(Math.max(args.limit ?? 50, 1), 100);
+    const rows = (await ctx.db
+      .query("threadSystemEvents")
+      .withIndex("by_thread", (q) => q.eq("threadId", thread._id))
+      .order("desc")
+      .take(limit)) as Doc<"threadSystemEvents">[];
+    const botNames = new Map<string, string | undefined>();
+    const memberNames = new Map<string, string | undefined>();
+    const systemEvents = [];
+    for (const row of rows) {
+      let botName: string | undefined;
+      if (row.chatbotId) {
+        if (!botNames.has(row.chatbotId)) {
+          const bot = (await ctx.db.get(row.chatbotId)) as Doc<"chatbots"> | null;
+          botNames.set(row.chatbotId, bot?.name);
+        }
+        botName = botNames.get(row.chatbotId);
+      }
+      let actorName: string | undefined;
+      if (row.actorMemberId) {
+        if (!memberNames.has(row.actorMemberId)) {
+          memberNames.set(row.actorMemberId, await memberLabel(ctx, row.actorMemberId));
+        }
+        actorName = memberNames.get(row.actorMemberId);
+      }
+      systemEvents.push({
+        _id: row._id,
+        kind: row.kind,
+        severity: row.severity,
+        code: row.code,
+        actorType: row.actorType,
+        actorName,
+        botName,
+        humanCaseId: row.humanCaseId,
+        payload: row.payload,
+        createdAt: row.createdAt,
+      });
+    }
+    const failedOutbox = [];
+    for (const status of ["failed", "unknown"] as const) {
+      const outbox = (await ctx.db
+        .query("channelOutbox")
+        .withIndex("by_channel_thread_status", (q) =>
+          q
+            .eq("channelId", thread.channelId)
+            .eq("threadKey", thread.threadKey)
+            .eq("status", status),
+        )
+        .order("desc")
+        .take(20)) as Doc<"channelOutbox">[];
+      for (const row of outbox) {
+        failedOutbox.push({
+          _id: row._id,
+          status: row.status,
+          messageKind: row.messageKind,
+          preview: outboxPreview(row.payload),
+          code: extractErrorCode(row.failureReason),
+          failureReason: row.failureReason?.slice(0, 200),
+          createdAt: row.createdAt,
+          updatedAt: row.updatedAt,
+        });
+      }
+    }
+    return { systemEvents, failedOutbox };
+  },
+});
+
+/**
+ * An agent cannot edit the pilot allowlist (that is an admin action in
+ * Settings with an explicit re-arm), but they can leave a traceable request:
+ * a system event on the thread plus a reminder for the first active admin.
+ * One request per thread per day.
+ */
+export const requestAllowlistInclusion = tenantMutation({
+  args: { threadId: v.id("channelThreads") },
+  returns: v.object({
+    requested: v.boolean(),
+    reminderId: v.optional(v.id("threadReminders")),
+  }),
+  handler: async (ctx, args) => {
+    requireCapability(ctx.role, "pilot.request_allowlist");
+    const thread = await loadByIdInTenant(ctx, "channelThreads", args.threadId);
+    const identity = await getThreadIdentity(ctx, thread);
+    const phone = identity?.phone ?? thread.threadKey;
+    const now = Date.now();
+    const day = new Date(now).toISOString().slice(0, 10);
+    const eventId = await recordThreadSystemEvent(ctx, {
+      thread,
+      kind: "pilot.allowlist_requested",
+      severity: "info",
+      actorType: "member",
+      actorMemberId: ctx.memberId,
+      payload: { phone: maskPhone(phone) },
+      dedupeKey: `pilot:${thread._id}:requested:${day}`,
+      now,
+    });
+    if (!eventId) return { requested: false };
+    const members = (await ctx.db
+      .query("members")
+      .withIndex("by_tenant_user", (q) => q.eq("tenantId", ctx.tenantId))
+      .take(100)) as Doc<"members">[];
+    const admin =
+      members.find(
+        (member) =>
+          member.status === "active" &&
+          (member.role === "owner" || member.role === "admin"),
+      ) ?? members.find((member) => member._id === ctx.memberId);
+    if (!admin) return { requested: true };
+    const dueAt = now + 60 * 60 * 1000;
+    const reminderId = await ctx.db.insert("threadReminders", {
+      tenantId: ctx.tenantId,
+      threadId: thread._id,
+      note: `Pedido de inclusão no piloto: ${phone}`,
+      dueAt,
+      status: "scheduled",
+      assignedMemberId: admin._id,
+      createdBy: ctx.memberId,
+      createdAt: now,
+      updatedAt: now,
+    });
+    await ctx.scheduler.runAt(dueAt, markReminderDue, { reminderId });
+    await audit(ctx, "inbox.pilot.allowlist_requested", thread._id, {
+      reminderId,
+      assignedMemberId: admin._id,
+    });
+    return { requested: true, reminderId };
   },
 });
 

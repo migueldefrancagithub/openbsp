@@ -660,6 +660,12 @@ export default defineSchema({
     .index("by_channel_business_key", ["channelId", "businessKey"])
     .index("by_channel_created", ["channelId", "createdAt"])
     .index("by_channel_provider_message", ["channelId", "providerMessageId"])
+    .index("by_channel_thread_status", [
+      "channelId",
+      "threadKey",
+      "status",
+      "createdAt",
+    ])
     .index("by_tenant_created", ["tenantId", "createdAt"]),
 
   channelTemplates: defineTable({
@@ -773,6 +779,8 @@ export default defineSchema({
     closedAt: v.optional(v.number()),
     closedReasonId: v.optional(v.id("threadCloseReasons")),
     dnd: v.optional(v.boolean()),
+    /** Set when an automatic reply was blocked by the pilot allowlist gate. */
+    pilotBlockedAt: v.optional(v.number()),
     automationMode: v.optional(
       v.union(
         v.literal("idle"),
@@ -848,6 +856,45 @@ export default defineSchema({
   })
     .index("by_tenant", ["tenantId", "active"])
     .index("by_tenant_name", ["tenantId", "name"]),
+
+  /**
+   * Operator-facing system timeline per thread: automation outcomes, pilot
+   * gate blocks, handoffs and lead changes. Deliberately separate from
+   * channelEvents (provider evidence + projection source: inserting synthetic
+   * rows there would move lastEventAt/serviceWindowExpiresAt) and from
+   * channelAutomationEvents (run-scoped, requires a chatbot).
+   */
+  threadSystemEvents: defineTable({
+    tenantId: v.id("tenants"),
+    channelId: v.id("channels"),
+    threadId: v.id("channelThreads"),
+    threadKey: v.string(),
+    kind: v.string(),
+    severity: v.union(
+      v.literal("info"),
+      v.literal("warning"),
+      v.literal("error"),
+    ),
+    /** ConvexError code or runtime reason when applicable. */
+    code: v.optional(v.string()),
+    actorType: v.union(
+      v.literal("member"),
+      v.literal("automation"),
+      v.literal("system"),
+    ),
+    actorMemberId: v.optional(v.id("members")),
+    chatbotId: v.optional(v.id("chatbots")),
+    runId: v.optional(v.id("channelAutomationRuns")),
+    humanCaseId: v.optional(v.id("humanCases")),
+    /** Normalized, safe fields only — never raw provider payloads. */
+    payload: v.optional(v.any()),
+    /** Idempotency key, e.g. `run:<id>:failed`. */
+    dedupeKey: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_thread", ["threadId", "createdAt"])
+    .index("by_thread_dedupe", ["threadId", "dedupeKey"])
+    .index("by_tenant_kind", ["tenantId", "kind", "createdAt"]),
 
   // ===== Clinic operating system =====
   clinicServices: defineTable({

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
 import {
   AlertTriangle,
@@ -159,6 +159,14 @@ export default function SettingsPage() {
   const [dndOnCode, setDndOnCode] = useState("");
   const [dndOffCode, setDndOffCode] = useState("");
   const [settingsTab, setSettingsTab] = useState("meta");
+  // Deep links (e.g. the inbox pilot banner) open a specific tab. Read the
+  // query string after mount so this client page needs no Suspense boundary.
+  useEffect(() => {
+    const requested = new URLSearchParams(window.location.search).get("tab");
+    if (requested && ["meta", "whatsapp", "automation", "team", "workspace"].includes(requested)) {
+      setSettingsTab(requested);
+    }
+  }, []);
   if (!tenant) return null;
 
   const hasConnection = (wabaAccounts?.length ?? 0) > 0;

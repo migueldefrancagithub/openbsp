@@ -13,6 +13,7 @@ import {
   Loader2,
   MessageCircleMore,
   Search,
+  ShieldAlert,
   SlidersHorizontal,
   Star,
   UserRound,
@@ -56,6 +57,7 @@ type ThreadRow = {
   inboxStatus: string;
   starred: boolean;
   automationMode?: string;
+  pilotBlocked?: boolean;
 };
 
 type FilterItem = {
@@ -341,6 +343,15 @@ export function ChannelThreadList() {
                             </span>
                           )}
                           {thread.automationMode === "bot" && <Bot size={11} className="shrink-0 text-blue-500" />}
+                          {thread.pilotBlocked && (
+                            <span
+                              className="inline-flex shrink-0 items-center gap-0.5 rounded border border-amber-200 bg-amber-50 px-1 py-0.5 text-[9px] font-semibold text-amber-800"
+                              title={t("inbox.pilotTitle")}
+                            >
+                              <ShieldAlert size={9} />
+                              {t("inbox.pilotBlockedShort")}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </Link>

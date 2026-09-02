@@ -39,6 +39,7 @@ import type * as lib_aiControl from "../lib/aiControl.js";
 import type * as lib_apiAuth from "../lib/apiAuth.js";
 import type * as lib_channels_outboxStatus from "../lib/channels/outboxStatus.js";
 import type * as lib_channels_projection from "../lib/channels/projection.js";
+import type * as lib_channels_systemEvents from "../lib/channels/systemEvents.js";
 import type * as lib_consent from "../lib/consent.js";
 import type * as lib_customFunctions from "../lib/customFunctions.js";
 import type * as lib_flow_window from "../lib/flow/window.js";
@@ -102,6 +103,7 @@ declare const fullApi: ApiFromModules<{
   "lib/apiAuth": typeof lib_apiAuth;
   "lib/channels/outboxStatus": typeof lib_channels_outboxStatus;
   "lib/channels/projection": typeof lib_channels_projection;
+  "lib/channels/systemEvents": typeof lib_channels_systemEvents;
   "lib/consent": typeof lib_consent;
   "lib/customFunctions": typeof lib_customFunctions;
   "lib/flow/window": typeof lib_flow_window;

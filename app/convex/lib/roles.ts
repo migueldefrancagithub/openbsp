@@ -33,6 +33,7 @@ export const CAPABILITIES = [
   "audit.export",
   "compliance.export_contact",
   "feature_flag.set",
+  "pilot.request_allowlist",
 ] as const;
 export type Capability = (typeof CAPABILITIES)[number];
 
@@ -57,6 +58,7 @@ const CAPABILITY_MATRIX: Record<Role, Set<Capability>> = {
     "tenant.update_settings",
     "audit.export",
     "compliance.export_contact",
+    "pilot.request_allowlist",
   ]),
   marketing: new Set<Capability>([
     "campaigns.create",
@@ -71,6 +73,7 @@ const CAPABILITY_MATRIX: Record<Role, Set<Capability>> = {
     "messages.send_template",
     "conversations.assign_self",
     "conversations.close",
+    "pilot.request_allowlist",
   ]),
 };
 
