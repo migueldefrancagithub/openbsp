@@ -76,4 +76,7 @@ crons.interval("follow-up stale claim sweep", { minutes: 10 }, internal.followUp
 crons.interval("ops unknown outbox sweep", { minutes: 10 }, internal.ops.sweepUnknownOutbox, {});
 crons.interval("ops sla breach sweep", { minutes: 5 }, internal.ops.sweepSlaBreaches, {});
 
+// Reports: rebuild today + yesterday per tenant from index-bounded scans.
+crons.interval("analytics daily rollups", { hours: 1 }, internal.analyticsRollups.runHourly, {});
+
 export default crons;

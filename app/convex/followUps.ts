@@ -1,4 +1,5 @@
 import { ConvexError, v } from "convex/values";
+import { paginationOptsValidator } from "convex/server";
 import { internalMutation } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 import { writeAudit } from "./lib/audit";
@@ -137,5 +138,49 @@ export const retryTask = tenantMutation({
     });
     await writeAudit(ctx, { action: "clinic.follow_up_task.retried", targetType: "followUpTask", targetId: task._id });
     return null;
+  },
+});
+
+/** Admin › Logs: recent tasks of the tenant, newest due first. */
+export const listRecent = tenantQuery({
+  args: { paginationOpts: paginationOptsValidator },
+  returns: v.object({
+    page: v.array(
+      v.object({
+        _id: v.id("followUpTasks"),
+        kind: v.string(),
+        threadKey: v.optional(v.string()),
+        status: v.string(),
+        dueAt: v.number(),
+        attempts: v.number(),
+        failureCode: v.optional(v.string()),
+        stoppedReason: v.optional(v.string()),
+      }),
+    ),
+    isDone: v.boolean(),
+    continueCursor: v.string(),
+  }),
+  handler: async (ctx, args) => {
+    requireCapability(ctx.role, "logs.read");
+    const result = await ctx.db
+      .query("followUpTasks")
+      .withIndex("by_tenant_due", (q) => q.eq("tenantId", ctx.tenantId))
+      .order("desc")
+      .paginate({ cursor: args.paginationOpts.cursor, numItems: Math.min(Math.max(args.paginationOpts.numItems, 1), 100) });
+    const page = [];
+    for (const row of result.page) {
+      const thread = row.threadId ? await ctx.db.get(row.threadId) : null;
+      page.push({
+        _id: row._id,
+        kind: row.kind ?? "rule",
+        threadKey: thread?.threadKey,
+        status: row.status,
+        dueAt: row.dueAt,
+        attempts: row.attempts,
+        failureCode: row.failureCode,
+        stoppedReason: row.stoppedReason,
+      });
+    }
+    return { page, isDone: result.isDone, continueCursor: result.continueCursor };
   },
 });

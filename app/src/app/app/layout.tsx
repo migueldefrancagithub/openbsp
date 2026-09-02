@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import {
+  ScrollText,
   CalendarDays,
   BarChart3,
   Building2,
@@ -74,6 +75,9 @@ const PRIMARY_NAV: NavItem[] = [
 ];
 
 const ADMIN_NAV: NavItem[] = [
+  { href: "/app/admin", labelKey: "nav.adminHome", icon: SlidersHorizontal, exact: true },
+  { href: "/app/admin/members", labelKey: "nav.members", icon: Users },
+  { href: "/app/admin/logs", labelKey: "nav.logs", icon: ScrollText },
   { href: "/app/contacts", labelKey: "nav.contacts", icon: Users },
   { href: "/app/analytics", labelKey: "nav.analytics", icon: BarChart3 },
   { href: "/app/channels", labelKey: "nav.channels", icon: Network },

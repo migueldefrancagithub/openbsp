@@ -26,6 +26,7 @@ import {
   type RangeKey,
 } from "@/components/analytics/lib";
 import { useI18n } from "@/lib/i18n";
+import { OperationRollups } from "@/components/analytics/OperationRollups";
 
 export default function AnalyticsPage() {
   const { locale, tr } = useI18n();
@@ -223,6 +224,10 @@ export default function AnalyticsPage() {
 
             <TabPanel id="activity" active={tab}>
               <ActivityTable rows={report.details} />
+            </TabPanel>
+
+            <TabPanel id="operation" active={tab}>
+              <OperationRollups days={range === "today" ? 7 : range === "7d" ? 7 : 30} />
             </TabPanel>
           </div>
         )}

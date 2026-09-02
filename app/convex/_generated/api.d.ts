@@ -10,6 +10,7 @@
 
 import type * as ai from "../ai.js";
 import type * as analytics from "../analytics.js";
+import type * as analyticsRollups from "../analyticsRollups.js";
 import type * as api_ from "../api.js";
 import type * as apiKeys from "../apiKeys.js";
 import type * as assignmentRules from "../assignmentRules.js";
@@ -103,6 +104,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   ai: typeof ai;
   analytics: typeof analytics;
+  analyticsRollups: typeof analyticsRollups;
   api: typeof api_;
   apiKeys: typeof apiKeys;
   assignmentRules: typeof assignmentRules;

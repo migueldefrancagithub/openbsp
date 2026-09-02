@@ -216,3 +216,28 @@ mensagem recebida).
    abertas por membro; os alertas SLA aparecem com link.
 4. Inbox: conversa nova sem resposta mostra chip "SLA em X min" (âmbar) e passa a
    coral quando expira; responder limpa o chip.
+
+## B8 — Relatórios agregados + área Admin
+
+### Rotinas
+| Cron | Cadência | Função | O que faz |
+|---|---|---|---|
+| analytics daily rollups | 1 h | `analyticsRollups:runHourly` | por tenant, recalcula hoje e ontem (dia local) em 4 fases paginadas (eventos recebidos, outbox por origem, conversas novas/1.ª resposta, marcações); `approximate: true` se alguma fonte passar de 20 000 linhas |
+
+### Backfill (uma vez após o deploy)
+```bash
+# últimos 30 dias para todos os tenants (agenda os dias em background)
+npx convex run analyticsRollups:backfill '{"days": 30}'
+```
+
+### Verificações
+1. Relatórios › separador "Operação": cartões (conversas novas, recebidas, respostas
+   humanas/agente, campanhas+follow-ups, 1.ª resposta média, marcações, faltas,
+   envios falhados) e tabela por dia; dias sem resumo indicados.
+2. Operação: `leads.total` = número real de conversas abertas por etapa (sem tecto
+   de 200); com >5000 numa etapa aparece `capped`.
+3. Admin (menu ⚙ › Painel admin): cartões, alertas abertos, "Verificar" integridade
+   da auditoria → "Cadeia íntegra (N entradas)".
+4. Admin › Membros: papéis/suspensão, presença, equipas, regras de atribuição.
+5. Admin › Registos: eventos (sem payload bruto, números mascarados), envios com
+   filtro por estado (incl. `unknown`), auditoria com hash, follow-ups.

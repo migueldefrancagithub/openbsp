@@ -926,6 +926,36 @@ export default defineSchema({
     .index("by_thread_dedupe", ["threadId", "dedupeKey"])
     .index("by_tenant_kind", ["tenantId", "kind", "createdAt"]),
 
+  /**
+   * One row per tenant per local day (optionally per channel). Written by the
+   * hourly rollup from index-bounded scans; `approximate` marks days whose
+   * scan hit the cap. Reads for reports never touch raw events.
+   */
+  analyticsDailyRollups: defineTable({
+    tenantId: v.id("tenants"),
+    day: v.string(),
+    channelId: v.optional(v.id("channels")),
+    timeZone: v.string(),
+    newThreads: v.number(),
+    inboundMessages: v.number(),
+    outboundHuman: v.number(),
+    outboundBot: v.number(),
+    outboundCampaign: v.number(),
+    outboundFollowUp: v.number(),
+    outboundFailed: v.number(),
+    booked: v.number(),
+    confirmed: v.number(),
+    attended: v.number(),
+    noShow: v.number(),
+    cancelled: v.number(),
+    firstResponseCount: v.number(),
+    firstResponseTotalMs: v.number(),
+    approximate: v.boolean(),
+    computedAt: v.number(),
+  })
+    .index("by_tenant_day", ["tenantId", "day"])
+    .index("by_tenant_channel_day", ["tenantId", "channelId", "day"]),
+
   /** Heartbeat per member (every 30 s from the app shell). Online < 90 s. */
   presence: defineTable({
     tenantId: v.id("tenants"),
@@ -1211,6 +1241,7 @@ export default defineSchema({
     .index("by_status_due", ["status", "dueAt"])
     .index("by_thread_status", ["tenantId", "threadId", "status"])
     .index("by_appointment", ["appointmentId", "status"])
+    .index("by_tenant_due", ["tenantId", "dueAt"])
     .index("by_rule_thread", ["ruleId", "threadId", "status"]),
 
   clinicAuditEvents: defineTable({

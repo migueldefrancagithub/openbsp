@@ -8,6 +8,7 @@ const CHANNEL_SCAN_LIMIT = 50;
 const CAMPAIGN_SCAN_LIMIT = 50;
 const CAMPAIGN_RECIPIENT_SCAN_LIMIT = 1_000;
 const RECENT_LIMIT = 6;
+const LEAD_COUNT_CAP = 5_000;
 
 const leadStatusValidator = v.union(
   v.literal("new"),
@@ -47,6 +48,7 @@ export const dashboard = tenantQuery({
     leads: v.object({
       total: v.number(),
       sourceThreads: v.number(),
+      capped: v.boolean(),
       statusCounts: v.array(
         v.object({
           status: leadStatusValidator,
@@ -137,12 +139,20 @@ export const dashboard = tenantQuery({
       if (await threadHasMessageEvent(ctx, thread)) threads.push(thread);
     }
 
+    // Lead counts come from the lead-status index (capped per status), not
+    // from the 200-thread attention sample, so totals do not plateau.
     const statusCounts = new Map<LeadStatus, number>();
-    for (const status of LEAD_STATUS_ORDER) statusCounts.set(status, 0);
-    for (const thread of threads) {
-      const status = leadStatus(thread);
-      statusCounts.set(status, (statusCounts.get(status) ?? 0) + 1);
+    let leadsCapped = false;
+    for (const status of LEAD_STATUS_ORDER) {
+      const rows = await ctx.db
+        .query("channelThreads")
+        .withIndex("by_tenant_lead_status", (q) => q.eq("tenantId", ctx.tenantId).eq("leadStatus", status))
+        .filter((q) => q.eq(q.field("closedAt"), undefined))
+        .take(LEAD_COUNT_CAP + 1);
+      if (rows.length > LEAD_COUNT_CAP) leadsCapped = true;
+      statusCounts.set(status, Math.min(rows.length, LEAD_COUNT_CAP));
     }
+    const leadsTotal = Array.from(statusCounts.values()).reduce((sum, n) => sum + n, 0);
 
     const campaignStats = emptyCampaignStats();
     for (const campaign of campaigns) {
@@ -207,8 +217,9 @@ export const dashboard = tenantQuery({
         activeBots,
       },
       leads: {
-        total: threads.length,
-        sourceThreads: threads.length,
+        total: leadsTotal,
+        sourceThreads: leadsTotal,
+        capped: leadsCapped,
         statusCounts: LEAD_STATUS_ORDER.map((status) => ({
           status,
           count: statusCounts.get(status) ?? 0,
