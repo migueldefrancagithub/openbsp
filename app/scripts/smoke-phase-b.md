@@ -99,3 +99,33 @@ Rotas novas: `/app/campaigns` (lista + KPIs), `/app/campaigns/new` (3 passos),
    pausar/retomar/cancelar/duplicar/CSV; motivo da pausa visível.
 6. **Mobile (≤400px)**: passos em 3 colunas, cartões empilham, tabela com scroll
    horizontal; nada cortado.
+
+## B4 — Agenda (backend)
+
+### Rotinas / APIs novas
+| Função | Notas |
+|---|---|
+| `clinic:reserveSlot` | idempotente por `businessKey` (devolve `{appointmentId, created}`); contrato usado pelo inbox e pelas ferramentas de IA (Fase C) |
+| `clinic:rescheduleAppointment` / `cancelAppointment` / `confirmAppointment(via)` | cancelamentos param notificações pendentes; remarcar liga a antiga (`rescheduledToId`) e a nova (`rescheduledFromId`) |
+| `clinic:recordAppointmentOutcome` | `completed` → lead `attended`; `no_show` → lead `no_show` + tarefa de follow-up se existir regra `no_show` activa |
+| `clinic:listAgenda` | intervalo local ≤31 dias, por profissional, ≤500 linhas |
+| `clinic:sendAppointmentNotice` | cria `followUpTasks` `appointment_confirmation`/`appointment_reminder` (o executor B5 envia) |
+| `clinic:listProfessionals` / `saveProfessional` / `archiveProfessional`, `getSettings` / `saveSettings` | fuso horário por clínica (`Intl`), passo dos slots, antecedência mínima, textos das notificações, SLAs |
+| auto-confirmação | inbound classificado como `confirm_attendance` ("confirmo") confirma a marcação `scheduled` mais próxima (`confirmedVia: reply`) |
+
+### Backfills
+Nenhum: marcações antigas continuam válidas (`businessKey`/`professionalId` opcionais).
+`followUpTasks.ruleId` passou a opcional (tarefas de notificação não têm regra).
+
+### Verificações
+1. Definições › Clínica: guardar fuso `Africa/Maputo` (ou o da clínica) → slots
+   aparecem no horário local correcto.
+2. Criar 2 profissionais; marcar a mesma hora para ambos funciona; a mesma hora
+   para o mesmo profissional dá "horário indisponível".
+3. Marcar a partir de uma conversa → thread passa a "Agendado" e, se veio de
+   campanha (≤30 dias), a campanha ganha 1 conversão.
+4. Enviar pedido de confirmação (`sendAppointmentNotice`) → tarefa `scheduled`;
+   responder "Confirmo" do telemóvel → marcação `confirmed` (via `reply`), tarefa
+   `stopped`, evento "Consulta confirmada" na timeline.
+5. Remarcar → duas linhas ligadas; cancelar → lead volta a "Interessado".
+6. Desfecho "faltou" com regra `no_show` activa → tarefa de follow-up criada.

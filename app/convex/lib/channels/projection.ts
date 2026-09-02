@@ -1,3 +1,4 @@
+import { autoConfirmFromReply } from "../clinicAgenda";
 import { bumpCampaignStats, markCampaignReply } from "../campaignAttribution";
 import type { CampaignRecipientStatus as CampaignRowStatus } from "../campaignStats";
 import type { Doc, Id } from "../../_generated/dataModel";
@@ -481,5 +482,13 @@ export async function projectThreadFromEvent(
   await ctx.db.patch(existing._id, patch);
   if (incoming) {
     await stopScheduledFollowUpsForReply(ctx, { thread: existing, now });
+  }
+
+  if (isInboundMessage && classified.intent === "confirm_attendance") {
+    const current = await ctx.db
+      .query("channelThreads")
+      .withIndex("by_channel_thread", (q) => q.eq("channelId", channel._id).eq("threadKey", threadKey))
+      .unique();
+    if (current) await autoConfirmFromReply(ctx, { thread: current, now });
   }
 }

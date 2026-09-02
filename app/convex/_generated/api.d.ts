@@ -54,6 +54,8 @@ import type * as lib_channels_projection from "../lib/channels/projection.js";
 import type * as lib_channels_systemEvents from "../lib/channels/systemEvents.js";
 import type * as lib_channels_threadUpdate from "../lib/channels/threadUpdate.js";
 import type * as lib_channels_threadVisibility from "../lib/channels/threadVisibility.js";
+import type * as lib_clinicAgenda from "../lib/clinicAgenda.js";
+import type * as lib_clinicTime from "../lib/clinicTime.js";
 import type * as lib_consent from "../lib/consent.js";
 import type * as lib_customFunctions from "../lib/customFunctions.js";
 import type * as lib_flow_window from "../lib/flow/window.js";
@@ -140,6 +142,8 @@ declare const fullApi: ApiFromModules<{
   "lib/channels/systemEvents": typeof lib_channels_systemEvents;
   "lib/channels/threadUpdate": typeof lib_channels_threadUpdate;
   "lib/channels/threadVisibility": typeof lib_channels_threadVisibility;
+  "lib/clinicAgenda": typeof lib_clinicAgenda;
+  "lib/clinicTime": typeof lib_clinicTime;
   "lib/consent": typeof lib_consent;
   "lib/customFunctions": typeof lib_customFunctions;
   "lib/flow/window": typeof lib_flow_window;

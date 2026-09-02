@@ -31,6 +31,14 @@ export const THREAD_SYSTEM_EVENT_KINDS = [
   "inbox.unsnoozed",
   "inbox.closed",
   "inbox.reopened",
+  "agenda.booked",
+  "agenda.confirmed",
+  "agenda.cancelled",
+  "agenda.attended",
+  "agenda.no_show",
+  "followup.sent",
+  "followup.failed",
+  "followup.stopped",
 ] as const;
 
 export type ThreadSystemEventKind = (typeof THREAD_SYSTEM_EVENT_KINDS)[number];

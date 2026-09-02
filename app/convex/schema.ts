@@ -255,6 +255,7 @@ const followUpRuleStatusValidator = v.union(
 
 const followUpTaskStatusValidator = v.union(
   v.literal("scheduled"),
+  v.literal("claimed"),
   v.literal("sent"),
   v.literal("stopped"),
   v.literal("failed"),
@@ -979,6 +980,8 @@ export default defineSchema({
       }),
     ),
     status: clinicServiceStatusValidator,
+    /** Professionals who perform this service (empty = any / not modelled). */
+    professionalIds: v.optional(v.array(v.id("clinicProfessionals"))),
     createdBy: v.id("members"),
     createdAt: v.number(),
     updatedAt: v.number(),
@@ -986,9 +989,48 @@ export default defineSchema({
     .index("by_tenant", ["tenantId"])
     .index("by_tenant_status", ["tenantId", "status"]),
 
+  /** People whose calendar gets booked (doctor, hygienist, room). */
+  clinicProfessionals: defineTable({
+    tenantId: v.id("tenants"),
+    name: v.string(),
+    specialty: v.optional(v.string()),
+    color: v.optional(v.string()),
+    memberId: v.optional(v.id("members")),
+    availability: v.optional(
+      v.array(v.object({ weekday: v.number(), start: v.string(), end: v.string() })),
+    ),
+    status: v.union(v.literal("active"), v.literal("archived")),
+    order: v.number(),
+    createdBy: v.id("members"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_tenant_status", ["tenantId", "status", "order"]),
+
+  /** One row per tenant: agenda behaviour and message templates. */
+  clinicSettings: defineTable({
+    tenantId: v.id("tenants"),
+    timezone: v.optional(v.string()),
+    slotStepMinutes: v.optional(v.number()),
+    minLeadMinutes: v.optional(v.number()),
+    reminderHoursBefore: v.optional(v.array(v.number())),
+    confirmationTemplateName: v.optional(v.string()),
+    confirmationTemplateLanguage: v.optional(v.string()),
+    reminderTemplateName: v.optional(v.string()),
+    reminderTemplateLanguage: v.optional(v.string()),
+    confirmationText: v.optional(v.string()),
+    reminderText: v.optional(v.string()),
+    fallbackText: v.optional(v.string()),
+    humanSlaMinutes: v.optional(v.number()),
+    firstResponseSlaMinutes: v.optional(v.number()),
+    updatedBy: v.id("members"),
+    updatedAt: v.number(),
+  }).index("by_tenant", ["tenantId"]),
+
   clinicAppointments: defineTable({
     tenantId: v.id("tenants"),
     serviceId: v.id("clinicServices"),
+    professionalId: v.optional(v.id("clinicProfessionals")),
     threadId: v.optional(v.id("channelThreads")),
     patientName: v.optional(v.string()),
     patientHandle: v.optional(v.string()),
@@ -996,12 +1038,38 @@ export default defineSchema({
     endAt: v.number(),
     status: clinicAppointmentStatusValidator,
     confirmationReadAt: v.optional(v.number()),
+    /** Idempotency key: the same intent never books twice. */
+    businessKey: v.optional(v.string()),
+    source: v.optional(
+      v.union(
+        v.literal("operation"),
+        v.literal("inbox"),
+        v.literal("agenda"),
+        v.literal("ai"),
+        v.literal("patient"),
+      ),
+    ),
+    confirmedVia: v.optional(
+      v.union(v.literal("manual"), v.literal("reply"), v.literal("ai")),
+    ),
+    confirmedAt: v.optional(v.number()),
+    cancelledAt: v.optional(v.number()),
+    cancelledBy: v.optional(
+      v.union(v.literal("clinic"), v.literal("patient"), v.literal("system")),
+    ),
+    cancelReason: v.optional(v.string()),
+    rescheduledFromId: v.optional(v.id("clinicAppointments")),
+    rescheduledToId: v.optional(v.id("clinicAppointments")),
+    outcomeAt: v.optional(v.number()),
+    notes: v.optional(v.string()),
     createdBy: v.id("members"),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
     .index("by_tenant_start", ["tenantId", "startAt"])
     .index("by_service_start", ["serviceId", "startAt"])
+    .index("by_professional_start", ["professionalId", "startAt"])
+    .index("by_tenant_business_key", ["tenantId", "businessKey"])
     .index("by_thread", ["tenantId", "threadId", "startAt"]),
 
   clinicKnowledgeItems: defineTable({
@@ -1073,21 +1141,41 @@ export default defineSchema({
 
   followUpTasks: defineTable({
     tenantId: v.id("tenants"),
-    ruleId: v.id("followUpRules"),
+    /** Absent for appointment notices (confirmation/reminder) — see `kind`. */
+    ruleId: v.optional(v.id("followUpRules")),
     threadId: v.optional(v.id("channelThreads")),
     humanCaseId: v.optional(v.id("humanCases")),
+    appointmentId: v.optional(v.id("clinicAppointments")),
+    kind: v.optional(
+      v.union(
+        v.literal("rule"),
+        v.literal("appointment_confirmation"),
+        v.literal("appointment_reminder"),
+      ),
+    ),
+    /** Resolved message (text) or template reference for the executor. */
+    message: v.optional(v.string()),
+    templateName: v.optional(v.string()),
+    templateLanguage: v.optional(v.string()),
     businessKey: v.string(),
     dueAt: v.number(),
     status: followUpTaskStatusValidator,
     attempts: v.number(),
     lastAttemptAt: v.optional(v.number()),
+    nextAttemptAt: v.optional(v.number()),
     stoppedReason: v.optional(v.string()),
+    failureCode: v.optional(v.string()),
+    failureReason: v.optional(v.string()),
+    outboxId: v.optional(v.id("channelOutbox")),
+    providerMessageId: v.optional(v.string()),
+    sentAt: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
     .index("by_business_key", ["tenantId", "businessKey"])
     .index("by_status_due", ["status", "dueAt"])
     .index("by_thread_status", ["tenantId", "threadId", "status"])
+    .index("by_appointment", ["appointmentId", "status"])
     .index("by_rule_thread", ["ruleId", "threadId", "status"]),
 
   clinicAuditEvents: defineTable({
