@@ -36,6 +36,8 @@ type LeadStatus =
   | "awaiting_human"
   | "booked"
   | "confirmed"
+  | "attended"
+  | "no_show"
   | "lost";
 
 type ActionTone = "good" | "warn" | "action";
@@ -49,6 +51,8 @@ const LEAD_STATUSES: LeadStatus[] = [
   "awaiting_human",
   "booked",
   "confirmed",
+  "attended",
+  "no_show",
   "lost",
 ];
 
@@ -60,6 +64,8 @@ const STATUS_KEYS: Record<LeadStatus, TranslationKey> = {
   awaiting_human: "status.awaiting_human",
   booked: "status.booked",
   confirmed: "status.confirmed",
+  attended: "status.attended",
+  no_show: "status.no_show",
   lost: "status.lost",
 };
 
@@ -607,22 +613,19 @@ function CompactHealth({
   );
 }
 
+function statusColorClass(status: LeadStatus) {
+  if (status === "awaiting_human") return "bg-amber-500";
+  if (status === "lost" || status === "no_show") return "bg-[#e0533d]";
+  if (status === "booked" || status === "confirmed" || status === "attended") return "bg-[#0d6b61]";
+  if (status === "wants_booking") return "bg-[#2b4f8a]";
+  if (status === "asked_price") return "bg-sky-500";
+  return "bg-teal-500";
+}
+
 function statusDotClass(status: LeadStatus) {
-  const base = "h-2.5 w-2.5 rounded-full shrink-0";
-  if (status === "awaiting_human") return `${base} bg-amber-500`;
-  if (status === "lost") return `${base} bg-slate-400`;
-  if (status === "booked" || status === "confirmed") return `${base} bg-emerald-500`;
-  if (status === "wants_booking") return `${base} bg-cyan-500`;
-  if (status === "asked_price") return `${base} bg-indigo-500`;
-  return `${base} bg-teal-500`;
+  return `h-2.5 w-2.5 rounded-full shrink-0 ${statusColorClass(status)}`;
 }
 
 function statusBarClass(status: LeadStatus) {
-  const base = "h-full rounded-full";
-  if (status === "awaiting_human") return `${base} bg-amber-500`;
-  if (status === "lost") return `${base} bg-slate-400`;
-  if (status === "booked" || status === "confirmed") return `${base} bg-emerald-500`;
-  if (status === "wants_booking") return `${base} bg-cyan-500`;
-  if (status === "asked_price") return `${base} bg-indigo-500`;
-  return `${base} bg-teal-500`;
+  return `h-full rounded-full ${statusColorClass(status)}`;
 }

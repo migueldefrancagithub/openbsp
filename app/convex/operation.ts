@@ -101,7 +101,7 @@ export const dashboard = tenantQuery({
   }),
   handler: async (ctx) => {
     const now = Date.now();
-    const [channels, rawThreads, conversations, campaigns, chatbots, runs] =
+    const [channels, rawThreads, campaigns, chatbots, runs] =
       await Promise.all([
         ctx.db
           .query("channels")
@@ -110,13 +110,6 @@ export const dashboard = tenantQuery({
         ctx.db
           .query("channelThreads")
           .withIndex("by_tenant_last_event", (q) =>
-            q.eq("tenantId", ctx.tenantId),
-          )
-          .order("desc")
-          .take(THREAD_SCAN_LIMIT),
-        ctx.db
-          .query("conversations")
-          .withIndex("by_tenant_lastmsg", (q) =>
             q.eq("tenantId", ctx.tenantId),
           )
           .order("desc")
@@ -148,10 +141,6 @@ export const dashboard = tenantQuery({
     for (const status of LEAD_STATUS_ORDER) statusCounts.set(status, 0);
     for (const thread of threads) {
       const status = leadStatus(thread);
-      statusCounts.set(status, (statusCounts.get(status) ?? 0) + 1);
-    }
-    for (const conversation of conversations) {
-      const status = mapConversationLeadStatus(conversation.opportunityStatus);
       statusCounts.set(status, (statusCounts.get(status) ?? 0) + 1);
     }
 
@@ -218,7 +207,7 @@ export const dashboard = tenantQuery({
         activeBots,
       },
       leads: {
-        total: threads.length + conversations.length,
+        total: threads.length,
         sourceThreads: threads.length,
         statusCounts: LEAD_STATUS_ORDER.map((status) => ({
           status,
@@ -315,15 +304,6 @@ const LEAD_STATUS_ORDER: LeadStatus[] = [
 
 function leadStatus(thread: Doc<"channelThreads">): LeadStatus {
   return thread.leadStatus ?? (thread.unreadCount > 0 ? "interested" : "new");
-}
-
-function mapConversationLeadStatus(status: string | undefined): LeadStatus {
-  if (status === "booked") return "booked";
-  if (status === "lost") return "lost";
-  if (status === "opportunity") return "wants_booking";
-  if (status === "replied") return "interested";
-  if (status === "contacted") return "asked_price";
-  return "new";
 }
 
 

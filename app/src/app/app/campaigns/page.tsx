@@ -46,7 +46,7 @@ import { relativeTime } from "@/lib/relativeTime";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { ImportCsvModal } from "../contacts/ImportCsvModal";
 import type { TemplateCategory } from "@/lib/whatsappTemplateAdvisor";
-import { useI18n, type Locale } from "@/lib/i18n";
+import { useI18n, type Locale, type TranslationKey } from "@/lib/i18n";
 import { convexErrorMessage } from "@/lib/convexErrorMessage";
 import { channelStateLabel, sendModeLabel } from "@/lib/operationalLabels";
 
@@ -85,10 +85,14 @@ type LeadSourceFilter = "" | "ctwa" | "organic" | "campaign_reply" | "unknown";
 type OpportunityStatusFilter =
   | ""
   | "new"
-  | "contacted"
-  | "replied"
-  | "opportunity"
+  | "interested"
+  | "asked_price"
+  | "wants_booking"
+  | "awaiting_human"
   | "booked"
+  | "confirmed"
+  | "attended"
+  | "no_show"
   | "lost";
 type CtwaWindowFilter = "any" | "open" | "expiring_6h" | "expired";
 type CampaignOutcomeFilter =
@@ -108,7 +112,7 @@ type StudioTabKey =
   | "micro";
 
 export default function CampaignsPage() {
-  const { locale } = useI18n();
+  const { locale, t } = useI18n();
   const convex = useConvex();
   const campaigns = useQuery(api.campaigns.listCampaigns, {});
   const lists = useQuery(api.campaigns.listContactLists, {});
@@ -224,7 +228,7 @@ export default function CampaignsPage() {
       leadSources: audienceLeadSource
         ? [audienceLeadSource as Exclude<LeadSourceFilter, "">]
         : undefined,
-      opportunityStatuses: audienceOpportunityStatus
+      leadStatuses: audienceOpportunityStatus
         ? [audienceOpportunityStatus as Exclude<OpportunityStatusFilter, "">]
         : undefined,
       ctwaWindow: audienceCtwaWindow,
@@ -1231,14 +1235,9 @@ export default function CampaignsPage() {
                 onChange={(value) =>
                   setAudienceOpportunityStatus(value as OpportunityStatusFilter)
                 }
-                options={[
-                  { value: "new", label: locale === "pt" ? "Novo" : "New" },
-                  { value: "contacted", label: locale === "pt" ? "Contactado" : "Contacted" },
-                  { value: "replied", label: locale === "pt" ? "Respondeu" : "Replied" },
-                  { value: "opportunity", label: locale === "pt" ? "Oportunidade" : "Opportunity" },
-                  { value: "booked", label: locale === "pt" ? "Agendado" : "Booked" },
-                  { value: "lost", label: locale === "pt" ? "Perdido" : "Lost" },
-                ]}
+                options={(
+                  ["new", "interested", "asked_price", "wants_booking", "awaiting_human", "booked", "confirmed", "attended", "no_show", "lost"] as const
+                ).map((status) => ({ value: status, label: t(`status.${status}` as TranslationKey) }))}
                 placeholder={locale === "pt" ? "Qualquer etapa" : "Any stage"}
               />
               <SelectBox

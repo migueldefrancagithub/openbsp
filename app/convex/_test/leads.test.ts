@@ -211,3 +211,99 @@ describe("lead consolidation", () => {
     });
   });
 });
+
+describe("leads kanban queries", () => {
+  it("paginates a column per stage, hides closed threads and caps counts", async () => {
+    const t = convexTest(schema);
+    const owner = await seedTenant(t, "leads-e");
+    const now = Date.now();
+    await t.run(async (ctx) => {
+      for (let index = 0; index < 3; index += 1) {
+        await ctx.db.insert("channelThreads", {
+          tenantId: owner.tenantId,
+          channelId: owner.channelId,
+          threadKey: `25884000000${index}`,
+          lastEventAt: now - index * 1000,
+          lastEventKind: "message.text",
+          lastInboundAt: now - index * 1000,
+          lastPreview: `Mensagem ${index}`,
+          unreadCount: 1,
+          leadStatus: "interested",
+          intent: "price_request",
+          createdAt: now,
+          updatedAt: now,
+        });
+      }
+      // Closed thread in the same stage must not show up.
+      await ctx.db.insert("channelThreads", {
+        tenantId: owner.tenantId,
+        channelId: owner.channelId,
+        threadKey: "258840000099",
+        lastEventAt: now,
+        lastEventKind: "message.text",
+        unreadCount: 0,
+        leadStatus: "interested",
+        inboxStatus: "closed",
+        closedAt: now,
+        createdAt: now,
+        updatedAt: now,
+      });
+      // Status-only projection (no message) must not show up either.
+      await ctx.db.insert("channelThreads", {
+        tenantId: owner.tenantId,
+        channelId: owner.channelId,
+        threadKey: "258840000098",
+        lastEventAt: now - 10_000,
+        lastEventKind: "status.delivered",
+        unreadCount: 0,
+        leadStatus: "interested",
+        createdAt: now,
+        updatedAt: now,
+      });
+    });
+    const asOwner = t.withIdentity({ subject: owner.userId });
+    const first = await asOwner.query(api.leads.listByStatus, {
+      leadStatus: "interested",
+      channelId: owner.channelId,
+      paginationOpts: { cursor: null, numItems: 2 },
+    });
+    expect(first.page).toHaveLength(2);
+    expect(first.page[0]).toMatchObject({ threadKey: "258840000000", intent: "price_request", pilotBlocked: false });
+    expect(first.isDone).toBe(false);
+    const second = await asOwner.query(api.leads.listByStatus, {
+      leadStatus: "interested",
+      channelId: owner.channelId,
+      paginationOpts: { cursor: first.continueCursor, numItems: 10 },
+    });
+    expect(second.page.map((row: any) => row.threadKey)).toEqual(["258840000002"]);
+
+    // Counts are index-level (open threads per stage); the rare status-only
+    // projection is not re-checked per row, so it is included here.
+    const counts = await asOwner.query(api.leads.counts, { channelId: owner.channelId });
+    expect(counts.find((row) => row.status === "interested")).toEqual({
+      status: "interested",
+      count: 4,
+      capped: false,
+    });
+    expect(counts.find((row) => row.status === "booked")?.count).toBe(0);
+
+    const tenantWide = await asOwner.query(api.leads.listByStatus, {
+      leadStatus: "interested",
+      paginationOpts: { cursor: null, numItems: 10 },
+    });
+    expect(tenantWide.page).toHaveLength(3);
+  });
+
+  it("keeps another tenant's channel out of the kanban", async () => {
+    const t = convexTest(schema);
+    const a = await seedTenant(t, "leads-f");
+    const b = await seedTenant(t, "leads-g");
+    await expect(
+      t.withIdentity({ subject: a.userId }).query(api.leads.listByStatus, {
+        leadStatus: "new",
+        channelId: b.channelId,
+        paginationOpts: { cursor: null, numItems: 5 },
+      }),
+    ).rejects.toThrow(/CHANNEL_NOT_FOUND/);
+  });
+});
