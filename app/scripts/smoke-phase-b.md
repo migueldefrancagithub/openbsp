@@ -74,3 +74,28 @@ se quiser ver taxas numa `micro_lab`, correr `_recomputeStats` para esse `campai
    `pending`, campanha `paused` com `pauseReason` e alerta em `ops:listAlerts`.
 6. **Lançar sem piloto pronto** → mensagem "Kill switch do piloto activo".
 7. `git diff main -- app/convex/iaSolutionHub.ts` mostra apenas 1 import e 1 action nova.
+
+## B3 — Wizard de campanhas (UI)
+
+Rotas novas: `/app/campaigns` (lista + KPIs), `/app/campaigns/new` (3 passos),
+`/app/campaigns/[id]` (detalhe). O estúdio antigo (Meta directo) vive em
+`/app/campaigns/legacy` até à contracção da Fase D.
+
+### Verificações
+1. **Lista**: com o canal Hub ligado aparece "Nova campanha"; sem canal aparece o
+   estado vazio com link para Definições › Canais.
+2. **Passo 1 — Público**: escolher etapas (chips) → o painel lateral mostra
+   elegíveis/encontradas e os motivos de bloqueio; sem elegíveis o botão
+   "Continuar" fica desactivado. Modo "Conversas escolhidas" aceita números um por
+   linha.
+3. **Passo 2 — Mensagem**: template aprovado lista variáveis `{{n}}` com fonte
+   (texto fixo / primeiro nome / link rastreado) e a pré-visualização iOS actualiza;
+   texto livre mostra o aviso de janela 24h quando há bloqueados por janela.
+4. **Passo 3 — Confirmação**: "A calcular destinatários…" até `ready`; resumo,
+   ritmo (15 a cada 65 s) e estimativa; lançar só com a atestação marcada; agendar
+   exige data futura (≤30 dias).
+5. **Detalhe**: funil com percentagens ≤100%, público/bloqueios, tabs
+   Destinatários (filtros por estado, link para a conversa no inbox) e Eventos;
+   pausar/retomar/cancelar/duplicar/CSV; motivo da pausa visível.
+6. **Mobile (≤400px)**: passos em 3 colunas, cartões empilham, tabela com scroll
+   horizontal; nada cortado.
