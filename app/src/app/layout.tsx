@@ -27,10 +27,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title:
-    "CXCast · WhatsApp operations for coexistence, campaigns, and CTWA leads",
+  title: "CXCast · Operação clínica no WhatsApp",
   description:
-    "Real-time inbox, segmented broadcasts, Meta-approved templates and 24h-window-aware replies with compliance guardrails, per-purpose consent, and append-only audit by default.",
+    "Atendimento, leads, campanhas, agentes de IA e operação clínica num único espaço de trabalho.",
   manifest: "/site.webmanifest",
   icons: {
     icon: [
