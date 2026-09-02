@@ -5,7 +5,7 @@ const cases: Array<[string, { leadStatus?: string; intent?: string }]> = [
   ["", { leadStatus: "interested" }],
   ["Olá!", { leadStatus: "interested", intent: "greeting" }],
   ["bom dia", { leadStatus: "interested", intent: "greeting" }],
-  ["Qual é o preço da consulta?", { leadStatus: "wants_booking", intent: "booking_request" }],
+  ["Qual é o preço da consulta?", { leadStatus: "asked_price", intent: "price_request" }],
   ["Quanto custa a limpeza?", { leadStatus: "asked_price", intent: "price_request" }],
   ["Queria marcar para amanhã", { leadStatus: "wants_booking", intent: "booking_request" }],
   ["Posso remarcar a consulta?", { leadStatus: "wants_booking", intent: "reschedule" }],

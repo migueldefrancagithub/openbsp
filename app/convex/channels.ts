@@ -359,6 +359,9 @@ export const getThread = tenantQuery({
       intentSource: v.optional(v.string()),
       originCampaignId: v.optional(v.id("campaigns")),
       originCampaignName: v.optional(v.string()),
+      customFields: v.optional(
+        v.record(v.string(), v.union(v.string(), v.number(), v.boolean())),
+      ),
       channelSendMode: v.string(),
       channelProvider: v.string(),
       channelDisplayName: v.string(),
@@ -421,6 +424,7 @@ export const getThread = tenantQuery({
       intentSource: thread.intentSource,
       originCampaignId: thread.originCampaignId,
       originCampaignName: originCampaign?.name,
+      customFields: thread.customFields,
       channelSendMode: channel.sendMode,
       channelProvider: channel.provider,
       channelDisplayName: channel.displayName,

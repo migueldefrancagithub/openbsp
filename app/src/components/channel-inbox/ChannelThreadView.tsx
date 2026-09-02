@@ -40,6 +40,7 @@ import { PilotBanner } from "@/components/channel-inbox/PilotBanner";
 import { LeadHeaderBar } from "@/components/channel-inbox/LeadHeaderBar";
 import { HandoffDialog } from "@/components/channel-inbox/HandoffDialog";
 import { HumanCaseChip } from "@/components/channel-inbox/HumanCaseChip";
+import { SnoozeMenu } from "@/components/channel-inbox/SnoozeMenu";
 import {
   SystemEventRow,
   type TimelineSystemItem,
@@ -497,6 +498,10 @@ export function ChannelThreadView({
   const [quickReplySearch, setQuickReplySearch] = useState("");
   const [patientPanelOpen, setPatientPanelOpen] = useState(false);
   const [handoffOpen, setHandoffOpen] = useState(false);
+  const [panelToolRequest, setPanelToolRequest] = useState<
+    { tool: "note" | "reminder" | "close"; nonce: number } | null
+  >(null);
+  const composerRef = useRef<HTMLTextAreaElement>(null);
   const [headerNotice, setHeaderNotice] = useState<string | null>(null);
   const threadOps = useQuery(
     inboxApi.getThreadOps,
@@ -637,6 +642,7 @@ export function ChannelThreadView({
         clientNonce: crypto.randomUUID(),
       });
       setDraft("");
+      if (composerRef.current) composerRef.current.style.height = "auto";
     } catch (err) {
       setError(errorMessage(err, locale));
     } finally {
@@ -645,9 +651,29 @@ export function ChannelThreadView({
   }
 
   function insertQuickReply(content: string) {
-    setDraft(content);
+    const el = composerRef.current;
+    const current = draft;
+    let base = current;
+    let start = el?.selectionStart ?? current.length;
+    let end = el?.selectionEnd ?? start;
+    if (current.startsWith("/")) {
+      // The "/needle" token opened the picker; replace it entirely.
+      base = "";
+      start = 0;
+      end = 0;
+    }
+    const before = base.slice(0, start);
+    const after = base.slice(end);
+    const joiner = before && !/\s$/.test(before) ? " " : "";
+    const next = `${before}${joiner}${content}${after}`;
+    setDraft(next);
     setShowQuickReplies(false);
     setQuickReplySearch("");
+    const caret = before.length + joiner.length + content.length;
+    requestAnimationFrame(() => {
+      el?.focus();
+      el?.setSelectionRange(caret, caret);
+    });
   }
 
   function chooseTemplate(template: ChannelTemplate) {
@@ -840,18 +866,17 @@ export function ChannelThreadView({
               >
                 {summary.automationMode === "bot" ? <Pause size={15} /> : <Play size={15} />}
               </button>
-              <button
-                type="button"
-                onClick={() => void updateThread({
-                  threadId: summary._id,
-                  inboxStatus: "snoozed",
-                  snoozedUntil: Date.now() + 2 * 60 * 60 * 1000,
-                })}
-                className="rounded-md p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-[#0a1b33]"
-                title={t("inbox.snooze")}
-              >
-                <Clock size={15} />
-              </button>
+              <SnoozeMenu
+                snoozedUntil={summary.inboxStatus === "snoozed" ? summary.snoozedUntil : undefined}
+                onSnooze={(until) =>
+                  void updateThread({ threadId: summary._id, inboxStatus: "snoozed", snoozedUntil: until })
+                    .catch((cause) => setHeaderNotice(errorMessage(cause, locale)))
+                }
+                onUnsnooze={() =>
+                  void updateThread({ threadId: summary._id, inboxStatus: "open" })
+                    .catch((cause) => setHeaderNotice(errorMessage(cause, locale)))
+                }
+              />
               <button
                 type="button"
                 onClick={() => setPatientPanelOpen(true)}
@@ -1117,25 +1142,40 @@ export function ChannelThreadView({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setPatientPanelOpen(true)}
+                  onClick={() => {
+                    setPatientPanelOpen(true);
+                    setPanelToolRequest({ tool: "reminder", nonce: Date.now() });
+                  }}
                   title={t("inbox.createReminder")}
-                  className="rounded-md p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-[#0a152d] xl:hidden"
+                  className="rounded-md p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-[#0a152d]"
+                  data-reminder-button
                 >
                   <Bell size={15} />
                 </button>
                 <form onSubmit={submit} className="flex min-w-0 flex-1 items-center gap-1.5">
-                <input
+                <textarea
+                  ref={composerRef}
                   value={draft}
+                  rows={1}
                   onChange={(event) => {
                     setDraft(event.target.value);
                     if (event.target.value.startsWith("/")) {
                       setShowQuickReplies(true);
                     }
+                    event.target.style.height = "auto";
+                    event.target.style.height = `${Math.min(event.target.scrollHeight, 160)}px`;
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && !event.shiftKey && !quickRepliesOpen) {
+                      event.preventDefault();
+                      event.currentTarget.form?.requestSubmit();
+                    }
                   }}
                   placeholder={blocked ? blocked.title : t("inbox.writeReply")}
+                  title={t("inbox.sendHint")}
                   maxLength={4096}
                   disabled={sending || Boolean(blocked)}
-                  className="h-10 min-w-0 flex-1 rounded-md border border-slate-200 px-3 text-[13px] outline-none focus:border-slate-400 disabled:bg-slate-50 disabled:text-slate-400"
+                  className="max-h-40 min-h-10 min-w-0 flex-1 resize-none rounded-md border border-slate-200 px-3 py-2.5 text-[13px] leading-5 outline-none focus:border-slate-400 disabled:bg-slate-50 disabled:text-slate-400"
                 />
                 <button
                   type="submit"
@@ -1175,7 +1215,7 @@ export function ChannelThreadView({
           }}
         />
       )}
-      <PatientContextPanel thread={summary} className="hidden xl:flex" />
+      <PatientContextPanel thread={summary} className="hidden xl:flex" toolRequest={panelToolRequest} />
       {patientPanelOpen && (
         <div
           className="fixed inset-0 z-50 flex justify-end bg-slate-950/30 xl:hidden"
@@ -1187,6 +1227,7 @@ export function ChannelThreadView({
             thread={summary}
             onClose={() => setPatientPanelOpen(false)}
             className="w-full max-w-[360px] shadow-2xl"
+            toolRequest={panelToolRequest}
           />
         </div>
       )}

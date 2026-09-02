@@ -30,6 +30,7 @@ import { MembersSection } from "@/components/settings/MembersSection";
 import { TeamsSection } from "@/components/settings/TeamsSection";
 import { ComplianceSection } from "@/components/settings/ComplianceSection";
 import { IaSolutionHubSection } from "@/components/settings/IaSolutionHubSection";
+import { CustomFieldsSettingsSection } from "@/components/settings/CustomFieldsSettingsSection";
 import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { useI18n, type Locale } from "@/lib/i18n";
@@ -363,6 +364,7 @@ export default function SettingsPage() {
         />
 
         {/* Workspace card */}
+        {settingsTab === "workspace" && <CustomFieldsSettingsSection />}
         {settingsTab === "workspace" && (
         <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
           <div className="px-6 py-4 border-b border-slate-100">

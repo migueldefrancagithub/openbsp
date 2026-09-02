@@ -794,6 +794,10 @@ export default defineSchema({
     pilotBlockedAt: v.optional(v.number()),
     /** Cache of the open/assigned human case, for list rendering. */
     openHumanCaseId: v.optional(v.id("humanCases")),
+    /** Tenant-defined fields (see customFieldDefinitions); values inline. */
+    customFields: v.optional(
+      v.record(v.string(), v.union(v.string(), v.number(), v.boolean())),
+    ),
     automationMode: v.optional(
       v.union(
         v.literal("idle"),
@@ -909,6 +913,28 @@ export default defineSchema({
     .index("by_thread", ["threadId", "createdAt"])
     .index("by_thread_dedupe", ["threadId", "dedupeKey"])
     .index("by_tenant_kind", ["tenantId", "kind", "createdAt"]),
+
+  /** Tenant-defined patient fields shown in the inbox panel (max 20 active). */
+  customFieldDefinitions: defineTable({
+    tenantId: v.id("tenants"),
+    key: v.string(),
+    label: v.string(),
+    type: v.union(
+      v.literal("text"),
+      v.literal("number"),
+      v.literal("date"),
+      v.literal("select"),
+      v.literal("boolean"),
+    ),
+    options: v.optional(v.array(v.string())),
+    order: v.number(),
+    active: v.boolean(),
+    createdBy: v.id("members"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_tenant", ["tenantId", "active", "order"])
+    .index("by_tenant_key", ["tenantId", "key"]),
 
   // ===== Clinic operating system =====
   clinicServices: defineTable({

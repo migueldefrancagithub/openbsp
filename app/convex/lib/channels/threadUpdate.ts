@@ -5,6 +5,7 @@ import { writeAudit } from "../audit";
 import { recordThreadSystemEvent, type ThreadSystemEventKind } from "./systemEvents";
 import { resolveAssignment } from "../assignment";
 import { threadIntentValidator, type ThreadIntent } from "./intents";
+import { listActiveDefinitions, mergeCustomFieldValues } from "../../customFields";
 
 export const threadInboxStatusValidator = v.union(
   v.literal("open"),
@@ -52,6 +53,9 @@ export const threadUpdateArgs = {
   nextStepDueAt: v.optional(v.number()),
   clearNextStepDueAt: v.optional(v.boolean()),
   tags: v.optional(v.array(v.string())),
+  customFields: v.optional(
+    v.record(v.string(), v.union(v.string(), v.number(), v.boolean())),
+  ),
   dnd: v.optional(v.boolean()),
   automationMode: v.optional(threadAutomationModeValidator),
 };
@@ -72,6 +76,7 @@ export type ThreadUpdateArgs = {
   nextStepDueAt?: number;
   clearNextStepDueAt?: boolean;
   tags?: string[];
+  customFields?: Record<string, string | number | boolean>;
   dnd?: boolean;
   automationMode?: "idle" | "bot" | "human" | "stopped";
 };
@@ -106,6 +111,7 @@ export function requiredCapabilities(args: ThreadUpdateArgs, actor: Actor): Capa
   ) {
     needed.add("leads.update");
   }
+  if (args.customFields !== undefined) needed.add("inbox.custom_fields");
   if (
     args.starred !== undefined ||
     args.dnd !== undefined ||
@@ -139,6 +145,7 @@ function pickTracked(thread: Partial<Doc<"channelThreads">>) {
     nextStep: thread.nextStep,
     nextStepDueAt: thread.nextStepDueAt,
     tags: thread.tags,
+    customFields: thread.customFields,
     dnd: thread.dnd,
     starred: Boolean(thread.starredAt),
     snoozedUntil: thread.snoozedUntil,
@@ -227,6 +234,10 @@ export async function applyThreadUpdate(
     patch.tags = Array.from(
       new Set(args.tags.map((tag) => tag.trim()).filter(Boolean)),
     ).slice(0, 30);
+  }
+  if (args.customFields !== undefined) {
+    const definitions = await listActiveDefinitions(ctx);
+    patch.customFields = mergeCustomFieldValues(definitions, thread.customFields, args.customFields);
   }
   if (args.dnd !== undefined) patch.dnd = args.dnd;
   if (args.automationMode !== undefined) {

@@ -144,6 +144,13 @@ export const CONVEX_ERROR_MESSAGES: Record<string, Pair> = {
   APPOINTMENT_OUTSIDE_AVAILABILITY: ["Este horário está fora da disponibilidade do serviço.", "This time is outside the service availability."],
   APPOINTMENT_SLOT_UNAVAILABLE: ["Este horário já está ocupado. Escolha outro.", "This slot is already taken. Choose another."],
   HUMAN_CASE_OPEN: ["Resolva o caso humano aberto antes de devolver a conversa à IA.", "Resolve the open human case before returning the conversation to the AI."],
+  CUSTOM_FIELD_UNKNOWN: ["Este campo personalizado já não existe. Recarregue a página.", "This custom field no longer exists. Reload the page."],
+  CUSTOM_FIELD_INVALID: ["Valor inválido para o campo personalizado.", "Invalid value for the custom field."],
+  CUSTOM_FIELD_LIMIT: ["Limite de 20 campos personalizados ativos atingido.", "Limit of 20 active custom fields reached."],
+  CUSTOM_FIELD_EXISTS: ["Já existe um campo com este nome.", "A field with this name already exists."],
+  INVALID_FIELD_LABEL: ["Nome do campo inválido (2 a 40 caracteres).", "Invalid field name (2 to 40 characters)."],
+  INVALID_FIELD_KEY: ["Nome do campo inválido: use letras ou números.", "Invalid field name: use letters or digits."],
+  INVALID_CONSENT_PROOF: ["Indique como o consentimento foi obtido (mínimo 5 caracteres).", "Describe how consent was obtained (at least 5 characters)."],
 
   // ----- contacts / campaigns / templates (legacy Meta stack)
   CONTACT_NOT_FOUND: ["Contacto não encontrado.", "Contact not found."],

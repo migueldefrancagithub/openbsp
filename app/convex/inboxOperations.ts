@@ -12,6 +12,9 @@ import {
 import { writeAudit } from "./lib/audit";
 import { threadHasMessageEvent } from "./lib/channels/threadVisibility";
 import { applyThreadUpdate, threadUpdateArgs } from "./lib/channels/threadUpdate";
+import { findOrCreateContactForThread } from "./lib/channels/contactBridge";
+import { recordConsentTransition } from "./lib/consent";
+import type { MutationCtx } from "./_generated/server";
 import {
   extractErrorCode,
   maskPhone,
@@ -222,6 +225,7 @@ const threadSummaryValidator = v.object({
   pilotBlocked: v.boolean(),
   openCaseSlaDueAt: v.optional(v.number()),
   openCaseUrgency: v.optional(v.string()),
+  dueReminderCount: v.number(),
 });
 
 export const listThreads = tenantQuery({
@@ -265,6 +269,11 @@ export const listThreads = tenantQuery({
       const openCase = thread.openHumanCaseId
         ? ((await ctx.db.get(thread.openHumanCaseId)) as Doc<"humanCases"> | null)
         : null;
+      const dueReminders = (await ctx.db
+        .query("threadReminders")
+        .withIndex("by_thread", (q) => q.eq("threadId", thread._id))
+        .take(10)) as Doc<"threadReminders">[];
+      const dueReminderCount = dueReminders.filter((row) => row.status === "due").length;
       const haystack = `${displayName ?? ""} ${phone ?? ""} ${thread.threadKey} ${thread.lastPreview ?? ""}`.toLowerCase();
       if (search && !haystack.includes(search)) continue;
       const inboxStatus = deriveStatus(thread, now);
@@ -298,6 +307,7 @@ export const listThreads = tenantQuery({
         pilotBlocked,
         openCaseSlaDueAt: openCase?.slaDueAt,
         openCaseUrgency: openCase?.urgency,
+        dueReminderCount,
       });
     }
     return {
@@ -475,6 +485,47 @@ export const getThreadOps = tenantQuery({
         : null,
       pilotBlocked: !!thread.pilotBlockedAt,
     };
+  },
+});
+
+/**
+ * Record a consent decision from the conversation (e.g. the patient said yes
+ * to reminders on WhatsApp). The consent domain stays on `contacts`
+ * (currentConsents + consentEvents, the same rows campaign gates read); the
+ * thread is bridged to its contact by phone/BSUID, creating one if needed.
+ */
+export const recordConsent = tenantMutation({
+  args: {
+    threadId: v.id("channelThreads"),
+    purpose: v.union(v.literal("marketing"), v.literal("transactional")),
+    status: v.union(v.literal("granted"), v.literal("revoked")),
+    proofText: v.string(),
+  },
+  returns: v.object({ contactId: v.id("contacts") }),
+  handler: async (ctx, args) => {
+    requireCapability(ctx.role, "contacts.record_consent");
+    const thread = await loadByIdInTenant(ctx, "channelThreads", args.threadId);
+    const proofText = args.proofText.trim();
+    if (proofText.length < 5 || proofText.length > 500) {
+      throw new ConvexError({ code: "INVALID_CONSENT_PROOF" });
+    }
+    const identity = await getThreadIdentity(ctx, thread);
+    const contact = await findOrCreateContactForThread(ctx, thread, identity);
+    await recordConsentTransition(ctx as unknown as MutationCtx, {
+      tenantId: ctx.tenantId,
+      contactId: contact._id,
+      purpose: args.purpose,
+      newStatus: args.status,
+      source: "inbox_manual",
+      proofText,
+      capturedByMemberId: ctx.memberId,
+    });
+    await audit(ctx, "inbox.consent.recorded", thread._id, {
+      contactId: contact._id,
+      purpose: args.purpose,
+      status: args.status,
+    });
+    return { contactId: contact._id };
   },
 });
 

@@ -26,8 +26,10 @@ import { convexErrorMessage } from "@/lib/convexErrorMessage";
 import { relativeTime } from "@/lib/relativeTime";
 import { useI18n, type TranslationKey } from "@/lib/i18n";
 import { roleLabel } from "@/lib/operationalLabels";
+import { CustomFieldsSection } from "@/components/channel-inbox/CustomFieldsSection";
 
 type ThreadContext = {
+  customFields?: Record<string, string | number | boolean>;
   intent?: string;
   intentSource?: string;
   _id: Id<"channelThreads">;
@@ -109,6 +111,33 @@ function formatMoment(timestamp: number, locale: "pt" | "en") {
   }).format(timestamp);
 }
 
+function memberDisplay(member: { email?: string; name?: string; role: string }): string {
+  return member.name ?? member.email?.split("@")[0] ?? member.role;
+}
+
+function toLocalInputValue(timestamp: number): string {
+  const date = new Date(timestamp);
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function reminderPresets(t: (key: TranslationKey) => string): Array<[string, number]> {
+  const now = Date.now();
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(9, 0, 0, 0);
+  const monday = new Date();
+  const day = monday.getDay();
+  monday.setDate(monday.getDate() + ((8 - day) % 7 || 7));
+  monday.setHours(9, 0, 0, 0);
+  return [
+    [t("inbox.reminderIn1h"), now + 60 * 60 * 1000],
+    [t("inbox.reminderIn4h"), now + 4 * 60 * 60 * 1000],
+    [t("inbox.reminderTomorrow"), tomorrow.getTime()],
+    [t("inbox.reminderNextMonday"), monday.getTime()],
+  ];
+}
+
 function auditActionLabel(action: string, t: (key: TranslationKey) => string): string {
   const key = `audit.${action}` as TranslationKey;
   const label = t(key);
@@ -173,10 +202,12 @@ export function PatientContextPanel({
   thread,
   className,
   onClose,
+  toolRequest,
 }: {
   thread: ThreadContext;
   className?: string;
   onClose?: () => void;
+  toolRequest?: { tool: "note" | "reminder" | "close"; nonce: number } | null;
 }) {
   const { locale, t, tr } = useI18n();
   const context = useQuery(inboxApi.getPatientContext, { threadId: thread._id }) as any;
@@ -197,6 +228,12 @@ export function PatientContextPanel({
     activeTab === "history" ? { threadId: thread._id, limit: 40 } : "skip",
   );
   const [note, setNote] = useState("");
+  const [mentioned, setMentioned] = useState<Id<"members">[]>([]);
+  const [tagDraft, setTagDraft] = useState("");
+  const [consentDraft, setConsentDraft] = useState<
+    { purpose: "marketing" | "transactional"; status: "granted" | "revoked"; proof: string } | null
+  >(null);
+  const recordConsent = useMutation(inboxApi.recordConsent);
   const [nextStep, setNextStep] = useState(thread.nextStep ?? "");
   const [closeReason, setCloseReason] = useState("");
   const [reminderAt, setReminderAt] = useState(() => {
@@ -208,6 +245,12 @@ export function PatientContextPanel({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => setNextStep(thread.nextStep ?? ""), [thread.nextStep]);
+  useEffect(() => {
+    if (!toolRequest) return;
+    setActiveTab("tasks");
+    setTool(toolRequest.tool);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [toolRequest?.nonce]);
 
   async function run(operation: () => Promise<unknown>) {
     setBusy(true);
@@ -227,8 +270,9 @@ export function PatientContextPanel({
     const body = note.trim();
     if (!body) return;
     await run(async () => {
-      await addInternalNote({ threadId: thread._id, body, mentionedMemberIds: [] });
+      await addInternalNote({ threadId: thread._id, body, mentionedMemberIds: mentioned });
       setNote("");
+      setMentioned([]);
     });
   }
 
@@ -409,18 +453,60 @@ export function PatientContextPanel({
               IA · {thread.automationMode === "bot" ? tr("Ativa", "On") : tr("Pausada", "Paused")}
             </button>
           </div>
-          {tags.length > 0 ? (
-            <div className="mt-2 flex flex-wrap gap-1">
-              {tags.slice(0, 8).map((tag) => (
-                <span key={tag} className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[9px] font-semibold text-slate-500">{tag}</span>
-              ))}
-            </div>
-          ) : <p className="mt-2 text-[10px] text-slate-400">{t("inbox.noTags")}</p>}
+          <div className="mt-2 flex flex-wrap gap-1" data-tags>
+            {tags.map((tag) => (
+              <span
+                key={tag}
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[9px] font-semibold",
+                  tag.startsWith("grupo:") || tag.startsWith("group:")
+                    ? "border-[#cfe0f5] bg-[#eef4fc] text-[#2b4f8a]"
+                    : "border-slate-200 bg-slate-50 text-slate-500",
+                )}
+              >
+                {tag}
+                <button
+                  type="button"
+                  onClick={() => void updateThread({ threadId: thread._id, tags: tags.filter((item) => item !== tag) })}
+                  className="text-slate-400 hover:text-[#b3261e]"
+                  aria-label={`${t("inbox.cancel")} ${tag}`}
+                >
+                  <X size={9} />
+                </button>
+              </span>
+            ))}
+            {tags.length === 0 && <span className="text-[10px] text-slate-400">{t("inbox.noTags")}</span>}
+          </div>
+          <form
+            className="mt-1.5 flex gap-1"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const next = tagDraft.trim().toLowerCase();
+              if (!next || tags.includes(next)) return;
+              void updateThread({ threadId: thread._id, tags: [...tags, next] });
+              setTagDraft("");
+            }}
+          >
+            <input
+              value={tagDraft}
+              onChange={(event) => setTagDraft(event.target.value)}
+              placeholder={t("tags.placeholder")}
+              maxLength={40}
+              className="h-7 min-w-0 flex-1 rounded-md border border-slate-200 px-2 text-[10px] outline-none focus:border-slate-400"
+            />
+            <button type="submit" className="rounded-md border border-slate-200 px-2 text-[10px] font-semibold text-slate-600" title={t("tags.add")}>
+              +
+            </button>
+          </form>
           {context?.contact?.locale && (
             <div className="mt-2 text-[10px] text-slate-400">
               {tr("Idioma do paciente", "Patient language")}: <span className="font-semibold text-slate-600">{context.contact.locale}</span>
             </div>
           )}
+        </Section>
+
+        <Section title={t("fields.title")} icon={ListTodo}>
+          <CustomFieldsSection threadId={thread._id} values={thread.customFields} />
         </Section>
 
         <Section title={t("inbox.consent")} icon={ShieldCheck}>
@@ -441,6 +527,61 @@ export function PatientContextPanel({
             ))}
             {context?.consents?.length === 0 && <span className="text-[10px] text-slate-400">{t("inbox.noConsents")}</span>}
           </div>
+          <div className="mt-2 grid grid-cols-2 gap-1" data-consent-actions>
+            {(["marketing", "transactional"] as const).map((purpose) => {
+              const current = (context?.consents ?? []).find((item: any) => item.purpose === purpose)?.status;
+              const nextStatus = current === "granted" ? "revoked" : "granted";
+              return (
+                <button
+                  key={purpose}
+                  type="button"
+                  onClick={() => setConsentDraft({ purpose, status: nextStatus, proof: "" })}
+                  className={cn(
+                    "rounded-md border px-2 py-1.5 text-left text-[10px] font-semibold",
+                    nextStatus === "granted" ? "border-emerald-200 text-emerald-700" : "border-rose-200 text-rose-600",
+                  )}
+                >
+                  {nextStatus === "granted" ? t("consent.grant") : t("consent.revoke")} · {t(`consent.${purpose}` as TranslationKey)}
+                </button>
+              );
+            })}
+          </div>
+          {consentDraft && (
+            <form
+              className="mt-2 space-y-1.5 rounded-md bg-slate-50 p-2"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void run(async () => {
+                  await recordConsent({
+                    threadId: thread._id,
+                    purpose: consentDraft.purpose,
+                    status: consentDraft.status,
+                    proofText: consentDraft.proof,
+                  });
+                  setConsentDraft(null);
+                });
+              }}
+            >
+              <label className="block text-[10px] font-semibold text-slate-500">
+                {t("consent.proof")}
+                <input
+                  value={consentDraft.proof}
+                  onChange={(event) => setConsentDraft({ ...consentDraft, proof: event.target.value })}
+                  placeholder={t("consent.proofPlaceholder")}
+                  minLength={5}
+                  maxLength={500}
+                  required
+                  autoFocus
+                  className="mt-1 h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-[10px] outline-none focus:border-slate-400"
+                />
+              </label>
+              <div className="flex justify-end gap-1">
+                <button type="button" onClick={() => setConsentDraft(null)} className="rounded-md px-2 py-1 text-[10px] font-semibold text-slate-500">{t("inbox.cancel")}</button>
+                <button type="submit" disabled={busy || consentDraft.proof.trim().length < 5} className="rounded-md bg-[#0a1b33] px-2 py-1 text-[10px] font-bold text-white disabled:opacity-50">{t("consent.save")}</button>
+              </div>
+            </form>
+          )}
+          {error && !tool && <p className="mt-1 text-[10px] text-[#b3261e]">{error}</p>}
         </Section>
 
         <Section title={t("inbox.actions")} icon={Archive}>
@@ -465,6 +606,18 @@ export function PatientContextPanel({
               {context.notes.slice(0, 4).map((item: any) => (
                 <div key={item._id} className="border-l-2 border-amber-300 pl-2">
                   <p className="text-[11px] leading-4 text-slate-700">{item.body}</p>
+                  {item.mentionedMemberIds?.length > 0 && (
+                    <div className="mt-0.5 flex flex-wrap gap-1">
+                      {item.mentionedMemberIds.map((id: Id<"members">) => {
+                        const member = members?.find((row) => row._id === id);
+                        return (
+                          <span key={id} className="rounded bg-[#eef4fc] px-1 py-0.5 text-[9px] font-semibold text-[#2b4f8a]">
+                            @{member ? memberDisplay(member) : "…"}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
                   <span className="text-[9px] text-slate-400">{item.authorName ?? t("inbox.team")} · {relativeTime(item.createdAt, Date.now(), locale)}</span>
                 </div>
               ))}
@@ -578,7 +731,52 @@ export function PatientContextPanel({
             ) : (
               <>
                 <textarea value={note} onChange={(event) => setNote(event.target.value)} rows={7} maxLength={tool === "note" ? 4000 : 500} placeholder={tool === "note" ? t("inbox.teamOnlyNote") : t("inbox.nextAction")} className="resize-none rounded-md border border-slate-200 p-3 text-[12px] leading-5 outline-none focus:border-slate-400" autoFocus />
-                {tool === "reminder" && <input type="datetime-local" value={reminderAt} onChange={(event) => setReminderAt(event.target.value)} className="h-10 rounded-md border border-slate-200 px-3 text-[12px] outline-none" />}
+                {tool === "reminder" && (
+                  <>
+                    <div className="flex flex-wrap gap-1">
+                      {reminderPresets(t).map(([label, timestamp]) => (
+                        <button
+                          key={label}
+                          type="button"
+                          onClick={() => setReminderAt(toLocalInputValue(timestamp))}
+                          className="rounded-md border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold text-slate-600 hover:border-slate-300"
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                    <input type="datetime-local" value={reminderAt} onChange={(event) => setReminderAt(event.target.value)} className="h-10 rounded-md border border-slate-200 px-3 text-[12px] outline-none" />
+                  </>
+                )}
+                {tool === "note" && (
+                  <div>
+                    <div className="mb-1 text-[10px] font-semibold text-slate-500">{t("inbox.mentions")}</div>
+                    <div className="flex flex-wrap gap-1" data-mention-picker>
+                      {(members ?? [])
+                        .filter((member) => member.status === "active")
+                        .map((member) => {
+                          const selected = mentioned.includes(member._id);
+                          return (
+                            <button
+                              key={member._id}
+                              type="button"
+                              onClick={() =>
+                                setMentioned((current) =>
+                                  selected ? current.filter((id) => id !== member._id) : [...current, member._id],
+                                )
+                              }
+                              className={cn(
+                                "rounded-md border px-2 py-1 text-[10px] font-semibold transition-colors",
+                                selected ? "border-[#0a1b33] bg-[#0a1b33] text-white" : "border-slate-200 bg-white text-slate-600 hover:border-slate-300",
+                              )}
+                            >
+                              @{memberDisplay(member)}
+                            </button>
+                          );
+                        })}
+                    </div>
+                  </div>
+                )}
               </>
             )}
             {error && <p className="text-[11px] text-rose-600">{error}</p>}

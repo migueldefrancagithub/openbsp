@@ -89,8 +89,9 @@ export function classifyInbound(rawText: string): InboundClassification {
   if (CONFIRM.test(text)) return { leadStatus: "confirmed", intent: "confirm_attendance" };
   if (RESCHEDULE.test(text)) return { leadStatus: "wants_booking", intent: "reschedule" };
   if (CANCEL.test(text)) return { intent: "cancel" };
-  if (BOOKING.test(text)) return { leadStatus: "wants_booking", intent: "booking_request" };
+  // "Quanto custa a consulta?" is a price question, not a booking request.
   if (PRICE.test(text)) return { leadStatus: "asked_price", intent: "price_request" };
+  if (BOOKING.test(text)) return { leadStatus: "wants_booking", intent: "booking_request" };
   if (HUMAN.test(text)) return { leadStatus: "awaiting_human", intent: "human_request" };
   if (COMPLAINT.test(text)) return { leadStatus: "interested", intent: "complaint" };
   if (CLINICAL.test(text)) return { leadStatus: "interested", intent: "clinical_question" };

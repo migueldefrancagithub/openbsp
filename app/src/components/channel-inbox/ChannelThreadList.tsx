@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useDeferredValue, useMemo, useState } from "react";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, useSearchParams, useRouter } from "next/navigation";
 import { usePaginatedQuery, useQuery } from "convex/react";
 import {
   Archive,
+  Bell,
   Bot,
   ChevronDown,
   Clock3,
@@ -14,7 +15,6 @@ import {
   MessageCircleMore,
   Search,
   ShieldAlert,
-  SlidersHorizontal,
   Star,
   UserRound,
   UsersRound,
@@ -61,6 +61,7 @@ type ThreadRow = {
   pilotBlocked?: boolean;
   openCaseSlaDueAt?: number;
   openCaseUrgency?: string;
+  dueReminderCount?: number;
 };
 
 type FilterItem = {
@@ -85,13 +86,13 @@ const FILTERS: FilterItem[] = [
 ];
 
 const PRIMARY_FILTERS = FILTERS.filter((item) =>
-  ["all", "mine", "unassigned", "awaiting_team", "awaiting_patient", "closed"].includes(
+  ["all", "mine", "unassigned", "awaiting_team", "awaiting_patient"].includes(
     item.value,
   ),
 );
 
 const MORE_FILTERS = FILTERS.filter((item) =>
-  ["open", "active", "starred", "snoozed"].includes(item.value),
+  ["open", "active", "starred", "snoozed", "closed"].includes(item.value),
 );
 
 function isFilter(value: string | null): value is InboxFilter {
@@ -133,6 +134,7 @@ function routeWithState(
 
 export function ChannelThreadList() {
   const { locale, t } = useI18n();
+  const router = useRouter();
   const channels = useQuery(api.channels.list, {});
   const params = useParams<{ threadKey?: string }>();
   const searchParams = useSearchParams();
@@ -182,11 +184,8 @@ export function ChannelThreadList() {
                 <select
                   value={activeChannelId ?? ""}
                   onChange={(event) => {
-                    window.location.href = routeWithState(
-                      "/app/channel-inbox",
-                      event.target.value,
-                      filter,
-                      search,
+                    router.push(
+                      routeWithState("/app/channel-inbox", event.target.value, filter, search),
                     );
                   }}
                   className="h-9 w-full appearance-none rounded-md border border-slate-200 bg-white px-3 pr-8 text-[12px] font-semibold text-[#0a1b33] outline-none focus:border-slate-400"
@@ -241,32 +240,26 @@ export function ChannelThreadList() {
               );
             })}
           </nav>
-          <label className="mt-2 flex items-center gap-2">
-            <SlidersHorizontal size={13} className="shrink-0 text-slate-400" />
-            <span className="shrink-0 text-[10px] font-semibold text-slate-500">
-              {t("inbox.moreFilters")}
-            </span>
-            <select
-              value={MORE_FILTERS.some((item) => item.value === filter) ? filter : ""}
-              onChange={(event) => {
-                if (!event.target.value) return;
-                window.location.href = routeWithState(
-                  "/app/channel-inbox",
-                  activeChannelId ?? "",
-                  event.target.value as InboxFilter,
-                  search,
-                );
-              }}
-              className="h-8 min-w-0 flex-1 rounded-md border border-slate-200 bg-white px-2 text-[10px] font-semibold text-slate-600 outline-none focus:border-slate-400"
-            >
-              <option value="">{t("inbox.moreFilters")}</option>
-              {MORE_FILTERS.map((item) => (
-                <option key={item.value} value={item.value}>
+          <div className="mt-1.5 flex flex-wrap gap-1" aria-label={t("inbox.moreFilters")}>
+            {MORE_FILTERS.map((item) => {
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.value}
+                  href={routeWithState("/app/channel-inbox", activeChannelId ?? "", item.value, search)}
+                  className={cn(
+                    "inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[10px] font-semibold transition-colors",
+                    filter === item.value
+                      ? "border-[#0a1b33] bg-[#0a1b33] text-white"
+                      : "border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-[#0a1b33]",
+                  )}
+                >
+                  <Icon size={11} />
                   {t(item.labelKey)}
-                </option>
-              ))}
-            </select>
-          </label>
+                </Link>
+              );
+            })}
+          </div>
         </div>
 
         {channels === undefined ? (
@@ -347,6 +340,15 @@ export function ChannelThreadList() {
                             </span>
                           )}
                           {thread.automationMode === "bot" && <Bot size={11} className="shrink-0 text-blue-500" />}
+                          {(thread.dueReminderCount ?? 0) > 0 && (
+                            <span
+                              className="inline-flex shrink-0 items-center gap-0.5 rounded border border-[#f5c2b8] bg-[#fff1ee] px-1 py-0.5 text-[9px] font-semibold text-[#8a2a1b]"
+                              title={t("inbox.dueReminders")}
+                            >
+                              <Bell size={9} />
+                              {thread.dueReminderCount}
+                            </span>
+                          )}
                           {thread.openCaseSlaDueAt && (
                             <span
                               className={cn(

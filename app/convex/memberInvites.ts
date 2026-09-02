@@ -88,6 +88,7 @@ export const listMembers = tenantQuery({
       status: v.string(),
       createdAt: v.number(),
       email: v.optional(v.string()),
+      name: v.optional(v.string()),
     }),
   ),
   handler: async (ctx) => {
@@ -105,6 +106,7 @@ export const listMembers = tenantQuery({
         status: m.status,
         createdAt: m.createdAt,
         email: u?.email,
+        name: u?.name,
       });
     }
     return out;

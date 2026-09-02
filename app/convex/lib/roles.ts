@@ -84,6 +84,7 @@ const CAPABILITY_MATRIX: Record<Role, Set<Capability>> = {
     "pilot.request_allowlist",
     "leads.update",
     "inbox.handoff",
+    "inbox.custom_fields",
     "contacts.record_consent",
   ]),
 };
