@@ -1,3 +1,4 @@
+import { autoAssignThread } from "../assignment";
 import { stopThreadFollowUps } from "../followUpControl";
 import { autoConfirmFromReply } from "../clinicAgenda";
 import { bumpCampaignStats, markCampaignReply } from "../campaignAttribution";
@@ -387,7 +388,8 @@ export async function projectThreadFromEvent(
     .unique();
 
   if (!existing) {
-    await ctx.db.insert("channelThreads", {
+    const slaMs = isInboundMessage ? await firstResponseSlaMs(ctx, channel.tenantId) : 0;
+    const threadId = await ctx.db.insert("channelThreads", {
       tenantId: channel.tenantId,
       channelId: channel._id,
       threadKey,
@@ -412,9 +414,14 @@ export async function projectThreadFromEvent(
         ? nextStepFor(inferredLeadStatus)
         : "Aguardar primeira resposta do paciente.",
       nextStepDueAt: incoming ? eventAt + DEFAULT_NEXT_STEP_MS : undefined,
+      firstResponseDueAt: isInboundMessage ? eventAt + slaMs : undefined,
       createdAt: now,
       updatedAt: now,
     });
+    if (isInboundMessage) {
+      const created = (await ctx.db.get(threadId)) as Doc<"channelThreads"> | null;
+      if (created) await autoAssignThread(ctx, { thread: created, now });
+    }
     return;
   }
 
@@ -465,8 +472,15 @@ export async function projectThreadFromEvent(
         patch.leadSource = "campaign_reply";
       }
     }
+    if (isInboundMessage && !existing.firstResponseDueAt) {
+      patch.firstResponseDueAt = eventAt + (await firstResponseSlaMs(ctx, channel.tenantId));
+    }
   } else if (eventAt >= (existing.lastOutboundAt ?? 0)) {
     patch.lastOutboundAt = eventAt;
+    if (event.eventKind.startsWith("message.") && existing.firstResponseDueAt) {
+      patch.firstResponseDueAt = undefined;
+      patch.firstRespondedAt = eventAt;
+    }
   }
 
   await ctx.db.patch(existing._id, patch);
@@ -481,4 +495,15 @@ export async function projectThreadFromEvent(
       .unique();
     if (current) await autoConfirmFromReply(ctx, { thread: current, now });
   }
+}
+
+const DEFAULT_FIRST_RESPONSE_SLA_MS = 15 * 60_000;
+
+async function firstResponseSlaMs(ctx: MutationCtx, tenantId: Id<"tenants">): Promise<number> {
+  const settings = await ctx.db
+    .query("clinicSettings")
+    .withIndex("by_tenant", (q) => q.eq("tenantId", tenantId))
+    .unique();
+  const minutes = settings?.firstResponseSlaMinutes;
+  return minutes && minutes > 0 ? minutes * 60_000 : DEFAULT_FIRST_RESPONSE_SLA_MS;
 }

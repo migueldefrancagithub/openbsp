@@ -797,6 +797,11 @@ export default defineSchema({
     dnd: v.optional(v.boolean()),
     /** Set when an automatic reply was blocked by the pilot allowlist gate. */
     pilotBlockedAt: v.optional(v.number()),
+    /** First-response SLA: set on an unanswered inbound, cleared on the first reply. */
+    firstResponseDueAt: v.optional(v.number()),
+    firstRespondedAt: v.optional(v.number()),
+    assignedBy: v.optional(v.union(v.literal("manual"), v.literal("rule"))),
+    assignmentRuleId: v.optional(v.id("assignmentRules")),
     /** Cache of the open/assigned human case, for list rendering. */
     openHumanCaseId: v.optional(v.id("humanCases")),
     /** Tenant-defined fields (see customFieldDefinitions); values inline. */
@@ -823,7 +828,8 @@ export default defineSchema({
     .index("by_channel_lead_status", ["channelId", "leadStatus", "lastEventAt"])
     .index("by_tenant_inbox_status", ["tenantId", "inboxStatus", "lastEventAt"])
     .index("by_tenant_responsible", ["tenantId", "responsibleMemberId", "lastEventAt"])
-    .index("by_tenant_team", ["tenantId", "assignedTeamId", "lastEventAt"]),
+    .index("by_tenant_team", ["tenantId", "assignedTeamId", "lastEventAt"])
+    .index("by_tenant_first_response_due", ["tenantId", "firstResponseDueAt"]),
 
   threadInternalNotes: defineTable({
     tenantId: v.id("tenants"),
@@ -919,6 +925,35 @@ export default defineSchema({
     .index("by_thread", ["threadId", "createdAt"])
     .index("by_thread_dedupe", ["threadId", "dedupeKey"])
     .index("by_tenant_kind", ["tenantId", "kind", "createdAt"]),
+
+  /** Heartbeat per member (every 30 s from the app shell). Online < 90 s. */
+  presence: defineTable({
+    tenantId: v.id("tenants"),
+    memberId: v.id("members"),
+    lastSeenAt: v.number(),
+    manualStatus: v.optional(v.union(v.literal("available"), v.literal("away"))),
+    updatedAt: v.number(),
+  })
+    .index("by_tenant_member", ["tenantId", "memberId"])
+    .index("by_tenant_seen", ["tenantId", "lastSeenAt"]),
+
+  /** Automatic owner for new inbound conversations. */
+  assignmentRules: defineTable({
+    tenantId: v.id("tenants"),
+    name: v.string(),
+    channelId: v.optional(v.id("channels")),
+    teamId: v.id("teams"),
+    strategy: v.union(v.literal("round_robin"), v.literal("least_open")),
+    onlyOnline: v.boolean(),
+    leadStatuses: v.optional(v.array(v.string())),
+    active: v.boolean(),
+    order: v.number(),
+    lastAssignedMemberId: v.optional(v.id("members")),
+    assignedCount: v.optional(v.number()),
+    createdBy: v.id("members"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_tenant_active", ["tenantId", "active", "order"]),
 
   /**
    * Operational alerts for the team (SLA breaches, unconfirmed sends,

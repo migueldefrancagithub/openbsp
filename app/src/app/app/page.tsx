@@ -3,6 +3,7 @@
 import { useQuery } from "convex/react";
 import { useState } from "react";
 import {
+  BellRing,
   AlertTriangle,
   ArrowRight,
   Bot,
@@ -27,6 +28,7 @@ import { relativeTime } from "@/lib/relativeTime";
 import { useI18n, type TranslationKey } from "@/lib/i18n";
 import { ClinicOpsPanel } from "@/components/operation/ClinicOpsPanel";
 import { OpsAlertsPanel } from "@/components/operation/OpsAlertsPanel";
+import { TeamPresence } from "@/components/operation/TeamPresence";
 import { SegmentedTabs } from "@/components/app/SegmentedTabs";
 
 type LeadStatus =
@@ -42,7 +44,7 @@ type LeadStatus =
   | "lost";
 
 type ActionTone = "good" | "warn" | "action";
-type OperationTab = "today" | "pipeline" | "clinic";
+type OperationTab = "today" | "pipeline" | "clinic" | "alerts";
 
 const LEAD_STATUSES: LeadStatus[] = [
   "new",
@@ -115,6 +117,7 @@ const QUICK_CREATORS = [
 export default function AppOverview() {
   const tenant = useQuery(api.tenantsQueries.getActive);
   const dashboard = useQuery(api.operation.dashboard, {});
+  const alertSummary = useQuery(api.ops.summary, {});
   const { locale, t } = useI18n();
   const [operationTab, setOperationTab] = useState<OperationTab>("today");
 
@@ -242,6 +245,12 @@ export default function AppOverview() {
               label: locale === "pt" ? "Clínica" : "Clinic",
               value: locale === "pt" ? "Agenda, IA e seguimento" : "Schedule, AI, and follow-up",
               icon: CalendarDays,
+            },
+            {
+              key: "alerts",
+              label: locale === "pt" ? "Alertas" : "Alerts",
+              value: alertSummary ? `${alertSummary.open} ${locale === "pt" ? "abertos" : "open"}` : "…",
+              icon: BellRing,
             },
           ]}
           selected={operationTab}
@@ -507,6 +516,12 @@ export default function AppOverview() {
         )}
 
         {operationTab === "clinic" && <ClinicOpsPanel />}
+        {operationTab === "alerts" && (
+          <div className="grid gap-5 xl:grid-cols-[1.4fr_1fr]">
+            <OpsAlertsPanel />
+            <TeamPresence />
+          </div>
+        )}
       </div>
     </main>
   );

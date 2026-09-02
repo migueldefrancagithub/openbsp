@@ -226,6 +226,8 @@ const threadSummaryValidator = v.object({
   openCaseSlaDueAt: v.optional(v.number()),
   openCaseUrgency: v.optional(v.string()),
   dueReminderCount: v.number(),
+  firstResponseDueAt: v.optional(v.number()),
+  slaBreached: v.boolean(),
 });
 
 export const listThreads = tenantQuery({
@@ -308,6 +310,10 @@ export const listThreads = tenantQuery({
         openCaseSlaDueAt: openCase?.slaDueAt,
         openCaseUrgency: openCase?.urgency,
         dueReminderCount,
+        firstResponseDueAt: thread.firstResponseDueAt,
+        slaBreached:
+          (!!thread.firstResponseDueAt && thread.firstResponseDueAt < now && !thread.closedAt) ||
+          (!!openCase && openCase.slaDueAt < now),
       });
     }
     return {

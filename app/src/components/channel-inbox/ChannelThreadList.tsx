@@ -60,6 +60,8 @@ type ThreadRow = {
   automationMode?: string;
   pilotBlocked?: boolean;
   openCaseSlaDueAt?: number;
+  firstResponseDueAt?: number;
+  slaBreached?: boolean;
   openCaseUrgency?: string;
   dueReminderCount?: number;
 };
@@ -347,6 +349,17 @@ export function ChannelThreadList() {
                             >
                               <Bell size={9} />
                               {thread.dueReminderCount}
+                            </span>
+                          )}
+                          {thread.firstResponseDueAt && !thread.openCaseSlaDueAt && (
+                            <span
+                              className={cn(
+                                "inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold",
+                                thread.firstResponseDueAt < Date.now() ? "bg-[#fdf1ef] text-[#b3261e]" : "bg-amber-50 text-amber-700",
+                              )}
+                              title={t("inbox.firstResponseSla")}
+                            >
+                              SLA {relativeTime(thread.firstResponseDueAt, Date.now(), locale)}
                             </span>
                           )}
                           {thread.openCaseSlaDueAt && (

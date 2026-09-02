@@ -188,3 +188,31 @@ Clínica, painel do paciente › Tarefas › "+ Agendar", Agenda › "Nova marca
    anterior/hoje/seguinte; filtro por profissional.
 5. Operação › Clínica › Serviços: o bloco de marcação usa o mesmo scheduler.
 6. Mobile (≤400px): scheduler em coluna única, modal encosta ao fundo, nada cortado.
+
+## B7 — Presença, atribuição automática e SLA
+
+### Rotinas
+- Heartbeat: o shell da app chama `presence:heartbeat` a cada 30 s (só com o
+  separador visível). Online < 90 s; ausente < 10 min; offline depois.
+- `assignmentRules`: aplicadas **só** a conversas novas com mensagem recebida
+  (nunca reatribui). Estratégias: rotativo (`lastAssignedMemberId`) e menos
+  conversas abertas (amostra ≤25 por membro). `onlyOnline` ignora quem não está
+  online. Leituras limitadas: ≤20 regras, ≤50 membros por equipa.
+- SLA de primeira resposta (`clinicSettings.firstResponseSlaMinutes`, 15 min por
+  omissão): `firstResponseDueAt` fica na conversa ao receber mensagem sem resposta
+  pendente; a primeira mensagem enviada limpa-o. `ops:sweepSlaBreaches` (5 min)
+  agrega as conversas fora do prazo num alerta diário por tenant.
+
+### Backfills
+Nenhum. Conversas antigas não têm `firstResponseDueAt` (ganham-no na próxima
+mensagem recebida).
+
+### Verificações
+1. Definições › Equipa › "Atribuição automática": criar regra rotativa para a equipa
+   "Recepção" com "só online". Com 2 membros online, 3 mensagens novas de números
+   diferentes → responsáveis A, B, A (visível no inbox e na timeline "Atribuído").
+2. Sem ninguém online, a conversa fica por atribuir (filtro "Sem responsável").
+3. Operação › Alertas: "Equipa agora" mostra online/ausente/offline e conversas
+   abertas por membro; os alertas SLA aparecem com link.
+4. Inbox: conversa nova sem resposta mostra chip "SLA em X min" (âmbar) e passa a
+   coral quando expira; responder limpa o chip.

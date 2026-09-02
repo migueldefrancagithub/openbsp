@@ -33,6 +33,7 @@ import { ComplianceSection } from "@/components/settings/ComplianceSection";
 import { IaSolutionHubSection } from "@/components/settings/IaSolutionHubSection";
 import { CustomFieldsSettingsSection } from "@/components/settings/CustomFieldsSettingsSection";
 import { ClinicSettingsSection } from "@/components/settings/ClinicSettingsSection";
+import { AssignmentRulesSection } from "@/components/settings/AssignmentRulesSection";
 import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { useI18n, type Locale } from "@/lib/i18n";
@@ -884,6 +885,8 @@ export default function SettingsPage() {
             <MembersSection />
 
             <TeamsSection />
+
+            <AssignmentRulesSection />
 
             <ApiKeysSection />
           </div>

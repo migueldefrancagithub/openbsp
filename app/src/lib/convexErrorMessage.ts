@@ -56,6 +56,7 @@ export const CONVEX_ERROR_MESSAGES: Record<string, Pair> = {
   FOLLOW_UP_NOT_RETRYABLE: ["Este follow-up não pode ser reenviado automaticamente.", "This follow-up cannot be resent automatically."],
   OUTBOX_UNKNOWN: ["O provedor não confirmou o envio; não reenviamos automaticamente para evitar duplicados.", "The provider did not confirm the send; we do not resend automatically to avoid duplicates."],
   STALE_CLAIM: ["O envio ficou pendente demasiado tempo e foi abandonado.", "The send stayed pending too long and was abandoned."],
+  ASSIGNMENT_RULE_LIMIT: ["Limite de regras de atribuição atingido (20).", "Assignment rule limit reached (20)."],
   ACCEPTANCE_INCOMPLETE: ["Aceite o DPA e confirme a DPIA para continuar.", "Accept the DPA and confirm the DPIA to continue."],
   INVALID_CONTROLLER_NAME: ["Indique o nome da entidade responsável pelos dados.", "Enter the data controller name."],
   INVALID_CONTROLLER_EMAIL: ["Indique um email válido para o responsável pelos dados.", "Enter a valid email for the data controller."],

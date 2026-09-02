@@ -28,6 +28,7 @@ import {
   Zap,
   type LucideIcon,
 } from "lucide-react";
+import { PresenceHeartbeat } from "@/components/app/PresenceHeartbeat";
 import { api } from "../../../convex/_generated/api";
 import { cn } from "@/lib/cn";
 import { CommandPalette, KbdHint } from "@/components/CommandPalette";
@@ -106,6 +107,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
       initialLocale={tenant.locale ?? null}
       onLocaleChange={(locale) => void setLocale({ locale }).catch(() => undefined)}
     >
+      <PresenceHeartbeat />
       <AppShell tenant={tenant} tenants={tenants}>{children}</AppShell>
     </I18nProvider>
   );

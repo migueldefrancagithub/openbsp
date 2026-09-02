@@ -154,6 +154,29 @@ export const sweepSlaBreaches = internalMutation({
         }
       }
     }
+    const day = new Date(now).toISOString().slice(0, 10);
+    for (const tenant of page.page) {
+      const overdue = (await ctx.db
+        .query("channelThreads")
+        .withIndex("by_tenant_first_response_due", (q) =>
+          q.eq("tenantId", tenant._id).gt("firstResponseDueAt", 0).lt("firstResponseDueAt", now),
+        )
+        .take(51)) as Doc<"channelThreads">[];
+      const open = overdue.filter((row) => !row.closedAt);
+      if (open.length === 0) continue;
+      breached += open.length;
+      await upsertOpsAlert(ctx, {
+        tenantId: tenant._id,
+        kind: "sla.first_response",
+        businessKey: `sla:first_response:${day}`,
+        severity: open.length >= 5 ? "critical" : "warn",
+        title: `${open.length >= 51 ? "50+" : open.length} conversa(s) sem primeira resposta dentro do SLA.`,
+        payload: { count: open.length, sample: open.slice(0, 5).map((row) => row.threadKey) },
+        href: "/app/channel-inbox?filter=unassigned",
+        reopen: true,
+        now,
+      });
+    }
     if (!page.isDone) {
       await ctx.scheduler.runAfter(0, internal.ops.sweepSlaBreaches, { cursor: page.continueCursor });
     }
