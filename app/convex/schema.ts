@@ -1429,13 +1429,53 @@ export default defineSchema({
   campaigns: defineTable({
     tenantId: v.id("tenants"),
     name: v.string(),
-    kind: v.optional(v.union(v.literal("template_broadcast"), v.literal("micro_lab"))),
+    kind: v.optional(
+      v.union(
+        v.literal("template_broadcast"),
+        v.literal("micro_lab"),
+        v.literal("channel_template"),
+        v.literal("channel_text"),
+      ),
+    ),
     businessKey: v.optional(v.string()),
     listId: v.optional(v.id("contactLists")),
     templateId: v.optional(v.id("templates")),
     templateVersion: v.optional(v.number()),
     channelId: v.optional(v.id("channels")),
     contentPreview: v.optional(v.string()),
+    // ---- Channel campaigns (Phase B2) ----
+    channelTemplateId: v.optional(v.id("channelTemplates")),
+    templateName: v.optional(v.string()),
+    templateLanguage: v.optional(v.string()),
+    messageText: v.optional(v.string()),
+    variableBindings: v.optional(
+      v.array(
+        v.object({
+          index: v.number(),
+          source: v.union(
+            v.literal("static"),
+            v.literal("first_name"),
+            v.literal("tracked_link"),
+          ),
+          value: v.optional(v.string()),
+        }),
+      ),
+    ),
+    audience: v.optional(v.any()),
+    audienceStatus: v.optional(
+      v.union(
+        v.literal("pending"),
+        v.literal("materializing"),
+        v.literal("ready"),
+        v.literal("empty"),
+      ),
+    ),
+    audienceCursor: v.optional(v.string()),
+    audienceSummary: v.optional(v.any()),
+    stats: v.optional(v.any()),
+    consentAttestedBy: v.optional(v.id("members")),
+    consentAttestedAt: v.optional(v.number()),
+    lastBatchAt: v.optional(v.number()),
     status: v.optional(campaignStatusValidator),
     createdBy: v.optional(v.id("members")),
     scheduledAt: v.optional(v.number()),
@@ -1478,11 +1518,17 @@ export default defineSchema({
     conversionLabel: v.optional(v.string()),
     conversionValueMinor: v.optional(v.number()),
     conversionCurrency: v.optional(v.string()),
+    // ---- Channel campaigns (Phase B2) ----
+    threadId: v.optional(v.id("channelThreads")),
+    dispatchAttempts: v.optional(v.number()),
+    nextAttemptAt: v.optional(v.number()),
+    trackedLinkToken: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
     .index("by_campaign", ["campaignId"])
     .index("by_campaign_status", ["campaignId", "status"])
+    .index("by_campaign_thread", ["campaignId", "threadKey"])
     .index("by_message", ["messageId"])
     .index("by_contact", ["tenantId", "contactId"])
     .index("by_channel_outbox", ["channelOutboxId"])
@@ -1492,6 +1538,22 @@ export default defineSchema({
       "threadKey",
       "updatedAt",
     ]),
+
+  /** Per-recipient short links: /r/{token} → targetUrl, click attribution. */
+  trackedLinks: defineTable({
+    tenantId: v.id("tenants"),
+    campaignId: v.id("campaigns"),
+    campaignRecipientId: v.optional(v.id("campaignRecipients")),
+    token: v.string(),
+    targetUrl: v.string(),
+    clickCount: v.number(),
+    firstClickedAt: v.optional(v.number()),
+    lastClickedAt: v.optional(v.number()),
+    createdAt: v.number(),
+  })
+    .index("by_token", ["token"])
+    .index("by_campaign", ["campaignId"])
+    .index("by_recipient", ["campaignRecipientId"]),
 
   campaignEvents: defineTable({
     tenantId: v.id("tenants"),

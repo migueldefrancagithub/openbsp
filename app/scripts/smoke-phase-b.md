@@ -43,3 +43,34 @@ por tenant); `clinicAuditEvents` continua a ser escrito em paralelo.
    e esperar ≤5 min → aparece como "vencido" no inbox.
 8. **Ops alerts**: `npx convex run ops:listAlerts` (autenticado) mostra o alerta de
    retenção se existirem eventos antigos; `acknowledgeAlert` retira-o da lista aberta.
+
+## B2 — Motor de campanhas no canal (Hub)
+
+### Rotinas
+| Função | Quem chama | O que faz |
+|---|---|---|
+| `channelCampaigns:_materializePage` | `create`/`setAudience`/`duplicate` (auto) | pagina `channelThreads` do canal e grava um `campaignRecipients` por conversa: `pending` (elegível) ou `skipped` com `failureCode` (`RECIPIENT_NOT_ALLOWLISTED`, `DND`, `LOST`, `OPT_OUT`, `RECENT_CAMPAIGN`, `SERVICE_WINDOW_EXPIRED`) |
+| `channelCampaigns:_continue` | `launch`/`resume` (auto, a cada 65 s) | lote de 15 → `queued` + 1 job `iaSolutionHub:dispatchOutboundJob` por destinatário (3 s de intervalo) |
+| `iaSolutionHub:dispatchOutboundJob` | scheduler | **única** ponte com o provedor; passa por `_consumeRateLimit` → `_claimOutbox` (gates do piloto) → `_settleOutbox`; nunca reenvia `unknown` |
+| `channelCampaigns:_finalize` | auto | fecha em `completed`/`failed` quando não restam `pending`/`queued` e os `dispatching` já estão marcados `OUTBOX_UNKNOWN` |
+| `channelCampaigns:_recomputeStats` | manual | reconstrói `campaigns.stats` a partir das linhas (reparação) |
+
+### Backfills
+Nenhum obrigatório. Campanhas antigas (`template_broadcast`, `micro_lab`) não têm `stats`;
+se quiser ver taxas numa `micro_lab`, correr `_recomputeStats` para esse `campaignId`.
+
+### Verificações (após deploy)
+1. **Criar campanha de texto** para 1 conversa allowlisted com janela aberta →
+   `audienceStatus: ready`, resumo com 1 elegível; não-allowlisted aparecem como
+   `skipped/RECIPIENT_NOT_ALLOWLISTED` (nunca é tentado o envio).
+2. **Lançar** com atestação de consentimento → 1 outbox `hub:text:campaign:{id}:{rid}`;
+   `campaignRecipients.status: sent` com WAMID; depois `delivered`/`read` pelos
+   webhooks de estado (sem criar conversas novas).
+3. **Responder** do telefone → `replied` uma única vez; a thread ganha
+   `originCampaignId`; nas taxas `replyRate ≤ 1`.
+4. **Link rastreado** (template com variável `tracked_link`): abrir `/r/{token}` no
+   telemóvel → redirecciona e marca `clicked`; a pré-visualização do WhatsApp não conta.
+5. **Kill switch**: desligar `sendMode` durante um lote → destinatários voltam a
+   `pending`, campanha `paused` com `pauseReason` e alerta em `ops:listAlerts`.
+6. **Lançar sem piloto pronto** → mensagem "Kill switch do piloto activo".
+7. `git diff main -- app/convex/iaSolutionHub.ts` mostra apenas 1 import e 1 action nova.

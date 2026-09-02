@@ -1560,7 +1560,7 @@ type CampaignStats = {
 type CampaignSummary = {
   _id: Id<"campaigns">;
   name: string;
-  kind: "template_broadcast" | "micro_lab";
+  kind: "template_broadcast" | "micro_lab" | "channel_template" | "channel_text";
   status: string;
   channelName?: string;
   contentPreview?: string;

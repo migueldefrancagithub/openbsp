@@ -1,3 +1,5 @@
+import { bumpCampaignStats, markCampaignReply } from "../campaignAttribution";
+import type { CampaignRecipientStatus as CampaignRowStatus } from "../campaignStats";
 import type { Doc, Id } from "../../_generated/dataModel";
 import type { MutationCtx } from "../../_generated/server";
 import {
@@ -243,6 +245,21 @@ async function syncCampaignRecipientFromChannelOutbox(
   if (!advances && hadTimestamp) return;
 
   await ctx.db.patch(recipient._id, patch);
+  if (advances) {
+    const campaign = await ctx.db.get(recipient.campaignId);
+    if (campaign) {
+      await bumpCampaignStats(
+        ctx,
+        campaign,
+        {
+          from: recipient.status as CampaignRowStatus,
+          to: nextStatus as CampaignRowStatus,
+          unknown: recipient.failureCode === "OUTBOX_UNKNOWN" ? -1 : 0,
+        },
+        args.at,
+      );
+    }
+  }
   await ctx.db.insert("campaignEvents", {
     tenantId: recipient.tenantId,
     campaignId: recipient.campaignId,
@@ -318,7 +335,9 @@ function deriveFailureReason(payload: unknown): string | undefined {
 export async function findOriginCampaign(
   ctx: MutationCtx,
   args: { channel: Doc<"channels">; threadKey: string; now: number },
-): Promise<{ campaignId: Id<"campaigns">; sentAt: number } | undefined> {
+): Promise<
+  { campaignId: Id<"campaigns">; recipientId: Id<"campaignRecipients">; sentAt: number } | undefined
+> {
   const recipient = await ctx.db
     .query("campaignRecipients")
     .withIndex("by_tenant_channel_thread", (q) =>
@@ -332,7 +351,7 @@ export async function findOriginCampaign(
   if (!recipient?.sentAt) return undefined;
   if (!ATTRIBUTABLE_RECIPIENT_STATUSES.has(recipient.status)) return undefined;
   if (args.now - recipient.sentAt > CAMPAIGN_ORIGIN_WINDOW_MS) return undefined;
-  return { campaignId: recipient.campaignId, sentAt: recipient.sentAt };
+  return { campaignId: recipient.campaignId, recipientId: recipient._id, sentAt: recipient.sentAt };
 }
 
 /**
@@ -365,6 +384,9 @@ export async function projectThreadFromEvent(
   const origin = isInboundMessage
     ? await findOriginCampaign(ctx, { channel, threadKey, now })
     : undefined;
+  if (origin) {
+    await markCampaignReply(ctx, { recipientId: origin.recipientId, at: eventAt });
+  }
 
   const existing = await ctx.db
     .query("channelThreads")
