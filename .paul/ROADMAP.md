@@ -123,3 +123,34 @@ the laboratory adapter and UI and disconnect its neutral channel.
   Not automatable by Claude.
 - UI for templates, interactives, and `obsp_lab_` Flow lifecycle (handoff
   item 6) — explicitly gated behind the text/webhook path passing real tests.
+
+---
+
+## Milestone v0.2 — Clinic operating system (handoff 2026-09-02)
+
+Status: **In progress** (plan approved 2026-09-02; execution order approved by
+the owner: Phase 0 + Phase A now, B/C/D after review). Full plan:
+`~/.claude/plans/handoff-openbsp-fonte-de-structured-cocke.md`.
+
+Ground truth: production runs only on the channel-neutral stack through the
+`iasolution_hub` provider; the legacy Meta-direct tables are empty; every new
+feature is built on `channelThreads`/`channelEvents`/`channelOutbox` and every
+automatic send goes through the guarded outbox (single writer).
+
+### Phase 0 — Preparation
+Worktree environment, `DEPLOYMENT.md` corrected (manual Convex deploy),
+`channelAutomation.sweepStaleRuns` registered, PAUL state refreshed.
+
+### Phase A — Inbox end-to-end, lead consolidation, human handoff, incident fixes
+A1 incident visibility (`threadSystemEvents`, pilot banner) · A2 error mapping +
+create-path guards (Operação › Clínica first) · A3 lead consolidation
+(`intent`, campaign origin, audit seam, RBAC on inbox) · A4 leads kanban ·
+A5 human handoff from the inbox · A6 notes/reminders/mentions/snooze/filters/
+composer/patient panel.
+
+### Phase B — Campaigns on the neutral channel, agenda, durable follow-ups, RBAC/presence/SLA, analytics, admin
+### Phase C — Real AI agents (multi-provider: Anthropic/OpenAI/Gemini, chosen per tenant in the platform)
+### Phase D — Playwright QA PT/EN desktop/mobile, i18n/design polish, legacy contraction, production release
+
+v0.1 Phases 5 (Instagram adapter) and 6 (Meta direct completion + lab removal)
+stay deferred behind v0.2.

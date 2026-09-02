@@ -40,4 +40,14 @@ crons.interval(
   {},
 );
 
+// Stale channel-neutral automation runs (iaSolution Hub) → timed_out.
+// The legacy sweep above only covers chatbotFlowRuns; this one was written in
+// Phase 4 but never registered, so neutral runs could stay "active" forever.
+crons.interval(
+  "channel automation stale run sweep",
+  { hours: 1 },
+  internal.channelAutomation.sweepStaleRuns,
+  {},
+);
+
 export default crons;
