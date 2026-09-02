@@ -584,6 +584,26 @@ export const createListFromSegment = tenantMutation({
   },
 });
 
+/**
+ * Template campaigns still run on the direct Meta stack (templates +
+ * phoneNumbers + messages). A workspace that only has the isolated Hub pilot
+ * channel would otherwise fail deep inside with TEMPLATE_NOT_APPROVED /
+ * PHONE_NUMBER_NOT_CONNECTED; fail early with an explainable code instead.
+ * Phase B moves campaigns onto the neutral channel and removes this guard.
+ */
+async function requireLegacyWabaConnection(ctx: {
+  db: any;
+  tenantId: Id<"tenants">;
+}) {
+  const account = await ctx.db
+    .query("whatsappAccounts")
+    .withIndex("by_tenant", (q: any) => q.eq("tenantId", ctx.tenantId))
+    .first();
+  if (!account) {
+    throw new ConvexError({ code: "LEGACY_WABA_REQUIRED" });
+  }
+}
+
 export const createDraftCampaign = tenantMutation({
   args: {
     name: v.string(),
@@ -593,6 +613,7 @@ export const createDraftCampaign = tenantMutation({
   returns: v.id("campaigns"),
   handler: async (ctx, args): Promise<Id<"campaigns">> => {
     requireCapability(ctx.role, "campaigns.create");
+    await requireLegacyWabaConnection(ctx);
     const name = assertName(args.name);
     const list = await loadByIdInTenant(
       ctx as Parameters<typeof loadByIdInTenant>[0],
@@ -1065,6 +1086,7 @@ export const launchCampaign = tenantMutation({
   }),
   handler: async (ctx, args) => {
     requireCapability(ctx.role, "campaigns.start");
+    await requireLegacyWabaConnection(ctx);
     const campaign = await loadByIdInTenant(
       ctx as Parameters<typeof loadByIdInTenant>[0],
       "campaigns",

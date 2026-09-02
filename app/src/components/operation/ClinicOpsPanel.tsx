@@ -18,6 +18,7 @@ import type { ReactNode } from "react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { useI18n } from "@/lib/i18n";
+import { convexErrorMessage } from "@/lib/convexErrorMessage";
 import { relativeTime } from "@/lib/relativeTime";
 import { SegmentedTabs } from "@/components/app/SegmentedTabs";
 
@@ -105,18 +106,44 @@ export function ClinicOpsPanel() {
     ].filter(Boolean).length;
   }, [readiness]);
 
-  async function runAction(key: string, action: () => Promise<unknown>, success: string) {
+  async function runAction(
+    key: string,
+    action: () => Promise<unknown>,
+    success: string,
+    precheck?: () => string | null,
+  ) {
+    // Mirror the server rules before the round trip so the operator sees a
+    // plain sentence instead of a validation error.
+    const problem = precheck?.();
+    if (problem) {
+      setNotice({ tone: "error", text: problem });
+      return;
+    }
     setBusy(key);
     setNotice(null);
     try {
       await action();
       setNotice({ tone: "success", text: success });
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      setNotice({ tone: "error", text: message });
+      setNotice({
+        tone: "error",
+        text: convexErrorMessage(
+          error,
+          locale,
+          isPt ? "Não foi possível concluir a ação." : "Could not complete the action.",
+        ),
+      });
     } finally {
       setBusy(null);
     }
+  }
+
+  function textLengthProblem(value: string, label: string, min: number, max: number) {
+    const length = value.trim().length;
+    if (length >= min && length <= max) return null;
+    return isPt
+      ? `${label}: use entre ${min} e ${max} caracteres.`
+      : `${label}: use between ${min} and ${max} characters.`;
   }
 
   if (workspace === undefined) {
@@ -250,6 +277,13 @@ export function ClinicOpsPanel() {
                     professionalName: serviceProfessional || undefined,
                   }),
                 isPt ? "Serviço criado." : "Service created.",
+                () =>
+                  textLengthProblem(serviceName, isPt ? "Nome do serviço" : "Service name", 2, 80) ??
+                  (!Number.isFinite(serviceDuration) || serviceDuration < 10 || serviceDuration > 480
+                    ? isPt
+                      ? "Duração: entre 10 e 480 minutos."
+                      : "Duration: between 10 and 480 minutes."
+                    : null),
               )
             }
             disabled={busy !== null}
@@ -456,6 +490,14 @@ export function ClinicOpsPanel() {
                     message: followMessage,
                   }),
                 isPt ? "Regra de follow-up criada." : "Follow-up rule created.",
+                () =>
+                  textLengthProblem(followName, isPt ? "Nome da regra" : "Rule name", 2, 80) ??
+                  textLengthProblem(followMessage, isPt ? "Mensagem" : "Message", 5, 1000) ??
+                  (!Number.isFinite(followDelay) || followDelay < 5 || followDelay > 60 * 24 * 30
+                    ? isPt
+                      ? "Atraso: entre 5 minutos e 30 dias."
+                      : "Delay: between 5 minutes and 30 days."
+                    : null),
               )
             }
             disabled={busy !== null}
@@ -523,6 +565,9 @@ export function ClinicOpsPanel() {
                     question: caseQuestion,
                   }),
                 isPt ? "Caso humano criado." : "Human case created.",
+                () =>
+                  textLengthProblem(caseReason, isPt ? "Motivo" : "Reason", 2, 80) ??
+                  textLengthProblem(caseQuestion, isPt ? "Pergunta" : "Question", 3, 2000),
               )
             }
             disabled={busy !== null}

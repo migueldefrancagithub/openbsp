@@ -14,6 +14,7 @@ import {
 import { api } from "../../../convex/_generated/api";
 import { relativeTime } from "@/lib/relativeTime";
 import { useI18n, type Locale } from "@/lib/i18n";
+import { convexErrorMessage } from "@/lib/convexErrorMessage";
 
 type InviteRole = "admin" | "agent" | "marketing";
 
@@ -245,17 +246,7 @@ export function MembersSection() {
 }
 
 function formatError(err: unknown, locale: Locale): string {
-  if (err && typeof err === "object" && "data" in err) {
-    const data = (err as { data: unknown }).data;
-    if (typeof data === "object" && data !== null) {
-      const d = data as Record<string, unknown>;
-      if (typeof d.message === "string") return d.message;
-      if (typeof d.code === "string") return d.code;
-    }
-  }
-  return err instanceof Error
-    ? err.message
-    : locale === "pt" ? "Erro desconhecido" : "Unknown error";
+  return convexErrorMessage(err, locale, locale === "pt" ? "Erro desconhecido" : "Unknown error");
 }
 
 function roleLabel(role: string, locale: Locale) {

@@ -32,6 +32,7 @@ import type { Id } from "../../../convex/_generated/dataModel";
 import { cn } from "@/lib/cn";
 import { formatTime, relativeTime } from "@/lib/relativeTime";
 import { useI18n, type TranslationKey } from "@/lib/i18n";
+import { convexErrorMessage } from "@/lib/convexErrorMessage";
 import { templateCategoryLabel } from "@/lib/operationalLabels";
 import { PatientContextPanel } from "@/components/channel-inbox/PatientContextPanel";
 import { PilotBanner } from "@/components/channel-inbox/PilotBanner";
@@ -111,21 +112,7 @@ type TimelineItem =
   | { type: "system"; at: number; system: TimelineSystemItem };
 
 function errorMessage(error: unknown, locale: "pt" | "en"): string {
-  const data =
-    error && typeof error === "object" && "data" in error
-      ? (error as { data?: unknown }).data
-      : null;
-  if (data && typeof data === "object" && "message" in data) {
-    return String((data as { message: unknown }).message);
-  }
-  if (data && typeof data === "object" && "code" in data) {
-    return String((data as { code: unknown }).code);
-  }
-  return error instanceof Error
-    ? error.message
-    : locale === "pt"
-      ? "Falha ao enviar."
-      : "Send failed.";
+  return convexErrorMessage(error, locale, locale === "pt" ? "Falha ao enviar." : "Send failed.");
 }
 
 function object(value: unknown): Record<string, unknown> | null {

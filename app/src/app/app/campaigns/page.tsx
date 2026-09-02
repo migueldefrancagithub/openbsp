@@ -46,7 +46,8 @@ import { relativeTime } from "@/lib/relativeTime";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { ImportCsvModal } from "../contacts/ImportCsvModal";
 import type { TemplateCategory } from "@/lib/whatsappTemplateAdvisor";
-import { useI18n } from "@/lib/i18n";
+import { useI18n, type Locale } from "@/lib/i18n";
+import { convexErrorMessage } from "@/lib/convexErrorMessage";
 import { channelStateLabel, sendModeLabel } from "@/lib/operationalLabels";
 
 const STATUS_STYLES: Record<string, string> = {
@@ -367,7 +368,7 @@ export default function CampaignsPage() {
       setListDescription("");
       setNotice(locale === "pt" ? "Lista de contactos criada." : "Contact list created.");
     } catch (err) {
-      setError(readError(err));
+      setError(readError(err, locale));
     } finally {
       setBusy(null);
     }
@@ -389,7 +390,7 @@ export default function CampaignsPage() {
         ? locale === "pt" ? "Contacto adicionado à lista." : "Contact added to list."
         : locale === "pt" ? "O contacto já estava nesta lista." : "Contact was already in this list.");
     } catch (err) {
-      setError(readError(err));
+      setError(readError(err, locale));
     } finally {
       setBusy(null);
     }
@@ -416,7 +417,7 @@ export default function CampaignsPage() {
       );
       setStudioTab("dashboard");
     } catch (err) {
-      setError(readError(err));
+      setError(readError(err, locale));
     } finally {
       setBusy(null);
     }
@@ -437,7 +438,7 @@ export default function CampaignsPage() {
       setCampaignName("");
       setNotice(locale === "pt" ? "Rascunho criado com os destinatários prontos para envio." : "Draft campaign created with recipients ready for launch.");
     } catch (err) {
-      setError(readError(err));
+      setError(readError(err, locale));
     } finally {
       setBusy(null);
     }
@@ -461,7 +462,7 @@ export default function CampaignsPage() {
           : `Audience saved with ${result.added} contacts. ${result.excludedMarketingRevoked} marketing opt-outs excluded.`,
       );
     } catch (err) {
-      setError(readError(err));
+      setError(readError(err, locale));
     } finally {
       setBusy(null);
     }
@@ -482,7 +483,7 @@ export default function CampaignsPage() {
           : `Campaign launched: ${result.queued} queued, ${result.pendingRemaining} waiting, ${result.skippedConsent} skipped for consent, ${result.skippedUnsuitable} unsuitable.`,
       );
     } catch (err) {
-      setError(readError(err));
+      setError(readError(err, locale));
     } finally {
       setBusy(null);
     }
@@ -503,7 +504,7 @@ export default function CampaignsPage() {
           : `Next batch queued: ${result.queued} queued, ${result.pendingRemaining} still waiting, ${result.skippedConsent} skipped for consent, ${result.skippedUnsuitable} unsuitable.`,
       );
     } catch (err) {
-      setError(readError(err));
+      setError(readError(err, locale));
     } finally {
       setBusy(null);
     }
@@ -517,7 +518,7 @@ export default function CampaignsPage() {
       await pauseCampaign({ campaignId, reason: "Paused by the clinic team." });
       setNotice(locale === "pt" ? "Campanha pausada. Nenhum novo lote será criado." : "Campaign paused. No new batch will be created.");
     } catch (err) {
-      setError(readError(err));
+      setError(readError(err, locale));
     } finally {
       setBusy(null);
     }
@@ -531,7 +532,7 @@ export default function CampaignsPage() {
       await resumeCampaign({ campaignId });
       setNotice(locale === "pt" ? "Campanha retomada do ponto em que parou." : "Campaign resumed from where it stopped.");
     } catch (err) {
-      setError(readError(err));
+      setError(readError(err, locale));
     } finally {
       setBusy(null);
     }
@@ -551,7 +552,7 @@ export default function CampaignsPage() {
       await cancelCampaign({ campaignId, reason: "Cancelled by the clinic team." });
       setNotice(locale === "pt" ? "Campanha cancelada com segurança." : "Campaign cancelled safely.");
     } catch (err) {
-      setError(readError(err));
+      setError(readError(err, locale));
     } finally {
       setBusy(null);
     }
@@ -569,7 +570,7 @@ export default function CampaignsPage() {
           : `Retry queued: ${result.retried} safe failures retried, ${result.skippedUnsafe} unsafe skipped, ${result.skippedConsent} skipped for consent.`,
       );
     } catch (err) {
-      setError(readError(err));
+      setError(readError(err, locale));
     } finally {
       setBusy(null);
     }
@@ -592,7 +593,7 @@ export default function CampaignsPage() {
           : locale === "pt" ? "Este destinatário já estava marcado como convertido." : "This recipient was already marked as converted.",
       );
     } catch (err) {
-      setError(readError(err));
+      setError(readError(err, locale));
     } finally {
       setBusy(null);
     }
@@ -631,7 +632,7 @@ export default function CampaignsPage() {
       await navigator.clipboard.writeText(csv);
       setNotice(locale === "pt" ? `${rows.length} contactos com falha copiados como CSV.` : `Copied ${rows.length} failed contacts as CSV.`);
     } catch (err) {
-      setError(readError(err));
+      setError(readError(err, locale));
     } finally {
       setBusy(null);
     }
@@ -810,6 +811,29 @@ export default function CampaignsPage() {
                 : "Choose audience and approved template before creating the draft."
             }
           >
+            {templates !== undefined &&
+              approvedTemplates.length === 0 &&
+              labChannels.length > 0 && (
+                <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-[12px] text-amber-900">
+                  <div className="font-semibold">
+                    {locale === "pt"
+                      ? "Campanhas por template ainda exigem uma ligação WhatsApp direta (Meta)."
+                      : "Template campaigns still require a direct WhatsApp (Meta) connection."}
+                  </div>
+                  <p className="mt-0.5 leading-relaxed">
+                    {locale === "pt"
+                      ? "No canal do piloto, use a micro-campanha: texto livre para até 10 conversas com a janela de 24h aberta. As campanhas em massa no canal chegam na próxima fase."
+                      : "On the pilot channel, use the micro campaign: free text to up to 10 conversations with an open 24h window. Bulk campaigns on the channel arrive in the next phase."}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setStudioTab("micro")}
+                    className="mt-2 inline-flex h-8 items-center rounded-md bg-[#0a152d] px-3 text-[11px] font-semibold text-white hover:bg-[#0a1b33]"
+                  >
+                    {locale === "pt" ? "Abrir micro-campanha" : "Open micro campaign"}
+                  </button>
+                </div>
+              )}
             <form className="space-y-3" onSubmit={handleCreateCampaign}>
               <TextInput
                 label={locale === "pt" ? "Nome da campanha" : "Campaign name"}
@@ -2622,9 +2646,8 @@ function Metric({
   );
 }
 
-function readError(err: unknown): string {
-  if (err instanceof Error) return err.message;
-  return "Something went wrong.";
+function readError(err: unknown, locale: Locale = "pt"): string {
+  return convexErrorMessage(err, locale, locale === "pt" ? "Algo correu mal." : "Something went wrong.");
 }
 
 function toCsv(rows: string[][]): string {

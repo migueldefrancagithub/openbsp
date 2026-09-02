@@ -309,6 +309,7 @@ export const listWorkspace = tenantQuery({
 
 export const bootstrapDefaults = tenantMutation({
   args: {},
+  returns: v.object({ created: v.array(v.string()) }),
   handler: async (ctx) => {
     requireRoleAtLeast(ctx.role, "admin");
     const now = Date.now();
@@ -417,6 +418,7 @@ export const createService = tenantMutation({
     bufferAfterMinutes: v.optional(v.number()),
     availability: v.optional(availabilityValidator),
   },
+  returns: v.id("clinicServices"),
   handler: async (ctx, args) => {
     requireRoleAtLeast(ctx.role, "admin");
     const name = assertLength(args.name, "name", 2, 80);
@@ -465,6 +467,7 @@ export const saveKnowledgeItem = tenantMutation({
     body: v.string(),
     status: v.optional(v.union(v.literal("draft"), v.literal("active"))),
   },
+  returns: v.object({ itemId: v.id("clinicKnowledgeItems"), version: v.number() }),
   handler: async (ctx, args) => {
     requireRoleAtLeast(ctx.role, "admin");
     const title = assertLength(args.title, "title", 2, 120);
@@ -548,6 +551,7 @@ export const createFollowUpRule = tenantMutation({
     delayMinutes: v.number(),
     message: v.string(),
   },
+  returns: v.id("followUpRules"),
   handler: async (ctx, args) => {
     requireRoleAtLeast(ctx.role, "admin");
     const delayMinutes = Math.round(args.delayMinutes);
@@ -584,6 +588,7 @@ export const scheduleFollowUp = tenantMutation({
     businessKey: v.optional(v.string()),
     dueAt: v.optional(v.number()),
   },
+  returns: v.object({ taskId: v.id("followUpTasks"), created: v.boolean() }),
   handler: async (ctx, args) => {
     requireRoleAtLeast(ctx.role, "agent");
     const rule = await loadByIdInTenant(ctx, "followUpRules", args.ruleId);
@@ -649,6 +654,7 @@ export const createHumanCase = tenantMutation({
     question: v.string(),
     responsibleMemberId: v.optional(v.id("members")),
   },
+  returns: v.id("humanCases"),
   handler: async (ctx, args) => {
     requireRoleAtLeast(ctx.role, "agent");
     const thread = args.threadId
@@ -705,6 +711,7 @@ export const resolveHumanCase = tenantMutation({
     caseId: v.id("humanCases"),
     decision: v.string(),
   },
+  returns: v.object({ resolved: v.boolean(), idempotent: v.optional(v.boolean()) }),
   handler: async (ctx, args) => {
     requireRoleAtLeast(ctx.role, "agent");
     const humanCase = await loadByIdInTenant(ctx, "humanCases", args.caseId);
@@ -815,6 +822,7 @@ export const createAppointment = tenantMutation({
     patientHandle: v.optional(v.string()),
     startAt: v.number(),
   },
+  returns: v.id("clinicAppointments"),
   handler: async (ctx, args) => {
     requireRoleAtLeast(ctx.role, "agent");
     const service = await loadByIdInTenant(ctx, "clinicServices", args.serviceId);
@@ -865,6 +873,7 @@ export const confirmAppointment = tenantMutation({
     appointmentId: v.id("clinicAppointments"),
     confirmationReadAt: v.optional(v.number()),
   },
+  returns: v.object({ confirmed: v.boolean(), idempotent: v.optional(v.boolean()) }),
   handler: async (ctx, args) => {
     requireRoleAtLeast(ctx.role, "agent");
     const appointment = await loadByIdInTenant(ctx, "clinicAppointments", args.appointmentId);
@@ -899,6 +908,7 @@ export const recordAppointmentOutcome = tenantMutation({
     appointmentId: v.id("clinicAppointments"),
     status: appointmentOutcomeValidator,
   },
+  returns: v.object({ updated: v.boolean(), idempotent: v.optional(v.boolean()) }),
   handler: async (ctx, args) => {
     requireRoleAtLeast(ctx.role, "agent");
     const appointment = await loadByIdInTenant(ctx, "clinicAppointments", args.appointmentId);

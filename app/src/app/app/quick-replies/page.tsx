@@ -17,7 +17,8 @@ import {
 import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { relativeTime } from "@/lib/relativeTime";
-import { useI18n } from "@/lib/i18n";
+import { useI18n, type Locale } from "@/lib/i18n";
+import { convexErrorMessage } from "@/lib/convexErrorMessage";
 
 type QuickReply = {
   _id: Id<"quickReplies">;
@@ -503,14 +504,6 @@ function cleanShortcut(value: string): string {
     .slice(0, 40);
 }
 
-function formatError(err: unknown, fallback = "Unknown error"): string {
-  if (err && typeof err === "object" && "data" in err) {
-    const data = (err as { data: unknown }).data;
-    if (typeof data === "object" && data !== null) {
-      const d = data as Record<string, unknown>;
-      if (typeof d.message === "string") return d.message;
-      if (typeof d.code === "string") return d.code;
-    }
-  }
-  return err instanceof Error ? err.message : fallback;
+function formatError(err: unknown, fallback = "Unknown error", locale: Locale = "pt"): string {
+  return convexErrorMessage(err, locale, fallback);
 }

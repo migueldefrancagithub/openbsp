@@ -128,6 +128,18 @@ if (target === "production") {
   );
 }
 
+{
+  const { spawnSync } = await import("node:child_process");
+  const check = spawnSync(process.execPath, [
+    new URL("./check-error-codes.mjs", import.meta.url).pathname,
+  ]);
+  if (check.status !== 0) {
+    failures.push(
+      `Unmapped ConvexError codes:\n${check.stderr.toString().trim()}`,
+    );
+  }
+}
+
 console.log(`OpenBSP deploy preflight (${target})`);
 console.log(`Mode: ${strict ? "strict" : "report"}`);
 

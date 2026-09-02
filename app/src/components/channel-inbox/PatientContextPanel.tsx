@@ -22,6 +22,7 @@ import {
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { cn } from "@/lib/cn";
+import { convexErrorMessage } from "@/lib/convexErrorMessage";
 import { relativeTime } from "@/lib/relativeTime";
 import { useI18n, type TranslationKey } from "@/lib/i18n";
 import { roleLabel } from "@/lib/operationalLabels";
@@ -107,8 +108,7 @@ function formatMoment(timestamp: number, locale: "pt" | "en") {
 }
 
 function errorText(error: unknown, locale: "pt" | "en") {
-  if (error instanceof Error) return error.message;
-  return locale === "pt" ? "Não foi possível guardar." : "Could not save.";
+  return convexErrorMessage(error, locale, locale === "pt" ? "Não foi possível guardar." : "Could not save.");
 }
 
 function Section({

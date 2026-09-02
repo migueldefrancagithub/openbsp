@@ -7,6 +7,23 @@ import {
 
 const NAME_REGEX = /^[a-z0-9_-]{1,40}$/;
 
+/**
+ * Shortcuts are typed by humans ("Bom dia!", "/Marcação"). Normalize the
+ * same way the UI does so API callers and imports never hit INVALID_NAME for
+ * spaces, accents or a leading slash.
+ */
+export function normalizeQuickReplyName(raw: string): string {
+  return raw
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase()
+    .replace(/^\/+/, "")
+    .replace(/[^a-z0-9_-]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 40);
+}
+
 export const list = tenantQuery({
   args: {},
   returns: v.array(
@@ -39,7 +56,8 @@ export const create = tenantMutation({
   },
   returns: v.id("quickReplies"),
   handler: async (ctx, args) => {
-    if (!NAME_REGEX.test(args.name)) {
+    const name = normalizeQuickReplyName(args.name);
+    if (!NAME_REGEX.test(name)) {
       throw new ConvexError({
         code: "INVALID_NAME",
         message:
@@ -55,20 +73,20 @@ export const create = tenantMutation({
     const existing = await ctx.db
       .query("quickReplies")
       .withIndex("by_tenant_name", (q) =>
-        q.eq("tenantId", ctx.tenantId).eq("name", args.name),
+        q.eq("tenantId", ctx.tenantId).eq("name", name),
       )
       .unique();
     if (existing) {
       throw new ConvexError({
         code: "NAME_TAKEN",
-        message: `Quick reply '${args.name}' already exists.`,
+        message: `Quick reply '${name}' already exists.`,
       });
     }
 
     const now = Date.now();
     return await ctx.db.insert("quickReplies", {
       tenantId: ctx.tenantId,
-      name: args.name,
+      name,
       content,
       createdBy: ctx.memberId,
       createdAt: now,

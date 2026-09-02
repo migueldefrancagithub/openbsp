@@ -15,21 +15,10 @@ import {
 } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import { useI18n, type Locale } from "@/lib/i18n";
+import { convexErrorMessage } from "@/lib/convexErrorMessage";
 
 function errorMessage(error: unknown, locale: Locale): string {
-  const data =
-    error && typeof error === "object" && "data" in error
-      ? (error as { data?: unknown }).data
-      : null;
-  if (data && typeof data === "object" && "message" in data) {
-    return String((data as { message: unknown }).message);
-  }
-  if (data && typeof data === "object" && "code" in data) {
-    return String((data as { code: unknown }).code);
-  }
-  return error instanceof Error
-    ? error.message
-    : locale === "pt" ? "A operação falhou." : "Operation failed.";
+  return convexErrorMessage(error, locale, locale === "pt" ? "A operação falhou." : "Operation failed.");
 }
 
 function generateSecret(): string {
