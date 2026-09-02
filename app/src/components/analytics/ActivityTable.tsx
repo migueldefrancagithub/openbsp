@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Columns3, Download } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { useI18n, type Locale } from "@/lib/i18n";
 import { Module, EmptyRow, RiskBadge } from "./ui";
 import {
   downloadCsv,
@@ -35,22 +36,23 @@ type ColumnId =
   | "qualityRisk"
   | "retrySafety";
 
-const COLUMNS: { id: ColumnId; label: string; numeric?: boolean }[] = [
-  { id: "bucketLabel", label: "Interval" },
-  { id: "category", label: "Category" },
-  { id: "country", label: "Country" },
-  { id: "sent", label: "Sent", numeric: true },
-  { id: "delivered", label: "Delivered", numeric: true },
-  { id: "failed", label: "Failed", numeric: true },
-  { id: "deliveryRate", label: "Delivery rate", numeric: true },
-  { id: "qualityRisk", label: "Quality" },
-  { id: "retrySafety", label: "Retry" },
+const COLUMNS: { id: ColumnId; numeric?: boolean }[] = [
+  { id: "bucketLabel" },
+  { id: "category" },
+  { id: "country" },
+  { id: "sent", numeric: true },
+  { id: "delivered", numeric: true },
+  { id: "failed", numeric: true },
+  { id: "deliveryRate", numeric: true },
+  { id: "qualityRisk" },
+  { id: "retrySafety" },
 ];
 
 const DEFAULT_HIDDEN: ColumnId[] = ["retrySafety"];
 const PAGE_SIZE = 25;
 
 export function ActivityTable({ rows }: { rows: DetailRow[] }) {
+  const { locale, tr } = useI18n();
   const [hidden, setHidden] = useState<ColumnId[]>(DEFAULT_HIDDEN);
   const [page, setPage] = useState(0);
   const [chooserOpen, setChooserOpen] = useState(false);
@@ -87,27 +89,27 @@ export function ActivityTable({ rows }: { rows: DetailRow[] }) {
       case "bucketLabel":
         return row.bucketLabel;
       case "category":
-        return <span className="capitalize">{row.category}</span>;
+        return <span className="capitalize">{categoryLabel(row.category, locale)}</span>;
       case "country":
         return row.country;
       case "sent":
-        return formatNumber(row.sent);
+        return formatNumber(row.sent, locale);
       case "delivered":
-        return formatNumber(row.delivered);
+        return formatNumber(row.delivered, locale);
       case "failed":
-        return formatNumber(row.failed);
+        return formatNumber(row.failed, locale);
       case "deliveryRate":
         return formatPercent(row.deliveryRate, hasTraffic);
       case "qualityRisk":
         return <RiskBadge risk={row.qualityRisk} hasTraffic={hasTraffic} />;
       case "retrySafety":
-        return <span className="capitalize text-slate-500">{row.retrySafety}</span>;
+        return <span className="capitalize text-slate-500">{retryLabel(row.retrySafety, locale)}</span>;
     }
   }
 
   function exportCsv() {
     const csv = toCsv(
-      visible.map((column) => column.label),
+      visible.map((column) => columnLabel(column.id, locale)),
       rows.map((row) =>
         visible.map((column) => {
           switch (column.id) {
@@ -122,13 +124,17 @@ export function ActivityTable({ rows }: { rows: DetailRow[] }) {
       ),
     );
     downloadCsv(`openbsp-analytics-${rows.length}-rows.csv`, csv);
-    setNotice(`Downloaded ${rows.length} rows`);
+    setNotice(
+      locale === "pt"
+        ? `${rows.length} linhas exportadas`
+        : `Downloaded ${rows.length} rows`,
+    );
   }
 
   return (
     <Module
-      title="Activity"
-      hint={`${formatNumber(rows.length)} intervals`}
+      title={tr("Atividade", "Activity")}
+      hint={`${formatNumber(rows.length, locale)} ${tr("intervalos", "intervals")}`}
       action={
         <div className="flex items-center gap-1.5">
           {notice && (
@@ -145,7 +151,7 @@ export function ActivityTable({ rows }: { rows: DetailRow[] }) {
               className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-slate-200 px-2 text-[12px] font-medium text-slate-600 outline-none hover:border-slate-300 focus-visible:ring-2 focus-visible:ring-[#3d52d5]"
             >
               <Columns3 size={13} />
-              Columns
+              {tr("Colunas", "Columns")}
             </button>
             {chooserOpen && (
               <div className="absolute right-0 z-20 mt-1 w-48 rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
@@ -166,7 +172,7 @@ export function ActivityTable({ rows }: { rows: DetailRow[] }) {
                       }
                       className="h-3.5 w-3.5 accent-[#0a152d]"
                     />
-                    {column.label}
+                    {columnLabel(column.id, locale)}
                   </label>
                 ))}
               </div>
@@ -179,7 +185,7 @@ export function ActivityTable({ rows }: { rows: DetailRow[] }) {
             className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-slate-200 px-2 text-[12px] font-medium text-slate-600 outline-none hover:border-slate-300 disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-[#3d52d5]"
           >
             <Download size={13} />
-            Export CSV
+            {tr("Exportar CSV", "Export CSV")}
           </button>
         </div>
       }
@@ -203,7 +209,7 @@ export function ActivityTable({ rows }: { rows: DetailRow[] }) {
                         column.numeric && "text-right",
                       )}
                     >
-                      {column.label}
+                        {columnLabel(column.id, locale)}
                     </th>
                   ))}
                 </tr>
@@ -232,11 +238,11 @@ export function ActivityTable({ rows }: { rows: DetailRow[] }) {
             <span className="truncate text-[11px] text-slate-400">
               {current * PAGE_SIZE + 1}–
               {Math.min((current + 1) * PAGE_SIZE, rows.length)} of{" "}
-              {formatNumber(rows.length)}
+              {formatNumber(rows.length, locale)}
             </span>
             <div className="ml-auto flex shrink-0 items-center gap-1">
               <PageButton
-                label="Previous"
+                label={tr("Anterior", "Previous")}
                 disabled={current === 0}
                 onClick={() => setPage(current - 1)}
               />
@@ -244,7 +250,7 @@ export function ActivityTable({ rows }: { rows: DetailRow[] }) {
                 {current + 1} / {pageCount}
               </span>
               <PageButton
-                label="Next"
+                label={tr("Seguinte", "Next")}
                 disabled={current >= pageCount - 1}
                 onClick={() => setPage(current + 1)}
               />
@@ -254,6 +260,43 @@ export function ActivityTable({ rows }: { rows: DetailRow[] }) {
       )}
     </Module>
   );
+}
+
+function columnLabel(id: ColumnId, locale: Locale) {
+  const labels: Record<ColumnId, [string, string]> = {
+    bucketLabel: ["Intervalo", "Interval"],
+    category: ["Categoria", "Category"],
+    country: ["País", "Country"],
+    sent: ["Enviadas", "Sent"],
+    delivered: ["Entregues", "Delivered"],
+    failed: ["Falharam", "Failed"],
+    deliveryRate: ["Taxa de entrega", "Delivery rate"],
+    qualityRisk: ["Qualidade", "Quality"],
+    retrySafety: ["Nova tentativa", "Retry"],
+  };
+  return labels[id][locale === "pt" ? 0 : 1];
+}
+
+function categoryLabel(category: string, locale: Locale) {
+  const labels: Record<string, [string, string]> = {
+    marketing: ["marketing", "marketing"],
+    utility: ["utilidade", "utility"],
+    authentication: ["autenticação", "authentication"],
+    service: ["atendimento", "service"],
+  };
+  const label = labels[category.toLowerCase()];
+  return label ? label[locale === "pt" ? 0 : 1] : category;
+}
+
+function retryLabel(value: string, locale: Locale) {
+  if (locale !== "pt") return value;
+  const labels: Record<string, string> = {
+    safe: "segura",
+    unsafe: "não segura",
+    review: "rever",
+    unknown: "desconhecida",
+  };
+  return labels[value.toLowerCase()] ?? value;
 }
 
 /** The query returns no id, so identity is the bucket plus its dimensions. */

@@ -63,6 +63,8 @@ import { SegmentedTabs } from "@/components/app/SegmentedTabs";
 import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { relativeTime } from "@/lib/relativeTime";
+import { useI18n, type Locale } from "@/lib/i18n";
+import { channelStateLabel } from "@/lib/operationalLabels";
 
 type ChatbotStatus = "draft" | "active" | "paused";
 type TriggerKind = "inbound" | "keyword" | "ctwa" | "handoff";
@@ -202,25 +204,79 @@ const STATUS_STYLES: Record<ChatbotStatus, string> = {
   paused: "border-amber-200 bg-amber-50 text-amber-700",
 };
 
-const TRIGGER_COPY: Record<TriggerKind, string> = {
-  inbound: "All inbound messages",
-  keyword: "Keyword match",
-  ctwa: "Click-to-WhatsApp lead",
-  handoff: "Human handoff follow-up",
-};
+function pick(locale: Locale, pt: string, en: string) {
+  return locale === "pt" ? pt : en;
+}
 
-const NODE_TYPE_LABELS: Record<FlowNodeType, string> = {
-  start: "Start",
-  send_message: "Send message",
-  send_template: "Send template",
-  send_buttons: "Button menu",
-  send_list: "List menu",
-  collect_input: "Collect input",
-  condition: "Condition",
-  set_tag: "Set tag",
-  handoff: "Human handoff",
-  end: "End",
-};
+function triggerLabel(kind: TriggerKind, locale: Locale) {
+  const labels: Record<TriggerKind, [string, string]> = {
+    inbound: ["Todas as mensagens recebidas", "All inbound messages"],
+    keyword: ["Correspondência por palavra-chave", "Keyword match"],
+    ctwa: ["Lead de anúncio Click-to-WhatsApp", "Click-to-WhatsApp lead"],
+    handoff: ["Continuação após atendimento humano", "Human handoff follow-up"],
+  };
+  return pick(locale, ...labels[kind]);
+}
+
+function nodeTypeLabel(type: FlowNodeType, locale: Locale) {
+  const labels: Record<FlowNodeType, [string, string]> = {
+    start: ["Início", "Start"],
+    send_message: ["Enviar mensagem", "Send message"],
+    send_template: ["Enviar template", "Send template"],
+    send_buttons: ["Menu de botões", "Button menu"],
+    send_list: ["Menu de lista", "List menu"],
+    collect_input: ["Recolher resposta", "Collect input"],
+    condition: ["Condição", "Condition"],
+    set_tag: ["Aplicar etiqueta", "Set tag"],
+    handoff: ["Passar à equipa", "Human handoff"],
+    end: ["Fim", "End"],
+  };
+  return pick(locale, ...labels[type]);
+}
+
+function botStatusLabel(status: ChatbotStatus, locale: Locale) {
+  const labels: Record<ChatbotStatus, [string, string]> = {
+    active: ["Ativo", "Active"],
+    draft: ["Rascunho", "Draft"],
+    paused: ["Pausado", "Paused"],
+  };
+  return pick(locale, ...labels[status]);
+}
+
+function localizeFlowIssue(message: string, locale: Locale) {
+  if (locale === "en") return message;
+  const exact: Record<string, string> = {
+    "Bot name is required.": "O nome do agente é obrigatório.",
+    "Keyword-triggered flows need at least one keyword.":
+      "Fluxos por palavra-chave precisam de pelo menos uma palavra.",
+    "Add at least one node before activation.":
+      "Adicione pelo menos um passo antes de ativar.",
+    "Pick an entry node.": "Escolha um passo de entrada.",
+    "Each node needs a stable key.": "Cada passo precisa de uma chave estável.",
+    "Each button needs a reply id.": "Cada botão precisa de um identificador de resposta.",
+    "Condition nodes need a variable key.":
+      "Passos de condição precisam de uma variável.",
+    "Button nodes need 1-3 buttons for Meta.":
+      "Menus de botões precisam de 1 a 3 botões.",
+    "List nodes need 1-10 rows.": "Menus de lista precisam de 1 a 10 opções.",
+  };
+  if (exact[message]) return exact[message];
+  return message
+    .replace(" needs a next node.", " precisa de um próximo passo.")
+    .replace(" needs message text.", " precisa do texto da mensagem.")
+    .replace(" needs an approved template.", " precisa de um template aprovado.")
+    .replace(" needs a prompt.", " precisa de uma pergunta.")
+    .replace(" needs a variable key.", " precisa de uma variável.")
+    .replace(" needs menu message text.", " precisa do texto do menu.")
+    .replace(" needs a tag value.", " precisa de uma etiqueta.")
+    .replace(" does not exist.", " não existe.")
+    .replace(" is not reachable from the entry node.", " não é alcançável a partir da entrada.")
+    .replace(" references a template that does not exist.", " referencia um template inexistente.")
+    .replace(" must use an approved template", " deve usar um template aprovado")
+    .replace(" points to missing node ", " aponta para um passo inexistente ")
+    .replace("Choice labels must be ", "Os rótulos devem ter ")
+    .replace(" characters.", " caracteres.");
+}
 
 const FLOW_NODE_TYPES: FlowNodeType[] = [
   "send_message",
@@ -235,6 +291,7 @@ const FLOW_NODE_TYPES: FlowNodeType[] = [
 ];
 
 export default function ChatbotsPage() {
+  const { locale, tr } = useI18n();
   const studio = useQuery(api.chatbots.list);
   const createFolder = useMutation(api.chatbots.createFolder);
   const createBot = useMutation(api.chatbots.createBot);
@@ -328,7 +385,7 @@ export default function ChatbotsPage() {
       const id = await createFolder({ name: folderName });
       setSelectedFolderId(id);
       setFolderName("");
-      setNotice("Folder created.");
+      setNotice(tr("Pasta criada.", "Folder created."));
     } catch (err) {
       setError(readError(err));
     } finally {
@@ -355,7 +412,12 @@ export default function ChatbotsPage() {
       setBotName("");
       setBotDescription("");
       setStudioTab("flows");
-      setNotice("Bot drafted with a flow template.");
+      setNotice(
+        tr(
+          "Agente criado como rascunho com um fluxo inicial.",
+          "Bot drafted with a flow template.",
+        ),
+      );
     } catch (err) {
       setError(readError(err));
     } finally {
@@ -379,8 +441,14 @@ export default function ChatbotsPage() {
       const errors = issues.filter((issue) => issue.severity === "error");
       setNotice(
         errors.length > 0
-          ? `Flow saved as draft with ${errors.length} blocker(s).`
-          : "Flow saved and ready to activate.",
+          ? tr(
+              `Fluxo guardado como rascunho com ${errors.length} bloqueio(s).`,
+              `Flow saved as draft with ${errors.length} blocker(s).`,
+            )
+          : tr(
+              "Fluxo guardado e pronto para ativar.",
+              "Flow saved and ready to activate.",
+            ),
       );
     } catch (err) {
       setError(readError(err));
@@ -404,11 +472,16 @@ export default function ChatbotsPage() {
       });
       const errors = issues.filter((issue) => issue.severity === "error");
       if (errors.length > 0) {
-        setNotice(`Flow saved as draft with ${errors.length} blocker(s).`);
+        setNotice(
+          tr(
+            `Fluxo guardado como rascunho com ${errors.length} bloqueio(s).`,
+            `Flow saved as draft with ${errors.length} blocker(s).`,
+          ),
+        );
         return;
       }
       await updateStatus({ chatbotId: selectedBot._id, status: "active" });
-      setNotice("Flow validated and published.");
+      setNotice(tr("Fluxo validado e publicado.", "Flow validated and published."));
     } catch (err) {
       setError(readError(err));
     } finally {
@@ -423,7 +496,7 @@ export default function ChatbotsPage() {
     setError(null);
     try {
       await applyTemplate({ chatbotId: selectedBot._id, templateSlug: slug });
-      setNotice("Template applied to flow.");
+      setNotice(tr("Template aplicado ao fluxo.", "Template applied to flow."));
     } catch (err) {
       setError(readError(err));
     } finally {
@@ -441,7 +514,7 @@ export default function ChatbotsPage() {
 
   function addNode(type: FlowNodeType, position?: FlowNodePosition) {
     const key = uniqueNodeKey(flowNodes, type);
-    const node = { ...defaultNode(key, type), position };
+    const node = { ...defaultNode(key, type, locale), position };
     setFlowNodes((nodes) => [...nodes, node]);
     if (!flowEntryNodeKey) setFlowEntryNodeKey(node.key);
     return node.key;
@@ -459,7 +532,11 @@ export default function ChatbotsPage() {
     setError(null);
     try {
       await updateStatus({ chatbotId: botId, status });
-      setNotice(status === "active" ? "Bot activated." : "Bot updated.");
+      setNotice(
+        status === "active"
+          ? tr("Agente ativado.", "Bot activated.")
+          : tr("Agente atualizado.", "Bot updated."),
+      );
     } catch (err) {
       setError(readError(err));
     } finally {
@@ -476,7 +553,12 @@ export default function ChatbotsPage() {
     setError(null);
     try {
       await bindChannel({ chatbotId, channelId });
-      setNotice("Isolated channel selected. Review and publish the flow when the pilot is ready.");
+      setNotice(
+        tr(
+          "Canal isolado selecionado. Reveja e publique o fluxo quando o piloto estiver pronto.",
+          "Isolated channel selected. Review and publish the flow when the pilot is ready.",
+        ),
+      );
     } catch (err) {
       setError(readError(err));
     } finally {
@@ -540,9 +622,12 @@ export default function ChatbotsPage() {
   return (
     <>
       <PageHeader
-        eyebrow="Automation studio"
-        title="Chatbots"
-        description="Build WhatsApp bots that qualify leads, respect DND, and hand off safely to humans."
+        eyebrow={tr("AUTOMAÇÃO CLÍNICA", "CLINIC AUTOMATION")}
+        title={tr("Agentes", "Agents")}
+        description={tr(
+          "Configure agentes que qualificam pacientes, executam tarefas autorizadas e chamam a equipa quando necessário.",
+          "Configure agents that qualify patients, run authorized tasks, and call the team when needed.",
+        )}
         action={
           <div className="flex flex-wrap gap-2">
             <a
@@ -550,19 +635,20 @@ export default function ChatbotsPage() {
               className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-[#0a1b33] transition-colors hover:border-slate-300"
             >
               <FolderPlus size={15} />
-              Create folder
+              {tr("Nova pasta", "New folder")}
             </a>
             <a
               href="#create-bot"
               className="inline-flex h-10 items-center gap-2 rounded-lg bg-emerald-600 px-3 text-sm font-medium text-white transition-colors hover:bg-emerald-700"
             >
               <Plus size={15} />
-              Create bot
+              {tr("Novo agente", "New agent")}
             </a>
             <button
               type="button"
               className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-emerald-600 text-white transition-colors hover:bg-emerald-700"
-              aria-label="Import bot"
+              aria-label={tr("Importar agente", "Import agent")}
+              title={tr("Importar agente", "Import agent")}
             >
               <UploadCloud size={17} />
             </button>
@@ -570,9 +656,8 @@ export default function ChatbotsPage() {
         }
       />
 
-      <div className="relative min-h-[calc(100vh-105px)] overflow-hidden bg-[linear-gradient(145deg,#f4ffe8_0%,#f8fbff_42%,#ecfdf5_100%)] px-4 py-6 sm:px-6 lg:px-8">
-        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(100deg,rgba(190,242,100,0.18),transparent_30%,rgba(14,165,233,0.10)_64%,transparent)]" />
-        <div className="relative mx-auto max-w-7xl space-y-5">
+      <div className="min-h-[calc(100vh-105px)] bg-[#f7fafc] px-4 py-5 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl space-y-4">
           {(notice || error) && (
             <div
               className={`rounded-xl border px-4 py-3 text-sm ${
@@ -591,14 +676,17 @@ export default function ChatbotsPage() {
             items={[
               {
                 key: "flows",
-                label: "Flow Builder",
-                value: `${selectedBot?.nodeCount ?? 0} nodes`,
+                label: tr("Editor de fluxos", "Flow builder"),
+                value: tr(
+                  `${selectedBot?.nodeCount ?? 0} passos`,
+                  `${selectedBot?.nodeCount ?? 0} nodes`,
+                ),
                 icon: Workflow,
               },
               {
                 key: "bots",
-                label: "Bot Library",
-                value: `${bots.length} bots`,
+                label: tr("Biblioteca de agentes", "Agent library"),
+                value: tr(`${bots.length} agentes`, `${bots.length} agents`),
                 icon: Bot,
               },
             ]}
@@ -607,41 +695,42 @@ export default function ChatbotsPage() {
           <section className="grid gap-3 md:grid-cols-4">
             <StatCard
               icon={Bot}
-              label="Bots"
+              label={tr("Agentes", "Agents")}
               value={studio?.stats.total ?? 0}
-              note="WhatsApp automations"
+              note={tr("Automações WhatsApp", "WhatsApp automations")}
             />
             <StatCard
               icon={Radio}
-              label="Active"
+              label={tr("Ativos", "Active")}
               value={studio?.stats.active ?? 0}
-              note="Responding now"
+              note={tr("A responder agora", "Responding now")}
             />
             <StatCard
               icon={PauseCircle}
-              label="Paused"
+              label={tr("Pausados", "Paused")}
               value={studio?.stats.paused ?? 0}
-              note="Manual review"
+              note={tr("Aguardam revisão", "Manual review")}
             />
             <StatCard
               icon={Sparkles}
-              label="Draft"
+              label={tr("Rascunhos", "Draft")}
               value={studio?.stats.draft ?? 0}
-              note="Ready to refine"
+              note={tr("Em preparação", "Ready to refine")}
             />
           </section>
 
-          <section className="relative overflow-hidden rounded-[28px] border border-white/70 bg-white/55 p-5 shadow-[0_28px_90px_-56px_rgba(15,23,42,0.48)] ring-1 ring-emerald-100/80 backdrop-blur-2xl">
-            <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.82),rgba(236,253,245,0.38)_46%,rgba(219,234,254,0.34))]" />
-            <div className="relative">
+          <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+            <div>
               <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h2 className="font-[var(--font-outfit)] text-lg font-semibold text-[#0a1b33]">
-                    Folders
+                    {tr("Pastas", "Folders")}
                   </h2>
                   <p className="text-sm text-slate-500">
-                    Keep campaign bots, support bots, and qualification bots
-                    separated.
+                    {tr(
+                      "Separe receção, vendas, confirmações e suporte.",
+                      "Separate reception, sales, confirmations, and support.",
+                    )}
                   </p>
                 </div>
                 {selectedFolder && (
@@ -650,7 +739,7 @@ export default function ChatbotsPage() {
                     onClick={() => setSelectedFolderId("")}
                     className="text-sm font-medium text-violet-600"
                   >
-                    Show all bots
+                    {tr("Mostrar todos", "Show all")}
                   </button>
                 )}
               </div>
@@ -668,10 +757,13 @@ export default function ChatbotsPage() {
                 <div className="rounded-xl border border-dashed border-slate-200 p-6 text-center">
                   <FolderPlus size={24} className="mx-auto text-slate-300" />
                   <p className="mt-3 text-sm font-semibold text-[#0a1b33]">
-                    No folders yet
+                    {tr("Ainda não há pastas", "No folders yet")}
                   </p>
                   <p className="mt-1 text-sm text-slate-500">
-                    Create a folder for campaigns, support, or CTWA lead flows.
+                    {tr(
+                      "Crie uma pasta para organizar os agentes por objetivo.",
+                      "Create a folder to organize agents by objective.",
+                    )}
                   </p>
                 </div>
               ) : (
@@ -683,22 +775,21 @@ export default function ChatbotsPage() {
                         key={folder._id}
                         type="button"
                         onClick={() => setSelectedFolderId(folder._id)}
-                        className={`relative flex min-h-24 items-center gap-3 overflow-hidden rounded-2xl border px-4 py-3 text-left shadow-[0_20px_60px_-48px_rgba(15,23,42,0.7)] backdrop-blur-xl transition-all ${
+                        className={`flex min-h-20 items-center gap-3 rounded-lg border px-4 py-3 text-left transition-colors ${
                           active
-                            ? "border-lime-300/80 bg-lime-100/60 ring-1 ring-lime-200/70"
-                            : "border-white/70 bg-white/46 hover:border-lime-200/80 hover:bg-white/66 hover:shadow-[0_24px_70px_-46px_rgba(22,101,52,0.55)]"
+                            ? "border-emerald-300 bg-emerald-50"
+                            : "border-slate-200 bg-white hover:border-emerald-200 hover:bg-slate-50"
                         }`}
                       >
-                        <span className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.7),rgba(190,242,100,0.18)_52%,rgba(14,165,233,0.12))]" />
-                        <span className="relative flex h-10 w-10 items-center justify-center rounded-2xl border border-white/60 bg-white/55 text-emerald-700 shadow-inner">
+                        <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
                           <FolderPlus size={17} />
                         </span>
-                        <span className="relative min-w-0 flex-1">
+                        <span className="min-w-0 flex-1">
                           <span className="block truncate text-sm font-semibold text-[#0a1b33]">
                             {folder.name}
                           </span>
                           <span className="mt-0.5 block text-xs text-slate-500">
-                            {folder.botCount} bot
+                            {folder.botCount} {tr("agente", "agent")}
                             {folder.botCount === 1 ? "" : "s"}
                           </span>
                         </span>
@@ -710,58 +801,67 @@ export default function ChatbotsPage() {
             </div>
           </section>
 
-          <div className="grid gap-5 xl:grid-cols-[380px_1fr]">
-            <aside className="space-y-5">
+          <div className="grid gap-4 xl:grid-cols-[340px_1fr]">
+            <aside className="space-y-4">
               <section
                 id="create-folder"
-                className="scroll-mt-24 rounded-[24px] border border-white/70 bg-white/58 p-5 shadow-[0_24px_70px_-54px_rgba(15,23,42,0.55)] ring-1 ring-white/70 backdrop-blur-2xl"
+                className="scroll-mt-24 rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
               >
                 <PanelTitle
                   icon={FolderPlus}
-                  title="Create a folder"
-                  body="A folder is the operational home for related bots."
+                  title={tr("Criar pasta", "Create folder")}
+                  body={tr(
+                    "Agrupe agentes que trabalham no mesmo objetivo.",
+                    "Group agents that work toward the same objective.",
+                  )}
                 />
                 <form className="mt-4 space-y-3" onSubmit={handleCreateFolder}>
                   <TextInput
-                    label="Folder name"
+                    label={tr("Nome da pasta", "Folder name")}
                     value={folderName}
                     onChange={setFolderName}
-                    placeholder="Campanhas"
+                    placeholder={tr("Campanhas", "Campaigns")}
                   />
                   <SubmitButton
                     disabled={busy !== null || folderName.trim().length < 2}
                     loading={busy === "folder"}
                     icon={FolderPlus}
                   >
-                    Create folder
+                    {tr("Criar pasta", "Create folder")}
                   </SubmitButton>
                 </form>
               </section>
 
               <section
                 id="create-bot"
-                className="scroll-mt-24 rounded-[24px] border border-white/70 bg-white/58 p-5 shadow-[0_24px_70px_-54px_rgba(15,23,42,0.55)] ring-1 ring-white/70 backdrop-blur-2xl"
+                className="scroll-mt-24 rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
               >
                 <PanelTitle
                   icon={Bot}
-                  title="Create a bot"
-                  body="Start with a guarded WhatsApp automation, then tune the flow."
+                  title={tr("Criar agente", "Create agent")}
+                  body={tr(
+                    "Escolha um objetivo e ajuste o fluxo antes de publicar.",
+                    "Choose an objective and tune the flow before publishing.",
+                  )}
                 />
                 <form className="mt-4 space-y-3" onSubmit={handleCreateBot}>
                   <TextInput
-                    label="Bot name"
+                    label={tr("Nome do agente", "Agent name")}
                     value={botName}
                     onChange={setBotName}
-                    placeholder="Campanha LPG qualifier"
+                    placeholder={tr("Qualificador da campanha LPG", "LPG campaign qualifier")}
                   />
                   <TextInput
-                    label="Description"
+                    label={tr("Objetivo", "Objective")}
                     value={botDescription}
                     onChange={setBotDescription}
-                    placeholder="Qualifies CTWA leads before agent handoff"
+                    placeholder={tr(
+                      "Qualifica leads CTWA antes de entregar à equipa",
+                      "Qualifies CTWA leads before agent handoff",
+                    )}
                   />
                   <SelectBox
-                    label="Folder"
+                    label={tr("Pasta", "Folder")}
                     value={selectedFolderId}
                     onChange={(value) =>
                       setSelectedFolderId(value as Id<"chatbotFolders"> | "")
@@ -770,10 +870,10 @@ export default function ChatbotsPage() {
                       value: folder._id,
                       label: folder.name,
                     }))}
-                    placeholder="No folder"
+                    placeholder={tr("Sem pasta", "No folder")}
                   />
                   <SelectBox
-                    label="Starter flow"
+                    label={tr("Fluxo inicial", "Starter flow")}
                     value={templateSlug}
                     onChange={(value) =>
                       setTemplateSlug(value as FlowTemplate["slug"] | "")
@@ -782,56 +882,58 @@ export default function ChatbotsPage() {
                       value: template.slug,
                       label: `${template.name} (${template.nodeCount})`,
                     }))}
-                    placeholder="Blank"
+                    placeholder={tr("Em branco", "Blank")}
                   />
                   <SelectBox
                     label="Trigger"
                     value={triggerKind}
                     onChange={(value) => setTriggerKind(value as TriggerKind)}
                     options={[
-                      { value: "ctwa", label: TRIGGER_COPY.ctwa },
-                      { value: "inbound", label: TRIGGER_COPY.inbound },
-                      { value: "keyword", label: TRIGGER_COPY.keyword },
-                      { value: "handoff", label: TRIGGER_COPY.handoff },
+                      { value: "ctwa", label: triggerLabel("ctwa", locale) },
+                      { value: "inbound", label: triggerLabel("inbound", locale) },
+                      { value: "keyword", label: triggerLabel("keyword", locale) },
+                      { value: "handoff", label: triggerLabel("handoff", locale) },
                     ]}
-                    placeholder="Choose trigger"
+                    placeholder={tr("Escolha o gatilho", "Choose trigger")}
                   />
                   <SelectBox
-                    label="Isolated WhatsApp channel"
+                    label={tr("Canal WhatsApp", "WhatsApp channel")}
                     value={botChannelId}
                     onChange={(value) =>
                       setBotChannelId(value as Id<"channels"> | "")
                     }
                     options={automationChannels.map((channel) => ({
                       value: channel._id,
-                      label: `${channel.displayName} · ${channel.connectionState ?? channel.status}`,
+                      label: `${channel.displayName} · ${channelStateLabel(channel.connectionState ?? channel.status, locale)}`,
                     }))}
-                    placeholder="Select iaSolution Hub channel"
+                    placeholder={tr("Selecione um canal", "Select a channel")}
                   />
                   <SubmitButton
                     disabled={busy !== null || botName.trim().length < 2}
                     loading={busy === "bot"}
                     icon={Plus}
                   >
-                    Draft bot
+                    {tr("Criar rascunho", "Create draft")}
                   </SubmitButton>
                 </form>
               </section>
             </aside>
 
-            <section className="overflow-hidden rounded-[28px] border border-white/70 bg-white/58 shadow-[0_28px_90px_-56px_rgba(15,23,42,0.5)] ring-1 ring-white/70 backdrop-blur-2xl">
+            <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
               <div className="flex flex-col gap-2 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h2 className="font-[var(--font-outfit)] text-lg font-semibold text-[#0a1b33]">
-                    {selectedFolder ? selectedFolder.name : "All bots"}
+                    {selectedFolder ? selectedFolder.name : tr("Todos os agentes", "All agents")}
                   </h2>
                   <p className="text-sm text-slate-500">
-                    Activation stays explicit so a bot never takes over a human
-                    conversation by accident.
+                    {tr(
+                      "A ativação é explícita: nenhum agente assume uma conversa humana por acidente.",
+                      "Activation is explicit so an agent never takes over a human conversation by accident.",
+                    )}
                   </p>
                 </div>
                 <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
-                  {visibleBots.length} total
+                  {visibleBots.length} {tr("no total", "total")}
                 </span>
               </div>
 
@@ -843,10 +945,13 @@ export default function ChatbotsPage() {
                 <div className="p-10 text-center">
                   <Bot size={28} className="mx-auto text-slate-300" />
                   <h3 className="mt-3 font-[var(--font-outfit)] text-lg font-semibold text-[#0a1b33]">
-                    No bots in this view
+                    {tr("Não há agentes nesta vista", "No agents in this view")}
                   </h3>
                   <p className="mt-1 text-sm text-slate-500">
-                    Draft a CTWA, inbound, keyword, or handoff automation.
+                    {tr(
+                      "Crie um agente de receção, vendas, confirmação ou suporte.",
+                      "Create a reception, sales, confirmation, or support agent.",
+                    )}
                   </p>
                 </div>
               ) : (
@@ -854,13 +959,12 @@ export default function ChatbotsPage() {
                   {visibleBots.map((bot) => (
                     <article
                       key={bot._id}
-                      className="relative overflow-hidden rounded-[24px] border border-white/70 bg-white/58 p-5 shadow-[0_22px_70px_-52px_rgba(15,23,42,0.65)] backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:bg-white/72 hover:shadow-[0_28px_90px_-54px_rgba(22,101,52,0.45)]"
+                      className="rounded-lg border border-slate-200 bg-white p-4 transition-colors hover:border-slate-300 hover:bg-slate-50/40"
                     >
-                      <span className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.72),rgba(236,253,245,0.22)_50%,rgba(219,234,254,0.18))]" />
-                      <div className="relative">
+                      <div>
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex min-w-0 gap-3">
-                            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/70 bg-white/62 text-emerald-700 shadow-inner">
+                            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-white/70 bg-white/62 text-emerald-700 shadow-inner">
                               <Bot size={19} />
                             </span>
                             <div className="min-w-0">
@@ -869,38 +973,41 @@ export default function ChatbotsPage() {
                               </h3>
                               <p className="mt-1 text-sm leading-6 text-slate-500">
                                 {bot.description ??
-                                  "No description yet. Add a purpose before activation."}
+                                  tr(
+                                    "Ainda sem objetivo. Defina-o antes de ativar.",
+                                    "No objective yet. Add one before activation.",
+                                  )}
                               </p>
                             </div>
                           </div>
                           <span
                             className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold capitalize ${STATUS_STYLES[bot.status]}`}
                           >
-                            {bot.status}
+                            {botStatusLabel(bot.status, locale)}
                           </span>
                         </div>
 
                         <div className="mt-5 grid gap-2 sm:grid-cols-3">
                           <BotMeta
                             icon={Zap}
-                            label="Trigger"
-                            value={TRIGGER_COPY[bot.triggerKind]}
+                            label={tr("Gatilho", "Trigger")}
+                            value={triggerLabel(bot.triggerKind, locale)}
                           />
                           <BotMeta
                             icon={BrainCircuit}
-                            label="Model"
+                            label={tr("Modelo", "Model")}
                             value={bot.model ?? "CXCast guardrail bot"}
                           />
                           <BotMeta
                             icon={Radio}
-                            label="Channel"
-                            value={bot.channelDisplayName ?? "Not bound"}
+                            label={tr("Canal", "Channel")}
+                            value={bot.channelDisplayName ?? tr("Não ligado", "Not bound")}
                           />
                         </div>
 
                         <div className="mt-4 rounded-xl border border-slate-100 bg-white/55 p-3">
                           <SelectBox
-                            label="Automation channel (iaSolution Hub only)"
+                            label={tr("Canal de automação", "Automation channel")}
                             value={bot.channelId ?? ""}
                             onChange={(value) => {
                               if (value) {
@@ -912,13 +1019,15 @@ export default function ChatbotsPage() {
                             }}
                             options={automationChannels.map((channel) => ({
                               value: channel._id,
-                              label: `${channel.displayName} · ${channel.connectionState ?? channel.status}`,
+                              label: `${channel.displayName} · ${channelStateLabel(channel.connectionState ?? channel.status, locale)}`,
                             }))}
-                            placeholder="Required before activation"
+                            placeholder={tr("Obrigatório para ativar", "Required before activation")}
                           />
                           <p className="mt-2 text-[11px] leading-5 text-slate-500">
-                            Changing channel returns the bot to draft. Only
-                            active OpenBSP Hub channels appear here.
+                            {tr(
+                              "Alterar o canal devolve o agente a rascunho. Só aparecem canais ativos.",
+                              "Changing channel returns the agent to draft. Only active channels appear here.",
+                            )}
                           </p>
                         </div>
 
@@ -935,7 +1044,7 @@ export default function ChatbotsPage() {
                               ) : (
                                 <CheckCircle2 size={14} />
                               )}
-                              Activate
+                              {tr("Ativar", "Activate")}
                             </button>
                           )}
                           {bot.status === "active" && (
@@ -950,7 +1059,7 @@ export default function ChatbotsPage() {
                               ) : (
                                 <PauseCircle size={14} />
                               )}
-                              Pause
+                              {tr("Pausar", "Pause")}
                             </button>
                           )}
                           {bot.status !== "draft" && (
@@ -960,7 +1069,7 @@ export default function ChatbotsPage() {
                               disabled={busy !== null}
                               className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-[#0a1b33] transition-colors hover:border-slate-300 disabled:opacity-50"
                             >
-                              Move to draft
+                              {tr("Voltar a rascunho", "Move to draft")}
                             </button>
                           )}
                         </div>
@@ -986,67 +1095,69 @@ type FlowCanvasNodeData = {
 
 type FlowCanvasNode = Node<FlowCanvasNodeData, "flowStep">;
 
-const STEP_CATALOG: Array<{
+function stepCatalog(locale: Locale): Array<{
   type: FlowNodeType;
   label: string;
   detail: string;
   icon: LucideIcon;
-}> = [
+}> {
+  return [
   {
     type: "send_message",
-    label: "Send Message",
-    detail: "Plain WhatsApp text with a next step.",
+    label: pick(locale, "Enviar mensagem", "Send message"),
+    detail: pick(locale, "Texto WhatsApp com próximo passo.", "WhatsApp text with a next step."),
     icon: MessageSquare,
   },
   {
     type: "send_template",
-    label: "Send Template",
-    detail: "Approved template — works outside the 24h window.",
+    label: pick(locale, "Enviar template", "Send template"),
+    detail: pick(locale, "Template aprovado, inclusive fora da janela de 24h.", "Approved template, including outside the 24h window."),
     icon: Sparkles,
   },
   {
     type: "collect_input",
-    label: "Ask Question",
-    detail: "Collect a reply into a variable.",
+    label: pick(locale, "Fazer pergunta", "Ask question"),
+    detail: pick(locale, "Guarda a resposta numa variável.", "Stores the reply in a variable."),
     icon: Send,
   },
   {
     type: "send_buttons",
-    label: "Button Menu",
-    detail: "1-3 quick replies with branches.",
+    label: pick(locale, "Menu de botões", "Button menu"),
+    detail: pick(locale, "1 a 3 respostas rápidas com caminhos.", "1-3 quick replies with branches."),
     icon: GitBranch,
   },
   {
     type: "send_list",
-    label: "List",
-    detail: "Up to 10 list rows with branches.",
+    label: pick(locale, "Lista", "List"),
+    detail: pick(locale, "Até 10 opções com caminhos.", "Up to 10 options with branches."),
     icon: ListTree,
   },
   {
     type: "condition",
-    label: "Condition",
-    detail: "Route true and false paths.",
+    label: pick(locale, "Condição", "Condition"),
+    detail: pick(locale, "Encaminha pelos caminhos verdadeiro e falso.", "Routes true and false paths."),
     icon: Split,
   },
   {
     type: "set_tag",
-    label: "Set Tag",
-    detail: "Mark the lead before continuing.",
+    label: pick(locale, "Aplicar etiqueta", "Set tag"),
+    detail: pick(locale, "Marca o paciente antes de continuar.", "Marks the patient before continuing."),
     icon: Tag,
   },
   {
     type: "handoff",
-    label: "Handoff",
-    detail: "Pause automation for a human.",
+    label: pick(locale, "Chamar equipa", "Handoff"),
+    detail: pick(locale, "Pausa a automação para atendimento humano.", "Pauses automation for a human."),
     icon: UploadCloud,
   },
   {
     type: "end",
-    label: "End",
-    detail: "Finish the automation path.",
+    label: pick(locale, "Fim", "End"),
+    detail: pick(locale, "Termina este caminho da automação.", "Finishes this automation path."),
     icon: CheckCircle2,
   },
-];
+  ];
+}
 
 const FLOW_CANVAS_NODE_TYPES = { flowStep: FlowCanvasStepNode };
 const FLOW_CANVAS_EDGE_TYPES = { whatsappCurve: WhatsAppCurveEdge };
@@ -1120,10 +1231,14 @@ function FlowBuilder({
   runs: FlowRunRow[];
   runsLoading: boolean;
 }) {
+  const { locale, tr } = useI18n();
+  const availableSteps = useMemo(() => stepCatalog(locale), [locale]);
   const [selectedNodeKey, setSelectedNodeKey] = useState("");
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [templateMenuOpen, setTemplateMenuOpen] = useState(false);
-  const [drawerMode, setDrawerMode] = useState<"edit" | "preview" | null>(
+  const [drawerMode, setDrawerMode] = useState<
+    "edit" | "preview" | "runs" | null
+  >(
     "edit",
   );
   const [canvasNodes, setCanvasNodes, onCanvasNodesChange] =
@@ -1284,14 +1399,14 @@ function FlowBuilder({
 
   if (!selectedBot) {
     return (
-      <main className="flex min-h-screen flex-col overflow-hidden bg-[#eef6ef] lg:h-screen">
-        <header className="flex h-14 shrink-0 items-center justify-between border-b border-white/80 bg-white/82 px-5 shadow-[0_18px_54px_-48px_rgba(15,23,42,0.7)] backdrop-blur-2xl">
+      <main className="flex min-h-screen flex-col overflow-hidden bg-[#f7fafc] lg:h-screen">
+        <header className="flex h-14 shrink-0 items-center justify-between border-b border-slate-200 bg-white px-5">
           <div>
             <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-              Automations
+              {tr("AUTOMAÇÕES", "AUTOMATIONS")}
             </div>
             <h1 className="text-sm font-semibold text-[#0a1b33]">
-              Flow Builder
+              {tr("Editor de fluxos", "Flow builder")}
             </h1>
           </div>
           <button
@@ -1300,20 +1415,22 @@ function FlowBuilder({
             className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#0a152d] px-4 text-sm font-semibold text-white shadow-[0_18px_44px_-24px_rgba(15,23,42,0.8)] hover:bg-[#0a1b33]"
           >
             <Plus size={15} />
-            Create bot
+            {tr("Criar agente", "Create agent")}
           </button>
         </header>
         <section className="flow-builder-canvas grid flex-1 place-items-center px-4 py-8">
-          <div className="max-w-md rounded-[22px] border border-white/80 bg-white/78 p-8 text-center shadow-[0_28px_90px_-52px_rgba(15,23,42,0.72)] ring-1 ring-white/70 backdrop-blur-2xl">
-            <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#0a152d] text-white shadow-inner">
+          <div className="max-w-md rounded-lg border border-slate-200 bg-white p-8 text-center shadow-sm">
+            <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-lg bg-[#0a152d] text-white">
               <Workflow size={21} />
             </span>
             <h2 className="mt-4 font-[var(--font-outfit)] text-xl font-semibold text-[#0a1b33]">
-              Create a bot to open the canvas
+              {tr("Crie um agente para abrir o editor", "Create an agent to open the editor")}
             </h2>
             <p className="mt-2 text-sm leading-6 text-slate-500">
-              Pick a starter flow, then tune the blocks, branches, and WhatsApp
-              preview in one workbench.
+              {tr(
+                "Escolha um fluxo inicial e ajuste passos, caminhos e a pré-visualização do WhatsApp no mesmo espaço.",
+                "Choose a starter flow and tune steps, paths, and the WhatsApp preview in one workspace.",
+              )}
             </p>
             <button
               type="button"
@@ -1321,7 +1438,7 @@ function FlowBuilder({
               className="mt-6 inline-flex h-10 items-center gap-2 rounded-lg bg-[#0a152d] px-4 text-sm font-semibold text-white hover:bg-[#0a1b33]"
             >
               <Plus size={15} />
-              Create bot
+              {tr("Criar agente", "Create agent")}
             </button>
           </div>
         </section>
@@ -1330,10 +1447,10 @@ function FlowBuilder({
   }
 
   return (
-    <main className="flex min-h-screen flex-col overflow-hidden bg-[#eef6ef] lg:h-screen">
-      <header className="flex h-14 shrink-0 items-center justify-between border-b border-white/80 bg-white/82 px-4 shadow-[0_18px_54px_-48px_rgba(15,23,42,0.7)] backdrop-blur-2xl">
+    <main className="flex min-h-screen flex-col overflow-hidden bg-[#f7fafc] lg:h-screen">
+      <header className="flex h-14 shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4">
         <div className="flex min-w-0 items-center gap-2 text-xs text-slate-500">
-          <span className="font-medium text-slate-500">Automations</span>
+          <span className="font-medium text-slate-500">{tr("Automações", "Automations")}</span>
           <ArrowRight size={12} className="text-slate-300" />
           <select
             value={selectedBotId || selectedBot._id}
@@ -1341,7 +1458,7 @@ function FlowBuilder({
               onSelectBot(event.target.value as Id<"chatbots">)
             }
             className="h-8 max-w-[260px] truncate rounded-md border border-transparent bg-transparent px-1 text-sm font-semibold text-[#0a1b33] outline-none hover:border-white/80 hover:bg-white/60"
-            aria-label="Select bot"
+            aria-label={tr("Selecionar agente", "Select agent")}
           >
             {bots.map((bot) => (
               <option key={bot._id} value={bot._id}>
@@ -1361,29 +1478,31 @@ function FlowBuilder({
               }
             }}
             className="hidden h-8 max-w-[220px] truncate rounded-md border border-transparent bg-transparent px-1 text-xs font-medium text-slate-600 outline-none hover:border-white/80 hover:bg-white/60 md:block"
-            aria-label="Select isolated automation channel"
+            aria-label={tr("Selecionar canal da automação", "Select automation channel")}
           >
-            <option value="">No Hub channel</option>
+            <option value="">{tr("Sem canal", "No channel")}</option>
             {automationChannels.map((channel) => (
               <option key={channel._id} value={channel._id}>
-                {channel.displayName} · {channel.connectionState ?? channel.status}
+                {channel.displayName} · {channelStateLabel(channel.connectionState ?? channel.status, locale)}
               </option>
             ))}
           </select>
           <span className="hidden h-1 w-1 rounded-full bg-slate-300 md:inline-block" />
           <span className="hidden whitespace-nowrap sm:inline">
-            {nodes.length} blocks
+            {nodes.length} {tr("passos", "steps")}
           </span>
           <span className="hidden h-1 w-1 rounded-full bg-slate-300 sm:inline-block" />
           <span className="hidden whitespace-nowrap sm:inline">
-            {runsLoading ? "Runs loading" : `${runs.length} runs`}
+            {runsLoading
+              ? tr("A carregar execuções", "Loading runs")
+              : tr(`${runs.length} execuções`, `${runs.length} runs`)}
           </span>
         </div>
 
         <div className="flex items-center gap-2">
           <span className="hidden items-center gap-1.5 text-xs font-medium text-slate-500 sm:inline-flex">
             <CheckCircle2 size={13} className="text-slate-400" />
-            Saved
+            {tr("Guardado", "Saved")}
           </span>
           <div className="relative">
             <button
@@ -1396,7 +1515,7 @@ function FlowBuilder({
               Templates
             </button>
             {templateMenuOpen && (
-              <div className="absolute right-0 top-11 z-30 w-80 rounded-2xl border border-white/80 bg-white/76 p-2 shadow-[0_26px_80px_-34px_rgba(15,23,42,0.62)] ring-1 ring-white/70 backdrop-blur-2xl">
+              <div className="absolute right-0 top-11 z-30 w-80 rounded-lg border border-white/80 bg-white/76 p-2 shadow-[0_26px_80px_-34px_rgba(15,23,42,0.62)] ring-1 ring-white/70 backdrop-blur-2xl">
                 {templates.map((template) => (
                   <button
                     key={template.slug}
@@ -1428,7 +1547,17 @@ function FlowBuilder({
             className="inline-flex h-8 items-center gap-2 rounded-md border border-blue-100/90 bg-white/70 px-3 text-sm font-semibold text-blue-600 shadow-sm backdrop-blur-xl hover:bg-blue-50/82"
           >
             <PlayCircle size={15} />
-            Preview
+            {tr("Pré-visualizar", "Preview")}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setDrawerMode("runs")}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+            aria-label={tr("Abrir execuções", "Open runs")}
+            title={tr("Execuções", "Runs")}
+          >
+            <History size={15} />
           </button>
 
           <span
@@ -1446,10 +1575,10 @@ function FlowBuilder({
               <CheckCircle2 size={14} />
             )}
             {errors.length > 0
-              ? `${errors.length} blockers`
+              ? tr(`${errors.length} bloqueios`, `${errors.length} blockers`)
               : warnings.length > 0
-                ? `${warnings.length} warnings`
-                : "Valid"}
+                ? tr(`${warnings.length} avisos`, `${warnings.length} warnings`)
+                : tr("Válido", "Valid")}
           </span>
 
           <button
@@ -1463,7 +1592,7 @@ function FlowBuilder({
             ) : (
               <Save size={15} />
             )}
-            Save
+            {tr("Guardar", "Save")}
           </button>
           <button
             type="button"
@@ -1476,21 +1605,21 @@ function FlowBuilder({
             ) : (
               <CheckCircle2 size={15} />
             )}
-            Live
+            {tr("Publicar", "Publish")}
           </button>
           <button
             type="button"
             onClick={onOpenBots}
             className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-white/80 bg-white/68 text-slate-500 shadow-sm backdrop-blur-xl hover:bg-white/88"
-            aria-label="Open bot library"
+            aria-label={tr("Abrir biblioteca de agentes", "Open agent library")}
           >
             <Bot size={15} />
           </button>
         </div>
       </header>
 
-      <div className="min-h-0 flex-1 bg-[linear-gradient(145deg,#ecf8ee_0%,#f7fbf8_45%,#e7f5ee_100%)] p-3">
-        <section className="grid h-full min-h-[680px] min-w-0 overflow-hidden rounded-[24px] border border-white/80 bg-white/36 shadow-[0_30px_90px_-58px_rgba(15,23,42,0.72)] ring-1 ring-white/70 backdrop-blur-2xl lg:grid-cols-[minmax(0,1fr)_392px]">
+      <div className="min-h-0 flex-1 bg-[#eef3f7] p-3">
+        <section className="grid h-full min-h-[680px] min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm lg:grid-cols-[minmax(0,1fr)_392px]">
           <div className="relative min-h-[680px] min-w-0 overflow-hidden">
           {selectedNode && drawerMode === null && (
             <button
@@ -1498,27 +1627,27 @@ function FlowBuilder({
               onClick={() => setDrawerMode("edit")}
               className="absolute left-1/2 top-3 z-20 inline-flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/80 bg-white/72 px-3 py-1.5 text-xs font-semibold text-slate-500 shadow-[0_16px_42px_-30px_rgba(15,23,42,0.7)] ring-1 ring-white/70 backdrop-blur-xl hover:text-[#0a1b33] lg:hidden"
             >
-              Edit step in sidebar
+              {tr("Editar passo", "Edit step")}
             </button>
           )}
 
           {paletteOpen && (
-            <div className="absolute right-20 top-16 z-30 w-[336px] overflow-hidden rounded-2xl border border-white/78 bg-white/72 shadow-[0_28px_90px_-42px_rgba(15,23,42,0.72)] ring-1 ring-white/70 backdrop-blur-2xl">
+            <div className="absolute right-20 top-16 z-30 w-[336px] overflow-hidden rounded-lg border border-white/78 bg-white/72 shadow-[0_28px_90px_-42px_rgba(15,23,42,0.72)] ring-1 ring-white/70 backdrop-blur-2xl">
               <div className="flex items-center justify-between px-2 py-1">
                 <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
-                  Add step
+                  {tr("Adicionar passo", "Add step")}
                 </span>
                 <button
                   type="button"
                   onClick={() => setPaletteOpen(false)}
                   className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-white/72 hover:text-[#0a1b33]"
-                  aria-label="Close add step palette"
+                  aria-label={tr("Fechar lista de passos", "Close step list")}
                 >
                   <X size={14} />
                 </button>
               </div>
               <div className="grid gap-0.5 p-2">
-                {STEP_CATALOG.map((step) => {
+                {availableSteps.map((step) => {
                   const Icon = step.icon;
                   return (
                     <button
@@ -1579,7 +1708,7 @@ function FlowBuilder({
                     : "#64748b"
               }
               maskColor="rgba(236,253,245,0.68)"
-              className="hidden rounded-2xl border border-white/80 bg-white/72 shadow-[0_24px_70px_-48px_rgba(15,23,42,0.68)] backdrop-blur-xl lg:block"
+              className="hidden rounded-lg border border-white/80 bg-white/72 shadow-[0_24px_70px_-48px_rgba(15,23,42,0.68)] backdrop-blur-xl lg:block"
             />
           </ReactFlow>
           <div className="absolute right-5 top-5 z-20 flex flex-col gap-3">
@@ -1587,7 +1716,7 @@ function FlowBuilder({
               type="button"
               onClick={() => setPaletteOpen((open) => !open)}
               className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-blue-500 text-white shadow-[0_22px_48px_-22px_rgba(37,99,235,0.9)] ring-1 ring-white/60 transition-colors hover:bg-blue-600"
-              aria-label="Add step"
+              aria-label={tr("Adicionar passo", "Add step")}
             >
               <Plus size={25} />
             </button>
@@ -1598,7 +1727,7 @@ function FlowBuilder({
               className={`inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/80 bg-white/72 text-slate-500 shadow-[0_16px_42px_-32px_rgba(15,23,42,0.78)] backdrop-blur-xl hover:text-[#0a1b33] disabled:opacity-40 ${
                 drawerMode === "edit" ? "ring-2 ring-[#0a152d]/10" : ""
               }`}
-              aria-label="Edit selected step"
+              aria-label={tr("Editar passo selecionado", "Edit selected step")}
             >
               <Settings2 size={17} />
             </button>
@@ -1608,7 +1737,7 @@ function FlowBuilder({
               className={`inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/80 bg-white/72 text-slate-500 shadow-[0_16px_42px_-32px_rgba(15,23,42,0.78)] backdrop-blur-xl hover:text-[#0a1b33] ${
                 drawerMode === "preview" ? "ring-2 ring-blue-500/20" : ""
               }`}
-              aria-label="Open preview"
+              aria-label={tr("Abrir pré-visualização", "Open preview")}
             >
               <Smartphone size={17} />
             </button>
@@ -1621,7 +1750,7 @@ function FlowBuilder({
                 type="button"
                 onClick={() => setDrawerMode(null)}
                 className="absolute right-3 top-3 z-10 inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-400 hover:bg-slate-50 hover:text-[#0a1b33]"
-                aria-label="Close editor"
+                aria-label={tr("Fechar editor", "Close editor")}
               >
                 <X size={16} />
               </button>
@@ -1660,7 +1789,7 @@ function FlowBuilder({
                 type="button"
                 onClick={() => setDrawerMode(null)}
                 className="absolute right-3 top-3 z-10 inline-flex h-8 w-8 items-center justify-center rounded-md bg-white/90 text-slate-400 hover:bg-white hover:text-[#0a1b33]"
-                aria-label="Close preview"
+                aria-label={tr("Fechar pré-visualização", "Close preview")}
               >
                 <X size={16} />
               </button>
@@ -1672,6 +1801,20 @@ function FlowBuilder({
                 triggerKind={triggerKind}
                 keywords={keywords}
               />
+            </div>
+          )}
+
+          {drawerMode === "runs" && (
+            <div className="absolute bottom-4 right-4 top-4 z-40 w-[min(560px,calc(100%-2rem))] overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-[0_26px_90px_-42px_rgba(15,23,42,0.9)] lg:hidden">
+              <button
+                type="button"
+                onClick={() => setDrawerMode(null)}
+                className="absolute right-3 top-3 z-10 inline-flex h-8 w-8 items-center justify-center rounded-md bg-white text-slate-400 hover:bg-slate-50 hover:text-[#0a1b33]"
+                aria-label={tr("Fechar execuções", "Close runs")}
+              >
+                <X size={16} />
+              </button>
+              <FlowRuntimePanel runs={runs} loading={runsLoading} />
             </div>
           )}
           </div>
@@ -1688,7 +1831,7 @@ function FlowBuilder({
                 }`}
               >
                 <Settings2 size={14} />
-                Inspector
+                {tr("Configuração", "Settings")}
               </button>
               <button
                 type="button"
@@ -1700,7 +1843,19 @@ function FlowBuilder({
                 }`}
               >
                 <Smartphone size={14} />
-                Preview
+                {tr("Pré-visualização", "Preview")}
+              </button>
+              <button
+                type="button"
+                onClick={() => setDrawerMode("runs")}
+                className={`inline-flex h-8 flex-1 items-center justify-center gap-2 rounded-lg text-xs font-semibold transition-colors ${
+                  drawerMode === "runs"
+                    ? "bg-[#0a152d] text-white"
+                    : "bg-white text-slate-500 ring-1 ring-slate-200 hover:text-[#0a1b33]"
+                }`}
+              >
+                <History size={14} />
+                {tr("Execuções", "Runs")}
               </button>
             </div>
             <div className="h-[calc(100%-48px)] min-h-0 overflow-y-auto">
@@ -1713,6 +1868,8 @@ function FlowBuilder({
                   triggerKind={triggerKind}
                   keywords={keywords}
                 />
+              ) : drawerMode === "runs" ? (
+                <FlowRuntimePanel runs={runs} loading={runsLoading} />
               ) : (
                 <FlowInspectorPanel
                   selectedNode={selectedNode}
@@ -1809,6 +1966,7 @@ function WhatsAppCurveEdge({
 }
 
 function FlowCanvasStepNode({ data, selected }: NodeProps<FlowCanvasNode>) {
+  const { locale, tr } = useI18n();
   const { flowNode, isEntry, issueCount, hasError } = data;
   const Icon = flowNodeIcon(flowNode.type);
   const outgoingHandles = outgoingHandleLabels(flowNode);
@@ -1856,12 +2014,12 @@ function FlowCanvasStepNode({ data, selected }: NodeProps<FlowCanvasNode>) {
             </span>
             {isEntry && (
               <span className="rounded-full bg-emerald-100/90 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-emerald-700">
-                Entry
+                {tr("Entrada", "Entry")}
               </span>
             )}
           </div>
           <div className="mt-0.5 truncate text-[11px] text-slate-500">
-            {NODE_TYPE_LABELS[flowNode.type]} · {flowNode.key}
+            {nodeTypeLabel(flowNode.type, locale)} · {flowNode.key}
           </div>
         </div>
         {issueCount > 0 && (
@@ -1882,7 +2040,9 @@ function FlowCanvasStepNode({ data, selected }: NodeProps<FlowCanvasNode>) {
             {preview}
           </p>
         ) : (
-          <p className="text-xs text-slate-400">No content yet</p>
+          <p className="text-xs text-slate-400">
+            {tr("Ainda sem conteúdo", "No content yet")}
+          </p>
         )}
         {flowNode.buttons && flowNode.buttons.length > 0 && (
           <div className="mt-3 overflow-hidden rounded-xl border border-white/70 bg-white/58 shadow-inner">
@@ -1898,7 +2058,7 @@ function FlowCanvasStepNode({ data, selected }: NodeProps<FlowCanvasNode>) {
                   </span>
                 </span>
                 <span className="max-w-[92px] truncate text-slate-400">
-                  {button.nextKey || "No target"}
+                  {button.nextKey || tr("Sem destino", "No target")}
                 </span>
               </div>
             ))}
@@ -1955,6 +2115,7 @@ function FlowInspectorPanel({
   onUpdate: (patch: Partial<FlowNode>) => void;
   onRemove: () => void;
 }) {
+  const { locale, tr } = useI18n();
   const targetOptions = nodes
     .filter((item) => item.key !== selectedNode?.key)
     .map((item) => ({ value: item.key, label: `${item.title} · ${item.key}` }));
@@ -1969,39 +2130,41 @@ function FlowInspectorPanel({
             </span>
             <div>
               <h3 className="text-sm font-semibold text-[#0a1b33]">
-                Flow settings
+                {tr("Configuração do fluxo", "Flow settings")}
               </h3>
-              <p className="text-xs text-slate-500">Trigger and entry path.</p>
+              <p className="text-xs text-slate-500">
+                {tr("Gatilho e caminho de entrada.", "Trigger and entry path.")}
+              </p>
             </div>
           </div>
           <div className="space-y-3">
             <SelectBox
-              label="Trigger"
+              label={tr("Gatilho", "Trigger")}
               value={triggerKind}
               onChange={(value) => onTriggerKindChange(value as TriggerKind)}
               options={[
-                { value: "ctwa", label: TRIGGER_COPY.ctwa },
-                { value: "inbound", label: TRIGGER_COPY.inbound },
-                { value: "keyword", label: TRIGGER_COPY.keyword },
-                { value: "handoff", label: TRIGGER_COPY.handoff },
+                { value: "ctwa", label: triggerLabel("ctwa", locale) },
+                { value: "inbound", label: triggerLabel("inbound", locale) },
+                { value: "keyword", label: triggerLabel("keyword", locale) },
+                { value: "handoff", label: triggerLabel("handoff", locale) },
               ]}
-              placeholder="Choose trigger"
+              placeholder={tr("Escolha o gatilho", "Choose trigger")}
             />
             <TextInput
-              label="Keywords"
+              label={tr("Palavras-chave", "Keywords")}
               value={keywords}
               onChange={onKeywordsChange}
               placeholder="olá, menu, ajuda"
             />
             <SelectBox
-              label="Entry node"
+              label={tr("Passo de entrada", "Entry step")}
               value={entryNodeKey}
               onChange={onEntryNodeKeyChange}
               options={nodes.map((node) => ({
                 value: node.key,
                 label: `${node.title} · ${node.key}`,
               }))}
-              placeholder="Pick entry"
+              placeholder={tr("Escolha a entrada", "Pick entry")}
             />
           </div>
         </section>
@@ -2010,10 +2173,13 @@ function FlowInspectorPanel({
           <section className="p-8 text-center">
             <Workflow size={24} className="mx-auto text-slate-300" />
             <p className="mt-3 text-sm font-semibold text-[#0a1b33]">
-              Select a block
+              {tr("Selecione um passo", "Select a step")}
             </p>
             <p className="mt-1 text-xs leading-5 text-slate-500">
-              Click any node on the canvas to edit content and routing.
+              {tr(
+                "Clique num passo do mapa para editar conteúdo e caminhos.",
+                "Click any step on the map to edit content and routing.",
+              )}
             </p>
           </section>
         ) : (
@@ -2031,7 +2197,7 @@ function FlowInspectorPanel({
                     {selectedNode.title}
                   </h3>
                   <p className="mt-0.5 truncate text-xs text-slate-500">
-                    {NODE_TYPE_LABELS[selectedNode.type]} · {selectedNode.key}
+                    {nodeTypeLabel(selectedNode.type, locale)} · {selectedNode.key}
                   </p>
                 </div>
               </div>
@@ -2040,7 +2206,7 @@ function FlowInspectorPanel({
                 onClick={onRemove}
                 disabled={selectedNode.type === "start"}
                 className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-400 transition-colors hover:bg-slate-50 disabled:opacity-40"
-                aria-label={`Remove ${selectedNode.title}`}
+                aria-label={tr(`Remover ${selectedNode.title}`, `Remove ${selectedNode.title}`)}
               >
                 <Trash2 size={14} />
               </button>
@@ -2048,19 +2214,19 @@ function FlowInspectorPanel({
 
             <div className="space-y-3">
               <TextInput
-                label="Node key"
+                label={tr("Chave do passo", "Step key")}
                 value={selectedNode.key}
                 onChange={(value) => onUpdate({ key: value })}
                 placeholder="ask_time"
               />
               <TextInput
-                label="Title"
+                label={tr("Título", "Title")}
                 value={selectedNode.title}
                 onChange={(value) => onUpdate({ title: value })}
                 placeholder="Perguntar horário"
               />
               <SelectBox
-                label="Type"
+                label={tr("Tipo", "Type")}
                 value={selectedNode.type}
                 onChange={(value) =>
                   onUpdate({
@@ -2069,23 +2235,23 @@ function FlowInspectorPanel({
                   })
                 }
                 options={[
-                  { value: "start", label: NODE_TYPE_LABELS.start },
+                  { value: "start", label: nodeTypeLabel("start", locale) },
                   ...FLOW_NODE_TYPES.map((type) => ({
                     value: type,
-                    label: NODE_TYPE_LABELS[type],
+                    label: nodeTypeLabel(type, locale),
                   })),
                 ]}
-                placeholder="Choose type"
+                placeholder={tr("Escolha o tipo", "Choose type")}
               />
               {needsNextNode(selectedNode.type) && (
                 <SelectBox
-                  label="Next node"
+                  label={tr("Próximo passo", "Next step")}
                   value={selectedNode.nextKey ?? ""}
                   onChange={(value) =>
                     onUpdate({ nextKey: value || undefined })
                   }
                   options={targetOptions}
-                  placeholder="Stop here"
+                  placeholder={tr("Terminar aqui", "Stop here")}
                 />
               )}
             </div>
@@ -2093,7 +2259,7 @@ function FlowInspectorPanel({
             {needsBody(selectedNode.type) && (
               <label className="mt-3 block">
                 <span className="mb-1 block text-[11px] font-medium text-slate-500">
-                  Message / prompt
+                  {tr("Mensagem / instrução", "Message / prompt")}
                 </span>
                 <textarea
                   value={selectedNode.body ?? ""}
@@ -2113,7 +2279,7 @@ function FlowInspectorPanel({
             {selectedNode.type === "collect_input" && (
               <div className="mt-3">
                 <TextInput
-                  label="Variable key"
+                  label={tr("Variável da resposta", "Reply variable")}
                   value={selectedNode.variableKey ?? ""}
                   onChange={(value) => onUpdate({ variableKey: value })}
                   placeholder="preferred_time"
@@ -2148,7 +2314,7 @@ function FlowInspectorPanel({
             {selectedNode.type === "condition" && (
               <div className="mt-4 grid gap-3 rounded-lg border border-slate-200 bg-[#fbfdff] p-3">
                 <TextInput
-                  label="Variable"
+                  label={tr("Variável", "Variable")}
                   value={selectedNode.condition?.variableKey ?? ""}
                   onChange={(value) =>
                     onUpdate({
@@ -2161,7 +2327,7 @@ function FlowInspectorPanel({
                   placeholder="preferred_time"
                 />
                 <SelectBox
-                  label="Operator"
+                  label={tr("Operador", "Operator")}
                   value={selectedNode.condition?.operator ?? "present"}
                   onChange={(value) =>
                     onUpdate({
@@ -2172,17 +2338,17 @@ function FlowInspectorPanel({
                     })
                   }
                   options={[
-                    { value: "present", label: "Present" },
-                    { value: "absent", label: "Absent" },
-                    { value: "equals", label: "Equals" },
-                    { value: "contains", label: "Contains" },
-                    { value: "starts_with", label: "Starts with" },
-                    { value: "ends_with", label: "Ends with" },
+                    { value: "present", label: tr("Existe", "Present") },
+                    { value: "absent", label: tr("Não existe", "Absent") },
+                    { value: "equals", label: tr("É igual a", "Equals") },
+                    { value: "contains", label: tr("Contém", "Contains") },
+                    { value: "starts_with", label: tr("Começa por", "Starts with") },
+                    { value: "ends_with", label: tr("Termina em", "Ends with") },
                   ]}
-                  placeholder="Operator"
+                  placeholder={tr("Operador", "Operator")}
                 />
                 <TextInput
-                  label="Value"
+                  label={tr("Valor", "Value")}
                   value={selectedNode.condition?.value ?? ""}
                   onChange={(value) =>
                     onUpdate({
@@ -2195,7 +2361,7 @@ function FlowInspectorPanel({
                   placeholder="premium"
                 />
                 <SelectBox
-                  label="True next"
+                  label={tr("Se verdadeiro", "If true")}
                   value={selectedNode.condition?.trueNextKey ?? ""}
                   onChange={(value) =>
                     onUpdate({
@@ -2206,10 +2372,10 @@ function FlowInspectorPanel({
                     })
                   }
                   options={targetOptions}
-                  placeholder="Choose"
+                  placeholder={tr("Escolha", "Choose")}
                 />
                 <SelectBox
-                  label="False next"
+                  label={tr("Se falso", "If false")}
                   value={selectedNode.condition?.falseNextKey ?? ""}
                   onChange={(value) =>
                     onUpdate({
@@ -2220,7 +2386,7 @@ function FlowInspectorPanel({
                     })
                   }
                   options={targetOptions}
-                  placeholder="Choose"
+                  placeholder={tr("Escolha", "Choose")}
                 />
               </div>
             )}
@@ -2257,6 +2423,7 @@ function ChoiceRowsEditor({
   targetOptions: Array<{ value: string; label: string }>;
   onUpdate: (patch: Partial<FlowNode>) => void;
 }) {
+  const { tr } = useI18n();
   const choices = node.buttons ?? [];
   const limit = node.type === "send_buttons" ? 3 : 10;
 
@@ -2265,10 +2432,15 @@ function ChoiceRowsEditor({
       <div className="flex items-center justify-between gap-2 border-b border-slate-100 bg-[#fbfdff] px-3 py-2.5">
         <div>
           <div className="text-xs font-semibold text-[#0a1b33]">
-            {node.type === "send_buttons" ? "Quick replies" : "List rows"}
+            {node.type === "send_buttons"
+              ? tr("Respostas rápidas", "Quick replies")
+              : tr("Opções da lista", "List rows")}
           </div>
           <div className="mt-0.5 text-[11px] text-slate-500">
-            Each choice can branch to a different block.
+            {tr(
+              "Cada opção pode seguir para um passo diferente.",
+              "Each choice can branch to a different step.",
+            )}
           </div>
         </div>
         <button
@@ -2279,7 +2451,9 @@ function ChoiceRowsEditor({
                 ...choices,
                 {
                   replyId: `choice_${choices.length + 1}`,
-                  label: node.type === "send_buttons" ? "Option" : "Row",
+                  label: node.type === "send_buttons"
+                    ? tr("Opção", "Option")
+                    : tr("Linha", "Row"),
                   nextKey: targetOptions[0]?.value ?? "",
                 },
               ],
@@ -2289,13 +2463,13 @@ function ChoiceRowsEditor({
           className="inline-flex h-8 items-center gap-1 rounded-lg bg-[#0a152d] px-2.5 text-xs font-semibold text-white transition-colors hover:bg-[#0a1b33] disabled:opacity-50"
         >
           <Plus size={12} />
-          Add
+          {tr("Adicionar", "Add")}
         </button>
       </div>
 
       <div className="border-b border-slate-100 px-3 py-3">
         <TextInput
-          label="Save reply as"
+          label={tr("Guardar resposta como", "Save reply as")}
           value={node.variableKey ?? ""}
           onChange={(value) => onUpdate({ variableKey: value || undefined })}
           placeholder="service_interest"
@@ -2305,7 +2479,10 @@ function ChoiceRowsEditor({
       <div className="divide-y divide-slate-100">
         {choices.length === 0 ? (
           <div className="px-3 py-5 text-center text-xs text-slate-400">
-            Add a quick reply to branch this block.
+            {tr(
+              "Adicione uma opção para criar um novo caminho.",
+              "Add a reply to create a new path.",
+            )}
           </div>
         ) : (
           choices.map((button, buttonIndex) => (
@@ -2325,7 +2502,7 @@ function ChoiceRowsEditor({
                     })
                   }
                   className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-[#f8fafc] px-3 py-2 text-sm font-medium text-[#0a1b33] outline-none transition-colors placeholder:text-slate-300 hover:bg-white focus:border-slate-400 focus:bg-white"
-                  placeholder="Button text"
+                  placeholder={tr("Texto do botão", "Button text")}
                 />
                 <button
                   type="button"
@@ -2337,7 +2514,7 @@ function ChoiceRowsEditor({
                     })
                   }
                   className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600"
-                  aria-label="Remove quick reply"
+                  aria-label={tr("Remover resposta rápida", "Remove quick reply")}
                 >
                   <Trash2 size={13} />
                 </button>
@@ -2369,7 +2546,7 @@ function ChoiceRowsEditor({
                   }
                   className="min-w-0 rounded-lg border border-slate-200 bg-[#f8fafc] px-3 py-2 text-xs font-medium text-[#0a1b33] outline-none transition-colors hover:bg-white focus:border-slate-400 focus:bg-white"
                 >
-                  <option value="">No target</option>
+                  <option value="">{tr("Sem destino", "No target")}</option>
                   {targetOptions.map((option) => (
                     <option key={option.value} value={option.value}>
                       {option.label}
@@ -2400,6 +2577,7 @@ function WhatsAppFlowPreview({
   triggerKind: TriggerKind;
   keywords: string;
 }) {
+  const { tr } = useI18n();
   const previewNodes = useMemo(
     () => walkFlowPath(nodes, selectedNodeKey || entryNodeKey, 7),
     [entryNodeKey, nodes, selectedNodeKey],
@@ -2412,7 +2590,7 @@ function WhatsAppFlowPreview({
     triggerKind === "keyword"
       ? `#${keyword ?? "menu"}`
       : triggerKind === "ctwa"
-        ? "Tenho interesse"
+        ? tr("Tenho interesse", "I'm interested")
         : "Olá";
 
   return (
@@ -2425,10 +2603,10 @@ function WhatsAppFlowPreview({
             </span>
             <div>
               <h3 className="text-sm font-semibold text-[#0a1b33]">
-                WhatsApp preview
+                {tr("Pré-visualização WhatsApp", "WhatsApp preview")}
               </h3>
               <p className="text-xs text-slate-500">
-                Testing selected path
+                {tr("A testar o caminho selecionado", "Testing selected path")}
               </p>
             </div>
           </div>
@@ -2444,7 +2622,7 @@ function WhatsAppFlowPreview({
             </span>
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold">{botName}</p>
-              <p className="text-xs text-emerald-200">OpenBSP Bot</p>
+              <p className="text-xs text-emerald-200">OpenBSP</p>
             </div>
           </div>
 
@@ -2466,7 +2644,10 @@ function WhatsAppFlowPreview({
 
             {previewNodes.length === 0 ? (
               <div className="rounded-lg bg-white/90 px-3 py-2 text-sm text-slate-600">
-                Add and select a block to preview the conversation.
+                {tr(
+                  "Adicione e selecione um passo para pré-visualizar a conversa.",
+                  "Add and select a step to preview the conversation.",
+                )}
               </div>
             ) : (
               previewNodes.map((node) => (
@@ -2488,17 +2669,18 @@ function WhatsAppFlowPreview({
 }
 
 function PreviewBubble({ node }: { node: FlowNode }) {
+  const { tr } = useI18n();
   if (node.type === "start") {
     return (
       <div className="mx-auto w-fit rounded-full bg-black/20 px-3 py-1 text-[11px] font-medium text-emerald-100">
-        Start
+        {tr("Início", "Start")}
       </div>
     );
   }
   if (node.type === "condition") {
     return (
       <div className="rounded-lg border border-violet-200/40 bg-violet-50/95 px-3 py-2 text-xs leading-5 text-violet-900">
-        Condition: {node.condition?.variableKey || "variable"}{" "}
+        {tr("Condição", "Condition")}: {node.condition?.variableKey || tr("variável", "variable")}{" "}
         {node.condition?.operator ?? "present"}
       </div>
     );
@@ -2506,7 +2688,7 @@ function PreviewBubble({ node }: { node: FlowNode }) {
   if (node.type === "set_tag") {
     return (
       <div className="rounded-lg border border-amber-200/40 bg-amber-50/95 px-3 py-2 text-xs leading-5 text-amber-900">
-        Tag set: {node.tag || "untitled_tag"}
+        {tr("Etiqueta aplicada", "Tag set")}: {node.tag || "untitled_tag"}
       </div>
     );
   }
@@ -2514,36 +2696,36 @@ function PreviewBubble({ node }: { node: FlowNode }) {
     return node.template ? (
       <div className="rounded-lg bg-white/95 px-3 py-2 text-sm leading-5 text-slate-800">
         <span className="text-xs font-medium text-[#0b7a5f]">
-          Approved template
+          {tr("Template aprovado", "Approved template")}
         </span>
         <p className="text-xs text-slate-500">
-          Sends outside the 24h window.
+          {tr("Pode ser enviado fora da janela de 24h.", "Works outside the 24h window.")}
         </p>
       </div>
     ) : (
       <div className="rounded-lg border border-amber-200/40 bg-amber-50/95 px-3 py-2 text-xs leading-5 text-amber-900">
-        No template selected
+        {tr("Nenhum template selecionado", "No template selected")}
       </div>
     );
   }
   if (node.type === "handoff") {
     return (
       <div className="rounded-lg bg-white/95 px-3 py-2 text-sm leading-5 text-slate-700">
-        {node.body || "A human agent will continue from here."}
+        {node.body || tr("A equipa continuará a partir daqui.", "The team will continue from here.")}
       </div>
     );
   }
   if (node.type === "end") {
     return (
       <div className="mx-auto w-fit rounded-full bg-black/20 px-3 py-1 text-[11px] font-medium text-emerald-100">
-        End
+        {tr("Fim", "End")}
       </div>
     );
   }
 
   return (
     <div className="max-w-[88%] rounded-lg bg-white/95 px-3 py-2 text-sm leading-5 text-slate-800">
-      <p>{node.body || "Message text..."}</p>
+      <p>{node.body || tr("Texto da mensagem...", "Message text...")}</p>
       {(node.type === "send_buttons" || node.type === "send_list") &&
         (node.buttons ?? []).length > 0 && (
           <div className="mt-3 space-y-1.5 border-t border-slate-200 pt-2">
@@ -2559,7 +2741,7 @@ function PreviewBubble({ node }: { node: FlowNode }) {
         )}
       {node.type === "collect_input" && (
         <div className="mt-3 rounded-md bg-slate-100 px-2 py-1.5 text-xs font-medium text-slate-500">
-          Saves reply as {node.variableKey || "answer"}
+          {tr("Guarda a resposta como", "Saves reply as")} {node.variableKey || "answer"}
         </div>
       )}
       <div className="mt-1 text-right text-[10px] text-slate-400">9:42</div>
@@ -2568,6 +2750,7 @@ function PreviewBubble({ node }: { node: FlowNode }) {
 }
 
 function FlowIssueDock({ issues }: { issues: FlowIssue[] }) {
+  const { locale, tr } = useI18n();
   if (issues.length === 0) return null;
   const first = issues[0];
   const isError = first.severity === "error";
@@ -2584,11 +2767,13 @@ function FlowIssueDock({ issues }: { issues: FlowIssue[] }) {
         </span>
         <div className="min-w-0">
           <div className="truncate text-xs font-semibold text-[#0a1b33]">
-            {isError ? "Activation blocked" : "Flow warning"}
+            {isError
+              ? tr("Publicação bloqueada", "Activation blocked")
+              : tr("Aviso do fluxo", "Flow warning")}
           </div>
           <div className="truncate text-[11px] text-slate-500">
             {first.nodeKey ? `${first.nodeKey}: ` : ""}
-            {first.message}
+            {localizeFlowIssue(first.message, locale)}
             {issues.length > 1 ? ` (+${issues.length - 1})` : ""}
           </div>
         </div>
@@ -2606,10 +2791,11 @@ function FlowValidationPanel({
   errors: FlowIssue[];
   warnings: FlowIssue[];
 }) {
+  const { locale, tr } = useI18n();
   const clean = errors.length === 0;
   return (
     <section
-      className={`rounded-2xl border p-4 ${
+      className={`rounded-lg border p-4 ${
         clean ? "border-emerald-200 bg-emerald-50" : "border-red-200 bg-red-50"
       }`}
     >
@@ -2626,14 +2812,22 @@ function FlowValidationPanel({
           </span>
           <div>
             <h3 className="font-semibold text-[#0a1b33]">
-              {clean ? "Ready to activate" : "Activation blocked"}
+              {clean
+                ? tr("Pronto para ativar", "Ready to activate")
+                : tr("Publicação bloqueada", "Activation blocked")}
             </h3>
             <p className="mt-1 text-sm leading-6 text-slate-600">
               {clean
                 ? warnings.length > 0
-                  ? `${warnings.length} warning(s), no blockers.`
-                  : "No validator issues detected."
-                : `${errors.length} blocker(s), ${warnings.length} warning(s).`}
+                  ? tr(
+                      `${warnings.length} aviso(s), sem bloqueios.`,
+                      `${warnings.length} warning(s), no blockers.`,
+                    )
+                  : tr("Nenhum problema detetado.", "No validation issues detected.")
+                : tr(
+                    `${errors.length} bloqueio(s), ${warnings.length} aviso(s).`,
+                    `${errors.length} blocker(s), ${warnings.length} warning(s).`,
+                  )}
             </p>
           </div>
         </div>
@@ -2652,12 +2846,12 @@ function FlowValidationPanel({
                   {issue.nodeKey ?? issue.scope}
                 </span>
                 <span className="mx-1 opacity-50">·</span>
-                {issue.message}
+                {localizeFlowIssue(issue.message, locale)}
               </div>
             ))}
             {issues.length > 3 && (
               <p className="text-xs font-medium text-slate-500">
-                +{issues.length - 3} more issue(s)
+                +{issues.length - 3} {tr("problemas adicionais", "more issues")}
               </p>
             )}
           </div>
@@ -2682,6 +2876,7 @@ function FlowMapPanel({
   onSelect: (key: string) => void;
   onAddNode: (type: FlowNodeType) => void;
 }) {
+  const { locale, tr } = useI18n();
   const [newNodeType, setNewNodeType] = useState<FlowNodeType>("send_message");
   const issuesByNode = useMemo(() => {
     const map = new Map<string, FlowIssue[]>();
@@ -2698,9 +2893,9 @@ function FlowMapPanel({
         <div className="flex items-center justify-between gap-2">
           <div>
             <h3 className="font-[var(--font-outfit)] text-base font-semibold text-[#0a1b33]">
-              Flow map
+              {tr("Mapa do fluxo", "Flow map")}
             </h3>
-            <p className="text-xs text-slate-500">Pick a block to edit.</p>
+            <p className="text-xs text-slate-500">{tr("Selecione um bloco para editar.", "Pick a block to edit.")}</p>
           </div>
           <span className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-500">
             {nodes.length}
@@ -2716,7 +2911,7 @@ function FlowMapPanel({
           >
             {FLOW_NODE_TYPES.map((type) => (
               <option key={type} value={type}>
-                {NODE_TYPE_LABELS[type]}
+                {nodeTypeLabel(type, locale)}
               </option>
             ))}
           </select>
@@ -2724,7 +2919,7 @@ function FlowMapPanel({
             type="button"
             onClick={() => onAddNode(newNodeType)}
             className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-[#0a152d] text-white hover:bg-[#0a1b33]"
-            aria-label="Add node"
+            aria-label={tr("Adicionar bloco", "Add node")}
           >
             <Plus size={15} />
           </button>
@@ -2774,12 +2969,12 @@ function FlowMapPanel({
                     </span>
                     {node.key === entryNodeKey && (
                       <span className="shrink-0 rounded bg-emerald-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-emerald-700">
-                        Entry
+                        {tr("Entrada", "Entry")}
                       </span>
                     )}
                   </span>
                   <span className="mt-0.5 block truncate text-[11px] text-slate-500">
-                    {NODE_TYPE_LABELS[node.type]} · {node.key}
+                    {nodeTypeLabel(node.type, locale)} · {node.key}
                   </span>
                 </span>
                 {hasError ? (
@@ -2811,6 +3006,7 @@ function FlowNodeCard({
   onUpdate: (patch: Partial<FlowNode>) => void;
   onRemove: () => void;
 }) {
+  const { locale, tr } = useI18n();
   const NodeIcon =
     node.type === "send_list"
       ? ListTree
@@ -2832,7 +3028,7 @@ function FlowNodeCard({
             <div className="flex flex-wrap items-center gap-2">
               <h4 className="font-semibold text-[#0a1b33]">{node.title}</h4>
               <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
-                {NODE_TYPE_LABELS[node.type]}
+                {nodeTypeLabel(node.type, locale)}
               </span>
               <span className="rounded-full bg-slate-50 px-2 py-0.5 text-[11px] font-mono text-slate-500">
                 {node.key}
@@ -2850,7 +3046,7 @@ function FlowNodeCard({
           onClick={onRemove}
           disabled={node.type === "start" && index === 0}
           className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:bg-slate-50 disabled:opacity-40"
-          aria-label={`Remove ${node.title}`}
+          aria-label={`${tr("Remover", "Remove")} ${node.title}`}
         >
           <Trash2 size={15} />
         </button>
@@ -2858,19 +3054,19 @@ function FlowNodeCard({
 
       <div className="mt-4 grid gap-3 md:grid-cols-2">
         <TextInput
-          label="Node key"
+          label={tr("Chave do bloco", "Node key")}
           value={node.key}
           onChange={(value) => onUpdate({ key: value })}
           placeholder="ask_time"
         />
         <TextInput
-          label="Title"
+          label={tr("Título", "Title")}
           value={node.title}
           onChange={(value) => onUpdate({ title: value })}
           placeholder="Perguntar horário"
         />
         <SelectBox
-          label="Type"
+          label={tr("Tipo", "Type")}
           value={node.type}
           onChange={(value) =>
             onUpdate({
@@ -2879,21 +3075,21 @@ function FlowNodeCard({
             })
           }
           options={[
-            { value: "start", label: NODE_TYPE_LABELS.start },
+            { value: "start", label: nodeTypeLabel("start", locale) },
             ...FLOW_NODE_TYPES.map((type) => ({
               value: type,
-              label: NODE_TYPE_LABELS[type],
+              label: nodeTypeLabel(type, locale),
             })),
           ]}
-          placeholder="Choose type"
+          placeholder={tr("Escolha o tipo", "Choose type")}
         />
         {needsNextNode(node.type) && (
           <SelectBox
-            label="Next node"
+            label={tr("Próximo bloco", "Next node")}
             value={node.nextKey ?? ""}
             onChange={(value) => onUpdate({ nextKey: value || undefined })}
             options={targetOptions}
-            placeholder="Stop here"
+            placeholder={tr("Terminar aqui", "Stop here")}
           />
         )}
       </div>
@@ -2901,7 +3097,7 @@ function FlowNodeCard({
       {needsBody(node.type) && (
         <label className="mt-3 block">
           <span className="mb-1 block text-[11px] font-medium text-slate-500">
-            Message / prompt
+            {tr("Mensagem ou instrução", "Message or prompt")}
           </span>
           <textarea
             value={node.body ?? ""}
@@ -2916,7 +3112,7 @@ function FlowNodeCard({
       {node.type === "collect_input" && (
         <div className="mt-3">
           <TextInput
-            label="Variable key"
+            label={tr("Chave da variável", "Variable key")}
             value={node.variableKey ?? ""}
             onChange={(value) => onUpdate({ variableKey: value })}
             placeholder="preferred_time"
@@ -2939,7 +3135,7 @@ function FlowNodeCard({
         <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50 p-3">
           <div className="mb-3 flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-500">
-              {node.type === "send_buttons" ? "Buttons" : "List rows"}
+              {node.type === "send_buttons" ? tr("Botões", "Buttons") : tr("Opções da lista", "List rows")}
             </span>
             <button
               type="button"
@@ -2949,7 +3145,7 @@ function FlowNodeCard({
                     ...(node.buttons ?? []),
                     {
                       replyId: `choice_${(node.buttons ?? []).length + 1}`,
-                      label: node.type === "send_buttons" ? "Option" : "Row",
+                      label: node.type === "send_buttons" ? tr("Opção", "Option") : tr("Linha", "Row"),
                       nextKey: targetOptions[0]?.value ?? "",
                     },
                   ],
@@ -2962,12 +3158,12 @@ function FlowNodeCard({
               className="inline-flex h-8 items-center gap-1 rounded-lg bg-white px-2 text-xs font-semibold text-[#0a1b33] ring-1 ring-slate-200 disabled:opacity-50"
             >
               <Plus size={12} />
-              Add
+              {tr("Adicionar", "Add")}
             </button>
           </div>
           <div className="mb-3">
             <TextInput
-              label="Save reply as"
+              label={tr("Guardar resposta como", "Save reply as")}
               value={node.variableKey ?? ""}
               onChange={(value) =>
                 onUpdate({ variableKey: value || undefined })
@@ -3005,7 +3201,7 @@ function FlowNodeCard({
                     })
                   }
                   className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs outline-none"
-                  placeholder="Label"
+                  placeholder={tr("Rótulo", "Label")}
                 />
                 <select
                   value={button.nextKey}
@@ -3019,7 +3215,7 @@ function FlowNodeCard({
                   }
                   className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs outline-none"
                 >
-                  <option value="">Next</option>
+                  <option value="">{tr("Próximo", "Next")}</option>
                   {targetOptions.map((option) => (
                     <option key={option.value} value={option.value}>
                       {option.label}
@@ -3036,7 +3232,7 @@ function FlowNodeCard({
                     })
                   }
                   className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400"
-                  aria-label="Remove button"
+                  aria-label={tr("Remover botão", "Remove button")}
                 >
                   <Trash2 size={13} />
                 </button>
@@ -3047,9 +3243,9 @@ function FlowNodeCard({
       )}
 
       {node.type === "condition" && (
-        <div className="mt-4 grid gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3 md:grid-cols-2">
+        <div className="mt-4 grid gap-3 rounded-lg border border-slate-100 bg-slate-50 p-3 md:grid-cols-2">
           <TextInput
-            label="Variable"
+            label={tr("Variável", "Variable")}
             value={node.condition?.variableKey ?? ""}
             onChange={(value) =>
               onUpdate({
@@ -3062,7 +3258,7 @@ function FlowNodeCard({
             placeholder="preferred_time"
           />
           <SelectBox
-            label="Operator"
+            label={tr("Operador", "Operator")}
             value={node.condition?.operator ?? "present"}
             onChange={(value) =>
               onUpdate({
@@ -3073,17 +3269,17 @@ function FlowNodeCard({
               })
             }
             options={[
-              { value: "present", label: "Present" },
-              { value: "absent", label: "Absent" },
-              { value: "equals", label: "Equals" },
-              { value: "contains", label: "Contains" },
-              { value: "starts_with", label: "Starts with" },
-              { value: "ends_with", label: "Ends with" },
+              { value: "present", label: tr("Existe", "Present") },
+              { value: "absent", label: tr("Não existe", "Absent") },
+              { value: "equals", label: tr("É igual", "Equals") },
+              { value: "contains", label: tr("Contém", "Contains") },
+              { value: "starts_with", label: tr("Começa por", "Starts with") },
+              { value: "ends_with", label: tr("Termina em", "Ends with") },
             ]}
-            placeholder="Operator"
+            placeholder={tr("Operador", "Operator")}
           />
           <TextInput
-            label="Value"
+            label={tr("Valor", "Value")}
             value={node.condition?.value ?? ""}
             onChange={(value) =>
               onUpdate({
@@ -3093,7 +3289,7 @@ function FlowNodeCard({
             placeholder="premium"
           />
           <SelectBox
-            label="True next"
+            label={tr("Se verdadeiro", "True next")}
             value={node.condition?.trueNextKey ?? ""}
             onChange={(value) =>
               onUpdate({
@@ -3104,10 +3300,10 @@ function FlowNodeCard({
               })
             }
             options={targetOptions}
-            placeholder="Choose"
+            placeholder={tr("Escolha", "Choose")}
           />
           <SelectBox
-            label="False next"
+            label={tr("Se falso", "False next")}
             value={node.condition?.falseNextKey ?? ""}
             onChange={(value) =>
               onUpdate({
@@ -3118,7 +3314,7 @@ function FlowNodeCard({
               })
             }
             options={targetOptions}
-            placeholder="Choose"
+            placeholder={tr("Escolha", "Choose")}
           />
         </div>
       )}
@@ -3164,22 +3360,38 @@ function eventStatusClass(eventType: string) {
   return "bg-slate-100 text-slate-600";
 }
 
-function runtimeEventLabel(eventType: string) {
-  const labels: Record<string, string> = {
-    started: "Started",
-    node_entered: "Node entered",
-    message_sent: "Message queued",
-    message_skipped: "Message skipped",
-    reply_received: "Reply received",
-    fallback_fired: "Fallback fired",
-    tag_set: "Tag applied",
-    handoff: "Handoff",
-    completed: "Completed",
-    timeout: "Timed out",
-    stopped: "Stopped",
-    error: "Error",
+function runtimeEventLabel(eventType: string, locale: Locale) {
+  const labels: Record<string, [string, string]> = {
+    started: ["Iniciada", "Started"],
+    node_entered: ["Passo iniciado", "Step entered"],
+    message_sent: ["Mensagem em fila", "Message queued"],
+    message_skipped: ["Mensagem ignorada", "Message skipped"],
+    reply_received: ["Resposta recebida", "Reply received"],
+    fallback_fired: ["Fallback acionado", "Fallback fired"],
+    tag_set: ["Etiqueta aplicada", "Tag applied"],
+    handoff: ["Passou à equipa", "Handoff"],
+    completed: ["Concluída", "Completed"],
+    timeout: ["Tempo esgotado", "Timed out"],
+    stopped: ["Parada", "Stopped"],
+    error: ["Erro", "Error"],
   };
-  return labels[eventType] ?? eventType.replaceAll("_", " ");
+  return labels[eventType]
+    ? pick(locale, ...labels[eventType])
+    : eventType.replaceAll("_", " ");
+}
+
+function runStatusLabel(status: string, locale: Locale) {
+  const labels: Record<string, [string, string]> = {
+    active: ["Ativa", "Active"],
+    completed: ["Concluída", "Completed"],
+    handed_off: ["Com a equipa", "Handed off"],
+    failed: ["Falhou", "Failed"],
+    timed_out: ["Tempo esgotado", "Timed out"],
+    stopped: ["Parada", "Stopped"],
+  };
+  return labels[status]
+    ? pick(locale, ...labels[status])
+    : status.replaceAll("_", " ");
 }
 
 function formatDuration(startedAt: number, endedAt?: number, lastAdvancedAt?: number) {
@@ -3208,6 +3420,7 @@ function compactRuntimePayload(payload: unknown) {
 }
 
 function FlowRuntimePanel({ runs, loading }: { runs: FlowRunRow[]; loading: boolean }) {
+  const { locale, tr } = useI18n();
   const activeRuns = runs.filter((run) => run.status === "active").length;
   const completedRuns = runs.filter((run) => run.status === "completed").length;
   const attentionRuns = runs.filter((run) =>
@@ -3215,18 +3428,21 @@ function FlowRuntimePanel({ runs, loading }: { runs: FlowRunRow[]; loading: bool
   ).length;
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <section className="bg-white p-4">
       <PanelTitle
         icon={History}
-        title="Runtime history"
-        body="Live flow runs, replies, tags, handoffs, and timeouts."
+        title={tr("Histórico de execuções", "Runtime history")}
+        body={tr(
+          "Execuções, respostas, etiquetas, handoffs e timeouts reais.",
+          "Real runs, replies, tags, handoffs, and timeouts.",
+        )}
       />
 
       <div className="mt-4 grid gap-2 sm:grid-cols-3">
         {[
-          { label: "Active", value: activeRuns, tone: "text-emerald-700" },
-          { label: "Completed", value: completedRuns, tone: "text-sky-700" },
-          { label: "Needs review", value: attentionRuns, tone: "text-amber-700" },
+          { label: tr("Ativas", "Active"), value: activeRuns, tone: "text-emerald-700" },
+          { label: tr("Concluídas", "Completed"), value: completedRuns, tone: "text-sky-700" },
+          { label: tr("Requer atenção", "Needs review"), value: attentionRuns, tone: "text-amber-700" },
         ].map((item) => (
           <div key={item.label} className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
             <p className="text-[11px] font-semibold uppercase text-slate-400">
@@ -3241,38 +3457,41 @@ function FlowRuntimePanel({ runs, loading }: { runs: FlowRunRow[]; loading: bool
         {loading ? (
           <div className="flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-3 text-sm text-slate-500">
             <Loader2 size={14} className="animate-spin" />
-            Loading runs
+            {tr("A carregar execuções", "Loading runs")}
           </div>
         ) : runs.length === 0 ? (
           <p className="rounded-xl bg-slate-50 px-3 py-3 text-sm text-slate-500">
-            No runs yet. Send a matching WhatsApp message to start this flow.
+            {tr(
+              "Ainda não há execuções. Envie uma mensagem WhatsApp que corresponda ao gatilho.",
+              "No runs yet. Send a matching WhatsApp message to start this flow.",
+            )}
           </p>
         ) : (
           runs.map((run) => (
             <div
               key={run._id}
-              className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+              className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
             >
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   <div className="flex min-w-0 items-center gap-2">
                     <p className="truncate text-sm font-semibold text-[#0a1b33]">
-                      {run.contactName ?? run.contactHandle ?? "Unknown contact"}
+                      {run.contactName ?? run.contactHandle ?? tr("Contacto desconhecido", "Unknown contact")}
                     </p>
                     <span
                       className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${runStatusClass(
                         run.status,
                       )}`}
                     >
-                      {run.status.replaceAll("_", " ")}
+                      {runStatusLabel(run.status, locale)}
                     </span>
                   </div>
                   <p className="mt-1 truncate text-xs text-slate-500">
-                    {run.contactHandle ?? "No Meta handle"} · Started {relativeTime(run.startedAt)}
+                    {run.contactHandle ?? tr("Sem identificador", "No handle")} · {tr("Iniciada", "Started")} {relativeTime(run.startedAt, Date.now(), locale)}
                   </p>
                 </div>
                 <div className="rounded-xl bg-slate-50 px-3 py-2 text-right">
-                  <p className="text-[11px] font-semibold text-slate-500">Duration</p>
+                  <p className="text-[11px] font-semibold text-slate-500">{tr("Duração", "Duration")}</p>
                   <p className="text-sm font-semibold text-[#0a1b33]">
                     {formatDuration(run.startedAt, run.endedAt, run.lastAdvancedAt)}
                   </p>
@@ -3281,24 +3500,26 @@ function FlowRuntimePanel({ runs, loading }: { runs: FlowRunRow[]; loading: bool
 
               <div className="mt-3 grid gap-2 text-xs sm:grid-cols-4">
                 <div className="rounded-xl bg-slate-50 px-3 py-2">
-                  <p className="font-semibold text-slate-500">Current</p>
+                  <p className="font-semibold text-slate-500">{tr("Atual", "Current")}</p>
                   <p className="mt-1 truncate text-[#0a1b33]">
-                    {run.currentNodeKey ?? run.endReason ?? "Finished"}
+                    {run.currentNodeKey ?? run.endReason ?? tr("Terminada", "Finished")}
                   </p>
                 </div>
                 <div className="rounded-xl bg-slate-50 px-3 py-2">
-                  <p className="font-semibold text-slate-500">Events</p>
+                  <p className="font-semibold text-slate-500">{tr("Eventos", "Events")}</p>
                   <p className="mt-1 text-[#0a1b33]">
                     {run.eventCount}
-                    {run.eventCount > run.events.length ? ` total · ${run.events.length} shown` : ""}
+                    {run.eventCount > run.events.length
+                      ? tr(` no total · ${run.events.length} visíveis`, ` total · ${run.events.length} shown`)
+                      : ""}
                   </p>
                 </div>
                 <div className="rounded-xl bg-slate-50 px-3 py-2">
-                  <p className="font-semibold text-slate-500">Reprompts</p>
+                  <p className="font-semibold text-slate-500">{tr("Novas tentativas", "Reprompts")}</p>
                   <p className="mt-1 text-[#0a1b33]">{run.repromptCount}</p>
                 </div>
                 <div className="rounded-xl bg-slate-50 px-3 py-2">
-                  <p className="font-semibold text-slate-500">Variables</p>
+                  <p className="font-semibold text-slate-500">{tr("Variáveis", "Variables")}</p>
                   <p className="mt-1 text-[#0a1b33]">{Object.keys(run.vars ?? {}).length}</p>
                 </div>
               </div>
@@ -3310,7 +3531,7 @@ function FlowRuntimePanel({ runs, loading }: { runs: FlowRunRow[]; loading: bool
                       key={key}
                       className="rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-medium text-slate-600"
                     >
-                      {key}: captured
+                      {key}: {tr("recolhida", "captured")}
                     </span>
                   ))}
                 </div>
@@ -3327,7 +3548,7 @@ function FlowRuntimePanel({ runs, loading }: { runs: FlowRunRow[]; loading: bool
                               event.eventType,
                             )}`}
                           >
-                            {runtimeEventLabel(event.eventType)}
+                            {runtimeEventLabel(event.eventType, locale)}
                           </span>
                           {event.nodeKey && (
                             <span className="truncate text-xs font-medium text-slate-600">
@@ -3337,7 +3558,7 @@ function FlowRuntimePanel({ runs, loading }: { runs: FlowRunRow[]; loading: bool
                         </div>
                       </div>
                       <span className="shrink-0 text-xs text-slate-400">
-                        {relativeTime(event.createdAt)}
+                        {relativeTime(event.createdAt, Date.now(), locale)}
                       </span>
                     </div>
                     {compactRuntimePayload(event.payload).length > 0 && (
@@ -3375,7 +3596,7 @@ function StatCard({
   note: string;
 }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5">
+    <div className="rounded-lg border border-slate-200 bg-white p-5">
       <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-[#0a1b33]">
         <Icon size={18} />
       </span>
@@ -3419,6 +3640,7 @@ function SendTemplateConfig({
   node: FlowNode;
   onUpdate: (patch: Partial<FlowNode>) => void;
 }) {
+  const { tr } = useI18n();
   const templates = useQuery(api.templates.list) as
     | Array<{
         _id: Id<"templates">;
@@ -3434,11 +3656,17 @@ function SendTemplateConfig({
   if (templates && approved.length === 0) {
     return (
       <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-[12px] text-amber-800">
-        No approved templates yet. Create and submit one in{" "}
+        {tr(
+          "Ainda não há templates aprovados. Crie e submeta um em",
+          "No approved templates yet. Create and submit one in",
+        )}{" "}
         <Link href="/app/templates" className="font-medium underline">
           Templates
         </Link>{" "}
-        first — template sends are what work outside the 24h window.
+        {tr(
+          "primeiro; templates permitem enviar fora da janela de 24h.",
+          "first; templates allow sends outside the 24h window.",
+        )}
       </div>
     );
   }
@@ -3446,7 +3674,7 @@ function SendTemplateConfig({
   return (
     <div className="mt-4 grid gap-3 rounded-lg border border-slate-200 bg-[#fbfdff] p-3">
       <SelectBox
-        label="Approved template"
+        label={tr("Template aprovado", "Approved template")}
         value={node.template?.templateId ?? ""}
         onChange={(value) =>
           onUpdate({
@@ -3459,7 +3687,7 @@ function SendTemplateConfig({
           value: t._id,
           label: `${t.name} (${t.language})`,
         }))}
-        placeholder="Choose template"
+        placeholder={tr("Escolha o template", "Choose template")}
       />
       {selected &&
         selected.parameterSchema.map((param) => (
@@ -3483,7 +3711,7 @@ function SendTemplateConfig({
         ))}
       {selected && (
         <p className="text-[11px] text-slate-400">
-          Values support {"{{vars.x}}"} and {"{{contact.name}}"} interpolation.
+          {tr("Os valores aceitam", "Values support")} {"{{vars.x}}"} {tr("e", "and")} {"{{contact.name}}"}.
         </p>
       )}
     </div>
@@ -3624,11 +3852,15 @@ function uniqueNodeKey(nodes: FlowNode[], type: FlowNodeType): string {
   return key;
 }
 
-function defaultNode(key: string, type: FlowNodeType): FlowNode {
+function defaultNode(
+  key: string,
+  type: FlowNodeType,
+  locale: Locale = "en",
+): FlowNode {
   return {
     key,
     type,
-    title: NODE_TYPE_LABELS[type],
+    title: nodeTypeLabel(type, locale),
     ...defaultNodePatch(type),
   };
 }

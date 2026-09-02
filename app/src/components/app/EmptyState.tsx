@@ -16,16 +16,8 @@ export function EmptyState({
 }: EmptyStateProps) {
   return (
     <div className="flex flex-col items-center justify-center text-center py-24 px-6">
-      <div className="relative mb-5">
-        <div
-          className="absolute inset-0 rounded-2xl opacity-40"
-          style={{
-            background:
-              "linear-gradient(137deg, #FF3D77 0%, #06B6D4 50%, #4361EE 100%)",
-            filter: "blur(24px)",
-          }}
-        />
-        <div className="relative w-14 h-14 rounded-2xl bg-white border border-slate-200 flex items-center justify-center shadow-sm">
+      <div className="mb-5">
+        <div className="flex h-14 w-14 items-center justify-center rounded-lg border border-slate-200 bg-slate-50">
           <Icon size={22} className="text-[#0a1b33]" strokeWidth={2} />
         </div>
       </div>
@@ -52,8 +44,8 @@ export function PageHeader({
   action?: ReactNode;
 }) {
   return (
-    <div className="px-8 py-6 border-b border-slate-200 bg-white flex items-center justify-between gap-6">
-      <div>
+    <div className="flex flex-col gap-4 border-b border-slate-200 bg-white px-4 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6 xl:px-8">
+      <div className="min-w-0">
         <div className="text-[10px] uppercase tracking-[0.18em] text-slate-400 font-medium mb-1">
           {eyebrow}
         </div>

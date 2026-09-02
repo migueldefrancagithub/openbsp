@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Upload, X, Check, AlertCircle, Loader2 } from "lucide-react";
+import { useI18n } from "@/lib/i18n";
 
 type ParsedRow = {
   phone: string;
@@ -104,6 +105,7 @@ function normalizePhone(raw: string): string {
 }
 
 export function ImportCsvModal({ onClose, onImport }: Props) {
+  const { locale, tr } = useI18n();
   const [rawText, setRawText] = useState("");
   const [fileName, setFileName] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
@@ -112,13 +114,20 @@ export function ImportCsvModal({ onClose, onImport }: Props) {
   const parsed = useMemo(() => {
     if (!rawText.trim()) return null;
     const raw = parseCsv(rawText);
-    if (raw.length === 0) return { rows: [], errors: ["Empty CSV."] };
+    if (raw.length === 0) {
+      return {
+        rows: [],
+        errors: [locale === "pt" ? "O ficheiro CSV está vazio." : "The CSV file is empty."],
+      };
+    }
     const headers = mapHeaders(raw[0]);
     if (!headers.includes("phone")) {
       return {
         rows: [],
         errors: [
-          'Missing required column "phone" (or one of: telefone, whatsapp, number, numero).',
+          locale === "pt"
+            ? 'Falta a coluna obrigatória "phone" (também aceitamos: telefone, whatsapp, number, numero).'
+            : 'Missing required column "phone" (accepted aliases: telefone, whatsapp, number, numero).',
         ],
       };
     }
@@ -141,13 +150,19 @@ export function ImportCsvModal({ onClose, onImport }: Props) {
         }
       }
       if (!row.phone) {
-        errors.push(`Row ${i + 1}: missing phone`);
+        errors.push(
+          locale === "pt"
+            ? `Linha ${i + 1}: telefone em falta`
+            : `Row ${i + 1}: missing phone`,
+        );
         continue;
       }
       const normalized = normalizePhone(row.phone);
       if (!E164_REGEX.test(normalized)) {
         errors.push(
-          `Row ${i + 1}: invalid phone "${row.phone}" — must be E.164 with country code, e.g. +5511999999999`,
+          locale === "pt"
+            ? `Linha ${i + 1}: telefone inválido "${row.phone}". Use o formato internacional com indicativo, por exemplo +258841234567`
+            : `Row ${i + 1}: invalid phone "${row.phone}". Use international format with country code, for example +258841234567`,
         );
         continue;
       }
@@ -155,7 +170,7 @@ export function ImportCsvModal({ onClose, onImport }: Props) {
       rows.push(row as ParsedRow);
     }
     return { rows, errors };
-  }, [rawText]);
+  }, [locale, rawText]);
 
   async function handleFile(file: File) {
     const text = await file.text();
@@ -176,7 +191,7 @@ export function ImportCsvModal({ onClose, onImport }: Props) {
           ? err.message
           : typeof err === "object" && err !== null && "data" in err
             ? JSON.stringify((err as { data: unknown }).data)
-            : "Unknown error";
+            : tr("Erro desconhecido", "Unknown error");
       setResult({
         created: 0,
         updated: 0,
@@ -193,22 +208,22 @@ export function ImportCsvModal({ onClose, onImport }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-xl w-full max-w-2xl max-h-[88vh] flex flex-col">
+      <div className="flex max-h-[88vh] w-full max-w-2xl flex-col rounded-lg border border-slate-200 bg-white shadow-xl">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
           <div>
             <h2 className="font-[var(--font-outfit)] text-[18px] font-medium text-[#0a1b33]">
-              Import contacts from CSV
+              {tr("Importar contactos por CSV", "Import contacts from CSV")}
             </h2>
             <p className="text-[12px] text-slate-500 mt-0.5">
-              First row must be headers. Required: <code className="font-[var(--font-mono)] text-[11px] bg-slate-100 px-1 py-0.5 rounded">phone</code>.
-              Optional: name, locale, tags, proofText, proofUrl.
+              {tr("A primeira linha deve conter os cabeçalhos. Obrigatório:", "The first row must contain headers. Required:")} <code className="rounded bg-slate-100 px-1 py-0.5 font-[var(--font-mono)] text-[11px]">phone</code>.
+              {" "}{tr("Opcionais: name, locale, tags, proofText e proofUrl.", "Optional: name, locale, tags, proofText and proofUrl.")}
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
             className="text-slate-400 hover:text-slate-600 transition-colors p-1"
-            aria-label="Close"
+            aria-label={tr("Fechar", "Close")}
           >
             <X size={18} />
           </button>
@@ -221,10 +236,10 @@ export function ImportCsvModal({ onClose, onImport }: Props) {
                 <div className="border-2 border-dashed border-slate-200 rounded-xl px-6 py-8 text-center hover:border-slate-300 transition-colors cursor-pointer">
                   <Upload size={20} className="mx-auto text-slate-400 mb-2" />
                   <div className="text-[13px] font-medium text-[#0a1b33]">
-                    {fileName ?? "Click to upload a CSV"}
+                    {fileName ?? tr("Clique para carregar um CSV", "Click to upload a CSV")}
                   </div>
                   <div className="text-[11px] text-slate-500 mt-1">
-                    or paste below
+                    {tr("ou cole os dados abaixo", "or paste the data below")}
                   </div>
                   <input
                     type="file"
@@ -253,14 +268,28 @@ export function ImportCsvModal({ onClose, onImport }: Props) {
                   <div className="flex items-center gap-2 text-[12px]">
                     <Check size={14} className="text-emerald-600" />
                     <span className="text-slate-700">
-                      <strong>{validRows}</strong> valid row{validRows === 1 ? "" : "s"} ready to import
+                      <strong>{validRows}</strong>{" "}
+                      {locale === "pt"
+                        ? validRows === 1
+                          ? "linha válida pronta para importar"
+                          : "linhas válidas prontas para importar"
+                        : validRows === 1
+                          ? "valid row ready to import"
+                          : "valid rows ready to import"}
                     </span>
                   </div>
                   {parseErrors.length > 0 && (
                     <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
                       <div className="flex items-center gap-2 text-[12px] font-medium text-amber-800 mb-1.5">
                         <AlertCircle size={14} />
-                        {parseErrors.length} parse issue{parseErrors.length === 1 ? "" : "s"}
+                        {parseErrors.length}{" "}
+                        {locale === "pt"
+                          ? parseErrors.length === 1
+                            ? "problema encontrado"
+                            : "problemas encontrados"
+                          : parseErrors.length === 1
+                            ? "parse issue"
+                            : "parse issues"}
                       </div>
                       <ul className="text-[11px] text-amber-700 space-y-0.5 max-h-32 overflow-y-auto font-[var(--font-mono)]">
                         {parseErrors.slice(0, 20).map((e, i) => (
@@ -268,7 +297,7 @@ export function ImportCsvModal({ onClose, onImport }: Props) {
                         ))}
                         {parseErrors.length > 20 && (
                           <li className="text-amber-600">
-                            … +{parseErrors.length - 20} more
+                            ... +{parseErrors.length - 20} {tr("restantes", "more")}
                           </li>
                         )}
                       </ul>
@@ -284,17 +313,23 @@ export function ImportCsvModal({ onClose, onImport }: Props) {
               <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
                 <div className="flex items-center gap-2 text-[13px] font-medium text-emerald-800 mb-1">
                   <Check size={16} />
-                  Import complete
+                  {tr("Importação concluída", "Import complete")}
                 </div>
                 <div className="text-[12px] text-emerald-700 space-y-0.5">
                   <div>
-                    <strong>{result.created}</strong> created ·{" "}
-                    <strong>{result.updated}</strong> updated
+                    <strong>{result.created}</strong> {tr("criados", "created")} ·{" "}
+                    <strong>{result.updated}</strong> {tr("atualizados", "updated")}
                   </div>
                   {result.consentsRecorded > 0 && (
                     <div>
-                      <strong>{result.consentsRecorded}</strong> marketing consent
-                      proof{result.consentsRecorded === 1 ? "" : "s"} recorded
+                      <strong>{result.consentsRecorded}</strong>{" "}
+                      {locale === "pt"
+                        ? result.consentsRecorded === 1
+                          ? "prova de consentimento de marketing registada"
+                          : "provas de consentimento de marketing registadas"
+                        : result.consentsRecorded === 1
+                          ? "marketing consent proof recorded"
+                          : "marketing consent proofs recorded"}
                     </div>
                   )}
                 </div>
@@ -303,7 +338,12 @@ export function ImportCsvModal({ onClose, onImport }: Props) {
                 <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
                   <div className="flex items-center gap-2 text-[12px] font-medium text-amber-800 mb-1.5">
                     <AlertCircle size={14} />
-                    {result.skipped.length} skipped
+                    {result.skipped.length}{" "}
+                    {locale === "pt"
+                      ? result.skipped.length === 1
+                        ? "contacto ignorado"
+                        : "contactos ignorados"
+                      : "skipped"}
                   </div>
                   <ul className="text-[11px] text-amber-700 space-y-0.5 max-h-32 overflow-y-auto font-[var(--font-mono)]">
                     {result.skipped.slice(0, 30).map((s, i) => (
@@ -326,7 +366,7 @@ export function ImportCsvModal({ onClose, onImport }: Props) {
                 onClick={onClose}
                 className="text-[13px] text-slate-500 hover:text-slate-700 px-3 py-2"
               >
-                Cancel
+                {tr("Cancelar", "Cancel")}
               </button>
               <button
                 type="button"
@@ -335,7 +375,14 @@ export function ImportCsvModal({ onClose, onImport }: Props) {
                 className="inline-flex items-center gap-2 bg-[#0a152d] text-white text-[13px] font-medium px-4 py-2 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#0a1b33] transition-all"
               >
                 {importing && <Loader2 size={14} className="animate-spin" />}
-                Import {validRows} contact{validRows === 1 ? "" : "s"}
+                {tr("Importar", "Import")} {validRows}{" "}
+                {locale === "pt"
+                  ? validRows === 1
+                    ? "contacto"
+                    : "contactos"
+                  : validRows === 1
+                    ? "contact"
+                    : "contacts"}
               </button>
             </>
           ) : (
@@ -344,7 +391,7 @@ export function ImportCsvModal({ onClose, onImport }: Props) {
               onClick={onClose}
               className="inline-flex items-center gap-2 bg-[#0a152d] text-white text-[13px] font-medium px-4 py-2 rounded-lg hover:bg-[#0a1b33] transition-all"
             >
-              Done
+              {tr("Concluir", "Done")}
             </button>
           )}
         </div>

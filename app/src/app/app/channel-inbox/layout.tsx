@@ -7,7 +7,7 @@ export default function ChannelInboxLayout({
   children: ReactNode;
 }) {
   return (
-    <div className="flex h-[calc(100dvh-5.5rem)] min-h-[520px] overflow-hidden lg:h-screen lg:min-h-0">
+    <div className="flex h-[calc(100dvh-5.5rem)] min-h-[520px] overflow-hidden lg:h-full lg:min-h-0">
       <ChannelThreadList />
       <div className="flex-1 min-w-0 flex flex-col">{children}</div>
     </div>

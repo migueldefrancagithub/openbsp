@@ -71,6 +71,11 @@ export const MESSAGES = {
     "inbox.starred": "Favoritas",
     "inbox.snoozed": "Adiadas",
     "inbox.closed": "Fechadas",
+    "inbox.moreFilters": "Mais filtros",
+    "inbox.filterOpen": "Em aberto",
+    "inbox.filterActive": "Em atendimento",
+    "inbox.filterStarred": "Só favoritas",
+    "inbox.filterSnoozed": "Só adiadas",
     "inbox.search": "Pesquisar paciente ou mensagem...",
     "inbox.noThreads": "Nenhuma conversa neste filtro.",
     "inbox.pickThread": "Escolha uma conversa",
@@ -98,6 +103,17 @@ export const MESSAGES = {
     "inbox.resumeAi": "Devolver à IA",
     "inbox.assign": "Atribuir",
     "inbox.patient": "Paciente",
+    "inbox.summary": "Resumo",
+    "inbox.tasks": "Tarefas",
+    "inbox.history": "Histórico",
+    "inbox.patientDetails": "Dados do paciente",
+    "inbox.noTags": "Sem etiquetas",
+    "inbox.noNotes": "Sem notas internas",
+    "inbox.noReminders": "Sem lembretes pendentes",
+    "inbox.noAppointments": "Sem compromissos",
+    "inbox.noCampaigns": "Sem campanhas associadas",
+    "inbox.noConsents": "Sem consentimentos registados",
+    "inbox.backToQueue": "Voltar à fila",
     "inbox.notes": "Notas internas",
     "inbox.reminders": "Lembretes",
     "inbox.appointments": "Compromissos",
@@ -132,6 +148,23 @@ export const MESSAGES = {
     "inbox.fillTemplateVariables": "Preencha todos os campos do template.",
     "inbox.uploadFailed": "Falha no upload do anexo.",
     "inbox.sendFailed": "Falha ao enviar.",
+    "inbox.pickChannel": "Escolha um canal para abrir esta conversa.",
+    "state.scheduled": "Agendado",
+    "state.triggered": "Disparado",
+    "state.completed": "Concluído",
+    "state.cancelled": "Cancelado",
+    "state.failed": "Falhou",
+    "state.pending": "Pendente",
+    "state.queued": "Na fila",
+    "state.sent": "Enviado",
+    "state.delivered": "Entregue",
+    "state.read": "Lido",
+    "state.replied": "Respondeu",
+    "state.converted": "Convertido",
+    "state.granted": "Autorizado",
+    "state.denied": "Negado",
+    "state.withdrawn": "Retirado",
+    "state.expired": "Expirado",
     "inbox.blockedLegacyTitle": "Canal anterior apenas para leitura",
     "inbox.blockedLegacyDetail": "Esta inbox não usa outra conexão por engano. Configure o canal Hub isolado do OpenBSP antes de enviar.",
     "inbox.blockedDisabledTitle": "Envio desativado",
@@ -240,6 +273,11 @@ export const MESSAGES = {
     "inbox.starred": "Starred",
     "inbox.snoozed": "Snoozed",
     "inbox.closed": "Closed",
+    "inbox.moreFilters": "More filters",
+    "inbox.filterOpen": "Open only",
+    "inbox.filterActive": "In progress",
+    "inbox.filterStarred": "Starred only",
+    "inbox.filterSnoozed": "Snoozed only",
     "inbox.search": "Search patient or message...",
     "inbox.noThreads": "No conversations in this filter.",
     "inbox.pickThread": "Choose a conversation",
@@ -267,6 +305,17 @@ export const MESSAGES = {
     "inbox.resumeAi": "Return to AI",
     "inbox.assign": "Assign",
     "inbox.patient": "Patient",
+    "inbox.summary": "Summary",
+    "inbox.tasks": "Tasks",
+    "inbox.history": "History",
+    "inbox.patientDetails": "Patient details",
+    "inbox.noTags": "No tags",
+    "inbox.noNotes": "No internal notes",
+    "inbox.noReminders": "No pending reminders",
+    "inbox.noAppointments": "No appointments",
+    "inbox.noCampaigns": "No linked campaigns",
+    "inbox.noConsents": "No recorded consents",
+    "inbox.backToQueue": "Back to queue",
     "inbox.notes": "Internal notes",
     "inbox.reminders": "Reminders",
     "inbox.appointments": "Appointments",
@@ -301,6 +350,23 @@ export const MESSAGES = {
     "inbox.fillTemplateVariables": "Fill every template field.",
     "inbox.uploadFailed": "Attachment upload failed.",
     "inbox.sendFailed": "Send failed.",
+    "inbox.pickChannel": "Choose a channel to open this conversation.",
+    "state.scheduled": "Scheduled",
+    "state.triggered": "Triggered",
+    "state.completed": "Completed",
+    "state.cancelled": "Cancelled",
+    "state.failed": "Failed",
+    "state.pending": "Pending",
+    "state.queued": "Queued",
+    "state.sent": "Sent",
+    "state.delivered": "Delivered",
+    "state.read": "Read",
+    "state.replied": "Replied",
+    "state.converted": "Converted",
+    "state.granted": "Granted",
+    "state.denied": "Denied",
+    "state.withdrawn": "Withdrawn",
+    "state.expired": "Expired",
     "inbox.blockedLegacyTitle": "Previous channel is read-only",
     "inbox.blockedLegacyDetail": "This inbox never uses another connection by mistake. Configure the isolated OpenBSP Hub channel before sending.",
     "inbox.blockedDisabledTitle": "Sending disabled",
@@ -360,6 +426,7 @@ type I18nContextValue = {
   locale: Locale;
   setLocale: (locale: Locale) => void;
   t: (key: TranslationKey) => string;
+  tr: (pt: string, en: string) => string;
 };
 
 const I18nContext = createContext<I18nContextValue | null>(null);
@@ -396,6 +463,7 @@ export function I18nProvider({
         localStorage.setItem(storageKey(), next);
       },
       t: (key) => MESSAGES[locale][key] ?? MESSAGES.pt[key] ?? key,
+      tr: (pt, en) => (locale === "pt" ? pt : en),
     }),
     [locale, storageScope],
   );
@@ -409,17 +477,24 @@ export function useI18n() {
   return ctx;
 }
 
-export function LanguageSwitcher({ className }: { className?: string }) {
+export function LanguageSwitcher({
+  className,
+  compact = false,
+}: {
+  className?: string;
+  compact?: boolean;
+}) {
   const { locale, setLocale, t } = useI18n();
   return (
     <div
       className={cn(
         "inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1",
+        compact && "flex-col",
         className,
       )}
       aria-label={t("locale.label")}
     >
-      <Languages size={13} className="ml-1 text-slate-400" aria-hidden />
+      {!compact && <Languages size={13} className="ml-1 text-slate-400" aria-hidden />}
       {(["pt", "en"] as const).map((option) => (
         <button
           key={option}
@@ -427,12 +502,17 @@ export function LanguageSwitcher({ className }: { className?: string }) {
           onClick={() => setLocale(option)}
           className={cn(
             "h-7 rounded-md px-2 text-[11px] font-semibold transition-colors",
+            compact && "w-9 px-0 text-[13px]",
             locale === option
               ? "bg-white text-[#0a1b33] shadow-sm"
               : "text-slate-500 hover:bg-white/70 hover:text-[#0a1b33]",
           )}
         >
-          {t(option === "pt" ? "locale.pt" : "locale.en")}
+          {compact
+            ? option === "pt"
+              ? "🇲🇿"
+              : "🇬🇧"
+            : t(option === "pt" ? "locale.pt" : "locale.en")}
         </button>
       ))}
     </div>

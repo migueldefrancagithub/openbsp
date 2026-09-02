@@ -18,6 +18,7 @@ import {
   MousePointerClick,
   Network,
   Plus,
+  Search,
   Send,
   Settings,
   SlidersHorizontal,
@@ -37,6 +38,7 @@ import {
   type TranslationKey,
 } from "@/lib/i18n";
 import type { Id } from "../../../convex/_generated/dataModel";
+import { roleLabel, verticalLabel } from "@/lib/operationalLabels";
 
 type NavItem = {
   href: string;
@@ -88,7 +90,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   if (tenant === undefined || tenant === null) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#f9fafb]">
-        <div className="text-slate-400 text-sm">A carregar workspace...</div>
+        <div className="text-sm text-slate-400">A carregar espaço de trabalho...</div>
       </div>
     );
   }
@@ -113,11 +115,12 @@ function AppShell({
   const { signOut } = useAuthActions();
   const router = useRouter();
   const pathname = usePathname();
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
   const [switchingTenant, setSwitchingTenant] = useState<string | null>(null);
   const isFlowBuilderRoute = pathname.startsWith("/app/chatbots");
+  const isInboxRoute = pathname.startsWith("/app/channel-inbox");
 
   async function handleSignOut() {
     await signOut();
@@ -147,30 +150,31 @@ function AppShell({
   return (
     <div
       className={cn(
-        "min-h-screen flex flex-col lg:flex-row",
+        "min-h-screen flex flex-col lg:h-dvh lg:min-h-0 lg:flex-row lg:overflow-hidden",
         isFlowBuilderRoute ? "bg-[#eef6ef]" : "bg-[#f9fafb]",
       )}
     >
       <aside
         className={cn(
-          "w-full shrink-0 border-b border-slate-200 bg-white flex-col lg:sticky top-0 lg:h-screen lg:border-b-0 lg:border-r",
-          "flex lg:w-60 z-30",
+          "w-full shrink-0 border-b border-slate-200 bg-white flex-col lg:sticky top-0 lg:h-dvh lg:border-b-0 lg:border-r",
+          "flex lg:w-[72px] z-30",
         )}
       >
-        <div className="relative p-3 border-b border-slate-200">
+        <div className="relative border-b border-slate-200 p-3 lg:px-2">
           <button
             type="button"
             onClick={() => setWorkspaceOpen((open) => !open)}
             aria-expanded={workspaceOpen}
-            className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-slate-100 transition-colors group"
+            className="group flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 transition-colors hover:bg-slate-100 lg:justify-center lg:px-0"
+            title={tenant.name}
           >
-            <BrandMark className="h-7 w-7" />
-            <div className="flex-1 min-w-0 text-left">
+            <BrandMark className="h-8 w-8" />
+            <div className="min-w-0 flex-1 text-left lg:hidden">
               <div className="text-[13px] font-semibold text-[#0a1b33] truncate">
                 {BRAND_NAME}
               </div>
               <div className="text-[10px] text-slate-400 truncate uppercase tracking-wider">
-                {tenant.name} · {tenant.role}
+                {tenant.name} · {roleLabel(tenant.role, locale)}
               </div>
             </div>
             <ChevronDown
@@ -178,14 +182,16 @@ function AppShell({
               className={cn(
                 "text-slate-400 transition-all group-hover:text-slate-600",
                 workspaceOpen && "rotate-180",
+                "lg:hidden",
               )}
             />
           </button>
 
-          <LanguageSwitcher className="mt-2 w-full justify-center" />
+          <LanguageSwitcher className="mt-2 w-full justify-center lg:hidden" />
+          <LanguageSwitcher compact className="mx-auto mt-2 hidden lg:flex" />
 
           {workspaceOpen && (
-            <div className="absolute left-3 right-3 top-[104px] z-50 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_24px_70px_-38px_rgba(15,23,42,0.55)]">
+            <div className="absolute left-3 right-3 top-[104px] z-50 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_24px_70px_-38px_rgba(15,23,42,0.55)] lg:left-[62px] lg:right-auto lg:top-2 lg:w-72">
               <div className="border-b border-slate-100 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
                 {t("shell.companies")}
               </div>
@@ -217,7 +223,7 @@ function AppShell({
                           {workspace.name}
                         </span>
                         <span className="block truncate text-[10px] uppercase tracking-wider text-slate-400">
-                          {workspace.vertical} · {workspace.role}
+                          {verticalLabel(workspace.vertical, locale)} · {roleLabel(workspace.role, locale)}
                         </span>
                       </span>
                       {workspace.active ? (
@@ -241,7 +247,7 @@ function AppShell({
           )}
         </div>
 
-        <div className="hidden sm:block px-3 py-2 border-b border-slate-200">
+        <div className="hidden border-b border-slate-200 px-3 py-2 sm:block lg:px-2">
           <button
             type="button"
             onClick={() => {
@@ -249,36 +255,37 @@ function AppShell({
                 new KeyboardEvent("keydown", { key: "k", metaKey: true }),
               );
             }}
-            className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md border border-slate-200 bg-slate-50 hover:bg-slate-100 transition-colors text-left"
+            className="flex w-full items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-left transition-colors hover:bg-slate-100 lg:h-10 lg:justify-center lg:px-0"
+            title={t("shell.quickSwitch")}
           >
-            <span className="text-[11px] text-slate-400 flex-1">
+            <Search size={15} className="hidden text-slate-500 lg:block" />
+            <span className="flex-1 text-[11px] text-slate-400 lg:hidden">
               {t("shell.quickSwitch")}
             </span>
-            <KbdHint keys={["⌘", "K"]} />
+            <span className="lg:hidden"><KbdHint keys={["⌘", "K"]} /></span>
           </button>
         </div>
 
-        <nav className="flex gap-1 overflow-x-auto p-2 lg:block lg:flex-1 lg:space-y-0.5 lg:overflow-y-auto lg:overflow-x-visible">
+        <nav className="grid grid-cols-5 gap-1 p-2 lg:flex lg:flex-1 lg:flex-col lg:items-center lg:space-y-0.5">
           {PRIMARY_NAV.map((item) => (
             <NavLink key={item.href} item={item} active={isActive(item.href, item.exact)} />
           ))}
 
-          <div className="hidden lg:block pt-2">
+          <div className="relative hidden pt-2 lg:block">
             <button
               type="button"
               onClick={() => setAdminOpen((open) => !open)}
-              className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-[#0a1b33]"
+              className="flex h-11 w-11 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-[#0a1b33]"
               aria-expanded={adminOpen}
+              title={t("nav.admin")}
             >
-              <SlidersHorizontal size={16} />
-              <span className="flex-1 text-left">{t("nav.admin")}</span>
-              <ChevronDown
-                size={14}
-                className={cn("transition-transform", adminOpen && "rotate-180")}
-              />
+              <SlidersHorizontal size={18} />
             </button>
             {adminOpen && (
-              <div className="mt-1 space-y-0.5">
+              <div className="absolute left-[54px] top-2 z-50 w-56 space-y-0.5 rounded-lg border border-slate-200 bg-white p-2 shadow-[0_22px_60px_-34px_rgba(15,23,42,0.55)]">
+                <div className="px-3 pb-1.5 pt-1 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
+                  {t("nav.admin")}
+                </div>
                 {ADMIN_NAV.map((item) => (
                   <NavLink
                     key={item.href}
@@ -292,19 +299,19 @@ function AppShell({
           </div>
         </nav>
 
-        <div className="hidden lg:block p-2 border-t border-slate-200 space-y-0.5">
+        <div className="hidden space-y-0.5 border-t border-slate-200 p-2 lg:block">
           <button
             type="button"
             onClick={handleSignOut}
-            className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] text-slate-500 hover:bg-slate-100 hover:text-[#0a1b33] transition-all"
+            className="flex h-11 w-full items-center justify-center rounded-lg text-[13px] text-slate-500 transition-all hover:bg-slate-100 hover:text-[#0a1b33]"
+            title={t("nav.signOut")}
           >
             <LogOut size={16} strokeWidth={2} />
-            <span>{t("nav.signOut")}</span>
           </button>
         </div>
       </aside>
 
-      <main className="flex-1 min-w-0">{children}</main>
+      <main className={cn("min-h-0 min-w-0 flex-1", isInboxRoute ? "lg:overflow-hidden" : "lg:overflow-y-auto")}>{children}</main>
 
       <CommandPalette />
     </div>
@@ -326,16 +333,19 @@ function NavLink({
   return (
     <Link
       href={item.href}
+      title={t(item.labelKey)}
       className={cn(
-        "flex shrink-0 items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] transition-all",
-        nested && "pl-6",
+        "flex min-w-0 items-center rounded-lg transition-all",
+        nested
+          ? "gap-2.5 px-3 py-2 text-[13px] lg:h-9 lg:w-full lg:justify-start"
+          : "flex-col justify-center gap-1 px-1 py-2 text-[10px] sm:text-[11px] lg:h-11 lg:w-11 lg:flex-row lg:px-0",
         active
           ? "bg-[#0a152d] text-white font-medium"
           : "text-slate-600 hover:bg-slate-100 hover:text-[#0a1b33]",
       )}
     >
-      <Icon size={16} strokeWidth={active ? 2.5 : 2} />
-      <span className="flex-1">{t(item.labelKey)}</span>
+      <Icon size={nested ? 15 : 17} strokeWidth={active ? 2.5 : 2} />
+      <span className={cn("min-w-0", nested ? "flex-1" : "w-full truncate text-center lg:sr-only")}>{t(item.labelKey)}</span>
       {typeof item.badge === "number" && item.badge > 0 && (
         <span className="px-1.5 py-0.5 rounded-full bg-emerald-500 text-white text-[10px] font-semibold">
           {item.badge}

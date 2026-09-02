@@ -16,17 +16,19 @@ import {
   Tabs,
 } from "@/components/analytics/ui";
 import {
-  RANGE_LABELS,
   dateWindow,
   formatNumber,
   formatPercent,
   formatUpdatedAt,
+  rangeLabel,
   useAnalyticsParams,
   type Granularity,
   type RangeKey,
 } from "@/components/analytics/lib";
+import { useI18n } from "@/lib/i18n";
 
 export default function AnalyticsPage() {
+  const { locale, tr } = useI18n();
   const { tab, range, granularity, setParam } = useAnalyticsParams();
   const [snapshotAt, setSnapshotAt] = useState(() => Date.now());
 
@@ -47,33 +49,33 @@ export default function AnalyticsPage() {
         <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 pb-3">
           <div className="min-w-0">
             <h1 className="truncate font-[var(--font-display)] text-[19px] font-medium tracking-tight text-[#0a1b33]">
-              Analytics
+              {tr("Desempenho", "Analytics")}
             </h1>
             <p className="truncate text-[11px] text-slate-400">
               {loading
-                ? "Loading…"
-                : `${RANGE_LABELS[range]} · updated ${formatUpdatedAt(snapshotAt)}`}
+                ? tr("A carregar...", "Loading...")
+                : `${rangeLabel(range, locale)} · ${tr("atualizado às", "updated at")} ${formatUpdatedAt(snapshotAt, locale)}`}
             </p>
           </div>
 
           <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-1.5">
             <Select
-              label="Period"
+              label={tr("Período", "Period")}
               value={range}
               onChange={(value) => setParam("range", value)}
               options={[
-                { value: "today", label: RANGE_LABELS.today },
-                { value: "7d", label: RANGE_LABELS["7d"] },
-                { value: "30d", label: RANGE_LABELS["30d"] },
+                { value: "today", label: rangeLabel("today", locale) },
+                { value: "7d", label: rangeLabel("7d", locale) },
+                { value: "30d", label: rangeLabel("30d", locale) },
               ]}
             />
             <Select
-              label="Granularity"
+              label={tr("Agrupamento", "Granularity")}
               value={granularity}
               onChange={(value) => setParam("granularity", value)}
               options={[
-                { value: "hour", label: "Hourly" },
-                { value: "day", label: "Daily" },
+                { value: "hour", label: tr("Por hora", "Hourly") },
+                { value: "day", label: tr("Por dia", "Daily") },
               ]}
             />
             <button
@@ -82,7 +84,7 @@ export default function AnalyticsPage() {
               className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-[12px] font-medium text-[#0a1b33] outline-none hover:border-slate-300 focus-visible:ring-2 focus-visible:ring-[#3d52d5]"
             >
               <RefreshCcw size={13} />
-              Refresh
+              {tr("Atualizar", "Refresh")}
             </button>
           </div>
         </div>
@@ -104,12 +106,12 @@ export default function AnalyticsPage() {
                 <KpiStrip
                   items={[
                     {
-                      label: "Sent",
-                      value: formatNumber(summary!.sent),
+                      label: tr("Enviadas", "Sent"),
+                      value: formatNumber(summary!.sent, locale),
                     },
                     {
-                      label: "Delivered",
-                      value: formatNumber(summary!.delivered),
+                      label: tr("Entregues", "Delivered"),
+                      value: formatNumber(summary!.delivered, locale),
                       foot: (
                         <RiskBadge
                           risk={report.health.deliveryRisk}
@@ -118,44 +120,44 @@ export default function AnalyticsPage() {
                       ),
                     },
                     {
-                      label: "Delivery rate",
+                      label: tr("Taxa de entrega", "Delivery rate"),
                       value: formatPercent(
                         summary!.deliveryRate,
                         summary!.sent > 0,
                       ),
                     },
                     {
-                      label: "Failed",
-                      value: formatNumber(summary!.failed),
+                      label: tr("Falharam", "Failed"),
+                      value: formatNumber(summary!.failed, locale),
                     },
                   ]}
                 />
 
                 <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4 @4xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-                  <Module title="Messaging trend" hint={RANGE_LABELS[range]}>
+                  <Module title={tr("Tendência de mensagens", "Messaging trend")} hint={rangeLabel(range, locale)}>
                     <TrendChart series={report.series} />
                   </Module>
 
-                  <Module title="Health">
+                  <Module title={tr("Saúde do canal", "Channel health")}>
                     <div className="divide-y divide-slate-50">
                       <StatLine
-                        label="Failed"
-                        value={formatNumber(summary!.failed)}
+                        label={tr("Falharam", "Failed")}
+                        value={formatNumber(summary!.failed, locale)}
                       />
                       <StatLine
-                        label="Failure rate"
+                        label={tr("Taxa de falha", "Failure rate")}
                         value={formatPercent(
                           summary!.failureRate,
                           summary!.sent > 0,
                         )}
                       />
                       <StatLine
-                        label="Readiness"
-                        value={summary!.failed === 0 ? "Stable" : "Needs review"}
+                        label={tr("Estado", "Readiness")}
+                        value={summary!.failed === 0 ? tr("Estável", "Stable") : tr("Precisa de revisão", "Needs review")}
                       />
                       <div className="flex items-center justify-between gap-3 px-4 py-2">
                         <span className="text-[13px] text-slate-500">
-                          Delivery health
+                          {tr("Saúde da entrega", "Delivery health")}
                         </span>
                         <RiskBadge
                           risk={report.health.deliveryRisk}
@@ -172,14 +174,14 @@ export default function AnalyticsPage() {
               <div className="flex min-w-0 flex-col gap-4">
                 <KpiStrip
                   items={[
-                    { label: "Sent", value: formatNumber(summary!.sent) },
+                    { label: tr("Enviadas", "Sent"), value: formatNumber(summary!.sent, locale) },
                     {
-                      label: "Delivered",
-                      value: formatNumber(summary!.delivered),
+                      label: tr("Entregues", "Delivered"),
+                      value: formatNumber(summary!.delivered, locale),
                     },
-                    { label: "Failed", value: formatNumber(summary!.failed) },
+                    { label: tr("Falharam", "Failed"), value: formatNumber(summary!.failed, locale) },
                     {
-                      label: "Failure rate",
+                      label: tr("Taxa de falha", "Failure rate"),
                       value: formatPercent(
                         summary!.failureRate,
                         summary!.sent > 0,
@@ -187,7 +189,7 @@ export default function AnalyticsPage() {
                     },
                   ]}
                 />
-                <Module title="Delivered vs failed" hint={RANGE_LABELS[range]}>
+                <Module title={tr("Entregues e falhadas", "Delivered vs failed")} hint={rangeLabel(range, locale)}>
                   <TrendChart
                     series={report.series}
                     only={["delivered", "failed"]}
@@ -199,7 +201,7 @@ export default function AnalyticsPage() {
             <TabPanel id="audience" active={tab}>
               <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4 @3xl:grid-cols-2">
                 <Breakdown
-                  title="By country"
+                  title={tr("Por país", "By country")}
                   rows={report.countryBreakdown.map((row) => ({
                     key: row.key,
                     label: row.key,
@@ -208,10 +210,10 @@ export default function AnalyticsPage() {
                   }))}
                 />
                 <Breakdown
-                  title="By category"
+                  title={tr("Por categoria", "By category")}
                   rows={report.categoryBreakdown.map((row) => ({
                     key: row.category,
-                    label: row.category,
+                    label: localizeCategory(row.category, locale),
                     sent: row.sent,
                     value: formatPercent(row.deliveryRate, row.sent > 0),
                   }))}
@@ -236,12 +238,13 @@ function Breakdown({
   title: string;
   rows: { key: string; label: string; sent: number; value: string }[];
 }) {
+  const { locale } = useI18n();
   const peak = Math.max(1, ...rows.map((row) => row.sent));
   return (
     <Module title={title}>
       {rows.length === 0 ? (
         <div className="px-4 py-10 text-center text-[13px] text-slate-400">
-          No data for this period
+          {locale === "pt" ? "Sem dados neste período" : "No data for this period"}
         </div>
       ) : (
         <div className="divide-y divide-slate-50">
@@ -301,33 +304,45 @@ function Select({
 function LoadingState() {
   return (
     <div className="mx-auto flex min-w-0 max-w-[1400px] flex-col gap-4">
-      <div className="h-[76px] animate-pulse rounded-xl border border-slate-200/80 bg-white" />
+      <div className="h-[76px] animate-pulse rounded-lg border border-slate-200/80 bg-white" />
       <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4 @4xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-        <div className="h-[280px] animate-pulse rounded-xl border border-slate-200/80 bg-white" />
-        <div className="h-[280px] animate-pulse rounded-xl border border-slate-200/80 bg-white" />
+        <div className="h-[280px] animate-pulse rounded-lg border border-slate-200/80 bg-white" />
+        <div className="h-[280px] animate-pulse rounded-lg border border-slate-200/80 bg-white" />
       </div>
     </div>
   );
 }
 
 function ErrorState({ onRetry }: { onRetry: () => void }) {
+  const { tr } = useI18n();
   return (
     <div className="flex min-h-[50vh] flex-col items-center justify-center px-6 text-center">
       <h2 className="font-[var(--font-display)] text-[17px] font-medium text-[#0a1b33]">
-        Analytics could not be loaded
+        {tr("Não foi possível carregar os indicadores", "Analytics could not be loaded")}
       </h2>
       <p className="mt-1.5 max-w-sm text-sm text-slate-500">
-        The report request did not complete. Nothing was changed.
+        {tr("O pedido do relatório não terminou. Nenhum dado foi alterado.", "The report request did not complete. Nothing was changed.")}
       </p>
       <button
         type="button"
         onClick={onRetry}
         className="mt-4 inline-flex h-9 items-center rounded-lg border border-slate-200 bg-white px-4 text-[13px] font-medium text-[#0a1b33] outline-none hover:border-slate-300 focus-visible:ring-2 focus-visible:ring-[#3d52d5]"
       >
-        Try again
+        {tr("Tentar novamente", "Try again")}
       </button>
     </div>
   );
+}
+
+function localizeCategory(category: string, locale: "pt" | "en") {
+  if (locale !== "pt") return category;
+  const labels: Record<string, string> = {
+    marketing: "marketing",
+    utility: "utilidade",
+    authentication: "autenticação",
+    service: "atendimento",
+  };
+  return labels[category.toLowerCase()] ?? category;
 }
 
 export type { Granularity, RangeKey };

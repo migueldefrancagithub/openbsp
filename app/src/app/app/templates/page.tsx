@@ -21,6 +21,7 @@ import { PageHeader } from "@/components/app/EmptyState";
 import { api } from "../../../../convex/_generated/api";
 import { friendlyId } from "@/lib/friendlyId";
 import { relativeTime } from "@/lib/relativeTime";
+import { useI18n, type Locale } from "@/lib/i18n";
 
 const STATUS_STYLES: Record<string, string> = {
   draft: "bg-slate-100 text-slate-600 border-slate-200",
@@ -32,6 +33,7 @@ const STATUS_STYLES: Record<string, string> = {
 };
 
 export default function TemplatesPage() {
+  const { locale, tr } = useI18n();
   const templates = useQuery(api.templates.list);
   const sync = useAction(api.templates.syncFromMeta);
   const [syncing, setSyncing] = useState(false);
@@ -76,9 +78,12 @@ export default function TemplatesPage() {
   return (
     <>
       <PageHeader
-        eyebrow="Meta-approved messages"
+        eyebrow={tr("Mensagens aprovadas pela Meta", "Meta-approved messages")}
         title="Templates"
-        description="Versioned message templates submitted to Meta for approval."
+        description={tr(
+          "Mensagens versionadas para iniciar ou continuar atendimentos com segurança.",
+          "Versioned messages for starting or continuing conversations safely.",
+        )}
         action={
           <div className="flex items-center gap-2">
             <button
@@ -92,66 +97,67 @@ export default function TemplatesPage() {
               ) : (
                 <RefreshCw size={14} strokeWidth={2} />
               )}
-              Sync from Meta
+              {tr("Sincronizar com a Meta", "Sync from Meta")}
             </button>
             <Link
               href="/app/templates/new"
               className="inline-flex items-center gap-2 bg-[#0a152d] text-white text-[13px] font-medium px-4 py-2 rounded-lg shadow-[0_8px_24px_-8px_rgba(10,21,45,0.5)] hover:bg-[#0a1b33] transition-all"
             >
               <Plus size={14} strokeWidth={2.5} />
-              New template
+              {tr("Novo template", "New template")}
             </Link>
           </div>
         }
       />
 
-      <div className="px-8 py-8 max-w-7xl space-y-5">
+      <div className="max-w-7xl space-y-5 px-4 py-5 sm:px-6 sm:py-6">
         {templates === undefined ? (
-          <div className="text-slate-400 text-sm">Loading…</div>
+          <div className="text-sm text-slate-400">{tr("A carregar...", "Loading...")}</div>
         ) : templates.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-12 text-center">
+          <div className="rounded-lg border border-dashed border-slate-200 bg-white p-8 text-center sm:p-12">
             <FileText size={28} className="mx-auto text-slate-300 mb-3" />
             <h2 className="font-[var(--font-outfit)] text-[18px] font-medium text-[#0a1b33]">
-              No templates yet
+              {tr("Ainda não há templates", "No templates yet")}
             </h2>
             <p className="text-slate-500 text-sm mt-1.5 max-w-md mx-auto leading-relaxed">
-              Templates are required to start conversations outside the 24h
-              service window. Create one and we&apos;ll submit it to Meta for
-              approval.
+              {tr(
+                "É necessário um template aprovado para iniciar conversas fora da janela de atendimento de 24 horas.",
+                "An approved template is required to start conversations outside the 24-hour service window.",
+              )}
             </p>
             <Link
               href="/app/templates/new"
               className="inline-flex items-center gap-2 bg-[#0a152d] text-white text-[13px] font-medium px-4 py-2 rounded-lg mt-5 hover:bg-[#0a1b33] transition-all"
             >
               <Plus size={14} strokeWidth={2.5} />
-              Create your first template
+              {tr("Criar primeiro template", "Create your first template")}
             </Link>
           </div>
         ) : (
           <>
-            <section className="rounded-2xl border border-slate-200 bg-white p-4">
+            <section className="rounded-lg border border-slate-200 bg-white p-4">
               <div className="mb-4 grid gap-3 md:grid-cols-4">
                 <TemplateStat
                   icon={CheckCircle2}
-                  label="Approved"
+                  label={tr("Aprovados", "Approved")}
                   value={templateStats.approved}
                   tone="good"
                 />
                 <TemplateStat
                   icon={Clock3}
-                  label="Pending Meta"
+                  label={tr("Em análise", "Pending Meta")}
                   value={templateStats.pending}
                   tone="warn"
                 />
                 <TemplateStat
                   icon={XCircle}
-                  label="Blocked"
+                  label={tr("Bloqueados", "Blocked")}
                   value={templateStats.blocked}
                   tone="bad"
                 />
                 <TemplateStat
                   icon={FileText}
-                  label="With variables"
+                  label={tr("Com variáveis", "With variables")}
                   value={templateStats.withVariables}
                   tone="neutral"
                 />
@@ -165,7 +171,7 @@ export default function TemplatesPage() {
                   <input
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
-                    placeholder="Search templates..."
+                    placeholder={tr("Pesquisar templates...", "Search templates...")}
                     className="h-11 w-full rounded-lg border border-slate-200 bg-white pl-10 pr-3 text-sm text-[#0a1b33] outline-none transition-colors placeholder:text-slate-400 focus:border-slate-400"
                   />
                 </label>
@@ -174,23 +180,23 @@ export default function TemplatesPage() {
                   onChange={(event) => setCategory(event.target.value)}
                   className="h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-[#0a1b33] outline-none focus:border-slate-400"
                 >
-                  <option value="all">All categories</option>
+                  <option value="all">{tr("Todas as categorias", "All categories")}</option>
                   <option value="marketing">Marketing</option>
-                  <option value="utility">Utility</option>
-                  <option value="authentication">Authentication</option>
+                  <option value="utility">{tr("Utilidade", "Utility")}</option>
+                  <option value="authentication">{tr("Autenticação", "Authentication")}</option>
                 </select>
                 <select
                   value={status}
                   onChange={(event) => setStatus(event.target.value)}
                   className="h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-[#0a1b33] outline-none focus:border-slate-400"
                 >
-                  <option value="all">All statuses</option>
-                  <option value="draft">Draft</option>
-                  <option value="pending">Pending</option>
-                  <option value="approved">Approved</option>
-                  <option value="rejected">Rejected</option>
-                  <option value="paused">Paused</option>
-                  <option value="disabled">Disabled</option>
+                  <option value="all">{tr("Todos os estados", "All statuses")}</option>
+                  <option value="draft">{tr("Rascunho", "Draft")}</option>
+                  <option value="pending">{tr("Em análise", "Pending")}</option>
+                  <option value="approved">{tr("Aprovado", "Approved")}</option>
+                  <option value="rejected">{tr("Rejeitado", "Rejected")}</option>
+                  <option value="paused">{tr("Pausado", "Paused")}</option>
+                  <option value="disabled">{tr("Desativado", "Disabled")}</option>
                 </select>
                 <button
                   type="button"
@@ -202,12 +208,12 @@ export default function TemplatesPage() {
                   className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-[#0a1b33] transition-colors hover:border-slate-300"
                 >
                   <FilterX size={15} />
-                  Reset filters
+                  {tr("Limpar filtros", "Reset filters")}
                 </button>
               </div>
             </section>
 
-            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+            <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
               <ul className="divide-y divide-slate-100">
                 {filteredTemplates.map((t) => (
                   <li
@@ -222,23 +228,23 @@ export default function TemplatesPage() {
                         <span className="text-[10px] text-slate-400 font-[var(--font-mono)]">
                           {friendlyId("TPL", t._id)}
                         </span>
-                        <span className="inline-flex items-center rounded-full border border-violet-200 bg-violet-50 px-2.5 py-0.5 text-[11px] font-semibold uppercase text-violet-700">
-                          {t.category}
+                        <span className="inline-flex items-center rounded-full border border-sky-200 bg-sky-50 px-2.5 py-0.5 text-[11px] font-semibold uppercase text-sky-700">
+                          {categoryLabel(t.category, locale)}
                         </span>
                         <span
                           className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold uppercase ${STATUS_STYLES[t.status] ?? STATUS_STYLES.draft}`}
                         >
                           {t.status === "approved" && <CheckCircle2 size={12} />}
-                          {t.status}
+                          {statusLabel(t.status, locale)}
                         </span>
                       </div>
                       <div className="mt-1 text-[12px] text-slate-500 capitalize">
                         {t.language} · v{t.currentVersion}
-                        {t.syncedAt && ` · synced ${relativeTime(t.syncedAt)}`}
+                        {t.syncedAt && ` · ${tr("sincronizado", "synced")} ${relativeTime(t.syncedAt, Date.now(), locale)}`}
                         {t.parameterCount > 0 &&
-                          ` · ${t.parameterCount} variable${t.parameterCount === 1 ? "" : "s"}`}
+                          ` · ${t.parameterCount} ${locale === "pt" ? (t.parameterCount === 1 ? "variável" : "variáveis") : (t.parameterCount === 1 ? "variable" : "variables")}`}
                       </div>
-                      {templateReadiness(t.status, t.rejectionReason) && (
+                      {templateReadiness(t.status, t.rejectionReason, locale) && (
                         <div
                           className={`mt-2 inline-flex max-w-full items-start gap-2 rounded-lg border px-2.5 py-1.5 text-[12px] ${templateReadinessClass(
                             t.status,
@@ -246,7 +252,7 @@ export default function TemplatesPage() {
                         >
                           {templateReadinessIcon(t.status)}
                           <span className="min-w-0 truncate">
-                            {templateReadiness(t.status, t.rejectionReason)}
+                            {templateReadiness(t.status, t.rejectionReason, locale)}
                           </span>
                         </div>
                       )}
@@ -257,14 +263,14 @@ export default function TemplatesPage() {
                         className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-[#0a1b33] transition-colors hover:border-slate-300"
                       >
                         <Eye size={15} />
-                        Preview
+                        {tr("Pré-visualizar", "Preview")}
                       </Link>
                       <Link
                         href={`/app/templates/${t._id}`}
                         className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-[#0a1b33] transition-colors hover:border-slate-300"
                       >
                         <Pencil size={15} />
-                        Edit
+                        {tr("Editar", "Edit")}
                       </Link>
                     </div>
                   </li>
@@ -274,16 +280,16 @@ export default function TemplatesPage() {
                 <div className="p-10 text-center">
                   <FileText size={26} className="mx-auto text-slate-300" />
                   <h2 className="mt-3 font-[var(--font-outfit)] text-lg font-semibold text-[#0a1b33]">
-                    No templates match
+                    {tr("Nenhum template corresponde", "No templates match")}
                   </h2>
                   <p className="mt-1 text-sm text-slate-500">
-                    Clear filters or sync from Meta again.
+                    {tr("Limpe os filtros ou sincronize novamente com a Meta.", "Clear filters or sync from Meta again.")}
                   </p>
                 </div>
               )}
             </div>
             <div className="text-sm text-slate-500">
-              Showing {filteredTemplates.length} of {templates.length} templates
+              {tr("A mostrar", "Showing")} {filteredTemplates.length} {tr("de", "of")} {templates.length} templates
             </div>
           </>
         )}
@@ -312,7 +318,7 @@ function TemplateStat({
           ? "border-red-100 bg-red-50 text-red-700"
           : "border-slate-200 bg-slate-50 text-slate-600";
   return (
-    <div className={`rounded-xl border p-3 ${toneClass}`}>
+    <div className={`rounded-lg border p-3 ${toneClass}`}>
       <div className="flex items-center justify-between gap-3">
         <span className="text-xs font-semibold uppercase tracking-[0.12em] opacity-75">
           {label}
@@ -324,16 +330,44 @@ function TemplateStat({
   );
 }
 
-function templateReadiness(status: string, reason?: string) {
-  if (status === "approved") return "Ready for campaigns and service-window sends.";
-  if (status === "pending") return "Waiting for Meta review. Do not use in launches yet.";
+function templateReadiness(status: string, reason: string | undefined, locale: Locale) {
+  const pt = locale === "pt";
+  if (status === "approved") return pt ? "Pronto para campanhas e mensagens de atendimento." : "Ready for campaigns and service-window sends.";
+  if (status === "pending") return pt ? "A aguardar revisão da Meta. Ainda não pode ser usado em envios." : "Waiting for Meta review. Do not use in launches yet.";
   if (status === "rejected") {
-    return reason ? `Rejected: ${reason}` : "Rejected by Meta. Fix copy and submit a new version.";
+    return reason
+      ? `${pt ? "Rejeitado" : "Rejected"}: ${reason}`
+      : pt
+        ? "Rejeitado pela Meta. Corrija a mensagem e submeta uma nova versão."
+        : "Rejected by Meta. Fix copy and submit a new version.";
   }
-  if (status === "paused") return "Paused by Meta. Avoid campaigns until quality recovers.";
-  if (status === "disabled") return "Disabled by Meta. Remove from campaign flows.";
-  if (status === "draft") return "Draft only. Submit to Meta before using outside 24h windows.";
+  if (status === "paused") return pt ? "Pausado pela Meta. Evite campanhas até a qualidade recuperar." : "Paused by Meta. Avoid campaigns until quality recovers.";
+  if (status === "disabled") return pt ? "Desativado pela Meta. Retire-o dos fluxos de campanha." : "Disabled by Meta. Remove from campaign flows.";
+  if (status === "draft") return pt ? "Apenas rascunho. Submeta à Meta antes de usar fora das 24 horas." : "Draft only. Submit to Meta before using outside 24h windows.";
   return "";
+}
+
+function statusLabel(status: string, locale: Locale) {
+  const labels: Record<string, [string, string]> = {
+    draft: ["Rascunho", "Draft"],
+    pending: ["Em análise", "Pending"],
+    approved: ["Aprovado", "Approved"],
+    rejected: ["Rejeitado", "Rejected"],
+    paused: ["Pausado", "Paused"],
+    disabled: ["Desativado", "Disabled"],
+  };
+  const label = labels[status];
+  return label ? label[locale === "pt" ? 0 : 1] : status;
+}
+
+function categoryLabel(category: string, locale: Locale) {
+  const labels: Record<string, [string, string]> = {
+    marketing: ["Marketing", "Marketing"],
+    utility: ["Utilidade", "Utility"],
+    authentication: ["Autenticação", "Authentication"],
+  };
+  const label = labels[category];
+  return label ? label[locale === "pt" ? 0 : 1] : category;
 }
 
 function templateReadinessClass(status: string) {

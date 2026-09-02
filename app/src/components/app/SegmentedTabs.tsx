@@ -20,12 +20,14 @@ export function SegmentedTabs({
   onChange: (key: string) => void;
   className?: string;
 }) {
+  const gridClass = items.length === 3 ? "grid-cols-3" : "grid-cols-2 sm:grid-cols-3 xl:grid-cols-6";
+
   return (
     <div
       role="tablist"
-      className={`overflow-x-auto rounded-xl border border-slate-200 bg-white p-1 ${className}`}
+      className={`rounded-lg border border-slate-200 bg-white p-1 ${className}`}
     >
-      <div className="grid min-w-max grid-flow-col auto-cols-fr gap-1">
+      <div className={`grid gap-1 ${gridClass}`}>
         {items.map((item) => {
           const Icon = item.icon;
           const active = item.key === selected;
@@ -36,7 +38,7 @@ export function SegmentedTabs({
               role="tab"
               aria-selected={active}
               onClick={() => onChange(item.key)}
-              className={`group flex min-h-12 items-center gap-2 rounded-lg px-3 text-left transition-colors ${
+              className={`group flex min-h-12 min-w-0 items-center gap-1.5 rounded-md px-2 text-left transition-colors sm:gap-2 sm:px-2.5 ${
                 active
                   ? "bg-[#0a152d] text-white"
                   : "text-slate-600 hover:bg-slate-50 hover:text-[#0a1b33]"
@@ -53,7 +55,7 @@ export function SegmentedTabs({
                   <Icon size={15} />
                 </span>
               )}
-              <span className="min-w-0">
+                <span className="min-w-0 flex-1">
                 <span className="block truncate text-[13px] font-semibold">
                   {item.label}
                 </span>

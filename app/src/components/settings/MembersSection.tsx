@@ -13,10 +13,12 @@ import {
 } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import { relativeTime } from "@/lib/relativeTime";
+import { useI18n, type Locale } from "@/lib/i18n";
 
 type InviteRole = "admin" | "agent" | "marketing";
 
 export function MembersSection() {
+  const { locale, tr } = useI18n();
   const members = useQuery(api.memberInvites.listMembers, {});
   const invites = useQuery(api.memberInvites.list, {});
   const invite = useAction(api.memberInvites.invite);
@@ -43,7 +45,7 @@ export function MembersSection() {
       setEmail("");
       setInviting(false);
     } catch (err) {
-      setError(formatError(err));
+      setError(formatError(err, locale));
     } finally {
       setBusy(false);
     }
@@ -61,10 +63,10 @@ export function MembersSection() {
   );
 
   return (
-    <section className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+    <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
       <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
         <h2 className="font-semibold text-[#0a1b33] text-[15px]">
-          Members &amp; invites
+          {tr("Membros e convites", "Members & invites")}
         </h2>
         {!inviting && !justInvited && (
           <button
@@ -73,7 +75,7 @@ export function MembersSection() {
             className="inline-flex items-center gap-1.5 bg-[#0a152d] text-white text-[12px] font-medium px-3 py-1.5 rounded-lg hover:bg-[#0a1b33] transition-all"
           >
             <UserPlus size={12} strokeWidth={2.5} />
-            Invite
+            {tr("Convidar", "Invite")}
           </button>
         )}
       </div>
@@ -83,10 +85,10 @@ export function MembersSection() {
           <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 space-y-2">
             <div className="flex items-center gap-2 text-[12px] font-semibold text-emerald-800">
               <Check size={14} />
-              Invite sent to {justInvited.email}
+              {tr("Convite enviado para", "Invite sent to")} {justInvited.email}
             </div>
             <div className="text-[11px] text-emerald-700">
-              Send them this link. Expires in 7 days.
+              {tr("Envie este link. Expira em 7 dias.", "Send this link. It expires in 7 days.")}
             </div>
             <div className="flex items-stretch gap-2">
               <code className="flex-1 bg-white border border-emerald-200 rounded-md px-3 py-2 text-[11px] font-[var(--font-mono)] text-[#0a1b33] break-all">
@@ -98,7 +100,7 @@ export function MembersSection() {
                 className="bg-emerald-600 text-white px-3 rounded-md hover:bg-emerald-700 transition-colors flex items-center gap-1 text-[12px] font-medium"
               >
                 {copied ? <Check size={14} /> : <Copy size={14} />}
-                {copied ? "Copied" : "Copy"}
+                {copied ? tr("Copiado", "Copied") : tr("Copiar", "Copy")}
               </button>
             </div>
             <button
@@ -106,7 +108,7 @@ export function MembersSection() {
               onClick={() => setJustInvited(null)}
               className="text-[12px] text-emerald-800 font-medium hover:underline"
             >
-              Done
+              {tr("Concluído", "Done")}
             </button>
           </div>
         )}
@@ -127,16 +129,16 @@ export function MembersSection() {
             </div>
             <div>
               <label className="text-[11px] text-slate-500 font-medium">
-                Role
+                {tr("Papel", "Role")}
               </label>
               <select
                 value={role}
                 onChange={(e) => setRole(e.target.value as InviteRole)}
                 className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[#0a152d]/20"
               >
-                <option value="agent">agent — handle inbox</option>
-                <option value="marketing">marketing — send campaigns</option>
-                <option value="admin">admin — manage workspace</option>
+                <option value="agent">{tr("atendimento — gerir inbox", "agent — handle inbox")}</option>
+                <option value="marketing">{tr("marketing — enviar campanhas", "marketing — send campaigns")}</option>
+                <option value="admin">{tr("admin — gerir espaço", "admin — manage workspace")}</option>
               </select>
             </div>
             {error && (
@@ -155,7 +157,7 @@ export function MembersSection() {
                 }}
                 className="text-[12px] text-slate-500 hover:text-slate-700 px-2 py-1.5"
               >
-                Cancel
+                {tr("Cancelar", "Cancel")}
               </button>
               <button
                 type="button"
@@ -164,7 +166,7 @@ export function MembersSection() {
                 className="inline-flex items-center gap-1.5 bg-[#0a152d] text-white text-[12px] font-medium px-3 py-1.5 rounded-lg disabled:opacity-40 hover:bg-[#0a1b33] transition-all"
               >
                 {busy && <Loader2 size={12} className="animate-spin" />}
-                Send invite
+                {tr("Enviar convite", "Send invite")}
               </button>
             </div>
           </div>
@@ -172,10 +174,10 @@ export function MembersSection() {
 
         <div>
           <div className="text-[11px] uppercase tracking-wider text-slate-400 font-medium mb-2">
-            Active members
+            {tr("Membros ativos", "Active members")}
           </div>
           {members === undefined ? (
-            <div className="text-slate-400 text-[12px]">Loading…</div>
+            <div className="text-slate-400 text-[12px]">{tr("A carregar…", "Loading…")}</div>
           ) : (
             <ul className="divide-y divide-slate-100 border border-slate-200 rounded-lg overflow-hidden">
               {(members ?? []).map((m) => (
@@ -186,10 +188,10 @@ export function MembersSection() {
                   <Users size={14} className="text-slate-500" />
                   <div className="flex-1 min-w-0">
                     <div className="text-[13px] font-medium text-[#0a1b33]">
-                      {m.email ?? "(no email)"}
+                      {m.email ?? tr("(sem email)", "(no email)")}
                     </div>
                     <div className="text-[11px] text-slate-500 mt-0.5">
-                      {m.role} · joined {relativeTime(m.createdAt)}
+                      {roleLabel(m.role, locale)} · {tr("entrou", "joined")} {relativeTime(m.createdAt, Date.now(), locale)}
                     </div>
                   </div>
                 </li>
@@ -201,7 +203,7 @@ export function MembersSection() {
         {activeInvites.length > 0 && (
           <div>
             <div className="text-[11px] uppercase tracking-wider text-slate-400 font-medium mb-2">
-              Pending invites
+              {tr("Convites pendentes", "Pending invites")}
             </div>
             <ul className="divide-y divide-slate-100 border border-slate-200 rounded-lg overflow-hidden">
               {activeInvites.map((inv) => (
@@ -215,19 +217,20 @@ export function MembersSection() {
                       {inv.email}
                     </div>
                     <div className="text-[11px] text-slate-500 mt-0.5">
-                      {inv.role} · expires{" "}
-                      {new Date(inv.expiresAt).toLocaleDateString()}
+                      {roleLabel(inv.role, locale)} · {tr("expira em", "expires")} {" "}
+                      {new Date(inv.expiresAt).toLocaleDateString(locale === "pt" ? "pt-MZ" : "en-GB")}
                     </div>
                   </div>
                   <button
                     type="button"
                     onClick={() => {
-                      if (confirm(`Revoke invite to ${inv.email}?`)) {
+                      if (confirm(tr(`Revogar convite para ${inv.email}?`, `Revoke invite to ${inv.email}?`))) {
                         revoke({ inviteId: inv._id });
                       }
                     }}
                     className="text-slate-400 hover:text-red-600 p-1.5"
-                    title="Revoke"
+                    title={tr("Revogar", "Revoke")}
+                    aria-label={tr(`Revogar convite para ${inv.email}`, `Revoke invite to ${inv.email}`)}
                   >
                     <Trash2 size={13} />
                   </button>
@@ -241,7 +244,7 @@ export function MembersSection() {
   );
 }
 
-function formatError(err: unknown): string {
+function formatError(err: unknown, locale: Locale): string {
   if (err && typeof err === "object" && "data" in err) {
     const data = (err as { data: unknown }).data;
     if (typeof data === "object" && data !== null) {
@@ -250,5 +253,16 @@ function formatError(err: unknown): string {
       if (typeof d.code === "string") return d.code;
     }
   }
-  return err instanceof Error ? err.message : "Unknown error";
+  return err instanceof Error
+    ? err.message
+    : locale === "pt" ? "Erro desconhecido" : "Unknown error";
+}
+
+function roleLabel(role: string, locale: Locale) {
+  if (locale !== "pt") return role;
+  if (role === "agent") return "atendimento";
+  if (role === "marketing") return "marketing";
+  if (role === "admin") return "administrador";
+  if (role === "owner") return "proprietário";
+  return role;
 }

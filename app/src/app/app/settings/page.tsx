@@ -32,6 +32,14 @@ import { ComplianceSection } from "@/components/settings/ComplianceSection";
 import { IaSolutionHubSection } from "@/components/settings/IaSolutionHubSection";
 import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
+import { useI18n, type Locale } from "@/lib/i18n";
+import {
+  channelStateLabel,
+  roleLabel,
+  signupStateLabel,
+  tokenStateLabel,
+  verticalLabel,
+} from "@/lib/operationalLabels";
 
 type FacebookLoginResponse = {
   authResponse?: { code?: string };
@@ -121,6 +129,7 @@ type EvidenceResult = {
 };
 
 export default function SettingsPage() {
+  const { locale, tr } = useI18n();
   const tenant = useQuery(api.tenantsQueries.getActive);
   const wabaAccounts = useQuery(api.whatsappAccounts.listForTenant);
   const admission = useQuery(api.metaAdmission.readiness);
@@ -154,11 +163,11 @@ export default function SettingsPage() {
 
   const hasConnection = (wabaAccounts?.length ?? 0) > 0;
   const settingsTabs = [
-    { key: "meta", label: "Meta", value: admission ? `${admission.score}% ready` : "Checking", icon: ShieldCheck },
-    { key: "whatsapp", label: "WhatsApp", value: hasConnection ? "Connected" : "Setup", icon: Smartphone },
-    { key: "automation", label: "Automation", value: "Rules", icon: Bot },
-    { key: "team", label: "Team", value: "Members/API", icon: Users },
-    { key: "workspace", label: "Workspace", value: tenant.role, icon: Building2 },
+    { key: "meta", label: "Meta", value: admission ? `${admission.score}% ${tr("pronto", "ready")}` : tr("A verificar", "Checking"), icon: ShieldCheck },
+    { key: "whatsapp", label: "WhatsApp", value: hasConnection ? tr("Ligado", "Connected") : tr("Configurar", "Setup"), icon: Smartphone },
+    { key: "automation", label: tr("Automação", "Automation"), value: tr("Regras", "Rules"), icon: Bot },
+    { key: "team", label: tr("Equipa", "Team"), value: tr("Membros/API", "Members/API"), icon: Users },
+    { key: "workspace", label: tr("Espaço", "Workspace"), value: roleLabel(tenant.role, locale), icon: Building2 },
   ];
 
   async function handleEmbeddedSignup() {
@@ -174,7 +183,10 @@ export default function SettingsPage() {
         !result.graphVersion
       ) {
         setSignupNotice(
-          "Embedded Signup session created. Add META_EMBEDDED_SIGNUP_APP_ID, META_EMBEDDED_SIGNUP_CONFIG_ID, and META_EMBEDDED_SIGNUP_APP_SECRET to enable Meta v4 signup.",
+          tr(
+            "Sessão de cadastro criada. Adicione META_EMBEDDED_SIGNUP_APP_ID, META_EMBEDDED_SIGNUP_CONFIG_ID e META_EMBEDDED_SIGNUP_APP_SECRET para ativar o cadastro Meta v4.",
+            "Embedded Signup session created. Add META_EMBEDDED_SIGNUP_APP_ID, META_EMBEDDED_SIGNUP_CONFIG_ID, and META_EMBEDDED_SIGNUP_APP_SECRET to enable Meta v4 signup.",
+          ),
         );
         return;
       }
@@ -200,7 +212,7 @@ export default function SettingsPage() {
         window.removeEventListener("message", onMessage);
 
       await loadFacebookSdk(result.appId, result.graphVersion);
-      if (!window.FB) throw new Error("Facebook SDK failed to initialize.");
+      if (!window.FB) throw new Error(tr("Não foi possível iniciar o SDK do Facebook.", "Facebook SDK failed to initialize."));
 
       const response = await new Promise<FacebookLoginResponse>((resolve) => {
         window.FB!.login(resolve, {
@@ -214,8 +226,8 @@ export default function SettingsPage() {
       if (!code) {
         setSignupNotice(
           response.status
-            ? `Meta signup did not return a code (${response.status}).`
-            : "Meta signup was closed before a code was returned.",
+            ? tr(`O cadastro Meta não devolveu um código (${response.status}).`, `Meta signup did not return a code (${response.status}).`)
+            : tr("O cadastro Meta foi fechado antes de devolver um código.", "Meta signup was closed before a code was returned."),
         );
         return;
       }
@@ -231,14 +243,14 @@ export default function SettingsPage() {
       });
       setSignupNotice(
         completion.status === "connected"
-          ? "WhatsApp connected via Embedded Signup v4."
+          ? tr("WhatsApp ligado pelo Cadastro Incorporado v4.", "WhatsApp connected via Embedded Signup v4.")
           : completion.ok
-            ? `Meta signup captured (${completion.status}).`
-            : "Meta signup failed during backend onboarding.",
+            ? tr(`Cadastro Meta recebido (${completion.status}).`, `Meta signup captured (${completion.status}).`)
+            : tr("O cadastro Meta falhou durante a configuração no servidor.", "Meta signup failed during backend onboarding."),
       );
     } catch (err) {
       setSignupNotice(
-        err instanceof Error ? err.message : "Embedded Signup failed.",
+        err instanceof Error ? err.message : tr("O cadastro Meta falhou.", "Embedded Signup failed."),
       );
     } finally {
       removeMessageListener?.();
@@ -258,13 +270,16 @@ export default function SettingsPage() {
       setLaunchLink(url);
       await navigator.clipboard.writeText(url);
       setLaunchLinkNotice(
-        `Client signup link copied. It expires ${formatDate(result.expiresAt)}.`,
+        tr(
+          `Link de ligação copiado. Expira em ${formatDate(result.expiresAt, locale)}.`,
+          `Client signup link copied. It expires ${formatDate(result.expiresAt, locale)}.`,
+        ),
       );
     } catch (error) {
       setLaunchLinkNotice(
         error instanceof Error
           ? cleanError(error.message)
-          : "Could not create signup link.",
+          : tr("Não foi possível criar o link de ligação.", "Could not create signup link."),
       );
     } finally {
       setLaunchLinkBusy(false);
@@ -297,12 +312,12 @@ export default function SettingsPage() {
       setEvidenceResult(result);
       setEvidenceNotice(
         result.summary.failed === 0
-          ? "Read-only evidence pack generated."
-          : "Evidence pack generated with failed checks.",
+          ? tr("Pacote de evidências de leitura gerado.", "Read-only evidence pack generated.")
+          : tr("Pacote de evidências gerado com verificações falhadas.", "Evidence pack generated with failed checks."),
       );
     } catch (error) {
       setEvidenceNotice(
-        error instanceof Error ? error.message : "Evidence run failed.",
+        error instanceof Error ? error.message : tr("A verificação de evidências falhou.", "Evidence run failed."),
       );
     } finally {
       setEvidenceBusy(null);
@@ -327,12 +342,12 @@ export default function SettingsPage() {
   return (
     <>
       <PageHeader
-        eyebrow="Workspace"
-        title="Settings"
-        description="Workspace and WhatsApp connection."
+        eyebrow={tr("Administração", "Administration")}
+        title={tr("Configurações", "Settings")}
+        description={tr("Espaço de trabalho, equipa, automações e ligações WhatsApp.", "Workspace, team, automation and WhatsApp connections.")}
       />
 
-      <div className="px-8 py-8 max-w-6xl space-y-6">
+      <div className="max-w-6xl space-y-6 px-4 py-5 sm:px-6 sm:py-6">
         <SegmentedTabs
           items={settingsTabs}
           selected={settingsTab}
@@ -341,37 +356,37 @@ export default function SettingsPage() {
 
         {/* Workspace card */}
         {settingsTab === "workspace" && (
-        <section className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+        <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
           <div className="px-6 py-4 border-b border-slate-100">
             <h2 className="font-semibold text-[#0a1b33] text-[15px]">
-              Workspace
+              {tr("Espaço de trabalho", "Workspace")}
             </h2>
           </div>
           <dl className="divide-y divide-slate-100">
-            <Row label="Name" value={tenant.name} />
-            <Row label="Vertical" value={tenant.vertical} />
-            <Row label="Tenant ID" value={tenant.tenantId} mono />
-            <Row label="Your role" value={tenant.role} />
+            <Row label={tr("Nome", "Name")} value={tenant.name} />
+            <Row label={tr("Área", "Vertical")} value={verticalLabel(tenant.vertical, locale)} />
+            <Row label={tr("ID da organização", "Tenant ID")} value={tenant.tenantId} mono />
+            <Row label={tr("A sua função", "Your role")} value={roleLabel(tenant.role, locale)} />
           </dl>
         </section>
         )}
 
         {/* WhatsApp connection */}
         {settingsTab === "meta" && (
-        <section className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+        <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
           <div className="px-6 py-4 border-b border-slate-100">
             <h2 className="font-semibold text-[#0a1b33] text-[15px]">
-              Coexistence readiness
+              {tr("Preparação da ligação Meta", "Meta connection readiness")}
             </h2>
             <p className="text-xs text-slate-500 mt-0.5">
-              Provider-grade Meta admission, Embedded Signup, security, webhook, and COEX checks.
+              {tr("Verificações de cadastro, segurança, webhook e coexistência exigidas pela Meta.", "Provider-grade Meta admission, Embedded Signup, security, webhook, and coexistence checks.")}
             </p>
           </div>
           <div className="p-6">
             {!admission ? (
               <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-5 text-sm text-slate-500">
                 <Loader2 size={15} className="animate-spin" />
-                Loading provider readiness...
+                {tr("A verificar requisitos da Meta...", "Loading provider readiness...")}
               </div>
             ) : (
               <>
@@ -379,7 +394,7 @@ export default function SettingsPage() {
                   <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                     <div className="flex items-center gap-2 text-[12px] font-semibold uppercase text-slate-500">
                       <ShieldCheck size={14} />
-                      Meta readiness
+                      {tr("Preparação Meta", "Meta readiness")}
                     </div>
                     <div className="mt-3 text-4xl font-semibold text-[#0a1b33]">
                       {admission.score}%
@@ -399,14 +414,14 @@ export default function SettingsPage() {
                       </div>
                       <div>
                         <div className="text-[13px] font-semibold text-[#0a1b33]">
-                          Next move
+                          {tr("Próximo passo", "Next move")}
                         </div>
                         <p className="mt-1 text-sm leading-6 text-slate-500">
                           {admission.suggestedPath}
                         </p>
                         {admission.blockers.length > 0 && (
                           <div className="mt-2 text-[11px] font-mono text-slate-400">
-                            Blocking: {admission.blockers.join(", ")}
+                            {tr("Bloqueios", "Blocking")}: {admission.blockers.join(", ")}
                           </div>
                         )}
                       </div>
@@ -435,10 +450,10 @@ export default function SettingsPage() {
                   </div>
                   <div>
                     <div className="text-[13px] font-semibold text-[#0a1b33]">
-                      Meta App Review evidence
+                      {tr("Evidências para revisão da Meta", "Meta App Review evidence")}
                     </div>
                     <p className="mt-1 max-w-2xl text-[12px] leading-5 text-slate-500">
-                      Runs read-only Graph checks against the connected WABA and returns a token-redacted pack with HTTP status, trace IDs, request IDs, and responses.
+                      {tr("Executa verificações apenas de leitura na WABA ligada e gera um relatório sem tokens, com estados HTTP e identificadores de diagnóstico.", "Runs read-only Graph checks against the connected WABA and returns a token-redacted pack with HTTP status and diagnostic IDs.")}
                     </p>
                   </div>
                 </div>
@@ -449,7 +464,7 @@ export default function SettingsPage() {
                     className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[12px] font-medium text-slate-600 transition-colors hover:border-slate-300 hover:text-[#0a1b33]"
                   >
                     <Download size={13} />
-                    Download .txt
+                    {tr("Descarregar .txt", "Download .txt")}
                   </button>
                 )}
               </div>
@@ -462,7 +477,7 @@ export default function SettingsPage() {
 
               {(wabaAccounts ?? []).length === 0 ? (
                 <div className="mt-3 rounded-lg bg-white px-3 py-2 text-xs text-slate-500">
-                  Connect a WABA before generating Meta evidence.
+                  {tr("Ligue uma WABA antes de gerar evidências para a Meta.", "Connect a WABA before generating Meta evidence.")}
                 </div>
               ) : (
                 <div className="mt-3 grid gap-2">
@@ -481,7 +496,7 @@ export default function SettingsPage() {
                           <div className="mt-0.5 truncate text-[11px] text-slate-500">
                             {primaryPhone
                               ? `${primaryPhone.displayName} · ${primaryPhone.e164}`
-                              : "No phone number found"}
+                              : tr("Nenhum número encontrado", "No phone number found")}
                           </div>
                         </div>
                         <button
@@ -497,7 +512,7 @@ export default function SettingsPage() {
                           ) : (
                             <ShieldCheck size={13} />
                           )}
-                          Run read-only evidence
+                          {tr("Executar verificação", "Run read-only evidence")}
                         </button>
                       </div>
                     );
@@ -509,9 +524,9 @@ export default function SettingsPage() {
                 <div className="mt-4 rounded-xl border border-slate-200 bg-white p-3">
                   <div className="grid gap-2 text-xs sm:grid-cols-4">
                     <EvidenceMetric label="OK" value={evidenceResult.summary.ok} tone="text-emerald-700" />
-                    <EvidenceMetric label="Failed" value={evidenceResult.summary.failed} tone="text-red-700" />
-                    <EvidenceMetric label="Skipped" value={evidenceResult.summary.skipped} tone="text-amber-700" />
-                    <EvidenceMetric label="Writes" value={evidenceResult.summary.writesEnabled ? "enabled" : "off"} tone="text-slate-700" />
+                    <EvidenceMetric label={tr("Falharam", "Failed")} value={evidenceResult.summary.failed} tone="text-red-700" />
+                    <EvidenceMetric label={tr("Ignoradas", "Skipped")} value={evidenceResult.summary.skipped} tone="text-amber-700" />
+                    <EvidenceMetric label={tr("Escritas", "Writes")} value={evidenceResult.summary.writesEnabled ? tr("ativas", "enabled") : tr("desligadas", "off")} tone="text-slate-700" />
                   </div>
                   <div className="mt-3 max-h-64 space-y-1.5 overflow-auto pr-1">
                     {evidenceResult.records.map((record, index) => (
@@ -524,7 +539,7 @@ export default function SettingsPage() {
                             {record.label}
                           </span>
                           <span className={`rounded-md border px-1.5 py-0.5 font-semibold ${evidenceRecordTone(record)}`}>
-                            {record.skipped ? "skipped" : record.ok ? `HTTP ${record.status}` : `HTTP ${record.status || "fail"}`}
+                            {record.skipped ? tr("ignorado", "skipped") : record.ok ? `HTTP ${record.status}` : `HTTP ${record.status || tr("falha", "fail")}`}
                           </span>
                         </div>
                         {!record.skipped && (
@@ -547,10 +562,10 @@ export default function SettingsPage() {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <div className="text-[13px] font-medium text-[#0a1b33]">
-                  Embedded Signup
+                  {tr("Cadastro incorporado", "Embedded Signup")}
                 </div>
                 <div className="text-[11px] text-slate-500">
-                  Start a state-tracked Meta onboarding session when app config is present.
+                  {tr("Inicie uma sessão segura de ligação à Meta quando a app estiver configurada.", "Start a state-tracked Meta onboarding session when app config is present.")}
                 </div>
               </div>
               <button
@@ -560,7 +575,7 @@ export default function SettingsPage() {
                 className="inline-flex items-center gap-2 rounded-lg bg-[#0a152d] px-3 py-2 text-[12px] font-medium text-white transition-all hover:bg-[#0a1b33] disabled:opacity-50"
               >
                 {signupBusy ? <Loader2 size={13} className="animate-spin" /> : <LogIn size={13} />}
-                Start signup
+                {tr("Iniciar cadastro", "Start signup")}
               </button>
             </div>
             {(signupSessions ?? []).length > 0 && (
@@ -575,7 +590,7 @@ export default function SettingsPage() {
                         {session.state.slice(0, 8)}
                       </span>
                       <span className="font-medium text-slate-600">
-                        {session.status}
+                        {signupStateLabel(session.status, locale)}
                       </span>
                     </div>
                     {(session.businessId ||
@@ -604,11 +619,10 @@ export default function SettingsPage() {
                 <div>
                   <div className="flex items-center gap-2 text-[13px] font-medium text-[#0a1b33]">
                     <Link2 size={14} className="text-slate-500" />
-                    Client connect link
+                    {tr("Link de ligação do cliente", "Client connect link")}
                   </div>
                   <div className="mt-1 text-[11px] leading-5 text-slate-500">
-                    Create a 72-hour secure launcher for a client to complete
-                    Embedded Signup without accessing this dashboard.
+                    {tr("Crie um link seguro de 72 horas para o cliente concluir a ligação sem aceder a este painel.", "Create a secure 72-hour link for a client to complete Embedded Signup without accessing this dashboard.")}
                   </div>
                 </div>
                 <button
@@ -622,7 +636,7 @@ export default function SettingsPage() {
                   ) : (
                     <Copy size={13} />
                   )}
-                  Copy link
+                  {tr("Copiar link", "Copy link")}
                 </button>
               </div>
               {launchLink && (
@@ -642,18 +656,18 @@ export default function SettingsPage() {
 
         {/* WhatsApp connection */}
         {settingsTab === "whatsapp" && (
-        <section className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+        <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
           <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
             <h2 className="font-semibold text-[#0a1b33] text-[15px]">
               WhatsApp Business Account
             </h2>
             {hasConnection ? (
               <span className="inline-flex items-center gap-1.5 text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md text-xs font-medium">
-                <CheckCircle2 size={12} /> Connected
+                <CheckCircle2 size={12} /> {tr("Ligado", "Connected")}
               </span>
             ) : (
               <span className="inline-flex items-center gap-1.5 text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md text-xs font-medium">
-                Not connected
+                {tr("Não ligado", "Not connected")}
               </span>
             )}
           </div>
@@ -676,9 +690,9 @@ export default function SettingsPage() {
                             WABA {acc.wabaId}
                           </div>
                           <div className="text-xs text-slate-500">
-                            Status: {acc.status} · Token: {acc.tokenStatus}
-                            {` · Storage: ${acc.tokenStorage}`}
-                            {acc.qualityRating && ` · Quality: ${acc.qualityRating}`}
+                            {tr("Estado", "Status")}: {channelStateLabel(acc.status, locale)} · Token: {tokenStateLabel(acc.tokenStatus, locale)}
+                            {` · ${tr("Armazenamento", "Storage")}: ${tokenStateLabel(acc.tokenStorage, locale)}`}
+                            {acc.qualityRating && ` · ${tr("Qualidade", "Quality")}: ${acc.qualityRating}`}
                           </div>
                         </div>
                       </div>
@@ -703,7 +717,7 @@ export default function SettingsPage() {
                               {p.circuitBreakerUntil &&
                                 p.circuitBreakerUntil > Date.now() && (
                                   <span className="ml-2 rounded-md border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
-                                    Circuit breaker active
+                                    {tr("Proteção temporária ativa", "Circuit breaker active")}
                                   </span>
                                 )}
                               {p.circuitBreakerReason && (
@@ -722,7 +736,7 @@ export default function SettingsPage() {
                   </div>
                 ))}
                 <p className="text-xs text-slate-500">
-                  Connect another number using the form below.
+                  {tr("Ligue outro número usando o formulário abaixo.", "Connect another number using the form below.")}
                 </p>
                 <div className="border-t border-slate-100 pt-6">
                   <ConnectWabaForm />
@@ -736,14 +750,13 @@ export default function SettingsPage() {
                   </div>
                   <div className="flex-1">
                     <p className="text-[14px] text-[#0a1b33] font-medium">
-                      Connect a WABA system user token
+                      {tr("Ligar token de utilizador de sistema WABA", "Connect a WABA system user token")}
                     </p>
                     <p className="text-sm text-slate-500 mt-1">
-                      We call Graph API to validate scopes (
+                      {tr("Usamos a Graph API para validar as permissões", "We use Graph API to validate scopes")} (
                       <code>whatsapp_business_messaging</code>,{" "}
                       <code>whatsapp_business_management</code>,{" "}
-                      <code>business_management</code>) and bind the token to
-                      your WABA.
+                      <code>business_management</code>) {tr("e associar o token à sua WABA.", "and bind the token to your WABA.")}
                     </p>
                   </div>
                 </div>
@@ -763,29 +776,29 @@ export default function SettingsPage() {
         )}
 
         {settingsTab === "automation" && (
-        <section className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+        <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
           <div className="px-6 py-4 border-b border-slate-100">
             <h2 className="font-semibold text-[#0a1b33] text-[15px]">
-              Communication automation
+              {tr("Automação de atendimento", "Communication automation")}
             </h2>
             <p className="text-xs text-slate-500 mt-0.5">
-              Company-wide controls for DND, delayed auto replies, bots, and ecommerce flows.
+              {tr("Regras gerais para opt-out, respostas automáticas, agentes e fluxos de atendimento.", "Workspace-wide rules for opt-out, delayed replies, agents and service flows.")}
             </p>
           </div>
           <div className="grid gap-4 p-6 xl:grid-cols-2">
             <SettingsCard
               icon={MessageSquare}
-              title="Auto Reply"
-              body="Use a quick reply when the customer has waited longer than the selected period. When enabled, the bot should not answer that same contact automatically."
+              title={tr("Resposta automática", "Auto Reply")}
+              body={tr("Use uma resposta rápida quando o paciente esperar mais do que o período definido. O agente não deve responder ao mesmo contacto em duplicado.", "Use a quick reply when the patient has waited longer than the selected period. The agent must not reply to the same contact twice.")}
             >
               <ToggleRow
-                label="Enable"
+                label={tr("Ativar", "Enable")}
                 checked={autoReplyEnabled}
                 onChange={setAutoReplyEnabled}
               />
               <label className="block">
                 <span className="mb-1 block text-[12px] font-medium text-slate-500">
-                  Period in days
+                  {tr("Período em dias", "Period in days")}
                 </span>
                 <input
                   type="number"
@@ -799,7 +812,7 @@ export default function SettingsPage() {
                 />
               </label>
               <QuickReplySelect
-                label="Quick Message Code"
+                label={tr("Resposta rápida", "Quick reply")}
                 value={autoReplyCode}
                 onChange={setAutoReplyCode}
                 options={quickReplies ?? []}
@@ -809,16 +822,16 @@ export default function SettingsPage() {
             <SettingsCard
               icon={Ban}
               title="DND"
-              body='When a customer sends "STOP", pause marketing sends. "START" removes the pause and lets the system continue safely.'
+              body={tr('Quando o paciente envia "STOP", as mensagens de marketing são pausadas. "START" remove a pausa.', 'When a patient sends "STOP", marketing messages are paused. "START" removes the pause.')}
             >
               <QuickReplySelect
-                label="DND enabled Message Code"
+                label={tr("Resposta ao ativar STOP", "STOP acknowledgement")}
                 value={dndOnCode}
                 onChange={setDndOnCode}
                 options={quickReplies ?? []}
               />
               <QuickReplySelect
-                label="DND disabled Message Code"
+                label={tr("Resposta ao reativar START", "START acknowledgement")}
                 value={dndOffCode}
                 onChange={setDndOffCode}
                 options={quickReplies ?? []}
@@ -827,11 +840,11 @@ export default function SettingsPage() {
 
             <SettingsCard
               icon={Bot}
-              title="Bot"
-              body="Company-wide bot switch. Channel-specific rules can override this when a connected number needs human-only handling."
+              title={tr("Agente", "Agent")}
+              body={tr("Controlo geral do agente. Regras por canal podem exigir atendimento exclusivamente humano.", "Workspace-wide agent control. Channel rules can require human-only handling.")}
             >
               <ToggleRow
-                label="Enable Chat Bot"
+                label={tr("Ativar agente", "Enable agent")}
                 checked={botEnabled}
                 onChange={setBotEnabled}
               />
@@ -839,11 +852,11 @@ export default function SettingsPage() {
 
             <SettingsCard
               icon={ShoppingBag}
-              title="Ecommerce"
-              body="Prepare catalog, cart recovery, and order-status conversations for shops that sell through WhatsApp."
+              title={tr("Comércio", "Commerce")}
+              body={tr("Ative apenas quando a organização usa catálogo, recuperação de carrinho e estados de encomenda no WhatsApp.", "Enable only when the organization uses catalog, cart recovery and order-status conversations on WhatsApp.")}
             >
               <ToggleRow
-                label="Enable Ecommerce"
+                label={tr("Ativar comércio", "Enable commerce")}
                 checked={ecommerceEnabled}
                 onChange={setEcommerceEnabled}
               />
@@ -875,6 +888,7 @@ function AdmissionCheckCard({
   busy: string | null;
   onSetStatus: (key: string, status: AdmissionStatus) => Promise<void>;
 }) {
+  const { locale, tr } = useI18n();
   const manual = check.source !== "auto";
   const isBusy = busy?.startsWith(`${check.key}:`) ?? false;
   const StatusIcon =
@@ -887,7 +901,7 @@ function AdmissionCheckCard({
           : Circle;
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+    <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
       <div className="flex gap-3">
         <div className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border bg-white ${statusIconTone(check.status)}`}>
           <StatusIcon
@@ -901,16 +915,16 @@ function AdmissionCheckCard({
               {check.title}
             </div>
             <span className={`rounded-md border px-1.5 py-0.5 text-[10px] font-semibold ${statusBadgeTone(check.status)}`}>
-              {statusLabel(check.status)}
+              {statusLabel(check.status, locale)}
             </span>
             {check.blocking && check.status !== "done" && check.status !== "waived" && (
               <span className="rounded-md border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">
-                Required
+                {tr("Obrigatório", "Required")}
               </span>
             )}
           </div>
           <div className="mt-0.5 text-[11px] font-medium uppercase text-slate-400">
-            {groupLabel(check.group)} · {check.source}
+            {groupLabel(check.group, locale)} · {check.source === "auto" ? tr("automático", "automatic") : check.source === "manual" ? tr("manual", "manual") : tr("híbrido", "hybrid")}
           </div>
           <p className="mt-2 text-[12px] leading-5 text-slate-600">
             {check.description}
@@ -924,19 +938,19 @@ function AdmissionCheckCard({
                 disabled={isBusy || check.status === "done"}
                 onClick={() => onSetStatus(check.key, "done")}
               >
-                Done
+                {tr("Concluído", "Done")}
               </AdmissionButton>
               <AdmissionButton
                 disabled={isBusy || check.status === "in_progress"}
                 onClick={() => onSetStatus(check.key, "in_progress")}
               >
-                In progress
+                {tr("Em curso", "In progress")}
               </AdmissionButton>
               <AdmissionButton
                 disabled={isBusy || check.status === "blocked"}
                 onClick={() => onSetStatus(check.key, "blocked")}
               >
-                Blocked
+                {tr("Bloqueado", "Blocked")}
               </AdmissionButton>
             </div>
           )}
@@ -1022,12 +1036,28 @@ function statusBadgeTone(status: AdmissionStatus): string {
   return "border-slate-200 bg-white text-slate-500";
 }
 
-function statusLabel(status: AdmissionStatus): string {
-  return status.replace(/_/g, " ");
+function statusLabel(status: AdmissionStatus, locale: Locale): string {
+  const labels: Record<AdmissionStatus, [string, string]> = {
+    todo: ["por fazer", "to do"],
+    in_progress: ["em curso", "in progress"],
+    done: ["concluído", "done"],
+    blocked: ["bloqueado", "blocked"],
+    waived: ["dispensado", "waived"],
+  };
+  return labels[status][locale === "pt" ? 0 : 1];
 }
 
-function groupLabel(group: string): string {
-  return group.replace(/_/g, " ");
+function groupLabel(group: string, locale: Locale): string {
+  if (locale !== "pt") return group.replace(/_/g, " ");
+  const labels: Record<string, string> = {
+    business: "negócio",
+    security: "segurança",
+    technical: "técnico",
+    webhook: "webhook",
+    coexistence: "coexistência",
+    app_review: "revisão da app",
+  };
+  return labels[group] ?? group.replace(/_/g, " ");
 }
 
 function Row({
@@ -1067,7 +1097,7 @@ function SettingsCard({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-5">
+    <section className="rounded-lg border border-slate-200 bg-white p-5">
       <div className="mb-4 flex items-start gap-3">
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-[#0a1b33]">
           <Icon size={16} />
@@ -1094,13 +1124,13 @@ function ToggleRow({
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <label className="flex min-h-12 items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-[#0a1b33]">
+    <label className="flex min-h-12 items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-[#0a1b33]">
       {label}
       <input
         type="checkbox"
         checked={checked}
         onChange={(event) => onChange(event.target.checked)}
-        className="h-4 w-4 accent-violet-600"
+        className="h-4 w-4 accent-emerald-600"
       />
     </label>
   );
@@ -1117,6 +1147,7 @@ function QuickReplySelect({
   onChange: (value: string) => void;
   options: Array<{ _id: string; name: string }>;
 }) {
+  const { tr } = useI18n();
   return (
     <label className="block">
       <span className="mb-1 block text-[12px] font-medium text-slate-500">
@@ -1127,7 +1158,7 @@ function QuickReplySelect({
         onChange={(event) => onChange(event.target.value)}
         className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-[#0a1b33] outline-none focus:border-slate-400"
       >
-        <option value="">Select Quick Message Code</option>
+        <option value="">{tr("Selecionar resposta rápida", "Select quick reply")}</option>
         {options.map((reply) => (
           <option key={reply._id} value={reply.name}>
             {reply.name}
@@ -1138,8 +1169,8 @@ function QuickReplySelect({
   );
 }
 
-function formatDate(value: number) {
-  return new Intl.DateTimeFormat("en", {
+function formatDate(value: number, locale: Locale) {
+  return new Intl.DateTimeFormat(locale === "pt" ? "pt-MZ" : "en-GB", {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));

@@ -5,17 +5,19 @@ import { useRouter } from "next/navigation";
 import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { BrandLogo } from "@/components/Brand";
+import { LanguageSwitcher, useI18n } from "@/lib/i18n";
 
 const VERTICALS = [
-  { value: "clinic", label: "Clínica / Saúde" },
-  { value: "services", label: "Serviços B2C" },
-  { value: "ecommerce", label: "E-commerce" },
-  { value: "other", label: "Outro" },
+  { value: "clinic", pt: "Clínica / Saúde", en: "Clinic / Healthcare" },
+  { value: "services", pt: "Serviços B2C", en: "B2C services" },
+  { value: "ecommerce", pt: "Comércio eletrónico", en: "E-commerce" },
+  { value: "other", pt: "Outro", en: "Other" },
 ] as const;
 
 type Vertical = (typeof VERTICALS)[number]["value"];
 
 export default function OnboardingPage() {
+  const { tr } = useI18n();
   const router = useRouter();
   const createTenant = useMutation(api.tenants.createForCurrentUser);
 
@@ -31,28 +33,27 @@ export default function OnboardingPage() {
     try {
       await createTenant({ name, vertical });
       router.push("/app");
-    } catch (err: unknown) {
-      const msg =
-        err instanceof Error ? err.message : "Não foi possível criar o workspace.";
-      setError(msg);
+    } catch {
+      setError(tr("Não foi possível criar o espaço de trabalho. Tente novamente.", "Could not create the workspace. Try again."));
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#f9fafb] px-4 py-12">
+    <div className="relative flex min-h-screen items-center justify-center bg-[#f9fafb] px-4 py-12">
+      <LanguageSwitcher compact className="absolute right-4 top-4" />
       <div className="w-full max-w-md">
         <div className="mb-10 flex justify-center text-[#0a1b33]">
           <BrandLogo />
         </div>
 
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-[0_20px_60px_-30px_rgba(0,0,0,0.15)] p-8">
+        <div className="rounded-lg border border-slate-200 bg-white p-8 shadow-[0_20px_60px_-30px_rgba(0,0,0,0.15)]">
           <h1 className="font-[var(--font-outfit)] text-[26px] font-medium tracking-tight text-[#0a1b33]">
-            Set up your workspace
+            {tr("Configure o seu espaço de trabalho", "Set up your workspace")}
           </h1>
           <p className="text-slate-500 text-sm mt-1">
-            One last step before you can connect WhatsApp.
+            {tr("Só falta este passo para ligar o WhatsApp.", "One last step before you can connect WhatsApp.")}
           </p>
 
           <form onSubmit={onSubmit} className="mt-6 space-y-4">
@@ -61,7 +62,7 @@ export default function OnboardingPage() {
                 htmlFor="name"
                 className="block text-xs font-medium text-slate-700 mb-1.5"
               >
-                Workspace name
+                {tr("Nome do espaço de trabalho", "Workspace name")}
               </label>
               <input
                 id="name"
@@ -76,7 +77,7 @@ export default function OnboardingPage() {
 
             <div>
               <label className="block text-xs font-medium text-slate-700 mb-1.5">
-                Vertical
+                {tr("Área de atividade", "Business area")}
               </label>
               <div className="grid grid-cols-2 gap-2">
                 {VERTICALS.map((v) => (
@@ -90,7 +91,7 @@ export default function OnboardingPage() {
                         : "border-slate-200 text-slate-600 hover:border-slate-300"
                     }`}
                   >
-                    <div>{v.label}</div>
+                    <div>{tr(v.pt, v.en)}</div>
                   </button>
                 ))}
               </div>
@@ -107,7 +108,7 @@ export default function OnboardingPage() {
               disabled={busy}
               className="w-full bg-[#0a152d] text-white text-sm font-medium px-4 py-2.5 rounded-lg shadow-[0_8px_24px_-8px_rgba(10,21,45,0.5)] hover:bg-[#0a1b33] disabled:opacity-50 transition-all"
             >
-              {busy ? "Creating…" : "Create workspace →"}
+              {busy ? tr("A criar…", "Creating…") : tr("Criar espaço de trabalho", "Create workspace")}
             </button>
           </form>
         </div>

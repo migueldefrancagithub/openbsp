@@ -3,9 +3,13 @@ const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
 const WEEK = 7 * DAY;
 
-export function relativeTime(timestamp: number, now: number = Date.now()): string {
+export function relativeTime(
+  timestamp: number,
+  now: number = Date.now(),
+  locale: "pt" | "en" = "pt",
+): string {
   const diff = Math.max(0, now - timestamp);
-  if (diff < MINUTE) return "just now";
+  if (diff < MINUTE) return locale === "pt" ? "agora" : "just now";
   if (diff < HOUR) {
     const m = Math.floor(diff / MINUTE);
     return `${m}m`;
@@ -20,12 +24,17 @@ export function relativeTime(timestamp: number, now: number = Date.now()): strin
   }
   // Older: short date
   const date = new Date(timestamp);
-  const month = date.toLocaleDateString("en-GB", { month: "short" });
+  const month = date.toLocaleDateString(locale === "pt" ? "pt-MZ" : "en-GB", {
+    month: "short",
+  });
   return `${date.getDate()} ${month}`;
 }
 
-export function formatTime(timestamp: number): string {
-  return new Date(timestamp).toLocaleTimeString("pt-PT", {
+export function formatTime(
+  timestamp: number,
+  locale: "pt" | "en" = "pt",
+): string {
+  return new Date(timestamp).toLocaleTimeString(locale === "pt" ? "pt-MZ" : "en-GB", {
     hour: "2-digit",
     minute: "2-digit",
   });

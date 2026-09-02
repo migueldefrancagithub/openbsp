@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Outfit, Geist_Mono } from "next/font/google";
 import { ConvexAuthNextjsServerProvider } from "@convex-dev/auth/nextjs/server";
 import { ConvexClientProvider } from "@/components/ConvexClientProvider";
+import { I18nProvider } from "@/lib/i18n";
 import "./globals.css";
 
 const inter = Inter({
@@ -52,7 +53,9 @@ export default function RootLayout({
         className={`${inter.variable} ${outfit.variable} ${geistMono.variable} h-full antialiased`}
       >
         <body className="min-h-full flex flex-col bg-[#f9fafb]">
-          <ConvexClientProvider>{children}</ConvexClientProvider>
+          <ConvexClientProvider>
+            <I18nProvider>{children}</I18nProvider>
+          </ConvexClientProvider>
         </body>
       </html>
     </ConvexAuthNextjsServerProvider>
