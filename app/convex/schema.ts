@@ -1,6 +1,10 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 import { authTables } from "@convex-dev/auth/server";
+import {
+  intentSourceValidator,
+  threadIntentValidator,
+} from "./lib/channels/intents";
 
 // ---------- Validators reusable across tables ----------
 
@@ -769,6 +773,13 @@ export default defineSchema({
     tags: v.optional(v.array(v.string())),
     leadSource: v.optional(leadSourceValidator),
     leadStatus: v.optional(channelLeadStatusValidator),
+    /** What the patient asked for last (see lib/channels/intents.ts). */
+    intent: v.optional(threadIntentValidator),
+    intentSource: v.optional(intentSourceValidator),
+    intentUpdatedAt: v.optional(v.number()),
+    /** Campaign whose send this thread replied to (attribution window 7 days). */
+    originCampaignId: v.optional(v.id("campaigns")),
+    originCampaignAt: v.optional(v.number()),
     nextStep: v.optional(v.string()),
     nextStepDueAt: v.optional(v.number()),
     responsibleMemberId: v.optional(v.id("members")),
@@ -798,6 +809,7 @@ export default defineSchema({
     .index("by_channel_last_event", ["channelId", "lastEventAt"])
     .index("by_tenant_last_event", ["tenantId", "lastEventAt"])
     .index("by_tenant_lead_status", ["tenantId", "leadStatus", "lastEventAt"])
+    .index("by_channel_lead_status", ["channelId", "leadStatus", "lastEventAt"])
     .index("by_tenant_inbox_status", ["tenantId", "inboxStatus", "lastEventAt"])
     .index("by_tenant_responsible", ["tenantId", "responsibleMemberId", "lastEventAt"])
     .index("by_tenant_team", ["tenantId", "assignedTeamId", "lastEventAt"]),
@@ -1019,6 +1031,9 @@ export default defineSchema({
   clinicAuditEvents: defineTable({
     tenantId: v.id("tenants"),
     actorMemberId: v.id("members"),
+    actorKind: v.optional(
+      v.union(v.literal("member"), v.literal("ai"), v.literal("system")),
+    ),
     action: v.string(),
     targetType: v.string(),
     targetId: v.string(),

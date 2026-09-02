@@ -34,6 +34,10 @@ export const CAPABILITIES = [
   "compliance.export_contact",
   "feature_flag.set",
   "pilot.request_allowlist",
+  "leads.update",
+  "inbox.handoff",
+  "inbox.custom_fields",
+  "contacts.record_consent",
 ] as const;
 export type Capability = (typeof CAPABILITIES)[number];
 
@@ -59,6 +63,10 @@ const CAPABILITY_MATRIX: Record<Role, Set<Capability>> = {
     "audit.export",
     "compliance.export_contact",
     "pilot.request_allowlist",
+    "leads.update",
+    "inbox.handoff",
+    "inbox.custom_fields",
+    "contacts.record_consent",
   ]),
   marketing: new Set<Capability>([
     "campaigns.create",
@@ -74,6 +82,9 @@ const CAPABILITY_MATRIX: Record<Role, Set<Capability>> = {
     "conversations.assign_self",
     "conversations.close",
     "pilot.request_allowlist",
+    "leads.update",
+    "inbox.handoff",
+    "contacts.record_consent",
   ]),
 };
 

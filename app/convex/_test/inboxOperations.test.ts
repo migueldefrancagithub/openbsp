@@ -176,3 +176,101 @@ describe("operational inbox", () => {
     ).rejects.toThrow();
   });
 });
+
+async function addMember(
+  t: ReturnType<typeof convexTest>,
+  tenantId: Id<"tenants">,
+  role: "admin" | "agent" | "marketing",
+) {
+  return await t.run(async (ctx) => {
+    const userId = await ctx.db.insert("users", { name: `${role} user` });
+    const memberId = await ctx.db.insert("members", {
+      tenantId,
+      userId,
+      role,
+      status: "active",
+      createdAt: Date.now(),
+    });
+    await ctx.db.insert("sessions", { userId, activeTenantId: tenantId, updatedAt: Date.now() });
+    return { userId, memberId };
+  });
+}
+
+describe("inbox roles, intents and history", () => {
+  it("enforces the capability matrix on thread updates", async () => {
+    const t = convexTest(schema);
+    const owner = await seedTenant(t, "Clinic RBAC");
+    const { channelId } = await seedChannel(t, owner, "rbac");
+    const agent = await addMember(t, owner.tenantId, "agent");
+    const marketing = await addMember(t, owner.tenantId, "marketing");
+    await receiveMessage(t, { channelId, phone: TEST_PHONE, body: "Olá" });
+    const threadId = await t.run(async (ctx) => {
+      const [thread] = await ctx.db.query("channelThreads").collect();
+      return thread._id;
+    });
+    const asAgent = t.withIdentity({ subject: agent.userId });
+    const asMarketing = t.withIdentity({ subject: marketing.userId });
+
+    await asAgent.mutation(inboxApi.updateThread, { threadId, responsibleMemberId: agent.memberId });
+    await asAgent.mutation(inboxApi.updateThread, { threadId, leadStatus: "asked_price", intent: "price_request" });
+    await expect(
+      asAgent.mutation(inboxApi.updateThread, { threadId, responsibleMemberId: owner.memberId }),
+    ).rejects.toThrow(/FORBIDDEN_CAPABILITY/);
+    await expect(
+      asMarketing.mutation(inboxApi.updateThread, { threadId, starred: true }),
+    ).rejects.toThrow(/FORBIDDEN_CAPABILITY/);
+    await expect(
+      asMarketing.mutation(inboxApi.addInternalNote, { threadId, body: "x", mentionedMemberIds: [] }),
+    ).rejects.toThrow(/FORBIDDEN_CAPABILITY/);
+
+    const thread = (await t.run(async (ctx) => await ctx.db.get(threadId)))!;
+    expect(thread).toMatchObject({
+      responsibleMemberId: agent.memberId,
+      leadStatus: "asked_price",
+      intent: "price_request",
+      intentSource: "manual",
+    });
+
+    const mine = await asAgent.query(inboxApi.listThreads, {
+      channelId,
+      filter: "mine",
+      paginationOpts: { cursor: null, numItems: 10 },
+    });
+    expect(mine.page.map((row: any) => row._id)).toEqual([threadId]);
+    const notMine = await t.withIdentity({ subject: owner.userId }).query(inboxApi.listThreads, {
+      channelId,
+      filter: "mine",
+      paginationOpts: { cursor: null, numItems: 10 },
+    });
+    expect(notMine.page).toHaveLength(0);
+  });
+
+  it("records before/after in the history and emits lead system events", async () => {
+    const t = convexTest(schema);
+    const owner = await seedTenant(t, "Clinic History");
+    const { channelId } = await seedChannel(t, owner, "history");
+    await receiveMessage(t, { channelId, phone: TEST_PHONE, body: "Quero marcar" });
+    const threadId = await t.run(async (ctx) => {
+      const [thread] = await ctx.db.query("channelThreads").collect();
+      return thread._id;
+    });
+    const asOwner = t.withIdentity({ subject: owner.userId });
+    await asOwner.mutation(inboxApi.updateThread, {
+      threadId,
+      leadStatus: "booked",
+      nextStepDueAt: Date.now() + 3_600_000,
+    });
+    await asOwner.mutation(inboxApi.updateThread, { threadId, clearNextStepDueAt: true });
+    const history = await asOwner.query(inboxApi.listThreadHistory, { threadId });
+    expect(history.length).toBeGreaterThanOrEqual(2);
+    const first = history[history.length - 1];
+    expect(first.action).toBe("inbox.thread.updated");
+    expect(first.payload.changed.leadStatus).toEqual({ from: "wants_booking", to: "booked" });
+    const thread = (await t.run(async (ctx) => await ctx.db.get(threadId)))!;
+    expect(thread.nextStepDueAt).toBeUndefined();
+    const systemEvents = await t.run(async (ctx) =>
+      await ctx.db.query("threadSystemEvents").withIndex("by_thread", (q) => q.eq("threadId", threadId)).collect(),
+    );
+    expect(systemEvents.map((row) => row.kind)).toContain("lead.status_changed");
+  });
+});

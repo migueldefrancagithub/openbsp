@@ -5,9 +5,13 @@ import { internalMutation } from "./_generated/server";
 import {
   loadByIdInTenant,
   requireCapability,
+  requireRoleAtLeast,
   tenantMutation,
   tenantQuery,
 } from "./lib/customFunctions";
+import { writeAudit } from "./lib/audit";
+import { threadHasMessageEvent } from "./lib/channels/threadVisibility";
+import { applyThreadUpdate, threadUpdateArgs } from "./lib/channels/threadUpdate";
 import {
   extractErrorCode,
   maskPhone,
@@ -16,6 +20,7 @@ import {
 
 const filterValidator = v.union(
   v.literal("all"),
+  v.literal("mine"),
   v.literal("unassigned"),
   v.literal("open"),
   v.literal("active"),
@@ -99,8 +104,12 @@ function matchesFilter(
   thread: Doc<"channelThreads">,
   filter: string,
   status: OperationalStatus,
+  memberId?: Id<"members">,
 ): boolean {
   if (filter === "all") return status !== "closed";
+  if (filter === "mine") {
+    return status !== "closed" && !!memberId && thread.responsibleMemberId === memberId;
+  }
   if (filter === "unassigned") {
     return status !== "closed" && !thread.responsibleMemberId;
   }
@@ -147,19 +156,7 @@ async function findContact(
 }
 
 async function hasMessageEvent(ctx: { db: any }, thread: Doc<"channelThreads">) {
-  if (thread.lastEventKind.startsWith("message.")) return true;
-  return (
-    (await ctx.db
-      .query("channelEvents")
-      .withIndex("by_channel_thread_kind", (q: any) =>
-        q
-          .eq("channelId", thread.channelId)
-          .eq("threadKey", thread.threadKey)
-          .gte("eventKind", "message.")
-          .lt("eventKind", "message/"),
-      )
-      .first()) !== null
-  );
+  return await threadHasMessageEvent(ctx, thread);
 }
 
 async function memberLabel(ctx: { db: any }, memberId?: Id<"members">) {
@@ -186,14 +183,11 @@ async function audit(
   threadId: Id<"channelThreads">,
   payload?: unknown,
 ) {
-  await ctx.db.insert("clinicAuditEvents", {
-    tenantId: ctx.tenantId,
-    actorMemberId: ctx.memberId,
+  await writeAudit(ctx, {
     action,
     targetType: "channel_thread",
     targetId: threadId,
     payload,
-    createdAt: Date.now(),
   });
 }
 
@@ -211,6 +205,7 @@ const threadSummaryValidator = v.object({
   tags: v.array(v.string()),
   leadSource: v.optional(v.string()),
   leadStatus: v.optional(v.string()),
+  intent: v.optional(v.string()),
   nextStep: v.optional(v.string()),
   nextStepDueAt: v.optional(v.number()),
   responsibleMemberId: v.optional(v.id("members")),
@@ -267,7 +262,7 @@ export const listThreads = tenantQuery({
       const haystack = `${displayName ?? ""} ${phone ?? ""} ${thread.threadKey} ${thread.lastPreview ?? ""}`.toLowerCase();
       if (search && !haystack.includes(search)) continue;
       const inboxStatus = deriveStatus(thread, now);
-      if (!matchesFilter(thread, args.filter, inboxStatus)) continue;
+      if (!matchesFilter(thread, args.filter, inboxStatus, ctx.memberId)) continue;
       page.push({
         _id: thread._id,
         channelId: thread.channelId,
@@ -282,6 +277,7 @@ export const listThreads = tenantQuery({
         tags: thread.tags ?? [],
         leadSource: thread.leadSource,
         leadStatus: thread.leadStatus,
+        intent: thread.intent,
         nextStep: thread.nextStep,
         nextStepDueAt: thread.nextStepDueAt,
         responsibleMemberId: thread.responsibleMemberId,
@@ -712,6 +708,7 @@ export const createCloseReason = tenantMutation({
   args: { name: v.string() },
   returns: v.id("threadCloseReasons"),
   handler: async (ctx, args) => {
+    requireRoleAtLeast(ctx.role, "admin");
     const name = args.name.trim().replace(/\s+/g, " ").slice(0, 80);
     if (name.length < 2) throw new ConvexError({ code: "INVALID_CLOSE_REASON" });
     const existing = await ctx.db
@@ -736,118 +733,90 @@ export const createCloseReason = tenantMutation({
 export const updateThread = tenantMutation({
   args: {
     threadId: v.id("channelThreads"),
-    inboxStatus: v.optional(inboxStatusValidator),
-    starred: v.optional(v.boolean()),
-    snoozedUntil: v.optional(v.number()),
-    closeReasonId: v.optional(v.id("threadCloseReasons")),
-    responsibleMemberId: v.optional(v.id("members")),
-    clearResponsible: v.optional(v.boolean()),
-    assignedTeamId: v.optional(v.id("teams")),
-    clearTeam: v.optional(v.boolean()),
-    leadStatus: v.optional(leadStatusValidator),
-    nextStep: v.optional(v.string()),
-    nextStepDueAt: v.optional(v.number()),
-    tags: v.optional(v.array(v.string())),
-    dnd: v.optional(v.boolean()),
-    automationMode: v.optional(
-      v.union(
-        v.literal("idle"),
-        v.literal("bot"),
-        v.literal("human"),
-        v.literal("stopped"),
-      ),
-    ),
+    ...threadUpdateArgs,
   },
   returns: v.null(),
   handler: async (ctx, args) => {
+    const { threadId, ...update } = args;
     const thread = await loadByIdInTenant(
       ctx as Parameters<typeof loadByIdInTenant>[0],
       "channelThreads",
-      args.threadId,
+      threadId,
     );
-    if (args.responsibleMemberId) {
+    if (update.responsibleMemberId) {
       await loadByIdInTenant(
         ctx as Parameters<typeof loadByIdInTenant>[0],
         "members",
-        args.responsibleMemberId,
+        update.responsibleMemberId,
       );
     }
-    if (args.assignedTeamId) {
+    if (update.assignedTeamId) {
       await loadByIdInTenant(
         ctx as Parameters<typeof loadByIdInTenant>[0],
         "teams",
-        args.assignedTeamId,
+        update.assignedTeamId,
       );
     }
-    if (args.closeReasonId) {
+    if (update.closeReasonId) {
       await loadByIdInTenant(
         ctx as Parameters<typeof loadByIdInTenant>[0],
         "threadCloseReasons",
-        args.closeReasonId,
+        update.closeReasonId,
       );
     }
-    const now = Date.now();
-    const patch: Record<string, unknown> = { updatedAt: now };
-    if (args.inboxStatus !== undefined) {
-      patch.inboxStatus = args.inboxStatus;
-      if (args.inboxStatus === "closed") {
-        patch.closedAt = now;
-        patch.closedReasonId = args.closeReasonId;
-        patch.nextStep = undefined;
-        patch.nextStepDueAt = undefined;
-      } else {
-        patch.closedAt = undefined;
-        patch.closedReasonId = undefined;
-        if (args.inboxStatus === "snoozed") {
-          if (!args.snoozedUntil || args.snoozedUntil <= now) {
-            throw new ConvexError({ code: "INVALID_SNOOZE_TIME" });
-          }
-          patch.snoozedUntil = args.snoozedUntil;
-        } else {
-          patch.snoozedUntil = undefined;
-        }
-      }
-    }
-    if (args.starred !== undefined) patch.starredAt = args.starred ? now : undefined;
-    if (args.clearResponsible) {
-      patch.responsibleMemberId = undefined;
-    } else if (args.responsibleMemberId !== undefined) {
-      patch.responsibleMemberId = args.responsibleMemberId;
-    }
-    if (args.clearTeam) {
-      patch.assignedTeamId = undefined;
-    } else if (args.assignedTeamId !== undefined) {
-      patch.assignedTeamId = args.assignedTeamId;
-    }
-    if (args.leadStatus !== undefined) patch.leadStatus = args.leadStatus;
-    if (args.nextStep !== undefined) patch.nextStep = args.nextStep.trim().slice(0, 240);
-    if (args.nextStepDueAt !== undefined) patch.nextStepDueAt = args.nextStepDueAt;
-    if (args.tags !== undefined) {
-      patch.tags = Array.from(
-        new Set(args.tags.map((tag) => tag.trim()).filter(Boolean)),
-      ).slice(0, 30);
-    }
-    if (args.dnd !== undefined) patch.dnd = args.dnd;
-    if (args.automationMode !== undefined) {
-      patch.automationMode = args.automationMode;
-      patch.automationChangedAt = now;
-      patch.automationChangeReason = "manual_inbox_control";
-      if (args.automationMode === "human") {
-        patch.inboxStatus = "awaiting_team";
-        patch.leadStatus = "awaiting_human";
-      }
-    }
-    await ctx.db.patch(thread._id, patch);
-    await audit(ctx, "inbox.thread.updated", thread._id, {
-      inboxStatus: args.inboxStatus,
-      starred: args.starred,
-      responsibleMemberId: args.responsibleMemberId,
-      assignedTeamId: args.assignedTeamId,
-      leadStatus: args.leadStatus,
-      dnd: args.dnd,
-      automationMode: args.automationMode,
-    });
+    await applyThreadUpdate(ctx, thread, update);
     return null;
+  },
+});
+
+/**
+ * Audited changes on a thread (who changed what, when). Read from the
+ * operational audit sink by target; newest first, bounded.
+ */
+export const listThreadHistory = tenantQuery({
+  args: {
+    threadId: v.id("channelThreads"),
+    limit: v.optional(v.number()),
+  },
+  returns: v.array(
+    v.object({
+      _id: v.id("clinicAuditEvents"),
+      action: v.string(),
+      actorName: v.optional(v.string()),
+      actorKind: v.optional(v.string()),
+      payload: v.optional(v.any()),
+      createdAt: v.number(),
+    }),
+  ),
+  handler: async (ctx, args) => {
+    const thread = await loadByIdInTenant(ctx, "channelThreads", args.threadId);
+    const limit = Math.min(Math.max(args.limit ?? 50, 1), 100);
+    const rows = (await ctx.db
+      .query("clinicAuditEvents")
+      .withIndex("by_target", (q) =>
+        q
+          .eq("tenantId", ctx.tenantId)
+          .eq("targetType", "channel_thread")
+          .eq("targetId", thread._id),
+      )
+      .order("desc")
+      .take(limit)) as Doc<"clinicAuditEvents">[];
+    const names = new Map<string, string | undefined>();
+    const result = [];
+    for (const row of rows) {
+      if (!names.has(row.actorMemberId)) {
+        names.set(row.actorMemberId, await memberLabel(ctx, row.actorMemberId));
+      }
+      result.push({
+        _id: row._id,
+        action: row.action,
+        actorName: names.get(row.actorMemberId),
+        actorKind: row.actorKind,
+        payload: row.payload,
+        createdAt: row.createdAt,
+      });
+    }
+    return result;
   },
 });
 
@@ -859,6 +828,7 @@ export const addInternalNote = tenantMutation({
   },
   returns: v.id("threadInternalNotes"),
   handler: async (ctx, args) => {
+    requireCapability(ctx.role, "messages.send");
     const thread = await loadByIdInTenant(
       ctx as Parameters<typeof loadByIdInTenant>[0],
       "channelThreads",
@@ -904,6 +874,7 @@ export const createReminder = tenantMutation({
   },
   returns: v.id("threadReminders"),
   handler: async (ctx, args) => {
+    requireCapability(ctx.role, "messages.send");
     const thread = await loadByIdInTenant(
       ctx as Parameters<typeof loadByIdInTenant>[0],
       "channelThreads",
@@ -962,6 +933,7 @@ export const setReminderStatus = tenantMutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
+    requireCapability(ctx.role, "messages.send");
     const reminder = await loadByIdInTenant(
       ctx as Parameters<typeof loadByIdInTenant>[0],
       "threadReminders",
@@ -979,7 +951,10 @@ export const setReminderStatus = tenantMutation({
 export const generateAttachmentUploadUrl = tenantMutation({
   args: {},
   returns: v.string(),
-  handler: async (ctx) => await ctx.storage.generateUploadUrl(),
+  handler: async (ctx) => {
+    requireCapability(ctx.role, "messages.send");
+    return await ctx.storage.generateUploadUrl();
+  },
 });
 
 export const registerAttachment = tenantMutation({
@@ -996,6 +971,7 @@ export const registerAttachment = tenantMutation({
     url: v.string(),
   }),
   handler: async (ctx, args) => {
+    requireCapability(ctx.role, "messages.send");
     const thread = await loadByIdInTenant(
       ctx as Parameters<typeof loadByIdInTenant>[0],
       "channelThreads",
@@ -1046,6 +1022,7 @@ export const settleAttachment = tenantMutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
+    requireCapability(ctx.role, "messages.send");
     const attachment = await loadByIdInTenant(
       ctx as Parameters<typeof loadByIdInTenant>[0],
       "channelAttachments",

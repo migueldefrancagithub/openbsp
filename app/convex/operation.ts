@@ -1,9 +1,8 @@
 import { v } from "convex/values";
+import { threadHasMessageEvent } from "./lib/channels/threadVisibility";
 import type { Doc, Id } from "./_generated/dataModel";
 import { tenantQuery } from "./lib/customFunctions";
 
-const MESSAGE_EVENT_KIND_START = "message.";
-const MESSAGE_EVENT_KIND_END = "message/";
 const THREAD_SCAN_LIMIT = 200;
 const CHANNEL_SCAN_LIMIT = 50;
 const CAMPAIGN_SCAN_LIMIT = 50;
@@ -327,23 +326,6 @@ function mapConversationLeadStatus(status: string | undefined): LeadStatus {
   return "new";
 }
 
-async function threadHasMessageEvent(
-  ctx: { db: any },
-  thread: Doc<"channelThreads">,
-): Promise<boolean> {
-  if (thread.lastEventKind.startsWith(MESSAGE_EVENT_KIND_START)) return true;
-  const messageEvent = await ctx.db
-    .query("channelEvents")
-    .withIndex("by_channel_thread_kind", (q: any) =>
-      q
-        .eq("channelId", thread.channelId)
-        .eq("threadKey", thread.threadKey)
-        .gte("eventKind", MESSAGE_EVENT_KIND_START)
-        .lt("eventKind", MESSAGE_EVENT_KIND_END),
-    )
-    .first();
-  return messageEvent !== null;
-}
 
 function emptyCampaignStats() {
   return {

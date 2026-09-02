@@ -28,6 +28,8 @@ import { useI18n, type TranslationKey } from "@/lib/i18n";
 import { roleLabel } from "@/lib/operationalLabels";
 
 type ThreadContext = {
+  intent?: string;
+  intentSource?: string;
   _id: Id<"channelThreads">;
   threadKey: string;
   displayName?: string;
@@ -107,6 +109,37 @@ function formatMoment(timestamp: number, locale: "pt" | "en") {
   }).format(timestamp);
 }
 
+function auditActionLabel(action: string, t: (key: TranslationKey) => string): string {
+  const key = `audit.${action}` as TranslationKey;
+  const label = t(key);
+  return label === key ? action.replace(/[._]/g, " ") : label;
+}
+
+function describeChanges(payload: unknown, t: (key: TranslationKey) => string): string {
+  const changed =
+    payload && typeof payload === "object" && "changed" in payload
+      ? (payload as { changed?: Record<string, { from?: unknown; to?: unknown }> }).changed
+      : undefined;
+  if (!changed) return "";
+  const parts = Object.entries(changed).map(([field, diff]) => {
+    const key = `audit.field.${field}` as TranslationKey;
+    const label = t(key) === key ? field : t(key);
+    const to = diff?.to;
+    const rendered =
+      to === undefined || to === null || to === ""
+        ? "—"
+        : typeof to === "boolean"
+          ? to ? "✓" : "✗"
+          : Array.isArray(to)
+            ? to.join(", ")
+            : typeof to === "number" && to > 1_000_000_000_000
+              ? new Date(to).toLocaleString()
+              : String(to);
+    return `${label} → ${rendered}`;
+  });
+  return parts.length ? ` · ${parts.join(" · ")}` : "";
+}
+
 function errorText(error: unknown, locale: "pt" | "en") {
   return convexErrorMessage(error, locale, locale === "pt" ? "Não foi possível guardar." : "Could not save.");
 }
@@ -159,6 +192,10 @@ export function PatientContextPanel({
   const createCloseReason = useMutation(inboxApi.createCloseReason);
   const [tool, setTool] = useState<Tool>(null);
   const [activeTab, setActiveTab] = useState<PanelTab>("summary");
+  const history = useQuery(
+    inboxApi.listThreadHistory,
+    activeTab === "history" ? { threadId: thread._id, limit: 40 } : "skip",
+  );
   const [note, setNote] = useState("");
   const [nextStep, setNextStep] = useState(thread.nextStep ?? "");
   const [closeReason, setCloseReason] = useState("");
@@ -282,6 +319,21 @@ export function PatientContextPanel({
               >
                 {["new", "interested", "asked_price", "wants_booking", "awaiting_human", "booked", "confirmed", "attended", "no_show", "lost"].map((status) => (
                   <option key={status} value={status}>{t(`status.${status}` as TranslationKey)}</option>
+                ))}
+              </select>
+            </label>
+            <label className="text-[10px] font-semibold text-slate-400">
+              {t("inbox.intent")}
+              <select
+                value={thread.intent ?? ""}
+                onChange={(event) => void updateThread(event.target.value
+                  ? { threadId: thread._id, intent: event.target.value as never }
+                  : { threadId: thread._id, clearIntent: true })}
+                className="mt-1 h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-[11px] font-semibold text-[#0a1b33] outline-none"
+              >
+                <option value="">{t("inbox.noIntent")}</option>
+                {["greeting", "info_request", "price_request", "booking_request", "reschedule", "cancel", "confirm_attendance", "complaint", "support", "human_request", "opt_out", "clinical_question", "out_of_scope", "other"].map((intent) => (
+                  <option key={intent} value={intent}>{t(`intent.${intent}` as TranslationKey)}</option>
                 ))}
               </select>
             </label>
@@ -458,6 +510,29 @@ export function PatientContextPanel({
         </>}
 
         {activeTab === "history" && <>
+        <Section title={t("inbox.changes")} icon={History}>
+          {history === undefined ? (
+            <p className="text-[10px] text-slate-400">{t("shell.loading")}</p>
+          ) : history.length === 0 ? (
+            <p className="text-[10px] text-slate-400">{t("inbox.historyEmpty")}</p>
+          ) : (
+            history.map((row) => (
+              <div key={row._id} className="mb-2 text-[10px] last:mb-0">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="min-w-0 truncate font-semibold text-slate-600">
+                    {auditActionLabel(row.action, t)}
+                  </span>
+                  <span className="shrink-0 text-[9px] text-slate-400">{relativeTime(row.createdAt, Date.now(), locale)}</span>
+                </div>
+                <div className="text-[9px] text-slate-400">
+                  {row.actorName ?? (row.actorKind === "ai" ? "IA" : t("inbox.team"))}
+                  {describeChanges(row.payload, t)}
+                </div>
+              </div>
+            ))
+          )}
+        </Section>
+
         <Section title={t("inbox.campaigns")} icon={Megaphone}>
           {context?.campaigns?.length ? context.campaigns.slice(0, 4).map((item: any) => (
             <div key={`${item.campaignId}-${item.updatedAt}`} className="mb-1.5 flex items-center justify-between gap-2 text-[10px] last:mb-0">

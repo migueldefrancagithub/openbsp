@@ -36,6 +36,7 @@ import { convexErrorMessage } from "@/lib/convexErrorMessage";
 import { templateCategoryLabel } from "@/lib/operationalLabels";
 import { PatientContextPanel } from "@/components/channel-inbox/PatientContextPanel";
 import { PilotBanner } from "@/components/channel-inbox/PilotBanner";
+import { LeadHeaderBar } from "@/components/channel-inbox/LeadHeaderBar";
 import {
   SystemEventRow,
   type TimelineSystemItem,
@@ -74,6 +75,10 @@ type ThreadSummary = {
   automationMode?: string;
   automationChangeReason?: string;
   pilotBlockedAt?: number;
+  intent?: string;
+  intentSource?: string;
+  originCampaignId?: Id<"campaigns">;
+  originCampaignName?: string;
   channelSendMode: string;
   channelProvider: string;
   channelDisplayName: string;
@@ -738,9 +743,6 @@ export function ChannelThreadView({
   const summary = thread as ThreadSummary;
   const label = summary.displayName ?? summary.phone ?? summary.threadKey;
   const window = windowInfo(summary.serviceWindowExpiresAt, locale);
-  const responsibleName = members?.find(
-    (member) => member._id === summary.responsibleMemberId,
-  )?.email;
   const templateAllowed =
     summary.channelProvider === "iasolution_hub" &&
     summary.channelSendMode !== "disabled" &&
@@ -828,24 +830,11 @@ export function ChannelThreadView({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 border-t border-slate-100 bg-[#fbfcfd] sm:grid-cols-4">
-            {[
-              [t("inbox.source"), summary.leadSource ?? "WhatsApp"],
-              [t("inbox.stage"), summary.leadStatus ? t(`status.${summary.leadStatus}` as TranslationKey) : t("status.new")],
-              [
-                t("inbox.owner"),
-                summary.automationMode === "bot"
-                  ? automationLabel(summary.automationMode, locale)
-                  : responsibleName ?? t("inbox.unassignedShort"),
-              ],
-              [t("inbox.nextAction"), summary.nextStep ?? "-"],
-            ].map(([key, value], index) => (
-              <div key={key} className={cn("min-w-0 px-3 py-2", index > 0 && "border-l border-slate-100", index > 1 && "border-t sm:border-t-0")}>
-                <div className="text-[8px] font-bold uppercase tracking-[0.12em] text-slate-400">{key}</div>
-                <div className="mt-0.5 truncate text-[10px] font-semibold text-slate-700" title={value}>{value}</div>
-              </div>
-            ))}
-          </div>
+          <LeadHeaderBar
+            thread={summary}
+            members={members}
+            currentMemberId={workspace?.memberId}
+          />
         </header>
 
         <div

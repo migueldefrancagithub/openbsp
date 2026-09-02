@@ -29,6 +29,7 @@ import { useI18n, type TranslationKey } from "@/lib/i18n";
 
 type InboxFilter =
   | "all"
+  | "mine"
   | "unassigned"
   | "open"
   | "active"
@@ -70,6 +71,7 @@ const inboxApi = api.inboxOperations;
 
 const FILTERS: FilterItem[] = [
   { value: "all", labelKey: "inbox.all", icon: Inbox },
+  { value: "mine", labelKey: "inbox.mine", icon: UserRound },
   { value: "unassigned", labelKey: "inbox.unassigned", icon: UserRound },
   { value: "open", labelKey: "inbox.open", icon: MessageCircleMore },
   { value: "active", labelKey: "inbox.active", icon: Zap },
@@ -81,7 +83,7 @@ const FILTERS: FilterItem[] = [
 ];
 
 const PRIMARY_FILTERS = FILTERS.filter((item) =>
-  ["all", "unassigned", "awaiting_team", "awaiting_patient", "closed"].includes(
+  ["all", "mine", "unassigned", "awaiting_team", "awaiting_patient", "closed"].includes(
     item.value,
   ),
 );

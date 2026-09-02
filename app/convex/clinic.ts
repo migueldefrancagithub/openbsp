@@ -1,4 +1,5 @@
 import { ConvexError, v } from "convex/values";
+import { writeAudit } from "./lib/audit";
 import {
   loadByIdInTenant,
   requireRoleAtLeast,
@@ -215,14 +216,11 @@ async function writeClinicAudit(
     payload?: unknown;
   },
 ) {
-  await ctx.db.insert("clinicAuditEvents", {
-    tenantId: ctx.tenantId,
-    actorMemberId: ctx.memberId,
+  await writeAudit(ctx, {
     action: args.action,
     targetType: args.targetType,
     targetId: args.targetId,
     payload: args.payload,
-    createdAt: Date.now(),
   });
 }
 
