@@ -25,6 +25,7 @@ import {
   Star,
   Timer,
   UserRound,
+  UsersRound,
   Zap,
 } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
@@ -37,6 +38,8 @@ import { templateCategoryLabel } from "@/lib/operationalLabels";
 import { PatientContextPanel } from "@/components/channel-inbox/PatientContextPanel";
 import { PilotBanner } from "@/components/channel-inbox/PilotBanner";
 import { LeadHeaderBar } from "@/components/channel-inbox/LeadHeaderBar";
+import { HandoffDialog } from "@/components/channel-inbox/HandoffDialog";
+import { HumanCaseChip } from "@/components/channel-inbox/HumanCaseChip";
 import {
   SystemEventRow,
   type TimelineSystemItem,
@@ -493,6 +496,12 @@ export function ChannelThreadView({
   const [templateVariables, setTemplateVariables] = useState<string[]>([]);
   const [quickReplySearch, setQuickReplySearch] = useState("");
   const [patientPanelOpen, setPatientPanelOpen] = useState(false);
+  const [handoffOpen, setHandoffOpen] = useState(false);
+  const [headerNotice, setHeaderNotice] = useState<string | null>(null);
+  const threadOps = useQuery(
+    inboxApi.getThreadOps,
+    thread ? { threadId: thread._id } : "skip",
+  );
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const markedRef = useRef<string | null>(null);
@@ -796,13 +805,37 @@ export function ChannelThreadView({
               >
                 <Star size={15} className={summary.starredAt ? "fill-current" : undefined} />
               </button>
+              {threadOps?.openCase ? (
+                <HumanCaseChip threadId={summary._id} currentMemberId={workspace?.memberId} />
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setHandoffOpen(true)}
+                  className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-[10px] font-semibold text-slate-600 transition-colors hover:border-amber-300 hover:bg-amber-50 hover:text-amber-800"
+                  title={t("handoff.title")}
+                  data-handoff-button
+                >
+                  <UsersRound size={12} />
+                  <span className="hidden sm:inline">{t("handoff.button")}</span>
+                </button>
+              )}
               <button
                 type="button"
-                onClick={() => void updateThread({
-                  threadId: summary._id,
-                  automationMode: summary.automationMode === "bot" ? "human" : "bot",
-                })}
-                className="rounded-md p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-[#0a1b33]"
+                onClick={() => {
+                  if (summary.automationMode !== "bot" && threadOps?.openCase) {
+                    setHeaderNotice(t("handoff.aiBlocked"));
+                    return;
+                  }
+                  setHeaderNotice(null);
+                  void updateThread({
+                    threadId: summary._id,
+                    automationMode: summary.automationMode === "bot" ? "human" : "bot",
+                  }).catch((cause) => setHeaderNotice(errorMessage(cause, locale)));
+                }}
+                className={cn(
+                  "rounded-md p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-[#0a1b33]",
+                  summary.automationMode !== "bot" && threadOps?.openCase && "opacity-40",
+                )}
                 title={summary.automationMode === "bot" ? t("inbox.pauseAi") : t("inbox.resumeAi")}
               >
                 {summary.automationMode === "bot" ? <Pause size={15} /> : <Play size={15} />}
@@ -835,6 +868,11 @@ export function ChannelThreadView({
             members={members}
             currentMemberId={workspace?.memberId}
           />
+          {headerNotice && (
+            <div className="border-t border-amber-100 bg-amber-50 px-3 py-1.5 text-[11px] text-amber-900">
+              {headerNotice}
+            </div>
+          )}
         </header>
 
         <div
@@ -862,6 +900,7 @@ export function ChannelThreadView({
               threadId={summary._id}
               recipient={summary.phone ?? summary.threadKey}
               role={workspace?.role}
+              onHandoff={threadOps?.openCase ? undefined : () => setHandoffOpen(true)}
             />
           )}
           {blocked && blocked.kind !== "allowlist" && (
@@ -1122,6 +1161,20 @@ export function ChannelThreadView({
         </div>
       </section>
 
+      {handoffOpen && (
+        <HandoffDialog
+          threadId={summary._id}
+          intent={summary.intent}
+          lastPreview={summary.lastPreview}
+          members={members}
+          currentMemberId={workspace?.memberId}
+          onClose={() => setHandoffOpen(false)}
+          onCreated={() => {
+            setHandoffOpen(false);
+            setHeaderNotice(t("handoff.created"));
+          }}
+        />
+      )}
       <PatientContextPanel thread={summary} className="hidden xl:flex" />
       {patientPanelOpen && (
         <div

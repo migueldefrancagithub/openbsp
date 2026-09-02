@@ -40,6 +40,7 @@ import type * as lib_aiControl from "../lib/aiControl.js";
 import type * as lib_apiAuth from "../lib/apiAuth.js";
 import type * as lib_assignment from "../lib/assignment.js";
 import type * as lib_audit from "../lib/audit.js";
+import type * as lib_channels_automationControl from "../lib/channels/automationControl.js";
 import type * as lib_channels_intents from "../lib/channels/intents.js";
 import type * as lib_channels_outboxStatus from "../lib/channels/outboxStatus.js";
 import type * as lib_channels_projection from "../lib/channels/projection.js";
@@ -110,6 +111,7 @@ declare const fullApi: ApiFromModules<{
   "lib/apiAuth": typeof lib_apiAuth;
   "lib/assignment": typeof lib_assignment;
   "lib/audit": typeof lib_audit;
+  "lib/channels/automationControl": typeof lib_channels_automationControl;
   "lib/channels/intents": typeof lib_channels_intents;
   "lib/channels/outboxStatus": typeof lib_channels_outboxStatus;
   "lib/channels/projection": typeof lib_channels_projection;

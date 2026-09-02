@@ -159,6 +159,12 @@ export async function applyThreadUpdate(
   options: { now?: number; auditAction?: string } = {},
 ): Promise<void> {
   assertCanUpdateThread(args, { memberId: ctx.memberId, role: ctx.role });
+  if (args.automationMode === "bot" && thread.openHumanCaseId) {
+    const openCase = await ctx.db.get(thread.openHumanCaseId);
+    if (openCase && openCase.status !== "resolved") {
+      throw new ConvexError({ code: "HUMAN_CASE_OPEN", caseId: openCase._id });
+    }
+  }
   const now = options.now ?? Date.now();
   const patch: Record<string, unknown> = { updatedAt: now };
 

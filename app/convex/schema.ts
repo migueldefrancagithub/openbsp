@@ -792,6 +792,8 @@ export default defineSchema({
     dnd: v.optional(v.boolean()),
     /** Set when an automatic reply was blocked by the pilot allowlist gate. */
     pilotBlockedAt: v.optional(v.number()),
+    /** Cache of the open/assigned human case, for list rendering. */
+    openHumanCaseId: v.optional(v.id("humanCases")),
     automationMode: v.optional(
       v.union(
         v.literal("idle"),
@@ -986,6 +988,13 @@ export default defineSchema({
     slaDueAt: v.number(),
     decision: v.optional(v.string()),
     resolvedAt: v.optional(v.number()),
+    /** Stage the thread was in before awaiting_human, restored on resolve. */
+    previousLeadStatus: v.optional(channelLeadStatusValidator),
+    openedFrom: v.optional(
+      v.union(v.literal("inbox"), v.literal("operation"), v.literal("automation")),
+    ),
+    assignedAt: v.optional(v.number()),
+    returnedToAiAt: v.optional(v.number()),
     createdBy: v.id("members"),
     createdAt: v.number(),
     updatedAt: v.number(),

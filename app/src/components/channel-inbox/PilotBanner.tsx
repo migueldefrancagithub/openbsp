@@ -17,10 +17,12 @@ export function PilotBanner({
   threadId,
   recipient,
   role,
+  onHandoff,
 }: {
   threadId: Id<"channelThreads">;
   recipient: string;
   role?: string;
+  onHandoff?: () => void;
 }) {
   const { t } = useI18n();
   const requestInclusion = useMutation(api.inboxOperations.requestAllowlistInclusion);
@@ -66,6 +68,15 @@ export function PilotBanner({
             >
               {busy ? <Loader2 size={13} className="animate-spin" /> : <UserRoundPlus size={13} />}
               {t("inbox.pilotRequest")}
+            </button>
+          )}
+          {onHandoff && (
+            <button
+              type="button"
+              onClick={onHandoff}
+              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-amber-300 bg-white px-3 text-[11px] font-semibold text-amber-900 hover:bg-amber-100"
+            >
+              {t("handoff.button")}
             </button>
           )}
           {notice && <span className="text-[11px] text-amber-900">{notice}</span>}

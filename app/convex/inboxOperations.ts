@@ -77,6 +77,7 @@ function deriveStatus(thread: Doc<"channelThreads">, now: number): OperationalSt
     return "snoozed";
   }
   if (
+    thread.openHumanCaseId ||
     thread.inboxStatus === "awaiting_team" ||
     thread.leadStatus === "awaiting_human" ||
     thread.automationMode === "human"
@@ -219,6 +220,8 @@ const threadSummaryValidator = v.object({
   dnd: v.boolean(),
   /** An automatic reply was blocked because the number is outside the pilot allowlist. */
   pilotBlocked: v.boolean(),
+  openCaseSlaDueAt: v.optional(v.number()),
+  openCaseUrgency: v.optional(v.string()),
 });
 
 export const listThreads = tenantQuery({
@@ -259,6 +262,9 @@ export const listThreads = tenantQuery({
       const recipient = identity?.phone ?? thread.threadKey;
       const pilotBlocked =
         !!thread.pilotBlockedAt && !channel.outboundAllowlist.includes(recipient);
+      const openCase = thread.openHumanCaseId
+        ? ((await ctx.db.get(thread.openHumanCaseId)) as Doc<"humanCases"> | null)
+        : null;
       const haystack = `${displayName ?? ""} ${phone ?? ""} ${thread.threadKey} ${thread.lastPreview ?? ""}`.toLowerCase();
       if (search && !haystack.includes(search)) continue;
       const inboxStatus = deriveStatus(thread, now);
@@ -290,6 +296,8 @@ export const listThreads = tenantQuery({
         automationMode: thread.automationMode,
         dnd: thread.dnd ?? false,
         pilotBlocked,
+        openCaseSlaDueAt: openCase?.slaDueAt,
+        openCaseUrgency: openCase?.urgency,
       });
     }
     return {
@@ -414,6 +422,59 @@ export const listThreadTimelineExtras = tenantQuery({
       }
     }
     return { systemEvents, failedOutbox };
+  },
+});
+
+/**
+ * Operational state of one thread for the header: the open human case (with
+ * SLA) and the pilot verdict. The case table is the source of truth; the
+ * `openHumanCaseId` cache on the thread only serves list rows.
+ */
+export const getThreadOps = tenantQuery({
+  args: { threadId: v.id("channelThreads") },
+  returns: v.object({
+    openCase: v.union(
+      v.object({
+        _id: v.id("humanCases"),
+        reason: v.string(),
+        urgency: v.string(),
+        question: v.string(),
+        status: v.string(),
+        responsibleMemberId: v.optional(v.id("members")),
+        responsibleName: v.optional(v.string()),
+        slaDueAt: v.number(),
+        createdAt: v.number(),
+      }),
+      v.null(),
+    ),
+    pilotBlocked: v.boolean(),
+  }),
+  handler: async (ctx, args) => {
+    const thread = await loadByIdInTenant(ctx, "channelThreads", args.threadId);
+    const recent = (await ctx.db
+      .query("humanCases")
+      .withIndex("by_thread", (q) =>
+        q.eq("tenantId", ctx.tenantId).eq("threadId", thread._id),
+      )
+      .order("desc")
+      .take(5)) as Doc<"humanCases">[];
+    const open = recent.find((row) => row.status !== "resolved") ?? null;
+    return {
+      openCase: open
+        ? {
+            _id: open._id,
+            reason: open.reason,
+            urgency: open.urgency,
+            question: open.question,
+            status: open.status,
+            responsibleMemberId: open.responsibleMemberId,
+            responsibleName: await memberLabel(ctx, open.responsibleMemberId),
+            slaDueAt: open.slaDueAt,
+            createdAt: open.createdAt,
+          }
+        : null,
+      pilotBlocked: !!thread.pilotBlockedAt,
+    };
   },
 });
 

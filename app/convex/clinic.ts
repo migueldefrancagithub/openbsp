@@ -1,12 +1,20 @@
 import { ConvexError, v } from "convex/values";
 import { writeAudit } from "./lib/audit";
 import {
+  setThreadAutomationMode,
+  stopActiveAutomationRun,
+} from "./lib/channels/automationControl";
+import { recordThreadSystemEvent } from "./lib/channels/systemEvents";
+import { requireCapability } from "./lib/customFunctions";
+import {
   loadByIdInTenant,
   requireRoleAtLeast,
   tenantMutation,
   tenantQuery,
 } from "./lib/customFunctions";
 import type { Doc, Id } from "./_generated/dataModel";
+import { internalMutation } from "./_generated/server";
+import { internal } from "./_generated/api";
 
 const MAPUTO_OFFSET = "+02:00";
 const SLOT_LOOKAHEAD_DAYS = 21;
@@ -260,6 +268,7 @@ export const listWorkspace = tenantQuery({
       .withIndex("by_status_due", (q) =>
         q.eq("status", "scheduled").lt("dueAt", now + 7 * 24 * 60 * 60_000),
       )
+      .filter((q) => q.eq(q.field("tenantId"), ctx.tenantId))
       .take(60);
     const appointments = await ctx.db
       .query("clinicAppointments")
@@ -644,6 +653,23 @@ export const scheduleFollowUp = tenantMutation({
   },
 });
 
+const SLA_MINUTES_BY_URGENCY = { urgent: 30, high: 120, normal: 8 * 60, low: 24 * 60 } as const;
+
+function slaMinutesFor(
+  urgency: keyof typeof SLA_MINUTES_BY_URGENCY,
+  override?: number,
+): number {
+  if (override !== undefined && Number.isFinite(override)) {
+    return Math.min(Math.max(Math.round(override), 15), 2880);
+  }
+  return SLA_MINUTES_BY_URGENCY[urgency];
+}
+
+/**
+ * Open a human case: the AI pauses (any in-flight run is stopped), the
+ * thread moves to "awaiting team" with an SLA, and the timeline records it.
+ * Idempotent per thread: a thread with an open case returns that case.
+ */
 export const createHumanCase = tenantMutation({
   args: {
     threadId: v.optional(v.id("channelThreads")),
@@ -651,25 +677,27 @@ export const createHumanCase = tenantMutation({
     urgency: humanCaseUrgencyValidator,
     question: v.string(),
     responsibleMemberId: v.optional(v.id("members")),
+    slaMinutes: v.optional(v.number()),
+    openedFrom: v.optional(
+      v.union(v.literal("inbox"), v.literal("operation"), v.literal("automation")),
+    ),
   },
   returns: v.id("humanCases"),
   handler: async (ctx, args) => {
-    requireRoleAtLeast(ctx.role, "agent");
+    requireCapability(ctx.role, "inbox.handoff");
     const thread = args.threadId
       ? await loadByIdInTenant(ctx, "channelThreads", args.threadId)
       : null;
+    if (thread?.openHumanCaseId) {
+      const existing = await ctx.db.get(thread.openHumanCaseId);
+      if (existing && existing.status !== "resolved") return existing._id;
+    }
     if (args.responsibleMemberId) {
       await loadByIdInTenant(ctx, "members", args.responsibleMemberId);
     }
     const now = Date.now();
-    const slaMinutes =
-      args.urgency === "urgent"
-        ? 30
-        : args.urgency === "high"
-          ? 120
-          : args.urgency === "normal"
-            ? 8 * 60
-            : 24 * 60;
+    const slaMinutes = slaMinutesFor(args.urgency, args.slaMinutes);
+    const slaDueAt = now + slaMinutes * 60_000;
     const caseId = await ctx.db.insert("humanCases", {
       tenantId: ctx.tenantId,
       threadId: thread?._id,
@@ -678,64 +706,201 @@ export const createHumanCase = tenantMutation({
       question: assertLength(args.question, "question", 3, 2_000),
       status: args.responsibleMemberId ? "assigned" : "open",
       responsibleMemberId: args.responsibleMemberId,
-      slaDueAt: now + slaMinutes * 60_000,
+      assignedAt: args.responsibleMemberId ? now : undefined,
+      slaDueAt,
+      previousLeadStatus:
+        thread && thread.leadStatus !== "awaiting_human" ? thread.leadStatus : undefined,
+      openedFrom: args.openedFrom ?? "operation",
       createdBy: ctx.memberId,
       createdAt: now,
       updatedAt: now,
     });
     if (thread) {
+      await stopActiveAutomationRun(ctx, thread, "human_case_created", now);
       await ctx.db.patch(thread._id, {
         leadStatus: "awaiting_human",
-        automationMode: "human",
-        automationChangedAt: now,
-        automationChangeReason: "human_case_created",
+        inboxStatus: "awaiting_team",
+        openHumanCaseId: caseId,
+        responsibleMemberId: args.responsibleMemberId ?? thread.responsibleMemberId,
         nextStep: "Equipa humana precisa decidir este caso antes da IA continuar.",
-        nextStepDueAt: now + slaMinutes * 60_000,
+        nextStepDueAt: slaDueAt,
         updatedAt: now,
+      });
+      await setThreadAutomationMode(ctx, thread, "human", "human_case_created", now);
+      await recordThreadSystemEvent(ctx, {
+        thread,
+        kind: "handoff.case_opened",
+        severity: "warning",
+        actorType: "member",
+        actorMemberId: ctx.memberId,
+        humanCaseId: caseId,
+        payload: { urgency: args.urgency, slaDueAt, reason: args.reason.slice(0, 80) },
+        dedupeKey: `case:${caseId}:opened`,
+        now,
       });
     }
     await writeClinicAudit(ctx, {
       action: "clinic.human_case.created",
       targetType: "humanCase",
       targetId: caseId,
-      payload: { urgency: args.urgency },
+      payload: { urgency: args.urgency, threadId: thread?._id, openedFrom: args.openedFrom },
     });
     return caseId;
   },
 });
 
+export const assignHumanCase = tenantMutation({
+  args: {
+    caseId: v.id("humanCases"),
+    responsibleMemberId: v.id("members"),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    requireCapability(ctx.role, "inbox.handoff");
+    const humanCase = await loadByIdInTenant(ctx, "humanCases", args.caseId);
+    if (humanCase.status === "resolved") return null;
+    await loadByIdInTenant(ctx, "members", args.responsibleMemberId);
+    const now = Date.now();
+    await ctx.db.patch(humanCase._id, {
+      status: "assigned",
+      responsibleMemberId: args.responsibleMemberId,
+      assignedAt: now,
+      updatedAt: now,
+    });
+    const thread = humanCase.threadId ? await ctx.db.get(humanCase.threadId) : null;
+    if (thread) {
+      await ctx.db.patch(thread._id, {
+        responsibleMemberId: args.responsibleMemberId,
+        updatedAt: now,
+      });
+      await recordThreadSystemEvent(ctx, {
+        thread,
+        kind: "handoff.case_assigned",
+        severity: "info",
+        actorType: "member",
+        actorMemberId: ctx.memberId,
+        humanCaseId: humanCase._id,
+        dedupeKey: `case:${humanCase._id}:assigned:${args.responsibleMemberId}`,
+        now,
+      });
+    }
+    await writeClinicAudit(ctx, {
+      action: "clinic.human_case.assigned",
+      targetType: "humanCase",
+      targetId: humanCase._id,
+      payload: { responsibleMemberId: args.responsibleMemberId },
+    });
+    return null;
+  },
+});
+
+/**
+ * Close a human case with a decision. `returnToAi` hands the thread back to
+ * automation (next inbound is eligible for bots again); otherwise the team
+ * keeps the conversation. The stage returns from awaiting_human to where it
+ * was before the case.
+ */
 export const resolveHumanCase = tenantMutation({
   args: {
     caseId: v.id("humanCases"),
     decision: v.string(),
+    returnToAi: v.optional(v.boolean()),
   },
   returns: v.object({ resolved: v.boolean(), idempotent: v.optional(v.boolean()) }),
   handler: async (ctx, args) => {
-    requireRoleAtLeast(ctx.role, "agent");
+    requireCapability(ctx.role, "inbox.handoff");
     const humanCase = await loadByIdInTenant(ctx, "humanCases", args.caseId);
     if (humanCase.status === "resolved") {
       return { resolved: false, idempotent: true };
     }
     const now = Date.now();
+    const returnToAi = args.returnToAi === true;
     await ctx.db.patch(humanCase._id, {
       status: "resolved",
       decision: assertLength(args.decision, "decision", 2, 2_000),
       resolvedAt: now,
+      returnedToAiAt: returnToAi ? now : undefined,
       updatedAt: now,
     });
-    if (humanCase.threadId) {
-      await ctx.db.patch(humanCase.threadId, {
-        nextStep: "Decisão humana registada. A equipa pode responder ou devolver para a IA.",
+    const thread = humanCase.threadId ? await ctx.db.get(humanCase.threadId) : null;
+    if (thread) {
+      const restoredLeadStatus =
+        thread.leadStatus === "awaiting_human"
+          ? (humanCase.previousLeadStatus ?? "interested")
+          : thread.leadStatus;
+      await ctx.db.patch(thread._id, {
+        openHumanCaseId: undefined,
+        leadStatus: restoredLeadStatus,
+        inboxStatus: returnToAi ? "open" : "active",
+        nextStep: returnToAi
+          ? "Devolvida à IA com a decisão registada."
+          : "Decisão humana registada. A equipa continua o atendimento.",
         nextStepDueAt: now + 60 * 60_000,
         updatedAt: now,
       });
+      await setThreadAutomationMode(
+        ctx,
+        thread,
+        returnToAi ? "idle" : "human",
+        returnToAi ? "human_case_returned_to_ai" : "human_case_resolved",
+        now,
+      );
+      await recordThreadSystemEvent(ctx, {
+        thread,
+        kind: "handoff.case_resolved",
+        severity: "info",
+        actorType: "member",
+        actorMemberId: ctx.memberId,
+        humanCaseId: humanCase._id,
+        payload: { decision: args.decision.slice(0, 160) },
+        dedupeKey: `case:${humanCase._id}:resolved`,
+        now,
+      });
+      if (returnToAi) {
+        await recordThreadSystemEvent(ctx, {
+          thread,
+          kind: "handoff.returned_to_ai",
+          severity: "info",
+          actorType: "member",
+          actorMemberId: ctx.memberId,
+          humanCaseId: humanCase._id,
+          dedupeKey: `case:${humanCase._id}:returned`,
+          now,
+        });
+      }
     }
     await writeClinicAudit(ctx, {
       action: "clinic.human_case.resolved",
       targetType: "humanCase",
       targetId: humanCase._id,
+      payload: { returnToAi, threadId: thread?._id },
     });
     return { resolved: true };
+  },
+});
+
+/** Migrate step for A5: cache the open case on its thread. Idempotent. */
+export const _backfillOpenHumanCases = internalMutation({
+  args: { cursor: v.optional(v.string()) },
+  returns: v.object({ patched: v.number(), isDone: v.boolean() }),
+  handler: async (ctx, args) => {
+    const page = await ctx.db
+      .query("humanCases")
+      .paginate({ cursor: args.cursor ?? null, numItems: 100 });
+    let patched = 0;
+    for (const humanCase of page.page) {
+      if (humanCase.status === "resolved" || !humanCase.threadId) continue;
+      const thread = await ctx.db.get(humanCase.threadId);
+      if (!thread || thread.openHumanCaseId === humanCase._id) continue;
+      await ctx.db.patch(thread._id, { openHumanCaseId: humanCase._id, updatedAt: Date.now() });
+      patched += 1;
+    }
+    if (!page.isDone) {
+      await ctx.scheduler.runAfter(0, internal.clinic._backfillOpenHumanCases, {
+        cursor: page.continueCursor,
+      });
+    }
+    return { patched, isDone: page.isDone };
   },
 });
 
