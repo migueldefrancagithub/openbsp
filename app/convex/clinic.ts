@@ -318,7 +318,7 @@ export const bootstrapDefaults = tenantMutation({
   args: {},
   returns: v.object({ created: v.array(v.string()) }),
   handler: async (ctx) => {
-    requireRoleAtLeast(ctx.role, "admin");
+    requireCapability(ctx.role, "clinic.manage_settings");
     const now = Date.now();
     const existingService = await ctx.db
       .query("clinicServices")
@@ -427,7 +427,7 @@ export const createService = tenantMutation({
   },
   returns: v.id("clinicServices"),
   handler: async (ctx, args) => {
-    requireRoleAtLeast(ctx.role, "admin");
+    requireCapability(ctx.role, "clinic.manage_settings");
     const name = assertLength(args.name, "name", 2, 80);
     const durationMinutes = Math.round(args.durationMinutes);
     if (durationMinutes < 10 || durationMinutes > 480) {
@@ -476,7 +476,7 @@ export const saveKnowledgeItem = tenantMutation({
   },
   returns: v.object({ itemId: v.id("clinicKnowledgeItems"), version: v.number() }),
   handler: async (ctx, args) => {
-    requireRoleAtLeast(ctx.role, "admin");
+    requireCapability(ctx.role, "clinic.manage_settings");
     const title = assertLength(args.title, "title", 2, 120);
     const body = assertLength(args.body, "body", 10, 12_000);
     const now = Date.now();
@@ -560,7 +560,7 @@ export const createFollowUpRule = tenantMutation({
   },
   returns: v.id("followUpRules"),
   handler: async (ctx, args) => {
-    requireRoleAtLeast(ctx.role, "admin");
+    requireCapability(ctx.role, "clinic.manage_settings");
     const delayMinutes = Math.round(args.delayMinutes);
     if (delayMinutes < 5 || delayMinutes > 60 * 24 * 30) {
       throw new ConvexError({ code: "INVALID_DELAY" });
@@ -597,7 +597,7 @@ export const scheduleFollowUp = tenantMutation({
   },
   returns: v.object({ taskId: v.id("followUpTasks"), created: v.boolean() }),
   handler: async (ctx, args) => {
-    requireRoleAtLeast(ctx.role, "agent");
+    requireCapability(ctx.role, "clinic.manage_agenda");
     const rule = await loadByIdInTenant(ctx, "followUpRules", args.ruleId);
     if (rule.status !== "active") {
       throw new ConvexError({ code: "FOLLOW_UP_RULE_PAUSED" });
@@ -987,7 +987,7 @@ export const createAppointment = tenantMutation({
   },
   returns: v.id("clinicAppointments"),
   handler: async (ctx, args) => {
-    requireRoleAtLeast(ctx.role, "agent");
+    requireCapability(ctx.role, "clinic.manage_agenda");
     const service = await loadByIdInTenant(ctx, "clinicServices", args.serviceId);
     if (service.status !== "active") {
       throw new ConvexError({ code: "SERVICE_NOT_ACTIVE" });
@@ -1038,7 +1038,7 @@ export const confirmAppointment = tenantMutation({
   },
   returns: v.object({ confirmed: v.boolean(), idempotent: v.optional(v.boolean()) }),
   handler: async (ctx, args) => {
-    requireRoleAtLeast(ctx.role, "agent");
+    requireCapability(ctx.role, "clinic.manage_agenda");
     const appointment = await loadByIdInTenant(ctx, "clinicAppointments", args.appointmentId);
     if (appointment.status === "confirmed") {
       return { confirmed: false, idempotent: true };
@@ -1073,7 +1073,7 @@ export const recordAppointmentOutcome = tenantMutation({
   },
   returns: v.object({ updated: v.boolean(), idempotent: v.optional(v.boolean()) }),
   handler: async (ctx, args) => {
-    requireRoleAtLeast(ctx.role, "agent");
+    requireCapability(ctx.role, "clinic.manage_agenda");
     const appointment = await loadByIdInTenant(ctx, "clinicAppointments", args.appointmentId);
     if (appointment.status === args.status) {
       return { updated: false, idempotent: true };

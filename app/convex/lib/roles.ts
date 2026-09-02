@@ -38,6 +38,13 @@ export const CAPABILITIES = [
   "inbox.handoff",
   "inbox.custom_fields",
   "contacts.record_consent",
+  "teams.manage",
+  "quick_replies.manage",
+  "clinic.manage_agenda",
+  "clinic.manage_settings",
+  "logs.read",
+  "analytics.read",
+  "presence.view",
 ] as const;
 export type Capability = (typeof CAPABILITIES)[number];
 
@@ -67,6 +74,13 @@ const CAPABILITY_MATRIX: Record<Role, Set<Capability>> = {
     "inbox.handoff",
     "inbox.custom_fields",
     "contacts.record_consent",
+    "teams.manage",
+    "quick_replies.manage",
+    "clinic.manage_agenda",
+    "clinic.manage_settings",
+    "logs.read",
+    "analytics.read",
+    "presence.view",
   ]),
   marketing: new Set<Capability>([
     "campaigns.create",
@@ -75,6 +89,7 @@ const CAPABILITY_MATRIX: Record<Role, Set<Capability>> = {
     "templates.create",
     "templates.submit",
     "contacts.import",
+    "analytics.read",
   ]),
   agent: new Set<Capability>([
     "messages.send",
@@ -86,6 +101,9 @@ const CAPABILITY_MATRIX: Record<Role, Set<Capability>> = {
     "inbox.handoff",
     "inbox.custom_fields",
     "contacts.record_consent",
+    "quick_replies.manage",
+    "clinic.manage_agenda",
+    "presence.view",
   ]),
 };
 

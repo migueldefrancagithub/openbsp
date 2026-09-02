@@ -50,9 +50,11 @@ type NavItem = {
 
 type ActiveWorkspace = {
   tenantId: Id<"tenants">;
+  memberId?: Id<"members">;
   name: string;
   vertical: string;
   role: string;
+  locale?: "pt" | "en";
 };
 
 type WorkspaceMembership = ActiveWorkspace & {
@@ -81,6 +83,7 @@ const ADMIN_NAV: NavItem[] = [
 export default function AppLayout({ children }: { children: ReactNode }) {
   const tenant = useQuery(api.tenantsQueries.getActiveOptional);
   const tenants = useQuery(api.tenantsQueries.listMine, {});
+  const setLocale = useMutation(api.members.setLocale);
   const router = useRouter();
 
   useEffect(() => {
@@ -96,7 +99,11 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   }
 
   return (
-    <I18nProvider storageScope={tenant.tenantId}>
+    <I18nProvider
+      storageScope={tenant.tenantId}
+      initialLocale={tenant.locale ?? null}
+      onLocaleChange={(locale) => void setLocale({ locale }).catch(() => undefined)}
+    >
       <AppShell tenant={tenant} tenants={tenants}>{children}</AppShell>
     </I18nProvider>
   );

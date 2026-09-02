@@ -1,8 +1,9 @@
 import { v, ConvexError } from "convex/values";
 import {
+  loadByIdInTenant,
+  requireCapability,
   tenantMutation,
   tenantQuery,
-  loadByIdInTenant,
 } from "./lib/customFunctions";
 
 const NAME_REGEX = /^[a-z0-9_-]{1,40}$/;
@@ -56,6 +57,7 @@ export const create = tenantMutation({
   },
   returns: v.id("quickReplies"),
   handler: async (ctx, args) => {
+    requireCapability(ctx.role, "quick_replies.manage");
     const name = normalizeQuickReplyName(args.name);
     if (!NAME_REGEX.test(name)) {
       throw new ConvexError({
@@ -102,6 +104,7 @@ export const update = tenantMutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
+    requireCapability(ctx.role, "quick_replies.manage");
     await loadByIdInTenant(
       ctx as Parameters<typeof loadByIdInTenant>[0],
       "quickReplies",
@@ -124,6 +127,7 @@ export const remove = tenantMutation({
   args: { quickReplyId: v.id("quickReplies") },
   returns: v.null(),
   handler: async (ctx, args) => {
+    requireCapability(ctx.role, "quick_replies.manage");
     await loadByIdInTenant(
       ctx as Parameters<typeof loadByIdInTenant>[0],
       "quickReplies",

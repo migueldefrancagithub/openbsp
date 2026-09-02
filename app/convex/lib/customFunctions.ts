@@ -1,11 +1,13 @@
 import { ConvexError } from "convex/values";
 import {
+  customAction,
   customCtx,
   customMutation,
   customQuery,
 } from "convex-helpers/server/customFunctions";
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { mutation, query } from "../_generated/server";
+import { action, mutation, query } from "../_generated/server";
+import { internal } from "../_generated/api";
 import type {
   DataModel,
   Doc,
@@ -73,6 +75,20 @@ export const tenantQuery = customQuery(
 export const tenantMutation = customMutation(
   mutation,
   customCtx(async (ctx) => resolveActiveTenant(ctx as never)),
+);
+
+/**
+ * Actions cannot touch `ctx.db`; they resolve the caller through
+ * `me._tenantContext` and get the same `{ userId, memberId, tenantId, role }`
+ * shape as queries/mutations. Replaces the per-file `_meTenant` copies.
+ */
+export const tenantAction = customAction(
+  action,
+  customCtx(async (ctx): Promise<ResolvedTenantContext> => {
+    const me = await ctx.runQuery(internal.me._tenantContext, {});
+    if (!me) throw new ConvexError({ code: "UNAUTHENTICATED" });
+    return me;
+  }),
 );
 
 export async function loadByIdInTenant<T extends TableNames>(

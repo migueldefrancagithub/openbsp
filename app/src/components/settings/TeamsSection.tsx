@@ -2,17 +2,34 @@
 
 import { useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
-import { Check, Loader2, Shield, Users, UserRoundCog } from "lucide-react";
+import { Check, Loader2, Pencil, Shield, Trash2, Users, UserRoundCog } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
+import { convexErrorMessage } from "@/lib/convexErrorMessage";
 import { useI18n } from "@/lib/i18n";
 import { roleLabel } from "@/lib/operationalLabels";
 
+type TeamRow = {
+  _id: Id<"teams">;
+  name: string;
+  members: Array<{ memberId: Id<"members">; teamRole: string; email?: string; name?: string; role: string }>;
+};
+
 export function TeamsSection() {
-  const { locale, tr } = useI18n();
+  const { locale, tr, t } = useI18n();
   const teams = useQuery(api.teams.list, {});
   const members = useQuery(api.memberInvites.listMembers, {});
+  const me = useQuery(api.tenantsQueries.getActiveOptional);
   const createTeam = useMutation(api.teams.create);
+  const updateTeam = useMutation(api.teams.update);
+  const removeTeam = useMutation(api.teams.remove);
+  const canManage = me?.role === "owner" || me?.role === "admin";
+  const [editing, setEditing] = useState<{
+    teamId: Id<"teams">;
+    name: string;
+    memberIds: Array<Id<"members">>;
+    leadMemberId: Id<"members"> | "";
+  } | null>(null);
   const [name, setName] = useState("");
   const [selectedMemberIds, setSelectedMemberIds] = useState<
     Array<Id<"members">>
@@ -38,6 +55,56 @@ export function TeamsSection() {
     });
   }
 
+  function startEditing(team: TeamRow) {
+    setNotice(null);
+    setError(null);
+    setEditing({
+      teamId: team._id,
+      name: team.name,
+      memberIds: team.members.map((member) => member.memberId),
+      leadMemberId: team.members.find((member) => member.teamRole === "lead")?.memberId ?? "",
+    });
+  }
+
+  async function handleSaveEdit(team: TeamRow) {
+    if (!editing) return;
+    setBusy(true);
+    setNotice(null);
+    setError(null);
+    try {
+      const current = new Set(team.members.map((member) => member.memberId));
+      const next = new Set(editing.memberIds);
+      await updateTeam({
+        teamId: editing.teamId,
+        name: editing.name,
+        add: editing.memberIds.filter((id) => !current.has(id)),
+        remove: team.members.map((member) => member.memberId).filter((id) => !next.has(id)),
+        leadMemberId: editing.leadMemberId || undefined,
+      });
+      setEditing(null);
+      setNotice(t("teams.saved"));
+    } catch (err) {
+      setError(convexErrorMessage(err, locale));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleDelete(team: TeamRow) {
+    if (!window.confirm(t("teams.deleteConfirm"))) return;
+    setBusy(true);
+    setNotice(null);
+    setError(null);
+    try {
+      await removeTeam({ teamId: team._id });
+      if (editing?.teamId === team._id) setEditing(null);
+    } catch (err) {
+      setError(convexErrorMessage(err, locale));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function handleCreateTeam() {
     setBusy(true);
     setNotice(null);
@@ -55,7 +122,7 @@ export function TeamsSection() {
       setLeadMemberId("");
       setNotice(tr("Equipa criada.", "Team created."));
     } catch (err) {
-      setError(err instanceof Error ? err.message : tr("Não foi possível criar a equipa.", "Could not create team."));
+      setError(convexErrorMessage(err, locale, tr("Não foi possível criar a equipa.", "Could not create team.")));
     } finally {
       setBusy(false);
     }
@@ -198,23 +265,124 @@ export function TeamsSection() {
                     <div className="font-semibold text-[#0a1b33]">
                       {team.name}
                     </div>
-                    <span className="rounded-md bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-500">
-                      {team.members.length} {locale === "pt"
-                        ? team.members.length === 1 ? "membro" : "membros"
-                        : team.members.length === 1 ? "member" : "members"}
-                    </span>
-                  </div>
-                  <div className="mt-3 flex flex-wrap gap-1.5">
-                    {team.members.map((member) => (
-                      <span
-                        key={member.memberId}
-                        className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-600"
-                      >
-                        {member.email ?? member.name ?? roleLabel(member.role, locale)}
-                        {member.teamRole === "lead" ? ` · ${tr("líder", "lead")}` : ""}
+                    <div className="flex items-center gap-1.5">
+                      <span className="rounded-md bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-500">
+                        {team.members.length} {locale === "pt"
+                          ? team.members.length === 1 ? "membro" : "membros"
+                          : team.members.length === 1 ? "member" : "members"}
                       </span>
-                    ))}
+                      {canManage && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => (editing?.teamId === team._id ? setEditing(null) : startEditing(team))}
+                            className="rounded-md border border-slate-200 p-1.5 text-slate-500 hover:border-slate-300 hover:text-[#0a1b33]"
+                            aria-label={t("teams.edit")}
+                            title={t("teams.edit")}
+                          >
+                            <Pencil size={13} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void handleDelete(team)}
+                            disabled={busy}
+                            className="rounded-md border border-slate-200 p-1.5 text-slate-500 hover:border-rose-300 hover:text-rose-600 disabled:opacity-50"
+                            aria-label={t("teams.delete")}
+                            title={t("teams.delete")}
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </div>
+                  {editing?.teamId === team._id ? (
+                    <div className="mt-3 space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                      <label className="block">
+                        <span className="text-[11px] font-medium text-slate-500">{t("teams.rename")}</span>
+                        <input
+                          value={editing.name}
+                          onChange={(event) => setEditing({ ...editing, name: event.target.value })}
+                          className="mt-1 h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-[#0a1b33] outline-none focus:border-slate-400"
+                        />
+                      </label>
+                      <div>
+                        <div className="mb-1.5 text-[11px] font-medium text-slate-500">{t("teams.members")}</div>
+                        <div className="grid gap-1 sm:grid-cols-2">
+                          {activeMembers.map((member) => {
+                            const checked = editing.memberIds.includes(member._id);
+                            const lead = editing.leadMemberId === member._id;
+                            return (
+                              <div key={member._id} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setEditing({
+                                      ...editing,
+                                      memberIds: checked
+                                        ? editing.memberIds.filter((id) => id !== member._id)
+                                        : [...editing.memberIds, member._id],
+                                      leadMemberId: checked && lead ? "" : editing.leadMemberId,
+                                    })
+                                  }
+                                  className={`flex h-4.5 w-4.5 items-center justify-center rounded border ${
+                                    checked ? "border-[#0a1b33] bg-[#0a1b33] text-white" : "border-slate-300 bg-white"
+                                  }`}
+                                  aria-pressed={checked}
+                                >
+                                  {checked && <Check size={11} />}
+                                </button>
+                                <span className="min-w-0 flex-1 truncate text-[12px] text-[#0a1b33]">
+                                  {member.email ?? member.name ?? roleLabel(member.role, locale)}
+                                </span>
+                                {checked && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditing({ ...editing, leadMemberId: lead ? "" : member._id })}
+                                    className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${
+                                      lead ? "bg-amber-100 text-amber-800" : "text-slate-400 hover:text-slate-600"
+                                    }`}
+                                  >
+                                    {t("teams.lead")}
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                      <div className="flex justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setEditing(null)}
+                          className="h-8 rounded-md border border-slate-200 px-3 text-[12px] font-semibold text-slate-600"
+                        >
+                          {tr("Cancelar", "Cancel")}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleSaveEdit(team)}
+                          disabled={busy || editing.name.trim().length < 2}
+                          className="inline-flex h-8 items-center gap-1.5 rounded-md bg-[#0a1b33] px-3 text-[12px] font-semibold text-white disabled:opacity-50"
+                        >
+                          {busy && <Loader2 size={12} className="animate-spin" />}
+                          {t("teams.save")}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                      {team.members.map((member) => (
+                        <span
+                          key={member.memberId}
+                          className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-600"
+                        >
+                          {member.email ?? member.name ?? roleLabel(member.role, locale)}
+                          {member.teamRole === "lead" ? ` · ${tr("líder", "lead")}` : ""}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

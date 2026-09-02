@@ -269,6 +269,20 @@ export const MESSAGES = {
     "consent.transactional": "Atendimento",
     "consent.authentication": "Autenticação",
     "inbox.dueReminders": "Lembretes vencidos",
+    "members.role": "Papel",
+    "members.suspend": "Suspender",
+    "members.reactivate": "Reativar",
+    "members.suspended": "Suspenso",
+    "members.roleChanged": "Papel atualizado.",
+    "members.you": "você",
+    "teams.edit": "Editar",
+    "teams.delete": "Eliminar equipa",
+    "teams.deleteConfirm": "Eliminar esta equipa? As conversas atribuídas ficam sem equipa.",
+    "teams.rename": "Nome da equipa",
+    "teams.members": "Membros",
+    "teams.lead": "Líder",
+    "teams.save": "Guardar alterações",
+    "teams.saved": "Equipa atualizada.",
     "inbox.intent": "Intenção",
     "inbox.noIntent": "Sem intenção",
     "inbox.due": "Prazo",
@@ -658,6 +672,20 @@ export const MESSAGES = {
     "consent.transactional": "Service",
     "consent.authentication": "Authentication",
     "inbox.dueReminders": "Due reminders",
+    "members.role": "Role",
+    "members.suspend": "Suspend",
+    "members.reactivate": "Reactivate",
+    "members.suspended": "Suspended",
+    "members.roleChanged": "Role updated.",
+    "members.you": "you",
+    "teams.edit": "Edit",
+    "teams.delete": "Delete team",
+    "teams.deleteConfirm": "Delete this team? Assigned conversations lose their team.",
+    "teams.rename": "Team name",
+    "teams.members": "Members",
+    "teams.lead": "Lead",
+    "teams.save": "Save changes",
+    "teams.saved": "Team updated.",
     "inbox.intent": "Intent",
     "inbox.noIntent": "No intent",
     "inbox.due": "Due",
@@ -816,17 +844,33 @@ function isLocale(value: string | null): value is Locale {
 export function I18nProvider({
   children,
   storageScope,
+  initialLocale,
+  onLocaleChange,
 }: {
   children: ReactNode;
   storageScope?: string;
+  /** Server-persisted preference (members.locale); wins over localStorage. */
+  initialLocale?: Locale | null;
+  /** Called after a user-initiated change so the server can persist it. */
+  onLocaleChange?: (locale: Locale) => void;
 }) {
-  const [locale, setLocaleState] = useState<Locale>("pt");
+  const [locale, setLocaleState] = useState<Locale>(initialLocale ?? "pt");
 
   useEffect(() => {
+    if (initialLocale) {
+      setLocaleState(initialLocale);
+      return;
+    }
     const scoped = localStorage.getItem(storageKey(storageScope));
     const global = localStorage.getItem(storageKey());
     setLocaleState(isLocale(scoped) ? scoped : isLocale(global) ? global : "pt");
-  }, [storageScope]);
+  }, [storageScope, initialLocale]);
+
+  useEffect(() => {
+    if (typeof document !== "undefined") {
+      document.documentElement.lang = locale === "pt" ? "pt-MZ" : "en";
+    }
+  }, [locale]);
 
   const value = useMemo<I18nContextValue>(
     () => ({
@@ -835,11 +879,12 @@ export function I18nProvider({
         setLocaleState(next);
         localStorage.setItem(storageKey(storageScope), next);
         localStorage.setItem(storageKey(), next);
+        onLocaleChange?.(next);
       },
       t: (key) => MESSAGES[locale][key] ?? MESSAGES.pt[key] ?? key,
       tr: (pt, en) => (locale === "pt" ? pt : en),
     }),
-    [locale, storageScope],
+    [locale, storageScope, onLocaleChange],
   );
 
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;

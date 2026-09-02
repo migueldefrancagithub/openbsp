@@ -19,8 +19,22 @@ import { convexErrorMessage } from "@/lib/convexErrorMessage";
 type InviteRole = "admin" | "agent" | "marketing";
 
 export function MembersSection() {
-  const { locale, tr } = useI18n();
+  const { locale, tr, t } = useI18n();
   const members = useQuery(api.memberInvites.listMembers, {});
+  const me = useQuery(api.tenantsQueries.getActiveOptional);
+  const changeRole = useMutation(api.members.changeRole);
+  const setStatus = useMutation(api.members.setStatus);
+  const [memberNotice, setMemberNotice] = useState<string | null>(null);
+  const canManage = me?.role === "owner" || me?.role === "admin";
+  async function runMemberAction(action: () => Promise<unknown>, success: string) {
+    setMemberNotice(null);
+    try {
+      await action();
+      setMemberNotice(success);
+    } catch (cause) {
+      setMemberNotice(formatError(cause, locale));
+    }
+  }
   const invites = useQuery(api.memberInvites.list, {});
   const invite = useAction(api.memberInvites.invite);
   const revoke = useMutation(api.memberInvites.revoke);
@@ -190,15 +204,57 @@ export function MembersSection() {
                   <div className="flex-1 min-w-0">
                     <div className="text-[13px] font-medium text-[#0a1b33]">
                       {m.email ?? tr("(sem email)", "(no email)")}
+                      {me?.memberId === m._id && (
+                        <span className="ml-1 text-[10px] font-normal text-slate-400">({t("members.you")})</span>
+                      )}
+                      {m.status === "suspended" && (
+                        <span className="ml-2 rounded border border-slate-200 bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-500">
+                          {t("members.suspended")}
+                        </span>
+                      )}
                     </div>
                     <div className="text-[11px] text-slate-500 mt-0.5">
                       {roleLabel(m.role, locale)} · {tr("entrou", "joined")} {relativeTime(m.createdAt, Date.now(), locale)}
                     </div>
                   </div>
+                  {canManage && me?.memberId !== m._id && (
+                    <div className="flex shrink-0 items-center gap-1.5" data-member-controls>
+                      <select
+                        value={m.role}
+                        onChange={(event) =>
+                          void runMemberAction(
+                            () => changeRole({ memberId: m._id, role: event.target.value as "owner" | "admin" | "agent" | "marketing" }),
+                            t("members.roleChanged"),
+                          )
+                        }
+                        aria-label={t("members.role")}
+                        className="h-8 rounded-md border border-slate-200 bg-white px-2 text-[11px] font-semibold text-[#0a1b33] outline-none focus:border-slate-400"
+                      >
+                        {(["owner", "admin", "agent", "marketing"] as const).map((value) => (
+                          <option key={value} value={value} disabled={value === "owner" && me?.role !== "owner"}>
+                            {roleLabel(value, locale)}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void runMemberAction(
+                            () => setStatus({ memberId: m._id, status: m.status === "suspended" ? "active" : "suspended" }),
+                            m.status === "suspended" ? t("members.reactivate") : t("members.suspend"),
+                          )
+                        }
+                        className="h-8 rounded-md border border-slate-200 px-2 text-[11px] font-semibold text-slate-600 hover:border-slate-300"
+                      >
+                        {m.status === "suspended" ? t("members.reactivate") : t("members.suspend")}
+                      </button>
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>
           )}
+          {memberNotice && <p className="mt-2 text-[12px] text-slate-600">{memberNotice}</p>}
         </div>
 
         {activeInvites.length > 0 && (

@@ -50,4 +50,20 @@ crons.interval(
   {},
 );
 
+// Reminders whose scheduled due-marker was lost become "due" within 5 min.
+crons.interval(
+  "thread reminder overdue sweep",
+  { minutes: 5 },
+  internal.inboxOperations.sweepOverdueReminders,
+  {},
+);
+
+// Retention policy report (no deletion in this phase).
+crons.daily(
+  "retention candidates report",
+  { hourUTC: 3, minuteUTC: 0 },
+  internal.retention.runDaily,
+  {},
+);
+
 export default crons;

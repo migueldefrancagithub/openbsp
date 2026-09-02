@@ -481,6 +481,8 @@ export default defineSchema({
     role: roleValidator,
     healthcareProfessional: v.optional(v.boolean()),
     status: v.union(v.literal("active"), v.literal("suspended")),
+    /** UI language, persisted server-side so it follows the user across devices. */
+    locale: v.optional(v.union(v.literal("pt"), v.literal("en"))),
     createdAt: v.number(),
   })
     .index("by_tenant_user", ["tenantId", "userId"])
@@ -670,6 +672,8 @@ export default defineSchema({
       "status",
       "createdAt",
     ])
+    .index("by_channel_status_created", ["channelId", "status", "createdAt"])
+    .index("by_status_unknown_since", ["status", "unknownSince"])
     .index("by_tenant_created", ["tenantId", "createdAt"]),
 
   channelTemplates: defineTable({
@@ -844,7 +848,8 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_thread", ["threadId", "dueAt"])
-    .index("by_tenant_status_due", ["tenantId", "status", "dueAt"]),
+    .index("by_tenant_status_due", ["tenantId", "status", "dueAt"])
+    .index("by_status_due", ["status", "dueAt"]),
 
   channelAttachments: defineTable({
     tenantId: v.id("tenants"),
@@ -913,6 +918,28 @@ export default defineSchema({
     .index("by_thread", ["threadId", "createdAt"])
     .index("by_thread_dedupe", ["threadId", "dedupeKey"])
     .index("by_tenant_kind", ["tenantId", "kind", "createdAt"]),
+
+  /**
+   * Operational alerts for the team (SLA breaches, unconfirmed sends,
+   * retention candidates). Upserted by sweeps with a businessKey so a
+   * condition never produces duplicate rows.
+   */
+  opsAlerts: defineTable({
+    tenantId: v.id("tenants"),
+    kind: v.string(),
+    businessKey: v.string(),
+    severity: v.union(v.literal("info"), v.literal("warn"), v.literal("critical")),
+    title: v.string(),
+    payload: v.optional(v.any()),
+    href: v.optional(v.string()),
+    status: v.union(v.literal("open"), v.literal("acknowledged")),
+    acknowledgedBy: v.optional(v.id("members")),
+    acknowledgedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_tenant_status_created", ["tenantId", "status", "createdAt"])
+    .index("by_business_key", ["tenantId", "businessKey"]),
 
   /** Tenant-defined patient fields shown in the inbox panel (max 20 active). */
   customFieldDefinitions: defineTable({

@@ -1038,6 +1038,26 @@ export const _markReminderDue = internalMutation({
   },
 });
 
+/**
+ * Safety net for reminders whose scheduled `_markReminderDue` was lost (e.g.
+ * a deploy that dropped a scheduled function). Global index, tiny pages.
+ */
+export const sweepOverdueReminders = internalMutation({
+  args: { limit: v.optional(v.number()) },
+  returns: v.object({ marked: v.number() }),
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    const rows = (await ctx.db
+      .query("threadReminders")
+      .withIndex("by_status_due", (q) => q.eq("status", "scheduled").lt("dueAt", now))
+      .take(Math.min(Math.max(args.limit ?? 200, 1), 500))) as Doc<"threadReminders">[];
+    for (const reminder of rows) {
+      await ctx.db.patch(reminder._id, { status: "due", updatedAt: now });
+    }
+    return { marked: rows.length };
+  },
+});
+
 export const setReminderStatus = tenantMutation({
   args: {
     reminderId: v.id("threadReminders"),
