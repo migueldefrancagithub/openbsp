@@ -27,6 +27,8 @@ import { relativeTime } from "@/lib/relativeTime";
 import { useI18n, type TranslationKey } from "@/lib/i18n";
 import { roleLabel } from "@/lib/operationalLabels";
 import { CustomFieldsSection } from "@/components/channel-inbox/CustomFieldsSection";
+import { AppointmentScheduler } from "@/components/agenda/AppointmentScheduler";
+import { appointmentStatusLabel } from "@/components/agenda/agendaLabels";
 
 type ThreadContext = {
   customFields?: Record<string, string | number | boolean>;
@@ -224,6 +226,20 @@ export function PatientContextPanel({
   const [tool, setTool] = useState<Tool>(null);
   const [activeTab, setActiveTab] = useState<PanelTab>("summary");
   const followUps = useQuery(api.followUps.listForThread, activeTab === "tasks" ? { threadId: thread._id } : "skip");
+  const threadAppointments = useQuery(api.clinic.listThreadAppointments, activeTab === "tasks" ? { threadId: thread._id } : "skip");
+  const confirmAppointment = useMutation(api.clinic.confirmAppointment);
+  const cancelAppointment = useMutation(api.clinic.cancelAppointment);
+  const sendAppointmentNotice = useMutation(api.clinic.sendAppointmentNotice);
+  const [showScheduler, setShowScheduler] = useState(false);
+  const [appointmentError, setAppointmentError] = useState<string | null>(null);
+  async function runAppointmentAction(action: () => Promise<unknown>) {
+    setAppointmentError(null);
+    try {
+      await action();
+    } catch (cause) {
+      setAppointmentError(convexErrorMessage(cause, locale));
+    }
+  }
   const stopFollowUps = useMutation(api.followUps.stopForThread);
   const stopFollowUpTask = useMutation(api.followUps.stopTask);
   const history = useQuery(
@@ -709,13 +725,41 @@ export function PatientContextPanel({
           )}
         </Section>
 
-        <Section title={t("inbox.appointments")} icon={CalendarDays}>
-          {context?.appointments?.length ? context.appointments.slice(0, 3).map((item: any) => (
-            <div key={item._id} className="mb-2 flex items-center gap-2 last:mb-0">
-              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-blue-50 text-blue-600"><CalendarDays size={13} /></div>
-              <div className="min-w-0"><p className="truncate text-[11px] font-semibold text-slate-700">{item.serviceName}</p><p className="text-[9px] text-slate-400">{formatMoment(item.startAt, locale)} · {stateLabel(item.status, t)}</p></div>
+        <Section
+          title={t("inbox.appointments")}
+          icon={CalendarDays}
+          action={<button type="button" onClick={() => setShowScheduler(true)} className="text-[10px] font-bold text-[#2b4f8a]">+ {tr("Agendar", "Book")}</button>}
+        >
+          {threadAppointments === undefined ? (
+            <Loader2 size={13} className="animate-spin text-slate-300" />
+          ) : threadAppointments.length === 0 ? (
+            <p className="text-[10px] text-slate-400">{t("inbox.noAppointments")}</p>
+          ) : (
+            <div className="space-y-2">
+              {threadAppointments.slice(0, 3).map((item) => {
+                const active = item.status === "scheduled" || item.status === "confirmed";
+                return (
+                  <div key={item._id} className="flex items-start gap-2">
+                    <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-md", active ? "bg-[#eef3fb] text-[#2b4f8a]" : "bg-slate-100 text-slate-400")}><CalendarDays size={13} /></div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[11px] font-semibold text-slate-700">{item.serviceName}{item.professionalName ? ` · ${item.professionalName}` : ""}</p>
+                      <p className="text-[9px] text-slate-400">{formatMoment(item.startAt, locale)} · {appointmentStatusLabel(item.status, locale)}{item.pendingNotices > 0 ? ` · ${tr("aviso pendente", "notice pending")}` : ""}</p>
+                      {active && (
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {item.status === "scheduled" && (
+                            <button type="button" onClick={() => void runAppointmentAction(() => confirmAppointment({ appointmentId: item._id }))} className="rounded border border-[#0d6b61]/30 px-1.5 py-0.5 text-[9px] font-semibold text-[#0d6b61]">{tr("Confirmar", "Confirm")}</button>
+                          )}
+                          <button type="button" onClick={() => void runAppointmentAction(() => sendAppointmentNotice({ appointmentId: item._id, kind: item.status === "confirmed" ? "appointment_reminder" : "appointment_confirmation" }))} className="rounded border border-slate-200 px-1.5 py-0.5 text-[9px] font-semibold text-slate-600">{item.status === "confirmed" ? tr("Lembrete", "Reminder") : tr("Pedir confirmação", "Ask to confirm")}</button>
+                          <button type="button" onClick={() => { if (window.confirm(tr("Cancelar esta marcação?", "Cancel this appointment?"))) void runAppointmentAction(() => cancelAppointment({ appointmentId: item._id })); }} className="rounded border border-slate-200 px-1.5 py-0.5 text-[9px] font-semibold text-slate-500 hover:text-[#b3261e]">{tr("Cancelar", "Cancel")}</button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+              {appointmentError && <p className="text-[10px] text-[#b3261e]">{appointmentError}</p>}
             </div>
-          )) : <p className="text-[10px] text-slate-400">{t("inbox.noAppointments")}</p>}
+          )}
         </Section>
         </>}
 
@@ -769,6 +813,22 @@ export function PatientContextPanel({
         </Section>
         </>}
       </div>
+
+      {showScheduler && (
+        <div className="absolute inset-0 z-20 flex flex-col bg-white">
+          <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+            <div className="text-[13px] font-bold text-[#0a1b33]">{tr("Agendar consulta", "Book appointment")}</div>
+            <button type="button" onClick={() => setShowScheduler(false)} className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100"><X size={15} /></button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-4">
+            <AppointmentScheduler
+              compact
+              mode={{ kind: "book", threadId: thread._id, patientName: thread.displayName ?? undefined, source: "inbox" }}
+              onDone={() => setShowScheduler(false)}
+            />
+          </div>
+        </div>
+      )}
 
       {tool && (
         <div className="absolute inset-0 z-20 flex flex-col bg-white">

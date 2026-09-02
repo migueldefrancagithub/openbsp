@@ -3,6 +3,7 @@
 import { type ReactNode, useEffect, useState } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
 import {
+  Stethoscope,
   AlertTriangle,
   Ban,
   Bot,
@@ -31,6 +32,7 @@ import { TeamsSection } from "@/components/settings/TeamsSection";
 import { ComplianceSection } from "@/components/settings/ComplianceSection";
 import { IaSolutionHubSection } from "@/components/settings/IaSolutionHubSection";
 import { CustomFieldsSettingsSection } from "@/components/settings/CustomFieldsSettingsSection";
+import { ClinicSettingsSection } from "@/components/settings/ClinicSettingsSection";
 import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { useI18n, type Locale } from "@/lib/i18n";
@@ -176,6 +178,7 @@ export default function SettingsPage() {
     { key: "whatsapp", label: "WhatsApp", value: hasConnection ? tr("Ligado", "Connected") : tr("Configurar", "Setup"), icon: Smartphone },
     { key: "automation", label: tr("Automação", "Automation"), value: tr("Regras", "Rules"), icon: Bot },
     { key: "team", label: tr("Equipa", "Team"), value: tr("Membros/API", "Members/API"), icon: Users },
+    { key: "clinic", label: tr("Clínica", "Clinic"), value: tr("Agenda/SLAs", "Calendar/SLAs"), icon: Stethoscope },
     { key: "workspace", label: tr("Espaço", "Workspace"), value: roleLabel(tenant.role, locale), icon: Building2 },
   ];
 
@@ -364,6 +367,7 @@ export default function SettingsPage() {
         />
 
         {/* Workspace card */}
+        {settingsTab === "clinic" && <ClinicSettingsSection />}
         {settingsTab === "workspace" && <CustomFieldsSettingsSection />}
         {settingsTab === "workspace" && (
         <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">

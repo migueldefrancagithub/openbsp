@@ -18,6 +18,7 @@ import type { ReactNode } from "react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { useI18n } from "@/lib/i18n";
+import { AppointmentScheduler } from "@/components/agenda/AppointmentScheduler";
 import { convexErrorMessage } from "@/lib/convexErrorMessage";
 import { relativeTime } from "@/lib/relativeTime";
 import { SegmentedTabs } from "@/components/app/SegmentedTabs";
@@ -49,7 +50,6 @@ export function ClinicOpsPanel() {
   const saveKnowledge = useMutation(api.clinic.saveKnowledgeItem);
   const createFollowUpRule = useMutation(api.clinic.createFollowUpRule);
   const createHumanCase = useMutation(api.clinic.createHumanCase);
-  const createAppointment = useMutation(api.clinic.createAppointment);
   const { locale } = useI18n();
   const isPt = locale === "pt";
   const [notice, setNotice] = useState<Notice>(null);
@@ -85,16 +85,6 @@ export function ClinicOpsPanel() {
       : "Patient needs a team decision before AI continues.",
   );
 
-  const firstServiceId = workspace?.services.find((service) => service.status === "active")
-    ?._id as Id<"clinicServices"> | undefined;
-  const [slotServiceId, setSlotServiceId] = useState<Id<"clinicServices"> | "">("");
-  const selectedSlotServiceId = slotServiceId || firstServiceId;
-  const [slotDate, setSlotDate] = useState(todayInputValue());
-  const [appointmentName, setAppointmentName] = useState("");
-  const slots = useQuery(
-    api.clinic.listAvailableSlots,
-    selectedSlotServiceId ? { serviceId: selectedSlotServiceId, date: slotDate } : "skip",
-  );
 
   const readiness = workspace?.readiness;
   const readyCount = useMemo(() => {
@@ -294,69 +284,13 @@ export function ClinicOpsPanel() {
           </button>
 
           <div className="mt-3 rounded-lg bg-[#f8fafc] p-3">
-            <div className="grid gap-3 sm:grid-cols-[1fr_150px]">
-              <label className="text-xs font-semibold text-slate-500">
-                {isPt ? "Serviço" : "Service"}
-                <select
-                  value={selectedSlotServiceId ?? ""}
-                  onChange={(event) => setSlotServiceId(event.target.value as Id<"clinicServices">)}
-                  className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-[#0a1b33]"
-                >
-                  {workspace.services
-                    .filter((service) => service.status === "active")
-                    .map((service) => (
-                      <option key={service._id} value={service._id}>
-                        {service.name}
-                      </option>
-                    ))}
-                </select>
-              </label>
-              <label className="text-xs font-semibold text-slate-500">
-                {isPt ? "Dia" : "Day"}
-                <input
-                  type="date"
-                  value={slotDate}
-                  onChange={(event) => setSlotDate(event.target.value)}
-                  className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-[#0a1b33]"
-                />
-              </label>
-            </div>
-            <Input
-              label={isPt ? "Paciente para reservar" : "Patient to book"}
-              value={appointmentName}
-              onChange={setAppointmentName}
-              placeholder={isPt ? "Nome opcional" : "Optional name"}
+            <div className="mb-2 text-xs font-semibold text-slate-500">{isPt ? "Marcar consulta" : "Book appointment"}</div>
+            <AppointmentScheduler
+              mode={{ kind: "book", source: "operation" }}
+              onDone={() => {
+                setNotice({ tone: "success", text: isPt ? "Agendamento criado." : "Appointment created." });
+              }}
             />
-            <div className="mt-3 flex flex-wrap gap-2">
-              {(slots ?? []).filter((slot) => slot.available).slice(0, 6).map((slot) => (
-                <button
-                  key={slot.startAt}
-                  type="button"
-                  onClick={() =>
-                    selectedSlotServiceId &&
-                    runAction(
-                      `slot-${slot.startAt}`,
-                      () =>
-                        createAppointment({
-                          serviceId: selectedSlotServiceId,
-                          startAt: slot.startAt,
-                          patientName: appointmentName || undefined,
-                        }),
-                      isPt ? "Agendamento criado." : "Appointment created.",
-                    )
-                  }
-                  disabled={busy !== null}
-                  className="rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-60"
-                >
-                  {slot.label}
-                </button>
-              ))}
-              {selectedSlotServiceId && slots?.filter((slot) => slot.available).length === 0 && (
-                <span className="text-xs text-slate-500">
-                  {isPt ? "Sem horários livres neste dia." : "No free slots on this day."}
-                </span>
-              )}
-            </div>
           </div>
         </Panel>
         )}

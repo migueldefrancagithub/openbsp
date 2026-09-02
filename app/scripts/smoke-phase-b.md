@@ -166,3 +166,25 @@ npx convex data followUpTasks --limit 5
 4. Marcar DND na conversa → pendentes param com `dnd`.
 5. Operação mostra o painel de alertas; "Visto" retira o alerta; caso humano fora do
    SLA aparece como crítico com link para a conversa.
+
+## B6 — Agenda (UI) + "Agendar" no inbox
+
+Rotas/UI novas: `/app/agenda` (dia/semana, filtro por profissional, acções por linha),
+Definições › Clínica (`ClinicSettingsSection`: fuso, passo, antecedência, lembretes,
+templates/textos, SLAs, profissionais), `AppointmentScheduler` partilhado (Operação ›
+Clínica, painel do paciente › Tarefas › "+ Agendar", Agenda › "Nova marcação").
+
+### Verificações
+1. Definições › Clínica: guardar fuso e passo de 15 min; adicionar 2 profissionais
+   com dias/horas; associar ao serviço.
+2. Inbox › painel do paciente › Tarefas › "+ Agendar": escolher serviço/profissional/dia,
+   um horário livre e "Reservar" com "Enviar pedido de confirmação" → a marcação
+   aparece na lista com "aviso pendente" e a thread passa a "Agendado"; o
+   `appointmentId` existe antes de qualquer mensagem sair.
+3. Agenda › dia de hoje: linhas densas com hora, paciente, estado; "Confirmar",
+   "Pedir confirmação"/"Lembrete", "Remarcar" (modal), "Cancelar"; marcações passadas
+   mostram "Compareceu"/"Faltou".
+4. Vista semana: 7 colunas em ecrã largo, empilhadas em mobile; navegação
+   anterior/hoje/seguinte; filtro por profissional.
+5. Operação › Clínica › Serviços: o bloco de marcação usa o mesmo scheduler.
+6. Mobile (≤400px): scheduler em coluna única, modal encosta ao fundo, nada cortado.

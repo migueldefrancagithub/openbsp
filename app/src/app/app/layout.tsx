@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import {
+  CalendarDays,
   BarChart3,
   Building2,
   Check,
@@ -65,6 +66,7 @@ type WorkspaceMembership = ActiveWorkspace & {
 const PRIMARY_NAV: NavItem[] = [
   { href: "/app/channel-inbox", labelKey: "nav.inbox", icon: Inbox },
   { href: "/app/leads", labelKey: "nav.leads", icon: MousePointerClick },
+  { href: "/app/agenda", labelKey: "nav.agenda", icon: CalendarDays },
   { href: "/app/campaigns", labelKey: "nav.campaigns", icon: Send },
   { href: "/app/chatbots", labelKey: "nav.agents", icon: Workflow },
   { href: "/app", labelKey: "nav.operation", icon: LayoutDashboard, exact: true },
