@@ -21,6 +21,7 @@ export function AlertsBell() {
   const summary = useQuery(api.ops.summary, {});
   const alerts = useQuery(api.ops.listAlerts, open ? {} : "skip");
   const acknowledge = useMutation(api.ops.acknowledgeAlert);
+  const acknowledgeAll = useMutation(api.ops.acknowledgeAll);
   const count = summary?.open ?? 0;
   const now = Date.now();
 
@@ -49,9 +50,24 @@ export function AlertsBell() {
         <div className="absolute bottom-0 left-full z-40 ml-2 w-[360px] rounded-xl border border-line bg-surface shadow-xl">
           <div className="flex items-center justify-between border-b border-line-soft px-3 py-2">
             <span className="text-[12px] font-semibold text-ink">{tr("Avisos abertos", "Open alerts")}</span>
-            <Link href="/app?tab=alerts" onClick={() => setOpen(false)} className="text-[11px] font-semibold text-chip-info-fg hover:underline">
-              {tr("Ver todos", "See all")}
-            </Link>
+            <span className="flex items-center gap-2">
+              {(alerts?.some((alert) => alert.severity !== "critical") ?? false) && (
+                <button
+                  type="button"
+                  onClick={() => void acknowledgeAll({})}
+                  className="text-[11px] font-semibold text-muted hover:text-ink"
+                  title={tr(
+                    "Marca como vistos os avisos informativos e de atenção. Os críticos ficam.",
+                    "Marks the informational and attention alerts as seen. Critical ones stay.",
+                  )}
+                >
+                  {tr("Limpar não-críticos", "Clear non-critical")}
+                </button>
+              )}
+              <Link href="/app?tab=alerts" onClick={() => setOpen(false)} className="text-[11px] font-semibold text-chip-info-fg hover:underline">
+                {tr("Ver todos", "See all")}
+              </Link>
+            </span>
           </div>
           <ul className="max-h-[60vh] divide-y divide-line-soft overflow-y-auto">
             {alerts === undefined ? (

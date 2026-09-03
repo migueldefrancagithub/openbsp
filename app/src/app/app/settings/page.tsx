@@ -35,6 +35,7 @@ import { IaSolutionHubSection } from "@/components/settings/IaSolutionHubSection
 import { CustomFieldsSettingsSection } from "@/components/settings/CustomFieldsSettingsSection";
 import { ClinicSettingsSection } from "@/components/settings/ClinicSettingsSection";
 import { AiSettingsSection } from "@/components/settings/AiSettingsSection";
+import { DiagnosticsCard } from "@/components/settings/DiagnosticsCard";
 import { IntegrationsSection } from "@/components/settings/IntegrationsSection";
 import { AssignmentRulesSection } from "@/components/settings/AssignmentRulesSection";
 import { api } from "../../../../convex/_generated/api";
@@ -374,7 +375,12 @@ export default function SettingsPage() {
 
         {/* Workspace card */}
         {settingsTab === "clinic" && <ClinicSettingsSection />}
-        {settingsTab === "ai" && <AiSettingsSection />}
+        {settingsTab === "ai" && (
+          <div className="space-y-4">
+            <DiagnosticsCard />
+            <AiSettingsSection />
+          </div>
+        )}
         {settingsTab === "integrations" && <IntegrationsSection />}
         {settingsTab === "workspace" && <CustomFieldsSettingsSection />}
         {settingsTab === "workspace" && (

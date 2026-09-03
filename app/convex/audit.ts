@@ -19,7 +19,13 @@ const auditRowValidator = v.object({
 });
 
 export const listPaginated = tenantQuery({
-  args: { paginationOpts: paginationOptsValidator },
+  args: {
+    paginationOpts: paginationOptsValidator,
+    /** Narrow by who did it, or by what was done. */
+    actorId: v.optional(v.id("members")),
+    actorType: v.optional(v.string()),
+    actionPrefix: v.optional(v.string()),
+  },
   returns: v.object({
     page: v.array(auditRowValidator),
     isDone: v.boolean(),
@@ -35,8 +41,16 @@ export const listPaginated = tenantQuery({
         cursor: args.paginationOpts.cursor,
         numItems: Math.min(Math.max(args.paginationOpts.numItems, 1), 100),
       });
+    // Filtering after the index keeps the chain order intact: the audit trail
+    // is only useful if what you read is what was written, in sequence.
+    const filtered = result.page.filter((row) => {
+      if (args.actorId && row.actorId !== args.actorId) return false;
+      if (args.actorType && row.actorType !== args.actorType) return false;
+      if (args.actionPrefix && !row.action.startsWith(args.actionPrefix)) return false;
+      return true;
+    });
     return {
-      page: result.page.map((row) => ({
+      page: filtered.map((row) => ({
         _id: row._id,
         actorType: row.actorType,
         actorId: row.actorId,

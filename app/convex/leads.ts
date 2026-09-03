@@ -74,6 +74,8 @@ export const listByStatus = tenantQuery({
   args: {
     leadStatus: threadLeadStatusValidator,
     channelId: v.optional(v.id("channels")),
+    /** Only leads that came from this campaign. */
+    originCampaignId: v.optional(v.id("campaigns")),
     paginationOpts: paginationOptsValidator,
   },
   returns: v.object({
@@ -112,6 +114,7 @@ export const listByStatus = tenantQuery({
     for (const thread of result.page) {
       if (thread.tenantId !== ctx.tenantId) continue;
       if (thread.closedAt || thread.inboxStatus === "closed") continue;
+      if (args.originCampaignId && thread.originCampaignId !== args.originCampaignId) continue;
       if (!(await threadHasMessageEvent(ctx, thread))) continue;
       if (!channels.has(thread.channelId)) {
         channels.set(thread.channelId, await ctx.db.get(thread.channelId));
@@ -176,7 +179,7 @@ export const listByStatus = tenantQuery({
  * threads per stage without the per-row message check the columns apply.
  */
 export const counts = tenantQuery({
-  args: { channelId: v.optional(v.id("channels")) },
+  args: { channelId: v.optional(v.id("channels")), originCampaignId: v.optional(v.id("campaigns")) },
   returns: v.array(
     v.object({
       status: v.string(),
@@ -207,7 +210,11 @@ export const counts = tenantQuery({
             .filter((q) => q.eq(q.field("closedAt"), undefined))
             .take(COUNT_CAP + 1);
       const open = rows.filter(
-        (row) => row.tenantId === ctx.tenantId && !row.closedAt && row.inboxStatus !== "closed",
+        (row) =>
+          row.tenantId === ctx.tenantId &&
+          !row.closedAt &&
+          row.inboxStatus !== "closed" &&
+          (!args.originCampaignId || row.originCampaignId === args.originCampaignId),
       );
       result.push({
         status,
