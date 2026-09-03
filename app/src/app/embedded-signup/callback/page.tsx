@@ -69,24 +69,24 @@ export default function EmbeddedSignupCallbackPage() {
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-[#f6f8fb] px-4">
-      <section className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+      <section className="w-full max-w-md rounded-2xl border border-line bg-surface p-8 text-center shadow-sm">
         <Icon
           size={30}
           className={`mx-auto ${
             status === "loading"
-              ? "animate-spin text-slate-400"
+              ? "animate-spin text-faint"
               : status === "success"
                 ? "text-emerald-600"
                 : "text-red-600"
           }`}
         />
-        <h1 className="mt-4 font-[var(--font-outfit)] text-2xl font-medium text-[#0a1b33]">
+        <h1 className="mt-4 font-[var(--font-outfit)] text-2xl font-medium text-ink">
           Embedded Signup
         </h1>
-        <p className="mt-2 text-sm leading-6 text-slate-500">{message}</p>
+        <p className="mt-2 text-sm leading-6 text-muted">{message}</p>
         <Link
           href="/app/settings"
-          className="mt-6 inline-flex h-10 items-center justify-center rounded-lg bg-[#0a152d] px-4 text-sm font-medium text-white hover:bg-[#0e1f41]"
+          className="mt-6 inline-flex h-10 items-center justify-center rounded-lg bg-nav-active px-4 text-sm font-medium text-white hover:bg-[#0e1f41]"
         >
           Back to Settings
         </Link>

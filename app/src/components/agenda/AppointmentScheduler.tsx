@@ -100,7 +100,7 @@ export function AppointmentScheduler({
     }
   }
 
-  const inputClass = "mt-1 h-9 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-[13px] text-[#0a1b33] outline-none focus:border-slate-400";
+  const inputClass = "mt-1 h-9 w-full rounded-lg border border-line bg-surface px-2.5 text-[13px] text-ink outline-none focus:border-brand-solid/40";
 
   if (workspace !== undefined && services.length === 0) {
     return (
@@ -113,7 +113,7 @@ export function AppointmentScheduler({
   return (
     <div className="space-y-3">
       <div className={cn("grid gap-2", compact ? "grid-cols-1" : "sm:grid-cols-3")}>
-        <label className="block text-[11px] font-medium text-slate-500">
+        <label className="block text-[11px] font-medium text-muted">
           {tr("Serviço", "Service")}
           <select value={serviceId} onChange={(e) => { setServiceId(e.target.value as Id<"clinicServices">); setSelected(null); }} className={inputClass} disabled={mode.kind === "reschedule"}>
             {services.map((s) => (
@@ -122,7 +122,7 @@ export function AppointmentScheduler({
           </select>
         </label>
         {eligibleProfessionals.length > 0 && (
-          <label className="block text-[11px] font-medium text-slate-500">
+          <label className="block text-[11px] font-medium text-muted">
             {tr("Profissional", "Professional")}
             <select value={professionalId} onChange={(e) => { setProfessionalId(e.target.value as Id<"clinicProfessionals"> | ""); setSelected(null); }} className={inputClass}>
               <option value="">{tr("Qualquer", "Any")}</option>
@@ -132,18 +132,18 @@ export function AppointmentScheduler({
             </select>
           </label>
         )}
-        <label className="block text-[11px] font-medium text-slate-500">
+        <label className="block text-[11px] font-medium text-muted">
           {tr("Dia", "Day")}
           <input type="date" value={date} min={todayLocalDate()} onChange={(e) => { setDate(e.target.value); setSelected(null); }} className={inputClass} />
         </label>
       </div>
 
       <div>
-        <div className="mb-1.5 text-[11px] font-medium text-slate-500">{tr("Horários livres", "Free slots")}</div>
+        <div className="mb-1.5 text-[11px] font-medium text-muted">{tr("Horários livres", "Free slots")}</div>
         {slots === undefined ? (
-          <div className="h-10 animate-pulse rounded-lg bg-slate-50" />
+          <div className="h-10 animate-pulse rounded-lg bg-surface-2" />
         ) : slots.filter((s) => s.available).length === 0 ? (
-          <p className="text-[12px] text-slate-500">{tr("Sem horários livres neste dia.", "No free slots on this day.")}</p>
+          <p className="text-[12px] text-muted">{tr("Sem horários livres neste dia.", "No free slots on this day.")}</p>
         ) : (
           <div className="flex flex-wrap gap-1.5">
             {slots.filter((s) => s.available).map((slot) => (
@@ -153,7 +153,7 @@ export function AppointmentScheduler({
                 onClick={() => setSelected(slot.startAt)}
                 className={cn(
                   "rounded-md border px-2.5 py-1 text-[12px] font-semibold transition-colors",
-                  selected === slot.startAt ? "border-[#2b4f8a] bg-[#2b4f8a] text-white" : "border-slate-200 bg-white text-[#0a1b33] hover:border-[#2b4f8a]",
+                  selected === slot.startAt ? "border-[#2b4f8a] bg-[#2b4f8a] text-white" : "border-line bg-surface text-ink hover:border-[#2b4f8a]",
                 )}
               >
                 {slot.label}
@@ -166,19 +166,19 @@ export function AppointmentScheduler({
       {mode.kind === "book" && (
         <div className={cn("grid gap-2", compact ? "grid-cols-1" : "sm:grid-cols-2")}>
           {!mode.threadId && (
-            <label className="block text-[11px] font-medium text-slate-500">
+            <label className="block text-[11px] font-medium text-muted">
               {tr("Paciente", "Patient")}
               <input value={patientName} onChange={(e) => setPatientName(e.target.value)} placeholder={tr("Nome", "Name")} className={inputClass} maxLength={120} />
             </label>
           )}
-          <label className="block text-[11px] font-medium text-slate-500">
+          <label className="block text-[11px] font-medium text-muted">
             {tr("Notas (internas)", "Notes (internal)")}
             <input value={notes} onChange={(e) => setNotes(e.target.value)} className={inputClass} maxLength={500} />
           </label>
         </div>
       )}
       {mode.kind === "book" && mode.threadId && (
-        <label className="flex items-center gap-2 text-[12px] text-[#0a1b33]">
+        <label className="flex items-center gap-2 text-[12px] text-ink">
           <input type="checkbox" checked={askConfirmation} onChange={(e) => setAskConfirmation(e.target.checked)} className="h-4 w-4 accent-[#0a1b33]" />
           <Send size={12} className="text-[#0d6b61]" />
           {tr("Enviar pedido de confirmação ao paciente", "Send a confirmation request to the patient")}

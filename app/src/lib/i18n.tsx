@@ -48,6 +48,19 @@ export const MESSAGES = {
     "shell.open": "abrir",
     "shell.results": "resultado",
     "shell.resultsPlural": "resultados",
+    "shell.groupActions": "Acções",
+    "palette.openSuggestions": "Ver sugestões da IA por aprovar",
+    "palette.openSuggestionsHint": "Inbox · separador Sugestões IA",
+    "palette.openRisk": "Ver conversas em risco",
+    "palette.openRiskHint": "Inbox · separador Risco / SLA",
+    "palette.openQueue": "Ver a fila de espera",
+    "palette.openQueueHint": "Inbox · separador Aguardando",
+    "palette.openAlerts": "Ver avisos da operação",
+    "palette.openAlertsHint": "Operação · avisos abertos",
+    "palette.openAgents": "Gerir agentes de IA",
+    "palette.openAgentsHint": "Modos, sandbox e evolução",
+    "palette.toggleTheme": "Alternar tema claro/escuro",
+    "palette.toggleThemeHint": "Aplica já, e fica guardado",
     "shell.groupNavigate": "Navegar",
     "shell.groupConversations": "Conversas",
     "shell.groupSettings": "Definições",
@@ -195,6 +208,13 @@ export const MESSAGES = {
     "leads.allChannels": "Todos os canais",
     "leads.loadMore": "Carregar mais",
     "leads.emptyColumn": "Sem leads nesta etapa",
+    "leads.commandAi": "A IA está a responder esta conversa",
+    "leads.commandMember": "Uma pessoa está a atender",
+    "leads.commandWaiting": "À espera de alguém da equipa",
+    "leads.human": "Equipa",
+    "leads.queue": "Fila",
+    "leads.riskNoNextStep": "Sem próximo passo",
+    "leads.riskCold": "Parado",
     "leads.moveTo": "Mover para…",
     "leads.dropHere": "Largar aqui",
     "leads.openChat": "Abrir conversa",
@@ -291,6 +311,10 @@ export const MESSAGES = {
     "inbox.intent": "Intenção",
     "inbox.firstResponseSla": "Prazo da primeira resposta",
     "inbox.aiSuggestion": "Sugestão IA",
+    "inbox.tabHandling": "Atendendo",
+    "inbox.tabWaiting": "Aguardando",
+    "inbox.tabSuggestions": "Sugestões IA",
+    "inbox.tabRisk": "Risco / SLA",
     "inbox.noIntent": "Sem intenção",
     "inbox.due": "Prazo",
     "inbox.noDue": "Sem prazo",
@@ -477,6 +501,19 @@ export const MESSAGES = {
     "shell.open": "open",
     "shell.results": "result",
     "shell.resultsPlural": "results",
+    "shell.groupActions": "Actions",
+    "palette.openSuggestions": "See AI suggestions awaiting approval",
+    "palette.openSuggestionsHint": "Inbox · AI suggestions tab",
+    "palette.openRisk": "See conversations at risk",
+    "palette.openRiskHint": "Inbox · Risk / SLA tab",
+    "palette.openQueue": "See the waiting queue",
+    "palette.openQueueHint": "Inbox · Waiting tab",
+    "palette.openAlerts": "See operational alerts",
+    "palette.openAlertsHint": "Operations · open alerts",
+    "palette.openAgents": "Manage AI agents",
+    "palette.openAgentsHint": "Modes, sandbox and evolution",
+    "palette.toggleTheme": "Switch light/dark theme",
+    "palette.toggleThemeHint": "Applies now, and is remembered",
     "shell.groupNavigate": "Navigate",
     "shell.groupConversations": "Conversations",
     "shell.groupSettings": "Settings",
@@ -624,6 +661,13 @@ export const MESSAGES = {
     "leads.allChannels": "All channels",
     "leads.loadMore": "Load more",
     "leads.emptyColumn": "No leads in this stage",
+    "leads.commandAi": "The AI is answering this conversation",
+    "leads.commandMember": "A person is handling it",
+    "leads.commandWaiting": "Waiting for someone on the team",
+    "leads.human": "Team",
+    "leads.queue": "Queue",
+    "leads.riskNoNextStep": "No next step",
+    "leads.riskCold": "Quiet",
     "leads.moveTo": "Move to…",
     "leads.dropHere": "Drop here",
     "leads.openChat": "Open conversation",
@@ -720,6 +764,10 @@ export const MESSAGES = {
     "inbox.intent": "Intent",
     "inbox.firstResponseSla": "First response deadline",
     "inbox.aiSuggestion": "AI suggestion",
+    "inbox.tabHandling": "Handling",
+    "inbox.tabWaiting": "Waiting",
+    "inbox.tabSuggestions": "AI suggestions",
+    "inbox.tabRisk": "Risk / SLA",
     "inbox.noIntent": "No intent",
     "inbox.due": "Due",
     "inbox.noDue": "No deadline",
@@ -959,13 +1007,13 @@ export function LanguageSwitcher({
   return (
     <div
       className={cn(
-        "inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1",
+        "inline-flex items-center gap-1 rounded-lg border border-line bg-surface-2 p-1",
         compact && "flex-col",
         className,
       )}
       aria-label={t("locale.label")}
     >
-      {!compact && <Languages size={13} className="ml-1 text-slate-400" aria-hidden />}
+      {!compact && <Languages size={13} className="ml-1 text-faint" aria-hidden />}
       {(["pt", "en"] as const).map((option) => (
         <button
           key={option}
@@ -975,8 +1023,8 @@ export function LanguageSwitcher({
             "h-7 rounded-md px-2 text-[11px] font-semibold transition-colors",
             compact && "w-9 px-0 text-[13px]",
             locale === option
-              ? "bg-white text-[#0a1b33] shadow-sm"
-              : "text-slate-500 hover:bg-white/70 hover:text-[#0a1b33]",
+              ? "bg-surface text-ink shadow-sm"
+              : "text-muted hover:bg-white/70 hover:text-ink",
           )}
         >
           {compact

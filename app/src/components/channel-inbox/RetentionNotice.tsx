@@ -8,7 +8,7 @@ import { retentionCopy } from "@/lib/retentionCopy";
 const STYLES = {
   protection: { box: "border-amber-200 bg-amber-50 text-amber-900", Icon: Clock3 },
   compliance: { box: "border-[#e0533d]/30 bg-[#fdf1ef] text-[#b3261e]", Icon: ShieldAlert },
-  quality: { box: "border-slate-200 bg-slate-50 text-slate-700", Icon: AlertTriangle },
+  quality: { box: "border-line bg-surface-2 text-ink", Icon: AlertTriangle },
 } as const;
 
 /**

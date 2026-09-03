@@ -97,7 +97,7 @@ export function HandoffDialog({
     >
       <form
         onSubmit={submit}
-        className="w-full max-w-lg rounded-t-2xl bg-white p-5 shadow-2xl sm:rounded-2xl"
+        className="w-full max-w-lg rounded-t-2xl bg-surface p-5 shadow-2xl sm:rounded-2xl"
       >
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-2.5">
@@ -105,22 +105,22 @@ export function HandoffDialog({
               <UsersRound size={17} />
             </span>
             <div>
-              <h2 className="text-[15px] font-bold text-[#0a1b33]">{t("handoff.title")}</h2>
-              <p className="mt-0.5 text-[12px] leading-relaxed text-slate-500">{t("handoff.subtitle")}</p>
+              <h2 className="text-[15px] font-bold text-ink">{t("handoff.title")}</h2>
+              <p className="mt-0.5 text-[12px] leading-relaxed text-muted">{t("handoff.subtitle")}</p>
             </div>
           </div>
-          <button type="button" onClick={onClose} className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100" aria-label={t("inbox.cancel")}>
+          <button type="button" onClick={onClose} className="rounded-md p-1.5 text-faint hover:bg-surface-3" aria-label={t("inbox.cancel")}>
             <X size={16} />
           </button>
         </div>
 
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          <label className="text-[11px] font-semibold text-slate-500">
+          <label className="text-[11px] font-semibold text-muted">
             {t("handoff.reason")}
             <select
               value={reasonKey}
               onChange={(event) => setReasonKey(event.target.value)}
-              className="mt-1 h-9 w-full rounded-md border border-slate-200 bg-white px-2 text-[12px] font-semibold text-[#0a1b33] outline-none focus:border-slate-400"
+              className="mt-1 h-9 w-full rounded-md border border-line bg-surface px-2 text-[12px] font-semibold text-ink outline-none focus:border-brand-solid/40"
             >
               {REASON_INTENTS.map((key) => (
                 <option key={key} value={key}>
@@ -134,16 +134,16 @@ export function HandoffDialog({
                 onChange={(event) => setCustomReason(event.target.value)}
                 maxLength={80}
                 placeholder={t("handoff.reasonOther")}
-                className="mt-1.5 h-9 w-full rounded-md border border-slate-200 px-2 text-[12px] outline-none focus:border-slate-400"
+                className="mt-1.5 h-9 w-full rounded-md border border-line px-2 text-[12px] outline-none focus:border-brand-solid/40"
               />
             )}
           </label>
-          <label className="text-[11px] font-semibold text-slate-500">
+          <label className="text-[11px] font-semibold text-muted">
             {t("handoff.responsible")}
             <select
               value={responsible}
               onChange={(event) => setResponsible(event.target.value)}
-              className="mt-1 h-9 w-full rounded-md border border-slate-200 bg-white px-2 text-[12px] font-semibold text-[#0a1b33] outline-none focus:border-slate-400"
+              className="mt-1 h-9 w-full rounded-md border border-line bg-surface px-2 text-[12px] font-semibold text-ink outline-none focus:border-brand-solid/40"
             >
               <option value="">{t("handoff.unassigned")}</option>
               {(members ?? [])
@@ -159,7 +159,7 @@ export function HandoffDialog({
         </div>
 
         <div className="mt-3">
-          <div className="text-[11px] font-semibold text-slate-500">{t("handoff.urgency")}</div>
+          <div className="text-[11px] font-semibold text-muted">{t("handoff.urgency")}</div>
           <div className="mt-1 grid grid-cols-2 gap-1.5 sm:grid-cols-4">
             {URGENCIES.map((value) => (
               <button
@@ -171,8 +171,8 @@ export function HandoffDialog({
                   urgency === value
                     ? value === "urgent"
                       ? "border-[#e0533d] bg-[#fff1ee] text-[#8a2a1b]"
-                      : "border-[#0a1b33] bg-[#0a1b33] text-white"
-                    : "border-slate-200 bg-white text-slate-600 hover:border-slate-300",
+                      : "border-brand-solid bg-brand-solid text-white"
+                    : "border-line bg-surface text-body hover:border-line",
                 )}
               >
                 {t(`handoff.urgency.${value}` as TranslationKey)}
@@ -181,7 +181,7 @@ export function HandoffDialog({
           </div>
         </div>
 
-        <label className="mt-3 block text-[11px] font-semibold text-slate-500">
+        <label className="mt-3 block text-[11px] font-semibold text-muted">
           {t("handoff.question")}
           <textarea
             value={question}
@@ -189,20 +189,20 @@ export function HandoffDialog({
             rows={3}
             maxLength={2000}
             placeholder={t("handoff.questionPlaceholder")}
-            className="mt-1 w-full rounded-md border border-slate-200 px-2.5 py-2 text-[12px] leading-relaxed outline-none focus:border-slate-400"
+            className="mt-1 w-full rounded-md border border-line px-2.5 py-2 text-[12px] leading-relaxed outline-none focus:border-brand-solid/40"
           />
         </label>
 
         {error && <div className="mt-2 text-[11px] text-[#b3261e]">{error}</div>}
 
         <div className="mt-4 flex items-center justify-end gap-2">
-          <button type="button" onClick={onClose} className="h-9 rounded-md px-3 text-[12px] font-semibold text-slate-500 hover:bg-slate-100">
+          <button type="button" onClick={onClose} className="h-9 rounded-md px-3 text-[12px] font-semibold text-muted hover:bg-surface-3">
             {t("inbox.cancel")}
           </button>
           <button
             type="submit"
             disabled={busy}
-            className="inline-flex h-9 items-center gap-2 rounded-md bg-[#0a152d] px-4 text-[12px] font-bold text-white disabled:opacity-50"
+            className="inline-flex h-9 items-center gap-2 rounded-md bg-nav-active px-4 text-[12px] font-bold text-white disabled:opacity-50"
           >
             {busy ? <Loader2 size={13} className="animate-spin" /> : <UsersRound size={13} />}
             {t("handoff.submit")}

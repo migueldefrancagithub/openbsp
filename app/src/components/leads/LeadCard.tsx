@@ -27,6 +27,9 @@ export type LeadCardData = {
   originCampaignName?: string;
   automationMode?: string;
   pilotBlocked: boolean;
+  command?: string;
+  riskBucket?: string;
+  hoursSinceActivity?: number;
 };
 
 export function LeadCard({
@@ -54,25 +57,26 @@ export function LeadCard({
         event.dataTransfer.effectAllowed = "move";
       }}
       className={cn(
-        "rounded-lg border border-slate-200 bg-white p-2.5 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-opacity",
+        "rounded-xl border border-line bg-surface p-3 shadow-[var(--shadow-card)] transition-all hover:border-brand-solid/30 hover:shadow-[0_6px_18px_-10px_rgba(10,27,51,0.35)]",
         moving && "opacity-50",
+        lead.riskBucket === "critical" && "border-l-2 border-l-[#b3261e]",
       )}
       data-lead-card={lead._id}
     >
       <div className="flex items-start justify-between gap-2">
         <Link href={href} className="min-w-0 flex-1" title={t("leads.openChat")}>
-          <div className={cn("truncate text-[12px]", lead.unreadCount > 0 ? "font-bold text-[#0a1b33]" : "font-semibold text-slate-700")}>
+          <div className={cn("truncate text-[12px]", lead.unreadCount > 0 ? "font-bold text-ink" : "font-semibold text-ink")}>
             {label}
           </div>
           {lead.lastPreview && (
-            <div className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-slate-500">{lead.lastPreview}</div>
+            <div className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-muted">{lead.lastPreview}</div>
           )}
         </Link>
-        <span className={cn("mt-1 h-2 w-2 shrink-0 rounded-full", windowOpen ? "bg-emerald-500" : "bg-slate-300")} title={t("leads.window")} />
+        <span className={cn("mt-1 h-2 w-2 shrink-0 rounded-full", windowOpen ? "bg-emerald-500" : "bg-faint/50")} title={t("leads.window")} />
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-1">
         {intentKey && (
-          <span className="rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[9px] font-semibold text-slate-600">
+          <span className="rounded border border-line bg-surface-2 px-1.5 py-0.5 text-[9px] font-semibold text-body">
             {t(intentKey) === intentKey ? lead.intent : t(intentKey)}
           </span>
         )}
@@ -88,27 +92,59 @@ export function LeadCard({
             {t("inbox.pilotBlockedShort")}
           </span>
         )}
-        {lead.automationMode === "bot" && <Bot size={11} className="text-blue-500" />}
+        <span
+          className={cn(
+            "inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] font-bold",
+            lead.command === "ai"
+              ? "bg-[#eef3fb] text-[#2b4f8a]"
+              : lead.command === "member"
+                ? "bg-[#edf8f6] text-[#0d6b61]"
+                : "bg-surface-3 text-muted",
+          )}
+          title={
+            lead.command === "ai"
+              ? t("leads.commandAi")
+              : lead.command === "member"
+                ? t("leads.commandMember")
+                : t("leads.commandWaiting")
+          }
+        >
+          {lead.command === "ai" ? <Bot size={9} /> : <UserRound size={9} />}
+          {lead.command === "ai" ? "IA" : lead.command === "member" ? t("leads.human") : t("leads.queue")}
+        </span>
         {lead.unreadCount > 0 && (
           <span className="ml-auto min-w-5 rounded-full bg-[#0d6b61] px-1.5 py-0.5 text-center text-[9px] font-bold text-white">
             {lead.unreadCount}
           </span>
         )}
       </div>
+      {lead.riskBucket && lead.riskBucket !== "in_flight" && (
+        <div
+          className={cn(
+            "mt-2 inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[9px] font-bold",
+            lead.riskBucket === "critical" ? "bg-[#fdf1ef] text-[#b3261e]" : "bg-amber-50 text-amber-800",
+          )}
+        >
+          <ShieldAlert size={9} />
+          {!lead.nextStep ? t("leads.riskNoNextStep") : t("leads.riskCold")}
+          {typeof lead.hoursSinceActivity === "number" &&
+            ` · ${lead.hoursSinceActivity < 48 ? `${lead.hoursSinceActivity}h` : `${Math.round(lead.hoursSinceActivity / 24)}d`}`}
+        </div>
+      )}
       {lead.nextStep && (
-        <div className="mt-2 flex items-start gap-1 text-[10px] text-slate-600">
-          <Clock3 size={10} className={cn("mt-0.5 shrink-0", overdue ? "text-[#b3261e]" : "text-slate-400")} />
+        <div className="mt-2 flex items-start gap-1 text-[10px] text-body">
+          <Clock3 size={10} className={cn("mt-0.5 shrink-0", overdue ? "text-[#b3261e]" : "text-faint")} />
           <span className="line-clamp-2">
             {lead.nextStep}
             {lead.nextStepDueAt && (
-              <span className={cn("ml-1", overdue ? "font-semibold text-[#b3261e]" : "text-slate-400")}>
+              <span className={cn("ml-1", overdue ? "font-semibold text-[#b3261e]" : "text-faint")}>
                 · {relativeTime(lead.nextStepDueAt, now, locale)}
               </span>
             )}
           </span>
         </div>
       )}
-      <div className="mt-2 flex items-center justify-between gap-2 text-[9px] text-slate-400">
+      <div className="mt-2 flex items-center justify-between gap-2 text-[9px] text-faint">
         <span className="inline-flex min-w-0 items-center gap-1">
           <UserRound size={10} />
           <span className="truncate">{lead.responsibleName ?? t("inbox.unassignedShort")}</span>
@@ -122,7 +158,7 @@ export function LeadCard({
         }}
         disabled={moving}
         aria-label={t("leads.moveTo")}
-        className="mt-2 h-7 w-full rounded-md border border-slate-200 bg-white px-1.5 text-[10px] font-semibold text-slate-600 outline-none focus:border-slate-400"
+        className="mt-2 h-7 w-full rounded-md border border-line bg-surface px-1.5 text-[10px] font-semibold text-body outline-none focus:border-brand-solid/40"
       >
         <option value="">{t("leads.moveTo")}</option>
         {LEAD_STATUSES.filter((status) => status !== lead.leadStatus).map((status) => (

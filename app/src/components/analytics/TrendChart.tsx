@@ -71,7 +71,7 @@ export function TrendChart({
   return (
     <div className="min-w-0 px-4 pb-3 pt-4">
       <div className="flex min-w-0 gap-3">
-        <div className="flex w-10 shrink-0 flex-col justify-between py-0.5 text-right text-[10px] tabular-nums text-slate-400">
+        <div className="flex w-10 shrink-0 flex-col justify-between py-0.5 text-right text-[10px] tabular-nums text-faint">
           <span>{formatNumber(max, locale)}</span>
           <span>{formatNumber(Math.round(max / 2), locale)}</span>
           <span>0</span>
@@ -79,9 +79,9 @@ export function TrendChart({
 
         <div className="relative min-w-0 flex-1">
           <div className="pointer-events-none absolute inset-0 flex flex-col justify-between">
-            <span className="border-t border-slate-100" />
-            <span className="border-t border-slate-100" />
-            <span className="border-t border-slate-100" />
+            <span className="border-t border-line-soft" />
+            <span className="border-t border-line-soft" />
+            <span className="border-t border-line-soft" />
           </div>
           <svg
             viewBox={`0 0 ${VW} ${VH}`}
@@ -112,7 +112,7 @@ export function TrendChart({
           {labels.map((row) => (
             <span
               key={row.bucketStart}
-              className="truncate text-[10px] text-slate-400"
+              className="truncate text-[10px] text-faint"
             >
               {row.bucketLabel}
             </span>
@@ -120,11 +120,11 @@ export function TrendChart({
         </div>
       </div>
 
-      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 border-t border-slate-100 pt-2.5">
+      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 border-t border-line-soft pt-2.5">
         {lines.map((line) => (
           <span
             key={line.key}
-            className="inline-flex items-center gap-1.5 text-[11px] text-slate-500"
+            className="inline-flex items-center gap-1.5 text-[11px] text-muted"
           >
             <span
               className="h-0.5 w-3 rounded-full"

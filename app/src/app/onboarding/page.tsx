@@ -41,18 +41,18 @@ export default function OnboardingPage() {
   }
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center bg-[#f9fafb] px-4 py-12">
+    <div className="relative flex min-h-screen items-center justify-center bg-background px-4 py-12">
       <LanguageSwitcher compact className="absolute right-4 top-4" />
       <div className="w-full max-w-md">
-        <div className="mb-10 flex justify-center text-[#0a1b33]">
+        <div className="mb-10 flex justify-center text-ink">
           <BrandLogo />
         </div>
 
-        <div className="rounded-lg border border-slate-200 bg-white p-8 shadow-[0_20px_60px_-30px_rgba(0,0,0,0.15)]">
-          <h1 className="font-[var(--font-outfit)] text-[26px] font-medium tracking-tight text-[#0a1b33]">
+        <div className="rounded-lg border border-line bg-surface p-8 shadow-[0_20px_60px_-30px_rgba(0,0,0,0.15)]">
+          <h1 className="font-[var(--font-outfit)] text-[26px] font-medium tracking-tight text-ink">
             {tr("Configure o seu espaço de trabalho", "Set up your workspace")}
           </h1>
-          <p className="text-slate-500 text-sm mt-1">
+          <p className="text-muted text-sm mt-1">
             {tr("Só falta este passo para ligar o WhatsApp.", "One last step before you can connect WhatsApp.")}
           </p>
 
@@ -60,7 +60,7 @@ export default function OnboardingPage() {
             <div>
               <label
                 htmlFor="name"
-                className="block text-xs font-medium text-slate-700 mb-1.5"
+                className="block text-xs font-medium text-ink mb-1.5"
               >
                 {tr("Nome do espaço de trabalho", "Workspace name")}
               </label>
@@ -70,13 +70,13 @@ export default function OnboardingPage() {
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm text-[#0a1b33] focus:outline-none focus:ring-2 focus:ring-[#0a152d]/10 focus:border-[#0a152d] transition-all"
+                className="w-full px-3 py-2.5 rounded-lg border border-line text-sm text-ink focus:outline-none focus:ring-2 focus:ring-[#0a152d]/10 focus:border-[#0a152d] transition-all"
                 placeholder="Clínica Marisa Vaz"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1.5">
+              <label className="block text-xs font-medium text-ink mb-1.5">
                 {tr("Área de atividade", "Business area")}
               </label>
               <div className="grid grid-cols-2 gap-2">
@@ -87,8 +87,8 @@ export default function OnboardingPage() {
                     onClick={() => setVertical(v.value)}
                     className={`text-left px-3 py-2.5 rounded-lg border text-sm transition-all ${
                       vertical === v.value
-                        ? "border-[#0a152d] bg-[#0a152d]/5 text-[#0a1b33] font-medium"
-                        : "border-slate-200 text-slate-600 hover:border-slate-300"
+                        ? "border-[#0a152d] bg-nav-active/5 text-ink font-medium"
+                        : "border-line text-body hover:border-line"
                     }`}
                   >
                     <div>{tr(v.pt, v.en)}</div>
@@ -106,7 +106,7 @@ export default function OnboardingPage() {
             <button
               type="submit"
               disabled={busy}
-              className="w-full bg-[#0a152d] text-white text-sm font-medium px-4 py-2.5 rounded-lg shadow-[0_8px_24px_-8px_rgba(10,21,45,0.5)] hover:bg-[#0a1b33] disabled:opacity-50 transition-all"
+              className="w-full bg-nav-active text-white text-sm font-medium px-4 py-2.5 rounded-lg shadow-[0_8px_24px_-8px_rgba(10,21,45,0.5)] hover:bg-brand-solid disabled:opacity-50 transition-all"
             >
               {busy ? tr("A criar…", "Creating…") : tr("Criar espaço de trabalho", "Create workspace")}
             </button>

@@ -29,7 +29,7 @@ export function appointmentStatusTone(status: string): string {
     case "cancelled":
       return "border-[#e0533d]/30 bg-[#fdf1ef] text-[#b3261e]";
     default:
-      return "border-slate-200 bg-slate-50 text-slate-600";
+      return "border-line bg-surface-2 text-body";
   }
 }
 

@@ -196,23 +196,23 @@ export function IaSolutionHubSection() {
   }
 
   return (
-    <section id="hub" className="scroll-mt-4 overflow-hidden rounded-lg border border-slate-200 bg-white">
-      <div className="flex flex-col gap-3 border-b border-slate-100 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
+    <section id="hub" className="scroll-mt-4 overflow-hidden rounded-lg border border-line bg-surface">
+      <div className="flex flex-col gap-3 border-b border-line-soft px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex items-center gap-2">
             <Radio size={15} className="text-emerald-600" />
-            <h2 className="text-[15px] font-semibold text-[#0a1b33]">
+            <h2 className="text-[15px] font-semibold text-ink">
               {tr("Canal isolado do iaSolution Hub", "Isolated iaSolution Hub channel")}
             </h2>
           </div>
-          <p className="mt-1 text-xs text-slate-500">
+          <p className="mt-1 text-xs text-muted">
             {tr(
               "Ligação Alfapay autorizada para laboratório OpenBSP, isolada por organização, canal, webhook, HMAC e lista autorizada.",
               "Authorized Alfapay lab connection for OpenBSP, isolated by workspace, channel, webhook, HMAC, and allowlist.",
             )}
           </p>
         </div>
-        <span className="w-fit rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-medium text-slate-600">
+        <span className="w-fit rounded-md border border-line bg-surface-2 px-2 py-1 text-[11px] font-medium text-body">
           {statusLabel(channel?.connectionState ?? "not_created", locale)}
         </span>
       </div>
@@ -225,7 +225,7 @@ export function IaSolutionHubSection() {
           )}
         </div>
         {!channel ? (
-          <div className="flex flex-col gap-4 rounded-lg border border-dashed border-slate-300 p-5 sm:flex-row sm:items-end">
+          <div className="flex flex-col gap-4 rounded-lg border border-dashed border-line p-5 sm:flex-row sm:items-end">
             <Field
               label={tr("Nome do canal", "Channel name")}
               value={displayName}
@@ -236,7 +236,7 @@ export function IaSolutionHubSection() {
               type="button"
               onClick={handleCreate}
               disabled={busy !== null || !displayName.trim()}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#0a152d] px-4 text-xs font-medium text-white disabled:opacity-50"
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-nav-active px-4 text-xs font-medium text-white disabled:opacity-50"
             >
               {busy === "create" ? <Loader2 size={13} className="animate-spin" /> : <ShieldCheck size={13} />}
               {tr("Reservar canal isolado", "Reserve isolated channel")}
@@ -252,14 +252,14 @@ export function IaSolutionHubSection() {
             </div>
 
             {channel.webhookUrl && channel.webhookStatus !== "disabled" && (
-              <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                <code className="min-w-0 flex-1 truncate text-[11px] text-slate-600">
+              <div className="flex items-center gap-2 rounded-lg border border-line bg-surface-2 px-3 py-2">
+                <code className="min-w-0 flex-1 truncate text-[11px] text-body">
                   {channel.webhookUrl}
                 </code>
                 <button
                   type="button"
                   onClick={() => navigator.clipboard.writeText(channel.webhookUrl!)}
-                  className="rounded-md border border-slate-200 bg-white p-2 text-slate-500"
+                  className="rounded-md border border-line bg-surface p-2 text-muted"
                   aria-label={tr("Copiar URL do webhook", "Copy webhook URL")}
                 >
                   <Copy size={13} />
@@ -268,7 +268,7 @@ export function IaSolutionHubSection() {
             )}
 
             {channel.connectionState === "pending_number" && (
-              <form onSubmit={handleConfigure} className="grid gap-3 rounded-lg border border-slate-200 p-4 md:grid-cols-2">
+              <form onSubmit={handleConfigure} className="grid gap-3 rounded-lg border border-line p-4 md:grid-cols-2">
                 <Field
                   label="Hub channel ID"
                   value={externalChannelId}
@@ -281,7 +281,7 @@ export function IaSolutionHubSection() {
                 <Field label={tr("Token do canal", "Channel token")} value={channelToken} onChange={setChannelToken} placeholder={tr("Guardado de forma encriptada", "Stored encrypted")} type="password" />
                 <div>
                   <div className="mb-1 flex items-center justify-between">
-                    <label className="text-[11px] font-medium text-slate-600">{tr("Segredo HMAC do webhook", "Webhook HMAC secret")}</label>
+                    <label className="text-[11px] font-medium text-body">{tr("Segredo HMAC do webhook", "Webhook HMAC secret")}</label>
                     <button
                       type="button"
                       onClick={() => {
@@ -298,11 +298,11 @@ export function IaSolutionHubSection() {
                       {tr("Gerar e copiar", "Generate & copy")}
                     </button>
                   </div>
-                  <input value={webhookSecret} onChange={(event) => setWebhookSecret(event.target.value)} type="password" placeholder={tr("Copie antes de gravar", "Copy before saving")} className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-slate-400" />
+                  <input value={webhookSecret} onChange={(event) => setWebhookSecret(event.target.value)} type="password" placeholder={tr("Copie antes de gravar", "Copy before saving")} className="h-10 w-full rounded-lg border border-line px-3 text-sm outline-none focus:border-brand-solid/40" />
                 </div>
                 <Field label={tr("Lista autorizada do piloto", "Pilot allowlist")} value={allowlist} onChange={setAllowlist} placeholder="258..." />
                 <div className="flex items-end">
-                  <button type="submit" disabled={busy !== null} className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-[#0a152d] px-4 text-xs font-medium text-white disabled:opacity-50">
+                  <button type="submit" disabled={busy !== null} className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-nav-active px-4 text-xs font-medium text-white disabled:opacity-50">
                     {busy === "configure" ? <Loader2 size={13} className="animate-spin" /> : <KeyRound size={13} />}
                     {tr("Validar e encriptar", "Validate and encrypt")}
                   </button>
@@ -323,17 +323,17 @@ export function IaSolutionHubSection() {
                     type="button"
                     onClick={handleAllowlist}
                     disabled={busy !== null || !allowlist.trim()}
-                    className="inline-flex h-10 items-center justify-center rounded-lg border border-slate-200 px-3 text-xs font-medium text-slate-600 disabled:opacity-40"
+                    className="inline-flex h-10 items-center justify-center rounded-lg border border-line px-3 text-xs font-medium text-body disabled:opacity-40"
                   >
                     {tr("Guardar lista", "Save allowlist")}
                   </button>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <button type="button" onClick={handleHealth} disabled={busy !== null} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 disabled:opacity-50">
+                  <button type="button" onClick={handleHealth} disabled={busy !== null} className="inline-flex items-center gap-2 rounded-lg border border-line px-3 py-2 text-xs font-medium text-body disabled:opacity-50">
                     {busy === "health" ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
                     {tr("Verificar saúde", "Check health")}
                   </button>
-                  <button type="button" onClick={handlePilot} disabled={busy !== null || channel.webhookStatus !== "verified"} className="inline-flex items-center gap-2 rounded-lg bg-[#0a152d] px-3 py-2 text-xs font-medium text-white disabled:opacity-40">
+                  <button type="button" onClick={handlePilot} disabled={busy !== null || channel.webhookStatus !== "verified"} className="inline-flex items-center gap-2 rounded-lg bg-nav-active px-3 py-2 text-xs font-medium text-white disabled:opacity-40">
                     {channel.sendMode === "disabled" ? <Power size={13} /> : <PowerOff size={13} />}
                     {channel.sendMode === "disabled"
                       ? tr("Ativar piloto autorizado", "Enable allowlist pilot")
@@ -346,7 +346,7 @@ export function IaSolutionHubSection() {
         )}
 
         {notice && (
-          <div className="flex items-start gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+          <div className="flex items-start gap-2 rounded-lg border border-line bg-surface-2 px-3 py-2 text-xs text-body">
             <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-emerald-600" />
             {notice}
           </div>
@@ -371,17 +371,17 @@ function Field({
 }) {
   return (
     <label className="block flex-1">
-      <span className="mb-1 block text-[11px] font-medium text-slate-600">{label}</span>
-      <input type={type} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-slate-400" />
+      <span className="mb-1 block text-[11px] font-medium text-body">{label}</span>
+      <input type={type} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} className="h-10 w-full rounded-lg border border-line px-3 text-sm outline-none focus:border-brand-solid/40" />
     </label>
   );
 }
 
 function Status({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-slate-200 p-3">
-      <div className="text-[10px] font-medium uppercase tracking-[0.12em] text-slate-400">{label}</div>
-      <div className="mt-1 truncate text-xs font-semibold text-[#0a1b33]">{value}</div>
+    <div className="rounded-lg border border-line p-3">
+      <div className="text-[10px] font-medium uppercase tracking-[0.12em] text-faint">{label}</div>
+      <div className="mt-1 truncate text-xs font-semibold text-ink">{value}</div>
     </div>
   );
 }

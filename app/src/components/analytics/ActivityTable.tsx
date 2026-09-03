@@ -103,7 +103,7 @@ export function ActivityTable({ rows }: { rows: DetailRow[] }) {
       case "qualityRisk":
         return <RiskBadge risk={row.qualityRisk} hasTraffic={hasTraffic} />;
       case "retrySafety":
-        return <span className="capitalize text-slate-500">{retryLabel(row.retrySafety, locale)}</span>;
+        return <span className="capitalize text-muted">{retryLabel(row.retrySafety, locale)}</span>;
     }
   }
 
@@ -148,17 +148,17 @@ export function ActivityTable({ rows }: { rows: DetailRow[] }) {
               onClick={() => setChooserOpen((open) => !open)}
               aria-expanded={chooserOpen}
               aria-haspopup="true"
-              className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-slate-200 px-2 text-[12px] font-medium text-slate-600 outline-none hover:border-slate-300 focus-visible:ring-2 focus-visible:ring-[#3d52d5]"
+              className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-line px-2 text-[12px] font-medium text-body outline-none hover:border-line focus-visible:ring-2 focus-visible:ring-[#3d52d5]"
             >
               <Columns3 size={13} />
               {tr("Colunas", "Columns")}
             </button>
             {chooserOpen && (
-              <div className="absolute right-0 z-20 mt-1 w-48 rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
+              <div className="absolute right-0 z-20 mt-1 w-48 rounded-lg border border-line bg-surface p-1 shadow-lg">
                 {COLUMNS.map((column) => (
                   <label
                     key={column.id}
-                    className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-[12px] text-slate-600 hover:bg-slate-50"
+                    className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-[12px] text-body hover:bg-surface-2"
                   >
                     <input
                       type="checkbox"
@@ -182,7 +182,7 @@ export function ActivityTable({ rows }: { rows: DetailRow[] }) {
             type="button"
             onClick={exportCsv}
             disabled={rows.length === 0}
-            className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-slate-200 px-2 text-[12px] font-medium text-slate-600 outline-none hover:border-slate-300 disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-[#3d52d5]"
+            className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-line px-2 text-[12px] font-medium text-body outline-none hover:border-line disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-[#3d52d5]"
           >
             <Download size={13} />
             {tr("Exportar CSV", "Export CSV")}
@@ -199,7 +199,7 @@ export function ActivityTable({ rows }: { rows: DetailRow[] }) {
           <div className="min-w-0 overflow-x-auto">
             <table className="w-full text-left text-[13px]">
               <thead>
-                <tr className="border-b border-slate-100 text-[11px] uppercase tracking-[0.08em] text-slate-400">
+                <tr className="border-b border-line-soft text-[11px] uppercase tracking-[0.08em] text-faint">
                   {visible.map((column) => (
                     <th
                       key={column.id}
@@ -221,7 +221,7 @@ export function ActivityTable({ rows }: { rows: DetailRow[] }) {
                       <td
                         key={column.id}
                         className={cn(
-                          "whitespace-nowrap px-4 py-2.5 text-[#0a1b33]",
+                          "whitespace-nowrap px-4 py-2.5 text-ink",
                           column.numeric && "text-right tabular-nums",
                         )}
                       >
@@ -234,8 +234,8 @@ export function ActivityTable({ rows }: { rows: DetailRow[] }) {
             </table>
           </div>
 
-          <div className="flex min-w-0 items-center gap-3 border-t border-slate-100 px-4 py-2">
-            <span className="truncate text-[11px] text-slate-400">
+          <div className="flex min-w-0 items-center gap-3 border-t border-line-soft px-4 py-2">
+            <span className="truncate text-[11px] text-faint">
               {current * PAGE_SIZE + 1}–
               {Math.min((current + 1) * PAGE_SIZE, rows.length)} of{" "}
               {formatNumber(rows.length, locale)}
@@ -246,7 +246,7 @@ export function ActivityTable({ rows }: { rows: DetailRow[] }) {
                 disabled={current === 0}
                 onClick={() => setPage(current - 1)}
               />
-              <span className="px-1 text-[11px] tabular-nums text-slate-500">
+              <span className="px-1 text-[11px] tabular-nums text-muted">
                 {current + 1} / {pageCount}
               </span>
               <PageButton
@@ -318,7 +318,7 @@ function PageButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="h-7 rounded-lg border border-slate-200 px-2 text-[12px] font-medium text-slate-600 outline-none hover:border-slate-300 disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-[#3d52d5]"
+      className="h-7 rounded-lg border border-line px-2 text-[12px] font-medium text-body outline-none hover:border-line disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-[#3d52d5]"
     >
       {label}
     </button>

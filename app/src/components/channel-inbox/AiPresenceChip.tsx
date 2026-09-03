@@ -20,7 +20,7 @@ export function AiPresenceChip({ threadId, ai, canResume, onNotice }: { threadId
   const label =
     ai.status === "responding" ? tr("IA a responder", "AI responding") : ai.status === "paused" ? tr("IA em pausa", "AI paused") : ai.status === "handed_off" ? tr("IA passou à equipa", "AI handed off") : tr("IA desligada", "AI off");
   const tone =
-    ai.status === "responding" ? "border-[#0d6b61]/30 bg-[#edf8f6] text-[#0d6b61]" : ai.status === "paused" ? "border-amber-200 bg-amber-50 text-amber-800" : ai.status === "handed_off" ? "border-[#2b4f8a]/30 bg-[#eef3fb] text-[#2b4f8a]" : "border-slate-200 bg-slate-50 text-slate-500";
+    ai.status === "responding" ? "border-[#0d6b61]/30 bg-[#edf8f6] text-[#0d6b61]" : ai.status === "paused" ? "border-amber-200 bg-amber-50 text-amber-800" : ai.status === "handed_off" ? "border-[#2b4f8a]/30 bg-[#eef3fb] text-[#2b4f8a]" : "border-line bg-surface-2 text-muted";
   return (
     <span className={cn("inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[10px] font-semibold", tone)} title={`${ai.agentName} · ${ai.turns} ${tr("respostas", "replies")}${ai.lastTurnAt ? ` · ${relativeTime(ai.lastTurnAt, Date.now(), locale)}` : ""}${ai.pausedReason ? ` · ${ai.pausedReason}` : ""}`}>
       <Bot size={12} />
@@ -41,7 +41,7 @@ export function AiPresenceChip({ threadId, ai, canResume, onNotice }: { threadId
               setBusy(false);
             }
           }}
-          className="ml-0.5 rounded bg-white/70 px-1.5 py-0.5 text-[10px] font-bold text-[#0a1b33] hover:bg-white"
+          className="ml-0.5 rounded bg-white/70 px-1.5 py-0.5 text-[10px] font-bold text-ink hover:bg-surface"
         >
           {busy ? <Loader2 size={10} className="animate-spin" /> : tr("Retomar", "Resume")}
         </button>

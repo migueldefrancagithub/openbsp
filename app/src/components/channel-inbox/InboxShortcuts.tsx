@@ -9,6 +9,9 @@ const BINDINGS: Binding[] = [
   { keys: "j", pt: "Conversa seguinte", en: "Next conversation" },
   { keys: "k", pt: "Conversa anterior", en: "Previous conversation" },
   { keys: "r", pt: "Focar a resposta", en: "Focus the reply" },
+  { keys: "i", pt: "Abrir a ficha do paciente", en: "Open the patient record" },
+  { keys: "⌘ + Enter", pt: "Aprovar a sugestão da IA", en: "Approve the AI suggestion" },
+  { keys: "⌘ + K", pt: "Procurar em todo o lado", en: "Search everywhere" },
   { keys: "Enter", pt: "Enviar a mensagem", en: "Send the message" },
   { keys: "Shift + Enter", pt: "Quebrar linha sem enviar", en: "New line without sending" },
   { keys: "Esc", pt: "Sair do composer", en: "Leave the composer" },
@@ -80,24 +83,24 @@ export function InboxShortcuts() {
       aria-modal="true"
       onClick={() => setHelpOpen(false)}
     >
-      <div className="w-full max-w-sm rounded-xl bg-white p-4 shadow-xl" onClick={(e) => e.stopPropagation()}>
-        <h2 className="mb-2 font-[var(--font-outfit)] text-[15px] font-medium text-[#0a1b33]">
+      <div className="w-full max-w-sm rounded-xl bg-surface p-4 shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <h2 className="mb-2 font-[var(--font-outfit)] text-[15px] font-medium text-ink">
           {tr("Atalhos do inbox", "Inbox shortcuts")}
         </h2>
         <ul className="space-y-1">
           {BINDINGS.map((binding) => (
             <li key={binding.keys} className="flex items-center justify-between gap-3 text-[12px]">
-              <kbd className="rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 font-mono text-[11px] text-[#0a1b33]">
+              <kbd className="rounded border border-line bg-surface-2 px-1.5 py-0.5 font-mono text-[11px] text-ink">
                 {binding.keys}
               </kbd>
-              <span className="text-slate-600">{tr(binding.pt, binding.en)}</span>
+              <span className="text-body">{tr(binding.pt, binding.en)}</span>
             </li>
           ))}
         </ul>
         <button
           type="button"
           onClick={() => setHelpOpen(false)}
-          className="mt-3 h-8 w-full rounded-md border border-slate-200 text-[12px] font-semibold text-slate-600"
+          className="mt-3 h-8 w-full rounded-md border border-line text-[12px] font-semibold text-body"
         >
           {tr("Fechar", "Close")}
         </button>

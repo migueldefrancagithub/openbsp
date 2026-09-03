@@ -134,7 +134,7 @@ export default function NewCampaignPage() {
   const estimate = detail ? estimateDurationMs(summary?.eligible ?? 0, detail.batchSize, detail.batchIntervalMs) : 0;
 
   const inputClass =
-    "h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-[#0a1b33] outline-none focus:border-slate-400";
+    "h-10 w-full rounded-lg border border-line bg-surface px-3 text-sm text-ink outline-none focus:border-brand-solid/40";
 
   return (
     <div className="flex min-h-full flex-col">
@@ -143,7 +143,7 @@ export default function NewCampaignPage() {
         title={tr("Nova campanha", "New campaign")}
         description={tr("Três passos: quem recebe, o que recebe e a confirmação segura.", "Three steps: who receives it, what they receive, and a safe confirmation.")}
         action={
-          <Link href="/app/campaigns" className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-[12px] font-semibold text-slate-600">
+          <Link href="/app/campaigns" className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line bg-surface px-3 text-[12px] font-semibold text-body">
             <ArrowLeft size={14} /> {tr("Voltar", "Back")}
           </Link>
         }
@@ -155,8 +155,8 @@ export default function NewCampaignPage() {
             const done = s.n < step;
             const active = s.n === step;
             return (
-              <li key={s.n} className={cn("flex items-center gap-2 rounded-lg border px-3 py-2 text-[12px] font-semibold", active ? "border-[#0a1b33] bg-[#0a1b33] text-white" : done ? "border-[#0d6b61]/30 bg-[#edf8f6] text-[#0d6b61]" : "border-slate-200 bg-white text-slate-500")}>
-                <span className={cn("flex h-5 w-5 items-center justify-center rounded-full text-[11px]", active ? "bg-white/15" : done ? "bg-[#0d6b61] text-white" : "bg-slate-100")}>
+              <li key={s.n} className={cn("flex items-center gap-2 rounded-lg border px-3 py-2 text-[12px] font-semibold", active ? "border-brand-solid bg-brand-solid text-white" : done ? "border-[#0d6b61]/30 bg-[#edf8f6] text-[#0d6b61]" : "border-line bg-surface text-muted")}>
+                <span className={cn("flex h-5 w-5 items-center justify-center rounded-full text-[11px]", active ? "bg-white/15" : done ? "bg-[#0d6b61] text-white" : "bg-surface-3")}>
                   {done ? <CheckCircle2 size={12} /> : s.n}
                 </span>
                 <span className="truncate">{s.label}</span>
@@ -168,14 +168,14 @@ export default function NewCampaignPage() {
         {error && <div className="rounded-lg border border-[#e0533d]/30 bg-[#fdf1ef] px-4 py-3 text-[13px] text-[#b3261e]">{error}</div>}
 
         {step === 1 && (
-          <section className="space-y-5 rounded-lg border border-slate-200 bg-white p-5">
+          <section className="space-y-5 rounded-lg border border-line bg-surface p-5">
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="block">
-                <span className="text-[11px] font-medium text-slate-500">{tr("Nome da campanha", "Campaign name")}</span>
+                <span className="text-[11px] font-medium text-muted">{tr("Nome da campanha", "Campaign name")}</span>
                 <input value={name} onChange={(e) => setName(e.target.value)} placeholder={tr("Vagas de setembro", "September slots")} className={`mt-1 ${inputClass}`} maxLength={80} />
               </label>
               <label className="block">
-                <span className="text-[11px] font-medium text-slate-500">{tr("Canal", "Channel")}</span>
+                <span className="text-[11px] font-medium text-muted">{tr("Canal", "Channel")}</span>
                 <select value={channelId} onChange={(e) => setChannelId(e.target.value as Id<"channels"> | "")} className={`mt-1 ${inputClass}`}>
                   {productChannels.length === 0 && <option value="">{tr("Nenhum canal ligado", "No channel connected")}</option>}
                   {productChannels.map((c) => (
@@ -190,7 +190,7 @@ export default function NewCampaignPage() {
                 type="button"
                 disabled={!nameValid || !channelId || (preview?.eligible ?? 0) === 0}
                 onClick={() => setStep(2)}
-                className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#0a1b33] px-4 text-[13px] font-semibold text-white disabled:opacity-50"
+                className="inline-flex h-10 items-center gap-2 rounded-lg bg-brand-solid px-4 text-[13px] font-semibold text-white disabled:opacity-50"
               >
                 {tr("Continuar", "Continue")} <ArrowRight size={14} />
               </button>
@@ -199,17 +199,17 @@ export default function NewCampaignPage() {
         )}
 
         {step === 2 && (
-          <section className="space-y-5 rounded-lg border border-slate-200 bg-white p-5">
+          <section className="space-y-5 rounded-lg border border-line bg-surface p-5">
             <MessageComposer channelId={channelId} draft={message} onChange={setMessage} serviceWindowHint={preview?.blocked.SERVICE_WINDOW_EXPIRED} />
             <div className="flex justify-between">
-              <button type="button" onClick={() => setStep(1)} className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 px-4 text-[13px] font-semibold text-slate-600">
+              <button type="button" onClick={() => setStep(1)} className="inline-flex h-10 items-center gap-2 rounded-lg border border-line px-4 text-[13px] font-semibold text-body">
                 <ArrowLeft size={14} /> {tr("Público", "Audience")}
               </button>
               <button
                 type="button"
                 disabled={!messageValid || busy}
                 onClick={() => void goToConfirm()}
-                className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#0a1b33] px-4 text-[13px] font-semibold text-white disabled:opacity-50"
+                className="inline-flex h-10 items-center gap-2 rounded-lg bg-brand-solid px-4 text-[13px] font-semibold text-white disabled:opacity-50"
               >
                 {busy && <Loader2 size={14} className="animate-spin" />}
                 {tr("Rever e confirmar", "Review and confirm")} <ArrowRight size={14} />
@@ -219,28 +219,28 @@ export default function NewCampaignPage() {
         )}
 
         {step === 3 && (
-          <section className="space-y-5 rounded-lg border border-slate-200 bg-white p-5">
+          <section className="space-y-5 rounded-lg border border-line bg-surface p-5">
             <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">
               <div className="space-y-3">
-                <div className="text-[11px] font-medium uppercase tracking-[0.14em] text-slate-400">{tr("Resumo", "Summary")}</div>
+                <div className="text-[11px] font-medium uppercase tracking-[0.14em] text-faint">{tr("Resumo", "Summary")}</div>
                 <dl className="grid grid-cols-[120px_1fr] gap-y-1.5 text-[13px]">
-                  <dt className="text-slate-500">{tr("Nome", "Name")}</dt><dd className="font-semibold text-[#0a1b33]">{name}</dd>
-                  <dt className="text-slate-500">{tr("Canal", "Channel")}</dt><dd className="text-[#0a1b33]">{detail?.channelName ?? "—"}</dd>
-                  <dt className="text-slate-500">{tr("Mensagem", "Message")}</dt>
-                  <dd className="text-[#0a1b33]">{message.kind === "channel_text" ? tr("Texto (janela 24h)", "Text (24h window)") : `${tr("Template", "Template")} ${detail?.templateName ?? ""}`}</dd>
-                  <dt className="text-slate-500">{tr("Ritmo", "Pace")}</dt>
-                  <dd className="text-[#0a1b33]">
+                  <dt className="text-muted">{tr("Nome", "Name")}</dt><dd className="font-semibold text-ink">{name}</dd>
+                  <dt className="text-muted">{tr("Canal", "Channel")}</dt><dd className="text-ink">{detail?.channelName ?? "—"}</dd>
+                  <dt className="text-muted">{tr("Mensagem", "Message")}</dt>
+                  <dd className="text-ink">{message.kind === "channel_text" ? tr("Texto (janela 24h)", "Text (24h window)") : `${tr("Template", "Template")} ${detail?.templateName ?? ""}`}</dd>
+                  <dt className="text-muted">{tr("Ritmo", "Pace")}</dt>
+                  <dd className="text-ink">
                     {detail ? tr(`${detail.batchSize} a cada ${Math.round(detail.batchIntervalMs / 1000)} s · ${humanDuration(estimate, locale)}`, `${detail.batchSize} every ${Math.round(detail.batchIntervalMs / 1000)} s · ${humanDuration(estimate, locale)}`) : "—"}
                   </dd>
                 </dl>
-                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-[13px] leading-relaxed text-[#0a1b33] whitespace-pre-wrap">
+                <div className="rounded-lg border border-line bg-surface-2 p-3 text-[13px] leading-relaxed text-ink whitespace-pre-wrap">
                   {detail?.messageText ?? detail?.campaign.contentPreview ?? message.text}
                 </div>
               </div>
               <div className="space-y-3">
-                <div className="text-[11px] font-medium uppercase tracking-[0.14em] text-slate-400">{tr("Público final", "Final audience")}</div>
+                <div className="text-[11px] font-medium uppercase tracking-[0.14em] text-faint">{tr("Público final", "Final audience")}</div>
                 {!detail || (!audienceReady && !audienceEmpty) ? (
-                  <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-3 text-[13px] text-slate-500">
+                  <div className="flex items-center gap-2 rounded-lg border border-line bg-surface px-3 py-3 text-[13px] text-muted">
                     <Loader2 size={14} className="animate-spin" /> {tr("A calcular destinatários…", "Calculating recipients…")}
                   </div>
                 ) : (
@@ -255,9 +255,9 @@ export default function NewCampaignPage() {
                         <div className="font-[var(--font-outfit)] text-[26px] font-medium text-amber-800">{(summary?.matched ?? 0) - (summary?.eligible ?? 0)}</div>
                       </div>
                     </div>
-                    <ul className="space-y-1 text-[12px] text-slate-600">
+                    <ul className="space-y-1 text-[12px] text-body">
                       {Object.entries(summary?.blocked ?? {}).filter(([, n]) => n > 0).map(([code, n]) => (
-                        <li key={code} className="flex justify-between"><span>{blockReasonLabel(code, locale)}</span><b className="text-[#0a1b33]">{n}</b></li>
+                        <li key={code} className="flex justify-between"><span>{blockReasonLabel(code, locale)}</span><b className="text-ink">{n}</b></li>
                       ))}
                     </ul>
                     {audienceEmpty && (
@@ -270,8 +270,8 @@ export default function NewCampaignPage() {
               </div>
             </div>
 
-            <div className="grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4 sm:grid-cols-[1fr_auto]">
-              <label className="flex items-start gap-2 text-[13px] text-[#0a1b33]">
+            <div className="grid gap-3 rounded-lg border border-line bg-surface-2 p-4 sm:grid-cols-[1fr_auto]">
+              <label className="flex items-start gap-2 text-[13px] text-ink">
                 <input type="checkbox" checked={attest} onChange={(e) => setAttest(e.target.checked)} className="mt-0.5 h-4 w-4 accent-[#0a1b33]" />
                 <span>
                   <ShieldCheck size={13} className="mr-1 inline text-[#0d6b61]" />
@@ -282,21 +282,21 @@ export default function NewCampaignPage() {
                 </span>
               </label>
               <div className="flex flex-col gap-1.5">
-                <div className="inline-flex rounded-lg border border-slate-200 bg-white p-1 text-[12px] font-semibold">
+                <div className="inline-flex rounded-lg border border-line bg-surface p-1 text-[12px] font-semibold">
                   {(["now", "later"] as const).map((mode) => (
-                    <button key={mode} type="button" onClick={() => setScheduleMode(mode)} className={cn("rounded-md px-3 py-1.5", scheduleMode === mode ? "bg-[#0a1b33] text-white" : "text-slate-500")}>
+                    <button key={mode} type="button" onClick={() => setScheduleMode(mode)} className={cn("rounded-md px-3 py-1.5", scheduleMode === mode ? "bg-brand-solid text-white" : "text-muted")}>
                       {mode === "now" ? tr("Enviar agora", "Send now") : tr("Agendar", "Schedule")}
                     </button>
                   ))}
                 </div>
                 {scheduleMode === "later" && (
-                  <input type="datetime-local" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} className="h-9 rounded-lg border border-slate-200 bg-white px-2 text-[12px] text-[#0a1b33] outline-none" />
+                  <input type="datetime-local" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} className="h-9 rounded-lg border border-line bg-surface px-2 text-[12px] text-ink outline-none" />
                 )}
               </div>
             </div>
 
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-between">
-              <button type="button" onClick={() => setStep(2)} className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 px-4 text-[13px] font-semibold text-slate-600">
+              <button type="button" onClick={() => setStep(2)} className="inline-flex h-10 items-center gap-2 rounded-lg border border-line px-4 text-[13px] font-semibold text-body">
                 <ArrowLeft size={14} /> {tr("Mensagem", "Message")}
               </button>
               <button

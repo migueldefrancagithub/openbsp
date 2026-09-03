@@ -55,7 +55,7 @@ export function AgentModeToggle({ agentId, mode, published, onNotice }: { agentI
 
   return (
     <div className="space-y-1" data-agent-mode-toggle>
-      <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1 text-[12px] font-semibold" role="radiogroup" aria-label={tr("Modo do agente", "Agent mode")}>
+      <div className="inline-flex rounded-lg border border-line bg-surface-2 p-1 text-[12px] font-semibold" role="radiogroup" aria-label={tr("Modo do agente", "Agent mode")}>
         {(["sandbox", "copilot", "autopilot"] as const).map((key) => {
           const Icon = ICONS[key];
           const active = mode === key;
@@ -69,14 +69,14 @@ export function AgentModeToggle({ agentId, mode, published, onNotice }: { agentI
               disabled={disabled}
               onClick={() => void change(key)}
               title={modeHint(key, locale)}
-              className={cn("inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 transition-colors", active ? (key === "autopilot" ? "bg-[#0d6b61] text-white" : key === "copilot" ? "bg-[#2b4f8a] text-white" : "bg-[#0a1b33] text-white") : "text-slate-500 hover:text-[#0a1b33]", disabled && !active && "opacity-40")}
+              className={cn("inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 transition-colors", active ? (key === "autopilot" ? "bg-[#0d6b61] text-white" : key === "copilot" ? "bg-[#2b4f8a] text-white" : "bg-brand-solid text-white") : "text-muted hover:text-ink", disabled && !active && "opacity-40")}
             >
               {busy === key ? <Loader2 size={12} className="animate-spin" /> : <Icon size={12} />} {modeLabel(key, locale)}
             </button>
           );
         })}
       </div>
-      <p className="text-[11px] text-slate-500">{modeHint(mode, locale)}{!published ? ` ${tr("Publique para sair do Sandbox.", "Publish to leave the Sandbox.")}` : ""}</p>
+      <p className="text-[11px] text-muted">{modeHint(mode, locale)}{!published ? ` ${tr("Publique para sair do Sandbox.", "Publish to leave the Sandbox.")}` : ""}</p>
     </div>
   );
 }

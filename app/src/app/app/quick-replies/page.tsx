@@ -185,16 +185,16 @@ export default function QuickRepliesPage() {
   return (
     <div className="min-h-[calc(100vh-64px)] bg-[#f4f7fb] p-4 sm:p-6">
       <div className="mx-auto max-w-7xl space-y-4">
-        <header className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+        <header className="flex flex-col gap-3 rounded-lg border border-line bg-surface px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex min-w-0 items-center gap-3">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#0a152d] text-white">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-nav-active text-white">
               <Zap size={18} />
             </span>
             <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-faint">
                 {tr("Ferramentas da Inbox", "Inbox tools")}
               </p>
-              <h1 className="truncate font-[var(--font-outfit)] text-2xl font-semibold text-[#0a1b33]">
+              <h1 className="truncate font-[var(--font-outfit)] text-2xl font-semibold text-ink">
                 {tr("Respostas rápidas", "Quick replies")}
               </h1>
             </div>
@@ -202,7 +202,7 @@ export default function QuickRepliesPage() {
           <button
             type="button"
             onClick={() => startCreate()}
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-[#0a152d] px-4 text-sm font-semibold text-white hover:bg-[#0a1b33]"
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-nav-active px-4 text-sm font-semibold text-white hover:bg-brand-solid"
           >
             <Plus size={15} />
             {tr("Nova resposta", "New reply")}
@@ -210,18 +210,18 @@ export default function QuickRepliesPage() {
         </header>
 
         <section className="grid gap-4 xl:grid-cols-[340px_minmax(0,1fr)_360px]">
-          <aside className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-            <div className="border-b border-slate-100 p-3">
+          <aside className="overflow-hidden rounded-lg border border-line bg-surface">
+            <div className="border-b border-line-soft p-3">
               <label className="relative block">
                 <Search
                   size={14}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-faint"
                 />
                 <input
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
                   placeholder={tr("Pesquisar respostas...", "Search replies...")}
-                  className="h-10 w-full rounded-md border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm text-[#0a1b33] outline-none focus:border-slate-400 focus:bg-white"
+                  className="h-10 w-full rounded-md border border-line bg-surface-2 pl-9 pr-3 text-sm text-ink outline-none focus:border-brand-solid/40 focus:bg-surface"
                 />
               </label>
               <div className="mt-3 grid grid-cols-3 gap-2 text-center">
@@ -239,14 +239,14 @@ export default function QuickRepliesPage() {
 
             <div className="max-h-[calc(100vh-330px)] min-h-[360px] overflow-y-auto p-2">
               {items === undefined ? (
-                <div className="flex items-center gap-2 rounded-md bg-slate-50 px-3 py-3 text-sm text-slate-500">
+                <div className="flex items-center gap-2 rounded-md bg-surface-2 px-3 py-3 text-sm text-muted">
                   <Loader2 size={14} className="animate-spin" />
                   {tr("A carregar", "Loading")}
                 </div>
               ) : filtered.length === 0 ? (
                 <div className="p-8 text-center">
-                  <MessageSquare size={24} className="mx-auto text-slate-300" />
-                  <p className="mt-3 text-sm font-semibold text-[#0a1b33]">
+                  <MessageSquare size={24} className="mx-auto text-faint" />
+                  <p className="mt-3 text-sm font-semibold text-ink">
                     {tr("Nenhuma resposta encontrada", "No replies found")}
                   </p>
                 </div>
@@ -259,8 +259,8 @@ export default function QuickRepliesPage() {
                       onClick={() => selectItem(item)}
                       className={`w-full rounded-md px-3 py-3 text-left transition-colors ${
                         selectedId === item._id
-                          ? "bg-[#0a152d] text-white"
-                          : "hover:bg-slate-50"
+                          ? "bg-nav-active text-white"
+                          : "hover:bg-surface-2"
                       }`}
                     >
                       <div className="flex items-center justify-between gap-2">
@@ -271,7 +271,7 @@ export default function QuickRepliesPage() {
                           className={`shrink-0 text-[10px] ${
                             selectedId === item._id
                               ? "text-white/60"
-                              : "text-slate-400"
+                              : "text-faint"
                           }`}
                         >
                           {relativeTime(item.updatedAt, Date.now(), locale)}
@@ -281,7 +281,7 @@ export default function QuickRepliesPage() {
                         className={`mt-1 line-clamp-2 text-xs leading-5 ${
                           selectedId === item._id
                             ? "text-white/70"
-                            : "text-slate-500"
+                            : "text-muted"
                         }`}
                       >
                         {item.content}
@@ -293,15 +293,15 @@ export default function QuickRepliesPage() {
             </div>
           </aside>
 
-          <main className="rounded-lg border border-slate-200 bg-white">
-            <div className="flex flex-col gap-3 border-b border-slate-100 px-4 py-4 md:flex-row md:items-center md:justify-between">
+          <main className="rounded-lg border border-line bg-surface">
+            <div className="flex flex-col gap-3 border-b border-line-soft px-4 py-4 md:flex-row md:items-center md:justify-between">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-faint">
                   {mode === "create"
                     ? tr("Nova resposta", "New reply")
                     : tr("Editar resposta", "Edit reply")}
                 </p>
-                <h2 className="mt-1 text-lg font-semibold text-[#0a1b33]">
+                <h2 className="mt-1 text-lg font-semibold text-ink">
                   {mode === "create" ? tr("Rascunho", "Draft quick reply") : `/${name}`}
                 </h2>
               </div>
@@ -316,7 +316,7 @@ export default function QuickRepliesPage() {
                         content,
                       })
                     }
-                    className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-200 px-3 text-sm font-semibold text-[#0a1b33] hover:bg-slate-50"
+                    className="inline-flex h-9 items-center gap-2 rounded-md border border-line px-3 text-sm font-semibold text-ink hover:bg-surface-2"
                   >
                     <Copy size={14} />
                     {tr("Duplicar", "Duplicate")}
@@ -352,11 +352,11 @@ export default function QuickRepliesPage() {
             <div className="grid gap-4 p-4">
               <section className="space-y-4">
                 <label className="block">
-                  <span className="mb-1 block text-[11px] font-medium text-slate-500">
+                  <span className="mb-1 block text-[11px] font-medium text-muted">
                     {tr("Atalho", "Shortcut")}
                   </span>
-                  <div className="flex h-11 items-center rounded-md border border-slate-200 bg-white px-3 focus-within:border-slate-400">
-                    <span className="font-[var(--font-mono)] text-sm text-slate-400">
+                  <div className="flex h-11 items-center rounded-md border border-line bg-surface px-3 focus-within:border-slate-400">
+                    <span className="font-[var(--font-mono)] text-sm text-faint">
                       /
                     </span>
                     <input
@@ -364,13 +364,13 @@ export default function QuickRepliesPage() {
                       onChange={(event) => setName(cleanShortcut(event.target.value))}
                       disabled={mode === "edit"}
                       placeholder="greeting"
-                      className="min-w-0 flex-1 bg-transparent px-1 text-sm font-semibold text-[#0a1b33] outline-none disabled:text-slate-500"
+                      className="min-w-0 flex-1 bg-transparent px-1 text-sm font-semibold text-ink outline-none disabled:text-muted"
                     />
                   </div>
                 </label>
 
                 <div>
-                  <p className="mb-2 text-[11px] font-medium text-slate-500">
+                  <p className="mb-2 text-[11px] font-medium text-muted">
                     {tr("Modelos prontos", "Presets")}
                   </p>
                   <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
@@ -379,7 +379,7 @@ export default function QuickRepliesPage() {
                         key={preset.name}
                         type="button"
                         onClick={() => startCreate(preset)}
-                        className="flex items-center justify-between gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm font-semibold text-[#0a1b33] hover:bg-white"
+                        className="flex items-center justify-between gap-2 rounded-md border border-line bg-surface-2 px-3 py-2 text-left text-sm font-semibold text-ink hover:bg-surface"
                       >
                         {preset.title[locale === "pt" ? 0 : 1]}
                         <Sparkles size={13} className="text-emerald-600" />
@@ -391,7 +391,7 @@ export default function QuickRepliesPage() {
 
               <section className="space-y-3">
                 <label className="block">
-                  <span className="mb-1 block text-[11px] font-medium text-slate-500">
+                  <span className="mb-1 block text-[11px] font-medium text-muted">
                     {tr("Mensagem", "Message")}
                   </span>
                   <textarea
@@ -399,7 +399,7 @@ export default function QuickRepliesPage() {
                     onChange={(event) => setContent(event.target.value)}
                     rows={11}
                     placeholder="Olá! Obrigado pelo contacto..."
-                    className="w-full resize-none rounded-md border border-slate-200 bg-white px-3 py-3 text-sm leading-6 text-[#0a1b33] outline-none focus:border-slate-400"
+                    className="w-full resize-none rounded-md border border-line bg-surface px-3 py-3 text-sm leading-6 text-ink outline-none focus:border-brand-solid/40"
                   />
                 </label>
                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -409,13 +409,13 @@ export default function QuickRepliesPage() {
                         key={chip}
                         type="button"
                         onClick={() => insertVariable(chip)}
-                        className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-600 hover:bg-white"
+                        className="rounded-md border border-line bg-surface-2 px-2.5 py-1 text-xs font-semibold text-body hover:bg-surface"
                       >
                         {chip}
                       </button>
                     ))}
                   </div>
-                  <span className="text-xs font-medium text-slate-400">
+                  <span className="text-xs font-medium text-faint">
                     {content.length}/4096
                   </span>
                 </div>
@@ -438,9 +438,9 @@ export default function QuickRepliesPage() {
 
 function Metric({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-md border border-slate-100 bg-slate-50 px-2 py-2">
-      <div className="text-base font-semibold text-[#0a1b33]">{value}</div>
-      <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+    <div className="rounded-md border border-line-soft bg-surface-2 px-2 py-2">
+      <div className="text-base font-semibold text-ink">{value}</div>
+      <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-faint">
         {label}
       </div>
     </div>
@@ -456,22 +456,22 @@ function QuickReplyPreview({
 }) {
   const { tr } = useI18n();
   return (
-    <aside className="rounded-lg border border-slate-200 bg-[#eef3f8] p-4">
+    <aside className="rounded-lg border border-line bg-[#eef3f8] p-4">
       <div className="mb-3 flex items-center gap-2">
         <span className="flex h-8 w-8 items-center justify-center rounded-md bg-emerald-50 text-emerald-700">
           <MessageSquare size={15} />
         </span>
         <div>
-          <h3 className="text-sm font-semibold text-[#0a1b33]">
+          <h3 className="text-sm font-semibold text-ink">
             {tr("Pré-visualização", "Preview")}
           </h3>
-          <p className="font-[var(--font-mono)] text-xs text-slate-500">
+          <p className="font-[var(--font-mono)] text-xs text-muted">
             /{cleanShortcut(name) || "shortcut"}
           </p>
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-slate-300 bg-[#111827]">
+      <div className="overflow-hidden rounded-lg border border-line bg-[#111827]">
         <div className="bg-[#1f2937] px-4 py-3 text-sm font-semibold text-white">
           OpenBSP Inbox
         </div>

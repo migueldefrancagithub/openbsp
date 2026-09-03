@@ -85,81 +85,81 @@ export default function AgendaPage() {
 
       <div className="mx-auto w-full max-w-7xl space-y-4 px-4 py-5 sm:px-6 xl:px-8">
         <div className="flex flex-wrap items-center gap-2">
-          <div className="inline-flex rounded-lg border border-slate-200 bg-white p-1 text-[12px] font-semibold">
+          <div className="inline-flex rounded-lg border border-line bg-surface p-1 text-[12px] font-semibold">
             {(["day", "week"] as const).map((key) => (
-              <button key={key} type="button" onClick={() => setView(key)} className={cn("rounded-md px-3 py-1.5", view === key ? "bg-[#0a1b33] text-white" : "text-slate-500")}>
+              <button key={key} type="button" onClick={() => setView(key)} className={cn("rounded-md px-3 py-1.5", view === key ? "bg-brand-solid text-white" : "text-muted")}>
                 {key === "day" ? tr("Dia", "Day") : tr("Semana", "Week")}
               </button>
             ))}
           </div>
-          <div className="inline-flex items-center rounded-lg border border-slate-200 bg-white">
-            <button type="button" onClick={() => setAnchor(addDaysLocal(anchor, -step))} className="p-2 text-slate-500 hover:text-[#0a1b33]" aria-label={tr("Anterior", "Previous")}><ChevronLeft size={15} /></button>
-            <button type="button" onClick={() => setAnchor(todayLocalDate())} className="px-2 text-[12px] font-semibold text-[#0a1b33]">{tr("Hoje", "Today")}</button>
-            <button type="button" onClick={() => setAnchor(addDaysLocal(anchor, step))} className="p-2 text-slate-500 hover:text-[#0a1b33]" aria-label={tr("Seguinte", "Next")}><ChevronRight size={15} /></button>
+          <div className="inline-flex items-center rounded-lg border border-line bg-surface">
+            <button type="button" onClick={() => setAnchor(addDaysLocal(anchor, -step))} className="p-2 text-muted hover:text-ink" aria-label={tr("Anterior", "Previous")}><ChevronLeft size={15} /></button>
+            <button type="button" onClick={() => setAnchor(todayLocalDate())} className="px-2 text-[12px] font-semibold text-ink">{tr("Hoje", "Today")}</button>
+            <button type="button" onClick={() => setAnchor(addDaysLocal(anchor, step))} className="p-2 text-muted hover:text-ink" aria-label={tr("Seguinte", "Next")}><ChevronRight size={15} /></button>
           </div>
-          <input type="date" value={anchor} onChange={(e) => e.target.value && setAnchor(e.target.value)} className="h-9 rounded-lg border border-slate-200 bg-white px-2 text-[12px] text-[#0a1b33] outline-none" />
+          <input type="date" value={anchor} onChange={(e) => e.target.value && setAnchor(e.target.value)} className="h-9 rounded-lg border border-line bg-surface px-2 text-[12px] text-ink outline-none" />
           {professionals && professionals.length > 0 && (
             <div className="flex flex-wrap gap-1">
-              <button type="button" onClick={() => setProfessionalId("")} className={cn("rounded-full border px-2.5 py-1 text-[11px] font-semibold", professionalId === "" ? "border-[#0a1b33] bg-[#0a1b33] text-white" : "border-slate-200 bg-white text-slate-600")}>{tr("Todos", "All")}</button>
+              <button type="button" onClick={() => setProfessionalId("")} className={cn("rounded-full border px-2.5 py-1 text-[11px] font-semibold", professionalId === "" ? "border-brand-solid bg-brand-solid text-white" : "border-line bg-surface text-body")}>{tr("Todos", "All")}</button>
               {professionals.map((p) => (
-                <button key={p._id} type="button" onClick={() => setProfessionalId(p._id)} className={cn("inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold", professionalId === p._id ? "border-[#0a1b33] bg-[#0a1b33] text-white" : "border-slate-200 bg-white text-slate-600")}>
+                <button key={p._id} type="button" onClick={() => setProfessionalId(p._id)} className={cn("inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold", professionalId === p._id ? "border-brand-solid bg-brand-solid text-white" : "border-line bg-surface text-body")}>
                   <span className="h-2 w-2 rounded-full" style={{ backgroundColor: p.color ?? "#2b4f8a" }} />
                   {p.name}
                 </button>
               ))}
             </div>
           )}
-          <span className="ml-auto text-[11px] text-slate-400">{timeZone}</span>
+          <span className="ml-auto text-[11px] text-faint">{timeZone}</span>
         </div>
 
         {error && <div className="rounded-lg border border-[#e0533d]/30 bg-[#fdf1ef] px-4 py-3 text-[13px] text-[#b3261e]">{error}</div>}
 
         {agenda === undefined ? (
-          <div className="flex items-center gap-2 px-2 py-8 text-sm text-slate-400"><Loader2 size={15} className="animate-spin" /> {tr("A carregar agenda…", "Loading calendar…")}</div>
+          <div className="flex items-center gap-2 px-2 py-8 text-sm text-faint"><Loader2 size={15} className="animate-spin" /> {tr("A carregar agenda…", "Loading calendar…")}</div>
         ) : (
           <div className={cn("grid gap-3", view === "week" ? "md:grid-cols-2 xl:grid-cols-7" : "grid-cols-1")}>
             {days.map((day) => {
               const rows = rowsByDay.get(day) ?? [];
               const isToday = day === todayLocalDate();
               return (
-                <section key={day} className={cn("min-w-0 rounded-lg border bg-white", isToday ? "border-[#2b4f8a]/40" : "border-slate-200")}>
-                  <header className={cn("flex items-center justify-between border-b px-3 py-2", isToday ? "border-[#2b4f8a]/20 bg-[#eef3fb]" : "border-slate-100")}>
-                    <span className={cn("text-[12px] font-semibold capitalize", isToday ? "text-[#2b4f8a]" : "text-[#0a1b33]")}>{formatDayIn(day, locale)}</span>
-                    <span className="text-[11px] text-slate-400">{rows.length}</span>
+                <section key={day} className={cn("min-w-0 rounded-lg border bg-surface", isToday ? "border-[#2b4f8a]/40" : "border-line")}>
+                  <header className={cn("flex items-center justify-between border-b px-3 py-2", isToday ? "border-[#2b4f8a]/20 bg-[#eef3fb]" : "border-line-soft")}>
+                    <span className={cn("text-[12px] font-semibold capitalize", isToday ? "text-[#2b4f8a]" : "text-ink")}>{formatDayIn(day, locale)}</span>
+                    <span className="text-[11px] text-faint">{rows.length}</span>
                   </header>
                   {rows.length === 0 ? (
-                    <p className="px-3 py-4 text-[12px] text-slate-400">{tr("Sem marcações.", "No appointments.")}</p>
+                    <p className="px-3 py-4 text-[12px] text-faint">{tr("Sem marcações.", "No appointments.")}</p>
                   ) : (
-                    <ul className="divide-y divide-slate-100">
+                    <ul className="divide-y divide-line-soft">
                       {rows.map((row) => {
                         const past = row.endAt < now;
                         const active = row.status === "scheduled" || row.status === "confirmed";
                         return (
                           <li key={row._id} className="px-3 py-2">
                             <div className="flex items-start gap-2">
-                              <div className="w-11 shrink-0 text-[12px] font-semibold tabular-nums text-[#0a1b33]">{formatTimeIn(row.startAt, timeZone, locale)}</div>
+                              <div className="w-11 shrink-0 text-[12px] font-semibold tabular-nums text-ink">{formatTimeIn(row.startAt, timeZone, locale)}</div>
                               <div className="min-w-0 flex-1">
                                 <div className="flex flex-wrap items-center gap-1.5">
-                                  <span className="truncate text-[13px] font-semibold text-[#0a1b33]">{row.patientName ?? tr("Sem nome", "No name")}</span>
+                                  <span className="truncate text-[13px] font-semibold text-ink">{row.patientName ?? tr("Sem nome", "No name")}</span>
                                   <span className={cn("rounded-md border px-1.5 py-0.5 text-[10px] font-semibold", appointmentStatusTone(row.status))}>{appointmentStatusLabel(row.status, locale)}</span>
                                   {row.pendingNotices > 0 && <span className="text-[10px] text-amber-700">{tr("aviso pendente", "notice pending")}</span>}
                                 </div>
-                                <div className="truncate text-[11px] text-slate-500">
+                                <div className="truncate text-[11px] text-muted">
                                   {row.serviceName}{row.professionalName ? ` · ${row.professionalName}` : ""}{row.confirmedVia === "reply" ? ` · ${tr("confirmou pelo WhatsApp", "confirmed on WhatsApp")}` : ""}
                                 </div>
                                 {active && (
                                   <div className="mt-1.5 flex flex-wrap gap-1">
                                     {row.threadKey && row.channelId && (
-                                      <Link href={`/app/channel-inbox/${row.threadKey}?channel=${row.channelId}`} className="inline-flex h-7 items-center gap-1 rounded-md border border-slate-200 px-2 text-[11px] font-semibold text-slate-600 hover:text-[#0a1b33]"><MessageCircle size={11} /> {tr("Conversa", "Chat")}</Link>
+                                      <Link href={`/app/channel-inbox/${row.threadKey}?channel=${row.channelId}`} className="inline-flex h-7 items-center gap-1 rounded-md border border-line px-2 text-[11px] font-semibold text-body hover:text-ink"><MessageCircle size={11} /> {tr("Conversa", "Chat")}</Link>
                                     )}
                                     {row.status === "scheduled" && (
                                       <button type="button" disabled={busy !== null} onClick={() => void run(row._id, () => confirm({ appointmentId: row._id }))} className="inline-flex h-7 items-center gap-1 rounded-md border border-[#0d6b61]/30 px-2 text-[11px] font-semibold text-[#0d6b61]"><Check size={11} /> {tr("Confirmar", "Confirm")}</button>
                                     )}
                                     {row.threadId && !past && (
-                                      <button type="button" disabled={busy !== null} onClick={() => void run(`n-${row._id}`, () => notice({ appointmentId: row._id, kind: row.status === "confirmed" ? "appointment_reminder" : "appointment_confirmation" }))} className="inline-flex h-7 items-center gap-1 rounded-md border border-slate-200 px-2 text-[11px] font-semibold text-slate-600"><Send size={11} /> {row.status === "confirmed" ? tr("Lembrete", "Reminder") : tr("Pedir confirmação", "Ask to confirm")}</button>
+                                      <button type="button" disabled={busy !== null} onClick={() => void run(`n-${row._id}`, () => notice({ appointmentId: row._id, kind: row.status === "confirmed" ? "appointment_reminder" : "appointment_confirmation" }))} className="inline-flex h-7 items-center gap-1 rounded-md border border-line px-2 text-[11px] font-semibold text-body"><Send size={11} /> {row.status === "confirmed" ? tr("Lembrete", "Reminder") : tr("Pedir confirmação", "Ask to confirm")}</button>
                                     )}
                                     {!past && (
-                                      <button type="button" onClick={() => setScheduler({ kind: "reschedule", appointmentId: row._id, serviceId: row.serviceId, professionalId: row.professionalId })} className="inline-flex h-7 items-center gap-1 rounded-md border border-slate-200 px-2 text-[11px] font-semibold text-slate-600"><RefreshCw size={11} /> {tr("Remarcar", "Reschedule")}</button>
+                                      <button type="button" onClick={() => setScheduler({ kind: "reschedule", appointmentId: row._id, serviceId: row.serviceId, professionalId: row.professionalId })} className="inline-flex h-7 items-center gap-1 rounded-md border border-line px-2 text-[11px] font-semibold text-body"><RefreshCw size={11} /> {tr("Remarcar", "Reschedule")}</button>
                                     )}
                                     {past ? (
                                       <>
@@ -167,7 +167,7 @@ export default function AgendaPage() {
                                         <button type="button" disabled={busy !== null} onClick={() => void run(`ns-${row._id}`, () => outcome({ appointmentId: row._id, status: "no_show" }))} className="inline-flex h-7 items-center gap-1 rounded-md border border-[#e0533d]/30 px-2 text-[11px] font-semibold text-[#b3261e]"><UserX size={11} /> {tr("Faltou", "No-show")}</button>
                                       </>
                                     ) : (
-                                      <button type="button" disabled={busy !== null} onClick={() => { if (window.confirm(tr("Cancelar esta marcação?", "Cancel this appointment?"))) void run(`c-${row._id}`, () => cancel({ appointmentId: row._id })); }} className="inline-flex h-7 items-center gap-1 rounded-md border border-slate-200 px-2 text-[11px] font-semibold text-slate-500 hover:border-[#e0533d]/40 hover:text-[#b3261e]"><X size={11} /> {tr("Cancelar", "Cancel")}</button>
+                                      <button type="button" disabled={busy !== null} onClick={() => { if (window.confirm(tr("Cancelar esta marcação?", "Cancel this appointment?"))) void run(`c-${row._id}`, () => cancel({ appointmentId: row._id })); }} className="inline-flex h-7 items-center gap-1 rounded-md border border-line px-2 text-[11px] font-semibold text-muted hover:border-[#e0533d]/40 hover:text-[#b3261e]"><X size={11} /> {tr("Cancelar", "Cancel")}</button>
                                     )}
                                   </div>
                                 )}
@@ -188,10 +188,10 @@ export default function AgendaPage() {
 
       {scheduler && (
         <div className="fixed inset-0 z-40 flex items-end justify-center bg-[#0a1b33]/40 p-2 sm:items-center sm:p-6" onClick={() => setScheduler(null)}>
-          <div className="w-full max-w-2xl rounded-xl border border-slate-200 bg-white p-4 shadow-xl sm:p-5" onClick={(e) => e.stopPropagation()}>
+          <div className="w-full max-w-2xl rounded-xl border border-line bg-surface p-4 shadow-xl sm:p-5" onClick={(e) => e.stopPropagation()}>
             <div className="mb-3 flex items-center justify-between">
-              <h2 className="flex items-center gap-2 text-[15px] font-semibold text-[#0a1b33]"><CalendarDays size={16} /> {scheduler.kind === "reschedule" ? tr("Remarcar consulta", "Reschedule appointment") : tr("Nova marcação", "New appointment")}</h2>
-              <button type="button" onClick={() => setScheduler(null)} className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100"><X size={15} /></button>
+              <h2 className="flex items-center gap-2 text-[15px] font-semibold text-ink"><CalendarDays size={16} /> {scheduler.kind === "reschedule" ? tr("Remarcar consulta", "Reschedule appointment") : tr("Nova marcação", "New appointment")}</h2>
+              <button type="button" onClick={() => setScheduler(null)} className="rounded-md p-1.5 text-faint hover:bg-surface-3"><X size={15} /></button>
             </div>
             <AppointmentScheduler mode={scheduler} onDone={() => setScheduler(null)} />
           </div>

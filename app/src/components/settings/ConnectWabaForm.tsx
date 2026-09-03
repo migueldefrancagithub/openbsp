@@ -91,7 +91,7 @@ export function ConnectWabaForm() {
           />
         </div>
         <div className="md:col-span-2">
-          <label className="block text-xs font-medium text-slate-700 mb-1.5">
+          <label className="block text-xs font-medium text-ink mb-1.5">
             {tr("Token de acesso do utilizador do sistema", "System user access token")}
           </label>
           <input
@@ -100,9 +100,9 @@ export function ConnectWabaForm() {
             value={systemUserToken}
             onChange={(e) => setSystemUserToken(e.target.value)}
             placeholder="EAAB…"
-            className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm font-mono text-[#0a1b33] focus:outline-none focus:ring-2 focus:ring-[#0a152d]/10 focus:border-[#0a152d] transition-all"
+            className="w-full px-3 py-2.5 rounded-lg border border-line text-sm font-mono text-ink focus:outline-none focus:ring-2 focus:ring-[#0a152d]/10 focus:border-[#0a152d] transition-all"
           />
-          <p className="text-[11px] text-slate-400 mt-1.5">
+          <p className="text-[11px] text-faint mt-1.5">
             {tr("Validado pela Graph API. Requer", "Validated via Graph API. Requires")} {" "}
             <code>whatsapp_business_messaging</code>,{" "}
             <code>whatsapp_business_management</code>,{" "}
@@ -135,7 +135,7 @@ export function ConnectWabaForm() {
       <button
         type="submit"
         disabled={busy}
-        className="inline-flex items-center gap-2 bg-[#0a152d] text-white text-[13px] font-medium px-4 py-2.5 rounded-lg shadow-[0_8px_24px_-8px_rgba(10,21,45,0.5)] hover:bg-[#0a1b33] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+        className="inline-flex items-center gap-2 bg-nav-active text-white text-[13px] font-medium px-4 py-2.5 rounded-lg shadow-[0_8px_24px_-8px_rgba(10,21,45,0.5)] hover:bg-brand-solid disabled:opacity-50 disabled:cursor-not-allowed transition-all"
       >
         {busy && <Loader2 size={14} className="animate-spin" />}
         {busy
@@ -159,7 +159,7 @@ function Field({
 }) {
   return (
     <div>
-      <label className="block text-xs font-medium text-slate-700 mb-1.5">
+      <label className="block text-xs font-medium text-ink mb-1.5">
         {label}
       </label>
       <input
@@ -168,7 +168,7 @@ function Field({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm text-[#0a1b33] focus:outline-none focus:ring-2 focus:ring-[#0a152d]/10 focus:border-[#0a152d] transition-all"
+        className="w-full px-3 py-2.5 rounded-lg border border-line text-sm text-ink focus:outline-none focus:ring-2 focus:ring-[#0a152d]/10 focus:border-[#0a152d] transition-all"
       />
     </div>
   );

@@ -32,7 +32,7 @@ export default function LeadsPage() {
   const counts = useQuery(api.leads.counts, channels === undefined ? "skip" : { channelId: channelId || undefined });
 
   return (
-    <div className="flex min-h-full flex-col">
+    <div className="flex h-full min-h-0 flex-col">
       <PageHeader
         eyebrow={t("leads.eyebrow")}
         title={t("leads.title")}
@@ -42,7 +42,7 @@ export default function LeadsPage() {
             <select
               value={channelId}
               onChange={(event) => setChannelId(event.target.value as Id<"channels"> | "")}
-              className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-[13px] font-medium text-[#0a1b33] outline-none"
+              className="h-9 rounded-lg border border-line bg-surface px-3 text-[13px] font-medium text-ink outline-none"
             >
               <option value="">{t("leads.allChannels")}</option>
               {productChannels.map((channel) => (
@@ -53,11 +53,11 @@ export default function LeadsPage() {
         }
       />
       {channels === undefined ? (
-        <div className="px-4 py-6 text-sm text-slate-400 sm:px-6">{t("leads.loading")}</div>
+        <div className="px-4 py-6 text-sm text-faint sm:px-6">{t("leads.loading")}</div>
       ) : channels.length === 0 ? (
         <EmptyState icon={MousePointerClick} title={t("leads.title")} description={t("leads.noChannel")} />
       ) : (
-        <div className="pt-4">
+        <div className="flex min-h-0 flex-1 flex-col pt-4">
           <LeadsKanban channelId={channelId || undefined} counts={counts} />
         </div>
       )}

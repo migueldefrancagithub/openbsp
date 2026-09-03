@@ -22,7 +22,7 @@ export function OpsAlertsPanel({ compact = false }: { compact?: boolean }) {
   const now = Date.now();
 
   if (alerts === undefined) {
-    return <div className="h-14 animate-pulse rounded-lg border border-slate-100 bg-slate-50" />;
+    return <div className="h-14 animate-pulse rounded-lg border border-line-soft bg-surface-2" />;
   }
   if (alerts.length === 0) {
     if (compact) return null;
@@ -47,7 +47,7 @@ export function OpsAlertsPanel({ compact = false }: { compact?: boolean }) {
   }
 
   return (
-    <section className="overflow-hidden rounded-lg border border-amber-200 bg-white">
+    <section className="overflow-hidden rounded-lg border border-amber-200 bg-surface">
       <div className="flex items-center justify-between gap-2 border-b border-amber-100 bg-amber-50 px-4 py-2">
         <div className="flex items-center gap-2 text-[13px] font-semibold text-amber-900">
           <BellRing size={14} /> {tr("Alertas", "Alerts")}
@@ -55,7 +55,7 @@ export function OpsAlertsPanel({ compact = false }: { compact?: boolean }) {
         </div>
         {error && <span className="text-[11px] text-[#b3261e]">{error}</span>}
       </div>
-      <ul className="divide-y divide-slate-100">
+      <ul className="divide-y divide-line-soft">
         {visible.map((alert) => {
           const critical = alert.severity === "critical";
           return (
@@ -64,14 +64,14 @@ export function OpsAlertsPanel({ compact = false }: { compact?: boolean }) {
                 {critical ? <ShieldAlert size={15} /> : <AlertTriangle size={15} />}
               </span>
               <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-x-2 text-[13px] text-[#0a1b33]">
+                <div className="flex flex-wrap items-center gap-x-2 text-[13px] text-ink">
                   <span className="font-semibold">{alertLabel(alert.kind, locale)}</span>
-                  <span className="text-[11px] text-slate-400">{relativeTime(alert.updatedAt, now, locale)}</span>
+                  <span className="text-[11px] text-faint">{relativeTime(alert.updatedAt, now, locale)}</span>
                 </div>
-                <p className="text-[12px] text-slate-600">{alert.title}</p>
+                <p className="text-[12px] text-body">{alert.title}</p>
               </div>
               {alert.href && (
-                <Link href={alert.href} className="inline-flex h-8 items-center gap-1 rounded-md px-2 text-[12px] font-semibold text-[#2b4f8a] hover:bg-slate-50">
+                <Link href={alert.href} className="inline-flex h-8 items-center gap-1 rounded-md px-2 text-[12px] font-semibold text-[#2b4f8a] hover:bg-surface-2">
                   {tr("Abrir", "Open")} <ChevronRight size={13} />
                 </Link>
               )}
@@ -79,7 +79,7 @@ export function OpsAlertsPanel({ compact = false }: { compact?: boolean }) {
                 type="button"
                 disabled={busy !== null}
                 onClick={() => void ack(alert._id)}
-                className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-200 px-2 text-[12px] font-semibold text-slate-600 hover:border-slate-300 disabled:opacity-50"
+                className="inline-flex h-8 items-center gap-1 rounded-md border border-line px-2 text-[12px] font-semibold text-body hover:border-line disabled:opacity-50"
               >
                 {busy === alert._id ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
                 {tr("Visto", "Seen")}

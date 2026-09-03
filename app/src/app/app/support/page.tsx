@@ -45,16 +45,16 @@ export default function SupportPage() {
       />
 
       <div className="max-w-7xl space-y-6 px-4 py-5 sm:px-6 lg:px-8 lg:py-8">
-        <section className="rounded-lg border border-slate-200 bg-white p-5">
+        <section className="rounded-lg border border-line bg-surface p-5">
           <div className="mb-4 flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#0a152d] text-white">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-nav-active text-white">
               <LifeBuoy size={18} />
             </div>
             <div>
-              <h2 className="font-[var(--font-outfit)] text-[18px] font-medium text-[#0a1b33]">
+              <h2 className="font-[var(--font-outfit)] text-[18px] font-medium text-ink">
                 {tr("Antes de ligar uma clínica", "Before onboarding a clinic")}
               </h2>
-              <p className="text-sm text-slate-500">
+              <p className="text-sm text-muted">
                 {tr(
                   "Validações mínimas antes de campanhas ou atendimento por IA.",
                   "Minimum validation before campaigns or AI handoff.",
@@ -66,7 +66,7 @@ export default function SupportPage() {
             {clientChecklist.map((item) => (
               <div
                 key={item}
-                className="flex items-start gap-2 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-[13px] text-slate-600"
+                className="flex items-start gap-2 rounded-lg border border-line-soft bg-surface-2 px-3 py-2 text-[13px] text-body"
               >
                 <CheckCircle2
                   size={15}
@@ -84,8 +84,8 @@ export default function SupportPage() {
           ))}
         </section>
 
-        <section className="rounded-lg border border-slate-200 bg-white p-5">
-          <h2 className="font-[var(--font-outfit)] text-[18px] font-medium text-[#0a1b33]">
+        <section className="rounded-lg border border-line bg-surface p-5">
+          <h2 className="font-[var(--font-outfit)] text-[18px] font-medium text-ink">
             {tr("Acessos rápidos", "Fast links")}
           </h2>
           <div className="mt-4 flex flex-wrap gap-2">
@@ -113,22 +113,22 @@ function GuideCard({
   bullets: string[];
 }) {
   return (
-    <article className="rounded-lg border border-slate-200 bg-white p-5">
+    <article className="rounded-lg border border-line bg-surface p-5">
       <div className="mb-3 flex items-start gap-3">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-[#0a1b33]">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-3 text-ink">
           <Icon size={17} />
         </div>
         <div>
-          <h3 className="font-[var(--font-outfit)] text-[16px] font-medium text-[#0a1b33]">
+          <h3 className="font-[var(--font-outfit)] text-[16px] font-medium text-ink">
             {title}
           </h3>
-          <p className="mt-1 text-sm leading-relaxed text-slate-500">{body}</p>
+          <p className="mt-1 text-sm leading-relaxed text-muted">{body}</p>
         </div>
       </div>
       <ul className="space-y-2">
         {bullets.map((bullet) => (
-          <li key={bullet} className="flex gap-2 text-[13px] text-slate-600">
-            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-300" />
+          <li key={bullet} className="flex gap-2 text-[13px] text-body">
+            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-faint/50" />
             {bullet}
           </li>
         ))}
@@ -297,7 +297,7 @@ function SupportLink({
   return (
     <Link
       href={href}
-      className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] font-medium text-[#0a1b33] transition-colors hover:border-slate-300 hover:bg-slate-50"
+      className="rounded-lg border border-line bg-surface px-3 py-2 text-[13px] font-medium text-ink transition-colors hover:border-line hover:bg-surface-2"
     >
       {children}
     </Link>

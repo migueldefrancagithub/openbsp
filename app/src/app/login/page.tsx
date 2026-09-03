@@ -32,21 +32,21 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center bg-[#f9fafb] px-4">
+    <div className="relative flex min-h-screen items-center justify-center bg-background px-4">
       <LanguageSwitcher compact className="absolute right-4 top-4" />
       <div className="w-full max-w-sm">
         <Link
           href="/"
-          className="mb-10 flex justify-center text-[#0a1b33]"
+          className="mb-10 flex justify-center text-ink"
         >
           <BrandLogo />
         </Link>
 
-        <div className="rounded-lg border border-slate-200 bg-white p-8 shadow-[0_20px_60px_-30px_rgba(0,0,0,0.15)]">
-          <h1 className="font-[var(--font-outfit)] text-[26px] font-medium tracking-tight text-[#0a1b33]">
+        <div className="rounded-lg border border-line bg-surface p-8 shadow-[0_20px_60px_-30px_rgba(0,0,0,0.15)]">
+          <h1 className="font-[var(--font-outfit)] text-[26px] font-medium tracking-tight text-ink">
             {tr("Bem-vindo de volta", "Welcome back")}
           </h1>
-          <p className="text-slate-500 text-sm mt-1">
+          <p className="text-muted text-sm mt-1">
             {tr("Entre para continuar para o seu espaço de trabalho.", "Sign in to continue to your workspace.")}
           </p>
 
@@ -54,7 +54,7 @@ export default function LoginPage() {
             <div>
               <label
                 htmlFor="email"
-                className="block text-xs font-medium text-slate-700 mb-1.5"
+                className="block text-xs font-medium text-ink mb-1.5"
               >
                 Email
               </label>
@@ -65,14 +65,14 @@ export default function LoginPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm text-[#0a1b33] focus:outline-none focus:ring-2 focus:ring-[#0a152d]/10 focus:border-[#0a152d] transition-all"
+                className="w-full px-3 py-2.5 rounded-lg border border-line text-sm text-ink focus:outline-none focus:ring-2 focus:ring-[#0a152d]/10 focus:border-[#0a152d] transition-all"
                 placeholder="you@example.pt"
               />
             </div>
             <div>
               <label
                 htmlFor="password"
-                className="block text-xs font-medium text-slate-700 mb-1.5"
+                className="block text-xs font-medium text-ink mb-1.5"
               >
                 {tr("Palavra-passe", "Password")}
               </label>
@@ -84,7 +84,7 @@ export default function LoginPage() {
                 minLength={8}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm text-[#0a1b33] focus:outline-none focus:ring-2 focus:ring-[#0a152d]/10 focus:border-[#0a152d] transition-all"
+                className="w-full px-3 py-2.5 rounded-lg border border-line text-sm text-ink focus:outline-none focus:ring-2 focus:ring-[#0a152d]/10 focus:border-[#0a152d] transition-all"
                 placeholder="••••••••"
               />
             </div>
@@ -98,17 +98,17 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={busy}
-              className="w-full bg-[#0a152d] text-white text-sm font-medium px-4 py-2.5 rounded-lg shadow-[0_8px_24px_-8px_rgba(10,21,45,0.5)] hover:bg-[#0a1b33] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              className="w-full bg-nav-active text-white text-sm font-medium px-4 py-2.5 rounded-lg shadow-[0_8px_24px_-8px_rgba(10,21,45,0.5)] hover:bg-brand-solid disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >
               {busy ? tr("A entrar…", "Signing in…") : tr("Entrar", "Sign in")}
             </button>
           </form>
 
-          <p className="text-center text-sm text-slate-500 mt-6">
+          <p className="text-center text-sm text-muted mt-6">
             {tr("Ainda não tem uma conta?", "Don't have an account?")}{" "}
             <Link
               href="/signup"
-              className="text-[#0a1b33] font-medium hover:underline"
+              className="text-ink font-medium hover:underline"
             >
               {tr("Criar conta", "Create one")}
             </Link>

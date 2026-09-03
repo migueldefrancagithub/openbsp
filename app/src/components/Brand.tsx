@@ -79,7 +79,7 @@ export function BrandLogo({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-2 font-[var(--font-outfit)] font-semibold tracking-tight text-[#0a1b33]",
+        "inline-flex items-center gap-2 font-[var(--font-outfit)] font-semibold tracking-tight text-ink",
         className,
       )}
     >

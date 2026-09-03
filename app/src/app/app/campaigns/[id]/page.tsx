@@ -129,7 +129,7 @@ export default function CampaignDetailPage() {
 
   if (detail === undefined) {
     return (
-      <div className="flex items-center gap-2 px-6 py-10 text-sm text-slate-400">
+      <div className="flex items-center gap-2 px-6 py-10 text-sm text-faint">
         <Loader2 size={15} className="animate-spin" /> {tr("A carregar campanha…", "Loading campaign…")}
       </div>
     );
@@ -150,7 +150,7 @@ export default function CampaignDetailPage() {
           <div className="flex flex-wrap items-center gap-2">
             <CampaignStatusBadge status={campaign.status} />
             {canPause && (
-              <button type="button" disabled={busy !== null} onClick={() => void run("pause", () => pause({ campaignId }))} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-[12px] font-semibold text-slate-700">
+              <button type="button" disabled={busy !== null} onClick={() => void run("pause", () => pause({ campaignId }))} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line bg-surface px-3 text-[12px] font-semibold text-ink">
                 <Pause size={13} /> {tr("Pausar", "Pause")}
               </button>
             )}
@@ -168,7 +168,7 @@ export default function CampaignDetailPage() {
                     void run("cancel", () => cancel({ campaignId }));
                   }
                 }}
-                className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#e0533d]/40 bg-white px-3 text-[12px] font-semibold text-[#b3261e]"
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#e0533d]/40 bg-surface px-3 text-[12px] font-semibold text-[#b3261e]"
               >
                 <XCircle size={13} /> {tr("Cancelar", "Cancel")}
               </button>
@@ -177,14 +177,14 @@ export default function CampaignDetailPage() {
               type="button"
               disabled={busy !== null}
               onClick={() => void run("duplicate", async () => { const id = await duplicate({ campaignId }); router.push(`/app/campaigns/${id}`); })}
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-[12px] font-semibold text-slate-700"
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line bg-surface px-3 text-[12px] font-semibold text-ink"
             >
               <Copy size={13} /> {tr("Duplicar", "Duplicate")}
             </button>
-            <button type="button" disabled={busy !== null} onClick={() => void exportCsv()} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-[12px] font-semibold text-slate-700">
+            <button type="button" disabled={busy !== null} onClick={() => void exportCsv()} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line bg-surface px-3 text-[12px] font-semibold text-ink">
               {busy === "export" ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />} CSV
             </button>
-            <Link href="/app/campaigns" className="inline-flex h-9 items-center gap-1.5 rounded-lg px-2 text-[12px] font-semibold text-slate-500 hover:text-[#0a1b33]">
+            <Link href="/app/campaigns" className="inline-flex h-9 items-center gap-1.5 rounded-lg px-2 text-[12px] font-semibold text-muted hover:text-ink">
               <ArrowLeft size={13} /> {tr("Todas", "All")}
             </Link>
           </div>
@@ -212,60 +212,60 @@ export default function CampaignDetailPage() {
         <FunnelStats rates={campaign.rates} />
 
         <div className="grid gap-4 lg:grid-cols-[1.2fr_1fr]">
-          <section className="rounded-lg border border-slate-200 bg-white p-4">
-            <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.14em] text-slate-400">{tr("Mensagem", "Message")}</div>
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-[13px] leading-relaxed text-[#0a1b33] whitespace-pre-wrap">
+          <section className="rounded-lg border border-line bg-surface p-4">
+            <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.14em] text-faint">{tr("Mensagem", "Message")}</div>
+            <div className="rounded-lg border border-line bg-surface-2 p-3 text-[13px] leading-relaxed text-ink whitespace-pre-wrap">
               {detail.messageText ?? `${tr("Template", "Template")} ${detail.templateName ?? ""} · ${detail.templateLanguage ?? ""}`}
             </div>
             {detail.variableBindings && detail.variableBindings.length > 0 && (
-              <ul className="mt-2 flex flex-wrap gap-1.5 text-[11px] text-slate-600">
+              <ul className="mt-2 flex flex-wrap gap-1.5 text-[11px] text-body">
                 {detail.variableBindings.map((b) => (
-                  <li key={b.index} className="rounded-md border border-slate-200 bg-white px-2 py-0.5">
+                  <li key={b.index} className="rounded-md border border-line bg-surface px-2 py-0.5">
                     {`{{${b.index}}}`} → {b.source === "static" ? b.value : b.source === "first_name" ? tr("primeiro nome", "first name") : tr("link rastreado", "tracked link")}
                   </li>
                 ))}
               </ul>
             )}
           </section>
-          <section className="rounded-lg border border-slate-200 bg-white p-4">
-            <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.14em] text-slate-400">{tr("Público", "Audience")}</div>
+          <section className="rounded-lg border border-line bg-surface p-4">
+            <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.14em] text-faint">{tr("Público", "Audience")}</div>
             <div className="grid grid-cols-3 gap-2 text-center">
               {[
                 { label: tr("Encontradas", "Matched"), value: detail.audienceSummary.matched },
                 { label: tr("Elegíveis", "Eligible"), value: detail.audienceSummary.eligible, tone: "text-[#0d6b61]" },
                 { label: tr("Bloqueadas", "Blocked"), value: detail.audienceSummary.matched - detail.audienceSummary.eligible, tone: "text-amber-700" },
               ].map((item) => (
-                <div key={item.label} className="rounded-lg border border-slate-100 bg-slate-50 px-2 py-2">
-                  <div className={cn("font-[var(--font-outfit)] text-[20px] font-medium", item.tone ?? "text-[#0a1b33]")}>{item.value}</div>
-                  <div className="text-[10px] uppercase tracking-[0.12em] text-slate-400">{item.label}</div>
+                <div key={item.label} className="rounded-lg border border-line-soft bg-surface-2 px-2 py-2">
+                  <div className={cn("font-[var(--font-outfit)] text-[20px] font-medium", item.tone ?? "text-ink")}>{item.value}</div>
+                  <div className="text-[10px] uppercase tracking-[0.12em] text-faint">{item.label}</div>
                 </div>
               ))}
             </div>
             {blockedEntries.length > 0 && (
-              <ul className="mt-3 space-y-1 text-[12px] text-slate-600">
+              <ul className="mt-3 space-y-1 text-[12px] text-body">
                 {blockedEntries.map(([code, n]) => (
-                  <li key={code} className="flex justify-between"><span>{blockReasonLabel(code, locale)}</span><b className="text-[#0a1b33]">{n}</b></li>
+                  <li key={code} className="flex justify-between"><span>{blockReasonLabel(code, locale)}</span><b className="text-ink">{n}</b></li>
                 ))}
               </ul>
             )}
-            <p className="mt-3 text-[11px] text-slate-400">
+            <p className="mt-3 text-[11px] text-faint">
               {tr(`Ritmo do piloto: ${detail.batchSize} mensagens a cada ${Math.round(detail.batchIntervalMs / 1000)} s.`, `Pilot pace: ${detail.batchSize} messages every ${Math.round(detail.batchIntervalMs / 1000)} s.`)}
               {detail.lastBatchAt ? ` ${tr("Último lote", "Last batch")} ${relativeTime(detail.lastBatchAt, now, locale)}.` : ""}
             </p>
           </section>
         </div>
 
-        <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-          <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-4 py-2">
+        <section className="overflow-hidden rounded-lg border border-line bg-surface">
+          <div className="flex flex-wrap items-center gap-2 border-b border-line-soft px-4 py-2">
             {(["recipients", "events"] as const).map((key) => (
-              <button key={key} type="button" onClick={() => setTab(key)} className={cn("rounded-md px-3 py-1.5 text-[12px] font-semibold", tab === key ? "bg-[#0a1b33] text-white" : "text-slate-500 hover:text-[#0a1b33]")}>
+              <button key={key} type="button" onClick={() => setTab(key)} className={cn("rounded-md px-3 py-1.5 text-[12px] font-semibold", tab === key ? "bg-brand-solid text-white" : "text-muted hover:text-ink")}>
                 {key === "recipients" ? tr("Destinatários", "Recipients") : tr("Eventos", "Events")}
               </button>
             ))}
             {tab === "recipients" && (
               <div className="ml-auto flex flex-wrap gap-1">
                 {RECIPIENT_FILTERS.map((key) => (
-                  <button key={key} type="button" onClick={() => setFilter(key)} className={cn("rounded-full border px-2 py-0.5 text-[11px] font-semibold", filter === key ? "border-[#0a1b33] bg-[#0a1b33] text-white" : "border-slate-200 text-slate-500")}>
+                  <button key={key} type="button" onClick={() => setFilter(key)} className={cn("rounded-full border px-2 py-0.5 text-[11px] font-semibold", filter === key ? "border-brand-solid bg-brand-solid text-white" : "border-line text-muted")}>
                     {key === "all" ? tr("Todos", "All") : recipientStatusLabel(key, locale)}
                   </button>
                 ))}
@@ -276,13 +276,13 @@ export default function CampaignDetailPage() {
           {tab === "recipients" ? (
             <>
               {recipients.status === "LoadingFirstPage" ? (
-                <div className="px-4 py-6 text-sm text-slate-400">{tr("A carregar…", "Loading…")}</div>
+                <div className="px-4 py-6 text-sm text-faint">{tr("A carregar…", "Loading…")}</div>
               ) : recipients.results.length === 0 ? (
-                <div className="px-4 py-8 text-center text-[13px] text-slate-500">{tr("Sem destinatários neste filtro.", "No recipients for this filter.")}</div>
+                <div className="px-4 py-8 text-center text-[13px] text-muted">{tr("Sem destinatários neste filtro.", "No recipients for this filter.")}</div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-[13px]">
-                    <thead className="bg-slate-50 text-left text-[11px] uppercase tracking-[0.12em] text-slate-400">
+                    <thead className="bg-surface-2 text-left text-[11px] uppercase tracking-[0.12em] text-faint">
                       <tr>
                         <th className="px-4 py-2 font-medium">{tr("Paciente", "Patient")}</th>
                         <th className="px-4 py-2 font-medium">{tr("Estado", "Status")}</th>
@@ -290,23 +290,23 @@ export default function CampaignDetailPage() {
                         <th className="px-4 py-2 font-medium">{tr("Atualizado", "Updated")}</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100">
+                    <tbody className="divide-y divide-line-soft">
                       {recipients.results.map((row) => (
-                        <tr key={row._id} className="hover:bg-slate-50">
+                        <tr key={row._id} className="hover:bg-surface-2">
                           <td className="px-4 py-2">
                             {row.threadKey && campaign.channelId ? (
-                              <Link href={`/app/channel-inbox/${row.threadKey}?channel=${campaign.channelId}`} className="font-semibold text-[#0a1b33] hover:underline">{row.label}</Link>
+                              <Link href={`/app/channel-inbox/${row.threadKey}?channel=${campaign.channelId}`} className="font-semibold text-ink hover:underline">{row.label}</Link>
                             ) : (
-                              <span className="font-semibold text-[#0a1b33]">{row.label}</span>
+                              <span className="font-semibold text-ink">{row.label}</span>
                             )}
                           </td>
                           <td className="px-4 py-2">
                             <span className={cn("rounded-md px-2 py-0.5 text-[11px] font-semibold", recipientStatusTone(row.status))}>{recipientStatusLabel(row.status, locale)}</span>
                           </td>
-                          <td className="px-4 py-2 text-slate-600">
+                          <td className="px-4 py-2 text-body">
                             {row.failureCode ? blockReasonLabel(row.failureCode, locale) : row.convertedAt ? `${tr("Conversão", "Conversion")}: ${row.conversionLabel ?? ""}` : row.nextAttemptAt && row.nextAttemptAt > now ? tr(`Nova tentativa ${relativeTime(row.nextAttemptAt, now, locale)}`, `Retry ${relativeTime(row.nextAttemptAt, now, locale)}`) : row.dispatchAttempts > 1 ? tr(`${row.dispatchAttempts} tentativas`, `${row.dispatchAttempts} attempts`) : ""}
                           </td>
-                          <td className="px-4 py-2 text-slate-400">{relativeTime(row.updatedAt, now, locale)}</td>
+                          <td className="px-4 py-2 text-faint">{relativeTime(row.updatedAt, now, locale)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -314,7 +314,7 @@ export default function CampaignDetailPage() {
                 </div>
               )}
               {recipients.status === "CanLoadMore" && (
-                <div className="border-t border-slate-100 px-4 py-2">
+                <div className="border-t border-line-soft px-4 py-2">
                   <button type="button" onClick={() => recipients.loadMore(30)} className="text-[12px] font-semibold text-[#2b4f8a] hover:underline">{tr("Carregar mais", "Load more")}</button>
                 </div>
               )}
@@ -322,19 +322,19 @@ export default function CampaignDetailPage() {
           ) : (
             <>
               {events.results.length === 0 ? (
-                <div className="px-4 py-8 text-center text-[13px] text-slate-500">{tr("Sem eventos.", "No events.")}</div>
+                <div className="px-4 py-8 text-center text-[13px] text-muted">{tr("Sem eventos.", "No events.")}</div>
               ) : (
-                <ul className="divide-y divide-slate-100">
+                <ul className="divide-y divide-line-soft">
                   {events.results.map((event) => (
                     <li key={event._id} className="flex items-center justify-between gap-3 px-4 py-2 text-[13px]">
-                      <span className="text-[#0a1b33]">{eventLabel(event.type, locale)}</span>
-                      <span className="text-[11px] text-slate-400">{relativeTime(event.createdAt, now, locale)}</span>
+                      <span className="text-ink">{eventLabel(event.type, locale)}</span>
+                      <span className="text-[11px] text-faint">{relativeTime(event.createdAt, now, locale)}</span>
                     </li>
                   ))}
                 </ul>
               )}
               {events.status === "CanLoadMore" && (
-                <div className="border-t border-slate-100 px-4 py-2">
+                <div className="border-t border-line-soft px-4 py-2">
                   <button type="button" onClick={() => events.loadMore(30)} className="text-[12px] font-semibold text-[#2b4f8a] hover:underline">{tr("Carregar mais", "Load more")}</button>
                 </div>
               )}

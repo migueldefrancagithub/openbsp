@@ -51,13 +51,13 @@ import { convexErrorMessage } from "@/lib/convexErrorMessage";
 import { channelStateLabel, sendModeLabel } from "@/lib/operationalLabels";
 
 const STATUS_STYLES: Record<string, string> = {
-  draft: "bg-slate-100 text-slate-700 border-slate-200",
+  draft: "bg-surface-3 text-ink border-line",
   scheduled: "bg-sky-50 text-sky-700 border-sky-200",
   running: "bg-emerald-50 text-emerald-700 border-emerald-200",
   paused: "bg-amber-50 text-amber-700 border-amber-200",
   completed: "bg-indigo-50 text-indigo-700 border-indigo-200",
   failed: "bg-red-50 text-red-700 border-red-200",
-  cancelled: "bg-slate-100 text-slate-500 border-slate-200",
+  cancelled: "bg-surface-3 text-muted border-line",
 };
 
 const BROADCAST_TABS = [
@@ -795,7 +795,7 @@ export default function CampaignsPage() {
                 type="button"
                 onClick={() => setImportOpen(true)}
                 disabled={!selectedListId || busy !== null}
-                className="w-full inline-flex items-center justify-center gap-2 border border-slate-200 bg-white text-[#0a1b33] text-[13px] font-medium px-4 py-2 rounded-lg hover:border-slate-300 disabled:opacity-50 transition-all"
+                className="w-full inline-flex items-center justify-center gap-2 border border-line bg-surface text-ink text-[13px] font-medium px-4 py-2 rounded-lg hover:border-line disabled:opacity-50 transition-all"
               >
                 <Upload size={14} />
                 {locale === "pt" ? "Importar CSV para lista" : "Import CSV to list"}
@@ -832,7 +832,7 @@ export default function CampaignsPage() {
                   <button
                     type="button"
                     onClick={() => setStudioTab("micro")}
-                    className="mt-2 inline-flex h-8 items-center rounded-md bg-[#0a152d] px-3 text-[11px] font-semibold text-white hover:bg-[#0a1b33]"
+                    className="mt-2 inline-flex h-8 items-center rounded-md bg-nav-active px-3 text-[11px] font-semibold text-white hover:bg-brand-solid"
                   >
                     {locale === "pt" ? "Abrir micro-campanha" : "Open micro campaign"}
                   </button>
@@ -920,20 +920,20 @@ export default function CampaignsPage() {
                 </div>
 
                 <div>
-                  <span className="mb-2 block text-[11px] font-medium text-slate-500">
+                  <span className="mb-2 block text-[11px] font-medium text-muted">
                     {locale === "pt" ? "Destinatários" : "Recipients"}
                   </span>
-                  <div className="grid max-h-64 gap-2 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-2">
+                  <div className="grid max-h-64 gap-2 overflow-y-auto rounded-xl border border-line bg-surface-2 p-2">
                     {channels === undefined || microThreads === undefined ? (
-                      <div className="rounded-lg bg-white px-3 py-3 text-sm text-slate-400">
+                      <div className="rounded-lg bg-surface px-3 py-3 text-sm text-faint">
                         {locale === "pt" ? "A carregar destinatários..." : "Loading recipients..."}
                       </div>
                     ) : labChannels.length === 0 ? (
-                      <div className="rounded-lg bg-white px-3 py-3 text-sm text-slate-500">
+                      <div className="rounded-lg bg-surface px-3 py-3 text-sm text-muted">
                         {locale === "pt" ? "Sem canal Hub isolado conectado." : "No isolated Hub channel connected."}
                       </div>
                     ) : microThreads.length === 0 ? (
-                      <div className="rounded-lg bg-white px-3 py-3 text-sm text-slate-500">
+                      <div className="rounded-lg bg-surface px-3 py-3 text-sm text-muted">
                         {locale === "pt" ? "Ainda não há conversas inbound com mensagens." : "No inbound threads with message events yet."}
                       </div>
                     ) : (
@@ -949,8 +949,8 @@ export default function CampaignsPage() {
                             onClick={() => toggleMicroThread(thread.threadKey)}
                             className={`flex min-h-16 w-full items-center gap-3 rounded-lg border px-3 py-2 text-left transition-colors ${
                               selected
-                                ? "border-[#0a152d] bg-white"
-                                : "border-slate-200 bg-white hover:border-slate-300"
+                                ? "border-[#0a152d] bg-surface"
+                                : "border-line bg-surface hover:border-line"
                             }`}
                           >
                             <input
@@ -961,12 +961,12 @@ export default function CampaignsPage() {
                               className="h-4 w-4 shrink-0 accent-[#0a152d]"
                             />
                             <span className="min-w-0 flex-1">
-                              <span className="block truncate text-sm font-semibold text-[#0a1b33]">
+                              <span className="block truncate text-sm font-semibold text-ink">
                                 {thread.displayName ??
                                   thread.phone ??
                                   thread.threadKey}
                               </span>
-                              <span className="mt-0.5 block truncate text-xs text-slate-500">
+                              <span className="mt-0.5 block truncate text-xs text-muted">
                                 {thread.lastPreview ?? thread.lastEventKind}
                               </span>
                             </span>
@@ -993,14 +993,14 @@ export default function CampaignsPage() {
                 </div>
 
                 <label className="block">
-                  <span className="mb-1 block text-[11px] font-medium text-slate-500">
+                  <span className="mb-1 block text-[11px] font-medium text-muted">
                     {locale === "pt" ? "Mensagem" : "Message"}
                   </span>
                   <textarea
                     value={microCampaignText}
                     onChange={(event) => setMicroCampaignText(event.target.value)}
                     rows={8}
-                    className="w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm leading-6 text-[#0a1b33] outline-none transition-colors placeholder:text-slate-300 focus:border-slate-400"
+                    className="w-full resize-y rounded-lg border border-line bg-surface px-3 py-2 text-sm leading-6 text-ink outline-none transition-colors placeholder:text-faint focus:border-brand-solid/40"
                   />
                 </label>
 
@@ -1291,9 +1291,9 @@ export default function CampaignsPage() {
                 checked={audienceExcludeMarketingRevoked}
                 onChange={setAudienceExcludeMarketingRevoked}
               />
-              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+              <div className="rounded-xl border border-line bg-surface-2 px-4 py-3">
                 <div className="flex flex-wrap items-center gap-3 text-sm">
-                  <span className="inline-flex items-center gap-2 font-semibold text-[#0a1b33]">
+                  <span className="inline-flex items-center gap-2 font-semibold text-ink">
                     <Users size={15} />
                     {audiencePreview?.count ?? 0} {locale === "pt" ? "encontrados" : "matched"}
                   </span>
@@ -1301,7 +1301,7 @@ export default function CampaignsPage() {
                     <ShieldCheck size={15} />
                     {audiencePreview?.excludedMarketingRevoked ?? 0} {locale === "pt" ? "recusas excluídas" : "opt-outs excluded"}
                   </span>
-                  <span className="inline-flex items-center gap-2 font-medium text-slate-500">
+                  <span className="inline-flex items-center gap-2 font-medium text-muted">
                     <Filter size={15} />
                     {audiencePreview?.activeFilters ?? 0} {locale === "pt" ? "filtros" : "filters"}
                   </span>
@@ -1310,7 +1310,7 @@ export default function CampaignsPage() {
                   {(audiencePreview?.sample ?? []).slice(0, 4).map((contact) => (
                     <span
                       key={contact.contactId}
-                      className="inline-flex max-w-full items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600"
+                      className="inline-flex max-w-full items-center gap-2 rounded-full border border-line bg-surface px-3 py-1 text-xs font-medium text-body"
                     >
                       <span className="truncate">{contact.displayName}</span>
                       {contact.matchReasons.slice(0, 2).map((reason) => (
@@ -1324,7 +1324,7 @@ export default function CampaignsPage() {
                     </span>
                   ))}
                   {audiencePreview && audiencePreview.sample.length === 0 && (
-                    <span className="text-xs font-medium text-slate-400">
+                    <span className="text-xs font-medium text-faint">
                       {locale === "pt" ? "Ainda sem contactos correspondentes." : "No matching contacts yet."}
                     </span>
                   )}
@@ -1349,13 +1349,13 @@ export default function CampaignsPage() {
         )}
 
         {studioTab === "dashboard" && (
-        <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-          <div className="px-5 py-4 border-b border-slate-100 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <section className="overflow-hidden rounded-lg border border-line bg-surface">
+          <div className="px-5 py-4 border-b border-line-soft flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <h2 className="font-[var(--font-outfit)] text-[18px] font-medium text-[#0a1b33]">
+              <h2 className="font-[var(--font-outfit)] text-[18px] font-medium text-ink">
                 {locale === "pt" ? "Campanhas reais" : "Real campaigns"}
               </h2>
-              <p className="text-sm text-slate-500 mt-0.5">
+              <p className="text-sm text-muted mt-0.5">
                 {locale === "pt"
                   ? "Acompanha estado por destinatário, falhas, respostas, interações e conversões."
                   : "Track per-recipient state, failures, replies, interactions, and conversions."}
@@ -1364,14 +1364,14 @@ export default function CampaignsPage() {
             <button
               type="button"
               onClick={() => setStudioTab("launch")}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#0a152d] px-3 text-sm font-medium text-white transition-colors hover:bg-[#0a1b33]"
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-nav-active px-3 text-sm font-medium text-white transition-colors hover:bg-brand-solid"
             >
               <Plus size={15} />
               {locale === "pt" ? "Criar campanha" : "Create campaign"}
             </button>
           </div>
 
-          <div className="grid gap-3 border-b border-slate-100 p-5 sm:grid-cols-2 xl:grid-cols-5">
+          <div className="grid gap-3 border-b border-line-soft p-5 sm:grid-cols-2 xl:grid-cols-5">
             <DashboardMetric
               icon={Radio}
               label={locale === "pt" ? "Envios" : "Runs"}
@@ -1410,24 +1410,24 @@ export default function CampaignsPage() {
             />
           </div>
 
-          <div className="border-b border-slate-100 p-5">
+          <div className="border-b border-line-soft p-5">
             <div className="grid gap-3 lg:grid-cols-[1fr_auto_auto]">
               <label className="relative block">
                 <Search
                   size={16}
-                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-faint"
                 />
                 <input
                   value={campaignSearch}
                   onChange={(event) => setCampaignSearch(event.target.value)}
                   placeholder={locale === "pt" ? "Pesquisar campanhas..." : "Search campaigns..."}
-                  className="h-11 w-full rounded-lg border border-slate-200 bg-white pl-10 pr-3 text-sm text-[#0a1b33] outline-none transition-colors placeholder:text-slate-400 focus:border-slate-400"
+                  className="h-11 w-full rounded-lg border border-line bg-surface pl-10 pr-3 text-sm text-ink outline-none transition-colors placeholder:text-faint focus:border-brand-solid/40"
                 />
               </label>
               <span className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50">
                 <span className="h-3 w-3 rounded-full bg-emerald-500" />
               </span>
-              <select className="h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-[#0a1b33] outline-none focus:border-slate-400">
+              <select className="h-11 rounded-lg border border-line bg-surface px-3 text-sm font-medium text-ink outline-none focus:border-brand-solid/40">
                 <option>{locale === "pt" ? "6 por página" : "6 per page"}</option>
                 <option>{locale === "pt" ? "12 por página" : "12 per page"}</option>
                 <option>{locale === "pt" ? "24 por página" : "24 per page"}</option>
@@ -1444,8 +1444,8 @@ export default function CampaignsPage() {
                     onClick={() => setCampaignStatusFilter(tab.key)}
                     className={`inline-flex h-10 items-center gap-2 rounded-lg px-3 text-sm font-semibold transition-colors ${
                       active
-                        ? "bg-[#0a152d] text-white"
-                        : "bg-white text-[#0a1b33] hover:bg-slate-50"
+                        ? "bg-nav-active text-white"
+                        : "bg-surface text-ink hover:bg-surface-2"
                     }`}
                   >
                     <Icon size={15} />
@@ -1455,7 +1455,7 @@ export default function CampaignsPage() {
               })}
             </div>
             <div className="mt-4 max-w-xs">
-              <label className="text-xs font-medium text-slate-500">
+              <label className="text-xs font-medium text-muted">
                 {locale === "pt" ? "Tamanho do lote manual" : "Manual batch size"}
               </label>
               <input
@@ -1464,22 +1464,22 @@ export default function CampaignsPage() {
                 max={5000}
                 value={batchSize}
                 onChange={(event) => setBatchSize(Number(event.target.value))}
-                className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-[#0a1b33] outline-none focus:border-slate-400"
+                className="mt-1 h-10 w-full rounded-lg border border-line bg-surface px-3 text-sm font-medium text-ink outline-none focus:border-brand-solid/40"
               />
             </div>
           </div>
 
           {campaigns === undefined ? (
-            <div className="p-8 text-sm text-slate-400">
+            <div className="p-8 text-sm text-faint">
               {locale === "pt" ? "A carregar campanhas..." : "Loading campaigns..."}
             </div>
           ) : campaigns.length === 0 ? (
             <div className="p-10 text-center">
-              <Send size={26} className="mx-auto text-slate-300 mb-3" />
-              <h3 className="font-[var(--font-outfit)] text-[18px] font-medium text-[#0a1b33]">
+              <Send size={26} className="mx-auto text-faint mb-3" />
+              <h3 className="font-[var(--font-outfit)] text-[18px] font-medium text-ink">
                 {locale === "pt" ? "Ainda sem campanhas" : "No campaign drafts yet"}
               </h3>
-              <p className="text-sm text-slate-500 mt-1">
+              <p className="text-sm text-muted mt-1">
                 {locale === "pt"
                   ? "Cria um rascunho com template ou envia um teste WhatsApp para começar a medir eventos reais."
                   : "Create a template broadcast or send a WhatsApp test to start tracking real events."}
@@ -1487,11 +1487,11 @@ export default function CampaignsPage() {
             </div>
           ) : filteredCampaigns.length === 0 ? (
             <div className="p-10 text-center">
-              <Search size={26} className="mx-auto text-slate-300 mb-3" />
-              <h3 className="font-[var(--font-outfit)] text-[18px] font-medium text-[#0a1b33]">
+              <Search size={26} className="mx-auto text-faint mb-3" />
+              <h3 className="font-[var(--font-outfit)] text-[18px] font-medium text-ink">
                 {locale === "pt" ? "Nenhuma campanha encontrada" : "No campaigns match"}
               </h3>
-              <p className="text-sm text-slate-500 mt-1">
+              <p className="text-sm text-muted mt-1">
                 {locale === "pt"
                   ? "Limpa a pesquisa ou muda o filtro de estado."
                   : "Clear search or switch status filters."}
@@ -1655,19 +1655,19 @@ function BroadcastCard({
 
   return (
     <article
-      className={`flex min-h-[520px] flex-col rounded-lg border border-l-4 border-slate-200 bg-white shadow-[0_18px_70px_-48px_rgba(15,23,42,0.55)] ${stripe}`}
+      className={`flex min-h-[520px] flex-col rounded-lg border border-l-4 border-line bg-surface shadow-[0_18px_70px_-48px_rgba(15,23,42,0.55)] ${stripe}`}
     >
       <div className="flex flex-1 flex-col p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <h3 className="truncate text-base font-semibold text-[#0a1b33]">
+            <h3 className="truncate text-base font-semibold text-ink">
               {campaign.name}
             </h3>
-            <p className="mt-1 text-xs font-medium text-slate-500">
+            <p className="mt-1 text-xs font-medium text-muted">
               # {friendlyCampaignId(campaign._id)} · {relativeTime(campaign.createdAt, Date.now(), locale)}
             </p>
           </div>
-          <button type="button" onClick={onOpenLog} className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-[#0a1b33]" aria-label={locale === "pt" ? "Abrir log da campanha" : "Open campaign log"}><MoreHorizontal size={17} /></button>
+          <button type="button" onClick={onOpenLog} className="rounded-md p-1.5 text-faint hover:bg-surface-3 hover:text-ink" aria-label={locale === "pt" ? "Abrir log da campanha" : "Open campaign log"}><MoreHorizontal size={17} /></button>
         </div>
 
         <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -1767,7 +1767,7 @@ function BroadcastCard({
           </span>
         </div>
 
-        <div className="mt-4 flex items-center gap-2 text-sm font-semibold text-slate-500">
+        <div className="mt-4 flex items-center gap-2 text-sm font-semibold text-muted">
           <FileText size={15} />
           <span className="truncate">
             {campaign.kind === "micro_lab"
@@ -1780,7 +1780,7 @@ function BroadcastCard({
         </div>
 
         {campaign.contentPreview && (
-          <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-500">
+          <p className="mt-2 line-clamp-2 text-xs leading-5 text-muted">
             {campaign.contentPreview}
           </p>
         )}
@@ -1799,7 +1799,7 @@ function BroadcastCard({
           />
         </div>
 
-        <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
+        <div className="mt-4 rounded-xl border border-line bg-surface-2 p-3">
           <ProgressRow label={locale === "pt" ? "Taxa de envio" : "Sent rate"} value={rate(sent, campaign.stats.total)} />
           <ProgressRow
             label={locale === "pt" ? "Taxa de entrega" : "Delivery rate"}
@@ -1827,7 +1827,7 @@ function BroadcastCard({
                   <span className="text-xs font-semibold text-red-800">
                     {failure.title}
                   </span>
-                  <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-red-600">
+                  <span className="rounded-full bg-surface px-2 py-0.5 text-[11px] font-semibold text-red-600">
                     {failure.count}
                   </span>
                 </div>
@@ -1857,17 +1857,17 @@ function BroadcastCard({
         </div>
       </div>
 
-      <div className="border-t border-slate-100 px-5 py-3 text-xs font-medium text-slate-500">
+      <div className="border-t border-line-soft px-5 py-3 text-xs font-medium text-muted">
         {locale === "pt" ? "Criada" : "Created"}: {new Date(campaign.createdAt).toLocaleString(locale === "pt" ? "pt-MZ" : "en-GB")}
       </div>
 
       {campaign.stats.failed > 0 && (
-        <div className="border-t border-slate-100 px-5 py-3">
+        <div className="border-t border-line-soft px-5 py-3">
           <button
             type="button"
             onClick={() => onCopyFailed(campaign._id)}
             disabled={busy !== null}
-            className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-[#0a1b33] transition-colors hover:border-slate-300 disabled:opacity-50"
+            className="inline-flex h-9 items-center gap-2 rounded-lg border border-line bg-surface px-3 text-xs font-semibold text-ink transition-colors hover:border-line disabled:opacity-50"
           >
             {busy === `export:${campaign._id}` ? (
               <Loader2 size={13} className="animate-spin" />
@@ -1900,18 +1900,18 @@ function CampaignLogDrawer({
   const progress = rate(sent + campaign.stats.failed + campaign.stats.skipped, campaign.stats.total);
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/60">
-      <aside className="h-full w-full max-w-xl border-l border-slate-200 bg-white shadow-2xl">
-        <div className="flex items-start justify-between gap-4 border-b border-slate-100 p-6">
+      <aside className="h-full w-full max-w-xl border-l border-line bg-surface shadow-2xl">
+        <div className="flex items-start justify-between gap-4 border-b border-line-soft p-6">
           <div className="flex items-start gap-3">
             <span className="relative flex h-11 w-11 items-center justify-center rounded-xl bg-violet-50 text-violet-600">
               <Radio size={19} />
               <span className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-emerald-500" />
             </span>
             <div>
-              <h2 className="font-[var(--font-outfit)] text-2xl font-semibold text-[#0a1b33]">
+              <h2 className="font-[var(--font-outfit)] text-2xl font-semibold text-ink">
                 {campaign.name}
               </h2>
-              <p className="mt-1 text-sm text-slate-500">
+              <p className="mt-1 text-sm text-muted">
                 {locale === "pt" ? "Atividade em tempo real" : "Real-time activity"} · ID: {friendlyCampaignId(campaign._id)}
               </p>
             </div>
@@ -1919,13 +1919,13 @@ function CampaignLogDrawer({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-slate-200 p-2 text-slate-500 hover:bg-slate-50"
+            className="rounded-lg border border-line p-2 text-muted hover:bg-surface-2"
           >
             <X size={17} />
           </button>
         </div>
 
-        <div className="grid grid-cols-3 gap-y-4 border-b border-slate-100 px-6 py-5 text-center sm:grid-cols-6">
+        <div className="grid grid-cols-3 gap-y-4 border-b border-line-soft px-6 py-5 text-center sm:grid-cols-6">
           <DrawerStat label="Total" value={campaign.stats.total} />
           <DrawerStat label={locale === "pt" ? "Enviados" : "Sent"} value={sent} tone="emerald" />
           <DrawerStat label={locale === "pt" ? "Interações" : "Clicks"} value={campaign.stats.clicked} tone="blue" />
@@ -1936,15 +1936,15 @@ function CampaignLogDrawer({
 
         <div className="max-h-[calc(100vh-260px)] space-y-3 overflow-y-auto p-6 pb-28">
           {events === undefined ? (
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm font-medium text-slate-500">
+            <div className="rounded-xl border border-line bg-surface-2 p-4 text-sm font-medium text-muted">
               {locale === "pt" ? "A carregar eventos da campanha..." : "Loading campaign events..."}
             </div>
           ) : events.length === 0 ? (
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-              <div className="text-sm font-semibold text-[#0a1b33]">
+            <div className="rounded-xl border border-line bg-surface-2 p-4">
+              <div className="text-sm font-semibold text-ink">
                 {locale === "pt" ? "Ainda sem eventos registados" : "No events recorded yet"}
               </div>
-              <p className="mt-1 text-sm leading-6 text-slate-500">
+              <p className="mt-1 text-sm leading-6 text-muted">
                 {locale === "pt" ? "Inicia ou processa a campanha para preencher esta atividade." : "Launch or process this campaign to populate the event stream."}
               </p>
             </div>
@@ -1991,7 +1991,7 @@ function CampaignLogDrawer({
           )}
         </div>
 
-        <div className="absolute bottom-0 right-0 flex w-full max-w-xl items-center justify-between border-t border-slate-100 bg-white px-6 py-4 text-sm text-slate-500">
+        <div className="absolute bottom-0 right-0 flex w-full max-w-xl items-center justify-between border-t border-line-soft bg-surface px-6 py-4 text-sm text-muted">
           <span>
             {events === undefined ? (locale === "pt" ? "A carregar eventos" : "Loading events") : `${events.length} ${locale === "pt" ? "eventos" : "events"}`}
           </span>
@@ -2019,16 +2019,16 @@ function ActionPill({
 }) {
   const toneClass =
     tone === "dark"
-      ? "border-[#0a152d] bg-[#0a152d] text-white"
+      ? "border-[#0a152d] bg-nav-active text-white"
       : tone === "orange"
         ? "border-orange-200 bg-orange-50 text-orange-700"
-        : "border-slate-200 bg-white text-[#0a1b33]";
+        : "border-line bg-surface text-ink";
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-xs font-semibold transition-colors hover:border-slate-300 disabled:opacity-50 ${toneClass}`}
+      className={`inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-xs font-semibold transition-colors hover:border-line disabled:opacity-50 ${toneClass}`}
     >
       {loading ? <Loader2 size={13} className="animate-spin" /> : <Icon size={14} />}
       {label}
@@ -2048,14 +2048,14 @@ function BroadcastMetric({
   danger?: boolean;
 }) {
   return (
-    <div className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
-      <div className="flex items-center gap-2 text-sm text-slate-500">
+    <div className="rounded-xl border border-line-soft bg-surface-2 px-3 py-2">
+      <div className="flex items-center gap-2 text-sm text-muted">
         <Icon size={15} />
         <span>{label}</span>
       </div>
       <div
         className={`mt-1 text-sm font-semibold ${
-          danger ? "text-red-600" : "text-[#0a1b33]"
+          danger ? "text-red-600" : "text-ink"
         }`}
       >
         {value}
@@ -2076,17 +2076,17 @@ function DashboardMetric({
   detail: string;
 }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+    <div className="rounded-xl border border-line bg-surface-2 px-4 py-3">
       <div className="flex items-center justify-between gap-3">
-        <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+        <span className="text-xs font-semibold uppercase tracking-wider text-faint">
           {label}
         </span>
-        <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-white text-[#0a1b33]">
+        <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-surface text-ink">
           <Icon size={15} />
         </span>
       </div>
-      <div className="mt-2 text-xl font-semibold text-[#0a1b33]">{value}</div>
-      <div className="mt-1 text-xs font-medium text-slate-500">{detail}</div>
+      <div className="mt-2 text-xl font-semibold text-ink">{value}</div>
+      <div className="mt-1 text-xs font-medium text-muted">{detail}</div>
     </div>
   );
 }
@@ -2095,12 +2095,12 @@ function ProgressRow({ label, value }: { label: string; value: number }) {
   return (
     <div className="mb-3 last:mb-0">
       <div className="mb-1 flex items-center justify-between text-sm">
-        <span className="text-slate-500">{label}</span>
-        <span className="font-semibold text-[#0a1b33]">{value.toFixed(1)}%</span>
+        <span className="text-muted">{label}</span>
+        <span className="font-semibold text-ink">{value.toFixed(1)}%</span>
       </div>
-      <div className="h-2 overflow-hidden rounded-full bg-white">
+      <div className="h-2 overflow-hidden rounded-full bg-surface">
           <div
-            className="h-full rounded-full bg-[#0a152d]"
+            className="h-full rounded-full bg-nav-active"
           style={{ width: `${Math.min(value, 100)}%` }}
         />
       </div>
@@ -2124,10 +2124,10 @@ function DrawerStat({
         ? "text-red-600"
         : tone === "blue"
           ? "text-blue-600"
-          : "text-[#0a1b33]";
+          : "text-ink";
   return (
     <div>
-      <div className="text-xs font-semibold text-slate-500">{label}</div>
+      <div className="text-xs font-semibold text-muted">{label}</div>
       <div className={`mt-1 text-lg font-semibold ${toneClass}`}>{value}</div>
     </div>
   );
@@ -2155,18 +2155,18 @@ function LogEvent({
         ? "bg-amber-50 text-amber-700"
         : tone === "good"
           ? "bg-emerald-50 text-emerald-700"
-          : "bg-slate-100 text-slate-600";
+          : "bg-surface-3 text-body";
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4">
+    <div className="rounded-xl border border-line bg-surface p-4">
       <div className="flex items-center justify-between gap-3">
         <span className={`rounded-lg px-2 py-1 text-xs font-semibold ${toneClass}`}>
           {kind}
         </span>
-        <span className="text-xs font-medium text-slate-500">{time}</span>
+        <span className="text-xs font-medium text-muted">{time}</span>
       </div>
-      <p className="mt-2 text-sm font-medium text-[#0a1b33]">{message}</p>
+      <p className="mt-2 text-sm font-medium text-ink">{message}</p>
       {detail && (
-        <p className="mt-1 break-words text-xs leading-5 text-slate-500">
+        <p className="mt-1 break-words text-xs leading-5 text-muted">
           {detail}
         </p>
       )}
@@ -2419,16 +2419,16 @@ function WorkflowPanel({
   children: ReactNode;
 }) {
   return (
-    <section id={id} className="scroll-mt-24 rounded-lg border border-slate-200 bg-white p-5">
+    <section id={id} className="scroll-mt-24 rounded-lg border border-line bg-surface p-5">
       <div className="flex items-start gap-3 mb-4">
-        <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center text-[#0a1b33]">
+        <div className="w-9 h-9 rounded-lg bg-surface-3 flex items-center justify-center text-ink">
           <Icon size={17} />
         </div>
         <div>
-          <h2 className="font-[var(--font-outfit)] text-[17px] font-medium text-[#0a1b33]">
+          <h2 className="font-[var(--font-outfit)] text-[17px] font-medium text-ink">
             {title}
           </h2>
-          <p className="text-[12px] text-slate-500 mt-0.5 leading-relaxed">
+          <p className="text-[12px] text-muted mt-0.5 leading-relaxed">
             {subtitle}
           </p>
         </div>
@@ -2452,16 +2452,16 @@ function StudioTab({
   return (
     <a
       href={href}
-      className="group flex items-center gap-3 rounded-xl px-3 py-3 transition-colors hover:bg-slate-50"
+      className="group flex items-center gap-3 rounded-xl px-3 py-3 transition-colors hover:bg-surface-2"
     >
-      <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500 transition-colors group-hover:bg-[#0a152d] group-hover:text-white">
+      <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-3 text-muted transition-colors group-hover:bg-nav-active group-hover:text-white">
         <Icon size={16} />
       </span>
       <span className="min-w-0">
-        <span className="block truncate text-[13px] font-semibold text-[#0a1b33]">
+        <span className="block truncate text-[13px] font-semibold text-ink">
           {label}
         </span>
-        <span className="block truncate text-[11px] font-medium text-slate-400">
+        <span className="block truncate text-[11px] font-medium text-faint">
           {value}
         </span>
       </span>
@@ -2482,14 +2482,14 @@ function TextInput({
 }) {
   return (
     <label className="block">
-      <span className="block text-[11px] font-medium text-slate-500 mb-1">
+      <span className="block text-[11px] font-medium text-muted mb-1">
         {label}
       </span>
       <input
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
-        className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-[#0a1b33] outline-none transition-colors placeholder:text-slate-300 focus:border-slate-400"
+        className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink outline-none transition-colors placeholder:text-faint focus:border-brand-solid/40"
       />
     </label>
   );
@@ -2506,14 +2506,14 @@ function DateInput({
 }) {
   return (
     <label className="block">
-      <span className="block text-[11px] font-medium text-slate-500 mb-1">
+      <span className="block text-[11px] font-medium text-muted mb-1">
         {label}
       </span>
       <input
         type="date"
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-[#0a1b33] outline-none transition-colors focus:border-slate-400"
+        className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-brand-solid/40"
       />
     </label>
   );
@@ -2534,13 +2534,13 @@ function SelectBox({
 }) {
   return (
     <label className="block">
-      <span className="block text-[11px] font-medium text-slate-500 mb-1">
+      <span className="block text-[11px] font-medium text-muted mb-1">
         {label}
       </span>
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-[#0a1b33] outline-none transition-colors focus:border-slate-400"
+        className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-brand-solid/40"
       >
         <option value="">{placeholder}</option>
         {options.map((option) => (
@@ -2568,7 +2568,7 @@ function SubmitButton({
     <button
       type="submit"
       disabled={disabled}
-      className="w-full inline-flex items-center justify-center gap-2 bg-[#0a152d] text-white text-[13px] font-medium px-4 py-2 rounded-lg shadow-[0_8px_24px_-8px_rgba(10,21,45,0.35)] hover:bg-[#0a1b33] disabled:opacity-50 disabled:shadow-none transition-all"
+      className="w-full inline-flex items-center justify-center gap-2 bg-nav-active text-white text-[13px] font-medium px-4 py-2 rounded-lg shadow-[0_8px_24px_-8px_rgba(10,21,45,0.35)] hover:bg-brand-solid disabled:opacity-50 disabled:shadow-none transition-all"
     >
       {loading ? <Loader2 size={14} className="animate-spin" /> : <Icon size={14} />}
       {children}
@@ -2586,7 +2586,7 @@ function Toggle({
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <label className="flex min-h-16 items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] font-medium text-[#0a1b33]">
+    <label className="flex min-h-16 items-center justify-between gap-3 rounded-xl border border-line bg-surface-2 px-3 py-2 text-[12px] font-medium text-ink">
       <span>{label}</span>
       <input
         type="checkbox"
@@ -2600,9 +2600,9 @@ function Toggle({
 
 function StrategyTile({ title, body }: { title: string; body: string }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-      <div className="text-[13px] font-semibold text-[#0a1b33]">{title}</div>
-      <p className="mt-1 text-[12px] leading-relaxed text-slate-500">{body}</p>
+    <div className="rounded-xl border border-line bg-surface-2 p-3">
+      <div className="text-[13px] font-semibold text-ink">{title}</div>
+      <p className="mt-1 text-[12px] leading-relaxed text-muted">{body}</p>
     </div>
   );
 }
@@ -2630,15 +2630,15 @@ function Metric({
   muted?: boolean;
 }) {
   return (
-    <div className="rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-2">
+    <div className="rounded-lg border border-line-soft bg-surface-2 px-2.5 py-2">
       <div
         className={`text-[16px] font-semibold ${
-          danger ? "text-red-600" : muted ? "text-slate-500" : "text-[#0a1b33]"
+          danger ? "text-red-600" : muted ? "text-muted" : "text-ink"
         }`}
       >
         {value}
       </div>
-      <div className="text-[10px] uppercase tracking-wider text-slate-400">
+      <div className="text-[10px] uppercase tracking-wider text-faint">
         {label}
       </div>
     </div>

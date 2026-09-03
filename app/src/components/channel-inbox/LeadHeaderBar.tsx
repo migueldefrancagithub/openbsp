@@ -109,20 +109,20 @@ export function LeadHeaderBar({
   const originKey = `origin.${thread.leadSource ?? "unknown"}` as TranslationKey;
   const originLabel = t(originKey) === originKey ? (thread.leadSource ?? "WhatsApp") : t(originKey);
   const selectClass =
-    "mt-0.5 h-7 w-full min-w-0 rounded-md border border-transparent bg-transparent px-1 text-[11px] font-semibold text-slate-700 outline-none hover:border-slate-200 hover:bg-white focus:border-slate-400 focus:bg-white";
+    "mt-0.5 h-7 w-full min-w-0 rounded-md border border-transparent bg-transparent px-1 text-[11px] font-semibold text-ink outline-none hover:border-line hover:bg-surface focus:border-brand-solid/40 focus:bg-surface";
 
   return (
-    <div className="border-t border-slate-100 bg-[#fbfcfd]" data-lead-header>
+    <div className="border-t border-line-soft bg-[#fbfcfd]" data-lead-header>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
         <div className="min-w-0 px-3 py-2">
-          <div className="text-[8px] font-bold uppercase tracking-[0.12em] text-slate-400">{t("inbox.source")}</div>
-          <div className="mt-1 truncate text-[11px] font-semibold text-slate-700" title={thread.originCampaignName}>
+          <div className="text-[8px] font-bold uppercase tracking-[0.12em] text-faint">{t("inbox.source")}</div>
+          <div className="mt-1 truncate text-[11px] font-semibold text-ink" title={thread.originCampaignName}>
             {originLabel}
             {thread.originCampaignName ? ` · ${thread.originCampaignName}` : ""}
           </div>
         </div>
-        <label className="min-w-0 border-l border-slate-100 px-3 py-2">
-          <div className="text-[8px] font-bold uppercase tracking-[0.12em] text-slate-400">{t("inbox.stage")}</div>
+        <label className="min-w-0 border-l border-line-soft px-3 py-2">
+          <div className="text-[8px] font-bold uppercase tracking-[0.12em] text-faint">{t("inbox.stage")}</div>
           <select
             value={thread.leadStatus ?? "new"}
             disabled={saving}
@@ -134,11 +134,11 @@ export function LeadHeaderBar({
             ))}
           </select>
         </label>
-        <label className="min-w-0 border-t border-slate-100 px-3 py-2 sm:border-l sm:border-t-0">
-          <div className="text-[8px] font-bold uppercase tracking-[0.12em] text-slate-400">
+        <label className="min-w-0 border-t border-line-soft px-3 py-2 sm:border-l sm:border-t-0">
+          <div className="text-[8px] font-bold uppercase tracking-[0.12em] text-faint">
             {t("inbox.intent")}
             {thread.intent && (
-              <span className="ml-1 font-medium normal-case tracking-normal text-slate-300">
+              <span className="ml-1 font-medium normal-case tracking-normal text-faint">
                 · {thread.intentSource === "manual" ? t("inbox.manual") : t("inbox.inferred")}
               </span>
             )}
@@ -157,8 +157,8 @@ export function LeadHeaderBar({
             ))}
           </select>
         </label>
-        <label className="min-w-0 border-l border-t border-slate-100 px-3 py-2 lg:border-t-0">
-          <div className="flex items-center justify-between text-[8px] font-bold uppercase tracking-[0.12em] text-slate-400">
+        <label className="min-w-0 border-l border-t border-line-soft px-3 py-2 lg:border-t-0">
+          <div className="flex items-center justify-between text-[8px] font-bold uppercase tracking-[0.12em] text-faint">
             <span>{t("inbox.owner")}</span>
             {currentMemberId && thread.responsibleMemberId !== currentMemberId && (
               <button
@@ -190,8 +190,8 @@ export function LeadHeaderBar({
               ))}
           </select>
         </label>
-        <div className="min-w-0 border-t border-slate-100 px-3 py-2 sm:border-l lg:border-t-0">
-          <div className="text-[8px] font-bold uppercase tracking-[0.12em] text-slate-400">{t("inbox.nextAction")}</div>
+        <div className="min-w-0 border-t border-line-soft px-3 py-2 sm:border-l lg:border-t-0">
+          <div className="text-[8px] font-bold uppercase tracking-[0.12em] text-faint">{t("inbox.nextAction")}</div>
           <div className="mt-0.5 flex items-center gap-1">
             <input
               value={nextStep}
@@ -207,13 +207,13 @@ export function LeadHeaderBar({
               }}
               placeholder="-"
               maxLength={240}
-              className="h-7 min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-1 text-[11px] font-semibold text-slate-700 outline-none hover:border-slate-200 hover:bg-white focus:border-slate-400 focus:bg-white"
+              className="h-7 min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-1 text-[11px] font-semibold text-ink outline-none hover:border-line hover:bg-surface focus:border-brand-solid/40 focus:bg-surface"
             />
             {nextStep.trim() !== (thread.nextStep ?? "") && (
               <button
                 type="button"
                 onClick={() => void save({ nextStep })}
-                className="rounded-md bg-[#0a1b33] p-1 text-white"
+                className="rounded-md bg-brand-solid p-1 text-white"
                 title={t("inbox.save")}
               >
                 <Check size={11} />
@@ -221,13 +221,13 @@ export function LeadHeaderBar({
             )}
           </div>
         </div>
-        <div className="min-w-0 border-l border-t border-slate-100 px-3 py-2 lg:border-t-0">
-          <div className="text-[8px] font-bold uppercase tracking-[0.12em] text-slate-400">{t("inbox.due")}</div>
+        <div className="min-w-0 border-l border-t border-line-soft px-3 py-2 lg:border-t-0">
+          <div className="text-[8px] font-bold uppercase tracking-[0.12em] text-faint">{t("inbox.due")}</div>
           <div className="mt-0.5 flex flex-wrap items-center gap-1">
             <span
               className={cn(
                 "inline-flex items-center gap-1 text-[11px] font-semibold",
-                overdue ? "text-[#b3261e]" : thread.nextStepDueAt ? "text-slate-700" : "text-slate-400",
+                overdue ? "text-[#b3261e]" : thread.nextStepDueAt ? "text-ink" : "text-faint",
               )}
               title={overdue ? t("inbox.overdue") : undefined}
             >
@@ -241,7 +241,7 @@ export function LeadHeaderBar({
                 const value = event.target.value ? new Date(event.target.value).getTime() : NaN;
                 if (Number.isFinite(value)) void save({ nextStepDueAt: value });
               }}
-              className="h-6 w-[26px] cursor-pointer rounded border border-slate-200 bg-white text-[10px] text-transparent"
+              className="h-6 w-[26px] cursor-pointer rounded border border-line bg-surface text-[10px] text-transparent"
               aria-label={t("inbox.due")}
             />
           </div>
@@ -255,7 +255,7 @@ export function LeadHeaderBar({
                 key={String(label)}
                 type="button"
                 onClick={() => void save({ nextStepDueAt: value })}
-                className="rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[9px] font-semibold text-slate-600 hover:border-slate-300"
+                className="rounded border border-line bg-surface px-1.5 py-0.5 text-[9px] font-semibold text-body hover:border-line"
               >
                 {label}
               </button>
@@ -264,7 +264,7 @@ export function LeadHeaderBar({
               <button
                 type="button"
                 onClick={() => void save({ clearNextStepDueAt: true })}
-                className="rounded px-1.5 py-0.5 text-[9px] font-semibold text-slate-400 hover:text-slate-700"
+                className="rounded px-1.5 py-0.5 text-[9px] font-semibold text-faint hover:text-ink"
               >
                 {t("inbox.clearDue")}
               </button>

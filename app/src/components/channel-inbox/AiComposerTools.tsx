@@ -30,7 +30,7 @@ export function AiComposerTools({ threadId, draft, onUse, disabled }: { threadId
     }
   }
 
-  const button = "inline-flex h-7 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-600 hover:border-[#2b4f8a] hover:text-[#2b4f8a] disabled:opacity-50";
+  const button = "inline-flex h-7 items-center gap-1 rounded-md border border-line bg-surface px-2 text-[11px] font-semibold text-body hover:border-[#2b4f8a] hover:text-[#2b4f8a] disabled:opacity-50";
   const hasDraft = draft.trim().length > 0;
 
   return (
@@ -48,11 +48,11 @@ export function AiComposerTools({ threadId, draft, onUse, disabled }: { threadId
           <div className="mb-1 flex items-center justify-between text-[10px] font-semibold uppercase tracking-[0.12em] text-amber-800">
             <span>{tr("Rascunho da IA · revê antes de enviar", "AI draft · review before sending")}</span>
             <span className="flex gap-2">
-              <button type="button" onClick={() => { onUse(result.text); setResult(null); }} className="rounded bg-[#0a1b33] px-2 py-0.5 text-[10px] font-bold text-white">{tr("Usar", "Use")}</button>
-              <button type="button" onClick={() => setResult(null)} className="text-[10px] font-bold text-slate-500">{tr("Descartar", "Discard")}</button>
+              <button type="button" onClick={() => { onUse(result.text); setResult(null); }} className="rounded bg-brand-solid px-2 py-0.5 text-[10px] font-bold text-white">{tr("Usar", "Use")}</button>
+              <button type="button" onClick={() => setResult(null)} className="text-[10px] font-bold text-muted">{tr("Descartar", "Discard")}</button>
             </span>
           </div>
-          <p className="whitespace-pre-wrap text-[12px] leading-5 text-[#0a1b33]">{result.text}</p>
+          <p className="whitespace-pre-wrap text-[12px] leading-5 text-ink">{result.text}</p>
           {result.flagged.length > 0 && <p className="mt-1 text-[10px] font-semibold text-[#b3261e]">{tr("Atenção: ", "Warning: ")}{result.flagged.map((f) => f.split(":")[0]).join(", ")} — {tr("corrija antes de enviar.", "fix before sending.")}</p>}
         </div>
       )}

@@ -25,12 +25,12 @@ export type Rates = {
 
 function Stat({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: "teal" | "blue" | "coral" | "amber" }) {
   const color =
-    tone === "teal" ? "text-[#0d6b61]" : tone === "blue" ? "text-[#2b4f8a]" : tone === "coral" ? "text-[#b3261e]" : tone === "amber" ? "text-amber-700" : "text-[#0a1b33]";
+    tone === "teal" ? "text-[#0d6b61]" : tone === "blue" ? "text-[#2b4f8a]" : tone === "coral" ? "text-[#b3261e]" : tone === "amber" ? "text-amber-700" : "text-ink";
   return (
-    <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5">
-      <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-slate-400">{label}</div>
+    <div className="rounded-lg border border-line bg-surface px-3 py-2.5">
+      <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-faint">{label}</div>
       <div className={`mt-1 font-[var(--font-outfit)] text-[20px] font-medium tracking-tight ${color}`}>{value}</div>
-      {sub && <div className="text-[11px] text-slate-500">{sub}</div>}
+      {sub && <div className="text-[11px] text-muted">{sub}</div>}
     </div>
   );
 }

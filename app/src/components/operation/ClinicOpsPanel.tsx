@@ -138,8 +138,8 @@ export function ClinicOpsPanel() {
 
   if (workspace === undefined) {
     return (
-      <section className="rounded-lg border border-slate-200 bg-white p-5">
-        <div className="flex items-center gap-2 text-sm text-slate-500">
+      <section className="rounded-lg border border-line bg-surface p-5">
+        <div className="flex items-center gap-2 text-sm text-muted">
           <Loader2 size={16} className="animate-spin" />
           {isPt ? "A carregar centro da clínica..." : "Loading clinic center..."}
         </div>
@@ -148,16 +148,16 @@ export function ClinicOpsPanel() {
   }
 
   return (
-    <section className="rounded-lg border border-slate-200 bg-white" id="clinic-center">
-      <div className="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
+    <section className="rounded-lg border border-line bg-surface" id="clinic-center">
+      <div className="flex flex-col gap-3 border-b border-line-soft px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-faint">
             {isPt ? "Centro da clínica" : "Clinic center"}
           </div>
-          <h2 className="mt-1 font-[var(--font-outfit)] text-xl font-medium text-[#0a1b33]">
+          <h2 className="mt-1 font-[var(--font-outfit)] text-xl font-medium text-ink">
             {isPt ? "Operação configurável em poucos cliques" : "Configurable operation in a few clicks"}
           </h2>
-          <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500">
+          <p className="mt-1 max-w-2xl text-sm leading-6 text-muted">
             {isPt
               ? "Serviços, fontes da IA, follow-ups e casos humanos ficam prontos para o atendimento agir sem improviso."
               : "Services, AI sources, follow-ups, and human cases stay ready for care without improvising."}
@@ -173,14 +173,14 @@ export function ClinicOpsPanel() {
             )
           }
           disabled={busy !== null}
-          className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#0a152d] px-3 text-sm font-semibold text-white hover:bg-[#0e1f41] disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-nav-active px-3 text-sm font-semibold text-white hover:bg-[#0e1f41] disabled:cursor-not-allowed disabled:opacity-60"
         >
           {busy === "bootstrap" ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}
           {isPt ? "Preparar operação" : "Prepare operation"}
         </button>
       </div>
 
-      <div className="border-b border-slate-100 px-5 py-4">
+      <div className="border-b border-line-soft px-5 py-4">
         <SegmentedTabs
           items={[
             {
@@ -277,14 +277,14 @@ export function ClinicOpsPanel() {
               )
             }
             disabled={busy !== null}
-            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-slate-200 px-3 text-sm font-semibold text-[#0a1b33] hover:bg-slate-50 disabled:opacity-60"
+            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-line px-3 text-sm font-semibold text-ink hover:bg-surface-2 disabled:opacity-60"
           >
             {busy === "service" ? <Loader2 size={14} className="animate-spin" /> : <CalendarPlus size={14} />}
             {isPt ? "Criar serviço" : "Create service"}
           </button>
 
-          <div className="mt-3 rounded-lg bg-[#f8fafc] p-3">
-            <div className="mb-2 text-xs font-semibold text-slate-500">{isPt ? "Marcar consulta" : "Book appointment"}</div>
+          <div className="mt-3 rounded-lg bg-surface-2 p-3">
+            <div className="mb-2 text-xs font-semibold text-muted">{isPt ? "Marcar consulta" : "Book appointment"}</div>
             <AppointmentScheduler
               mode={{ kind: "book", source: "operation" }}
               onDone={() => {
@@ -306,12 +306,12 @@ export function ClinicOpsPanel() {
           }
         >
           <div className="grid gap-3 sm:grid-cols-[150px_1fr]">
-            <label className="text-xs font-semibold text-slate-500">
+            <label className="text-xs font-semibold text-muted">
               {isPt ? "Tipo" : "Type"}
               <select
                 value={knowledgeKind}
                 onChange={(event) => setKnowledgeKind(event.target.value as KnowledgeKind)}
-                className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-[#0a1b33]"
+                className="mt-1 h-10 w-full rounded-lg border border-line bg-surface px-3 text-sm text-ink"
               >
                 {["faq", "service", "policy", "hours", "document", "instruction"].map((kind) => (
                   <option key={kind} value={kind}>
@@ -347,7 +347,7 @@ export function ClinicOpsPanel() {
               )
             }
             disabled={busy !== null}
-            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-slate-200 px-3 text-sm font-semibold text-[#0a1b33] hover:bg-slate-50 disabled:opacity-60"
+            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-line px-3 text-sm font-semibold text-ink hover:bg-surface-2 disabled:opacity-60"
           >
             {busy === "knowledge" ? <Loader2 size={14} className="animate-spin" /> : <BookOpenText size={14} />}
             {isPt ? "Adicionar conhecimento" : "Add knowledge"}
@@ -386,12 +386,12 @@ export function ClinicOpsPanel() {
               suffix="min"
             />
           </div>
-          <label className="text-xs font-semibold text-slate-500">
+          <label className="text-xs font-semibold text-muted">
             {isPt ? "Quando disparar" : "Trigger"}
             <select
               value={followTrigger}
               onChange={(event) => setFollowTrigger(event.target.value as FollowUpTrigger)}
-              className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-[#0a1b33]"
+              className="mt-1 h-10 w-full rounded-lg border border-line bg-surface px-3 text-sm text-ink"
             >
               {[
                 "no_reply",
@@ -435,7 +435,7 @@ export function ClinicOpsPanel() {
               )
             }
             disabled={busy !== null}
-            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-slate-200 px-3 text-sm font-semibold text-[#0a1b33] hover:bg-slate-50 disabled:opacity-60"
+            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-line px-3 text-sm font-semibold text-ink hover:bg-surface-2 disabled:opacity-60"
           >
             {busy === "follow" ? <Loader2 size={14} className="animate-spin" /> : <Clock3 size={14} />}
             {isPt ? "Criar follow-up" : "Create follow-up"}
@@ -472,12 +472,12 @@ export function ClinicOpsPanel() {
               value={caseReason}
               onChange={setCaseReason}
             />
-            <label className="text-xs font-semibold text-slate-500">
+            <label className="text-xs font-semibold text-muted">
               {isPt ? "Urgência" : "Urgency"}
               <select
                 value={caseUrgency}
                 onChange={(event) => setCaseUrgency(event.target.value as HumanUrgency)}
-                className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-[#0a1b33]"
+                className="mt-1 h-10 w-full rounded-lg border border-line bg-surface px-3 text-sm text-ink"
               >
                 {["low", "normal", "high", "urgent"].map((urgency) => (
                   <option key={urgency} value={urgency}>
@@ -510,7 +510,7 @@ export function ClinicOpsPanel() {
               )
             }
             disabled={busy !== null}
-            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-slate-200 px-3 text-sm font-semibold text-[#0a1b33] hover:bg-slate-50 disabled:opacity-60"
+            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-line px-3 text-sm font-semibold text-ink hover:bg-surface-2 disabled:opacity-60"
           >
             {busy === "case" ? <Loader2 size={14} className="animate-spin" /> : <LifeBuoy size={14} />}
             {isPt ? "Pedir ajuda humana" : "Ask human help"}
@@ -531,8 +531,8 @@ export function ClinicOpsPanel() {
         )}
       </div>
 
-      <div className="border-t border-slate-100 px-5 py-4">
-        <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+      <div className="border-t border-line-soft px-5 py-4">
+        <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
           <span
             className={`inline-flex h-7 items-center gap-1 rounded-full px-2.5 font-semibold ${
               readyCount === 3
@@ -566,14 +566,14 @@ function Panel({
   children: ReactNode;
 }) {
   return (
-    <div className="rounded-lg border border-slate-100 bg-[#fbfcfe] p-4">
+    <div className="rounded-lg border border-line-soft bg-[#fbfcfe] p-4">
       <div className="mb-4 flex items-start gap-3">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-[#0f766e] shadow-sm">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface text-[#0f766e] shadow-sm">
           <Icon size={17} />
         </span>
         <div>
-          <h3 className="text-sm font-semibold text-[#0a1b33]">{title}</h3>
-          <p className="mt-1 text-xs leading-5 text-slate-500">{description}</p>
+          <h3 className="text-sm font-semibold text-ink">{title}</h3>
+          <p className="mt-1 text-xs leading-5 text-muted">{description}</p>
         </div>
       </div>
       <div className="space-y-3">{children}</div>
@@ -593,13 +593,13 @@ function Input({
   placeholder?: string;
 }) {
   return (
-    <label className="block text-xs font-semibold text-slate-500">
+    <label className="block text-xs font-semibold text-muted">
       {label}
       <input
         value={value}
         placeholder={placeholder}
         onChange={(event) => onChange(event.target.value)}
-        className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-[#0a1b33] outline-none transition focus:border-[#0f766e]"
+        className="mt-1 h-10 w-full rounded-lg border border-line bg-surface px-3 text-sm text-ink outline-none transition focus:border-[#0f766e]"
       />
     </label>
   );
@@ -617,17 +617,17 @@ function NumberInput({
   suffix: string;
 }) {
   return (
-    <label className="block text-xs font-semibold text-slate-500">
+    <label className="block text-xs font-semibold text-muted">
       {label}
-      <div className="mt-1 flex h-10 items-center rounded-lg border border-slate-200 bg-white px-3 focus-within:border-[#0f766e]">
+      <div className="mt-1 flex h-10 items-center rounded-lg border border-line bg-surface px-3 focus-within:border-[#0f766e]">
         <input
           type="number"
           min={1}
           value={value}
           onChange={(event) => onChange(Number(event.target.value))}
-          className="min-w-0 flex-1 bg-transparent text-sm text-[#0a1b33] outline-none"
+          className="min-w-0 flex-1 bg-transparent text-sm text-ink outline-none"
         />
-        <span className="text-xs text-slate-400">{suffix}</span>
+        <span className="text-xs text-faint">{suffix}</span>
       </div>
     </label>
   );
@@ -643,13 +643,13 @@ function Textarea({
   onChange: (value: string) => void;
 }) {
   return (
-    <label className="block text-xs font-semibold text-slate-500">
+    <label className="block text-xs font-semibold text-muted">
       {label}
       <textarea
         value={value}
         onChange={(event) => onChange(event.target.value)}
         rows={3}
-        className="mt-1 w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm leading-5 text-[#0a1b33] outline-none transition focus:border-[#0f766e]"
+        className="mt-1 w-full resize-none rounded-lg border border-line bg-surface px-3 py-2 text-sm leading-5 text-ink outline-none transition focus:border-[#0f766e]"
       />
     </label>
   );
@@ -663,14 +663,14 @@ function MiniList({
   empty: string;
 }) {
   if (rows.length === 0) {
-    return <p className="rounded-lg bg-white px-3 py-2 text-xs text-slate-500">{empty}</p>;
+    return <p className="rounded-lg bg-surface px-3 py-2 text-xs text-muted">{empty}</p>;
   }
   return (
     <div className="space-y-2">
       {rows.map((row) => (
-        <div key={row.key} className="rounded-lg bg-white px-3 py-2">
-          <p className="truncate text-sm font-semibold text-[#0a1b33]">{row.title}</p>
-          <p className="mt-0.5 truncate text-xs text-slate-500">{row.detail}</p>
+        <div key={row.key} className="rounded-lg bg-surface px-3 py-2">
+          <p className="truncate text-sm font-semibold text-ink">{row.title}</p>
+          <p className="mt-0.5 truncate text-xs text-muted">{row.detail}</p>
         </div>
       ))}
     </div>

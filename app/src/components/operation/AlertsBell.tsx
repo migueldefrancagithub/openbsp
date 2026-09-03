@@ -31,7 +31,7 @@ export function AlertsBell() {
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
         title={tr("Avisos", "Alerts")}
-        className="relative flex h-11 w-11 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-[#0a1b33]"
+        className="relative flex h-11 w-11 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface-3 hover:text-ink"
       >
         <Bell size={18} />
         {count > 0 && (
@@ -46,18 +46,18 @@ export function AlertsBell() {
         )}
       </button>
       {open && (
-        <div className="absolute bottom-0 left-full z-40 ml-2 w-[360px] rounded-xl border border-slate-200 bg-white shadow-xl">
-          <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2">
-            <span className="text-[12px] font-semibold text-[#0a1b33]">{tr("Avisos abertos", "Open alerts")}</span>
+        <div className="absolute bottom-0 left-full z-40 ml-2 w-[360px] rounded-xl border border-line bg-surface shadow-xl">
+          <div className="flex items-center justify-between border-b border-line-soft px-3 py-2">
+            <span className="text-[12px] font-semibold text-ink">{tr("Avisos abertos", "Open alerts")}</span>
             <Link href="/app?tab=alerts" onClick={() => setOpen(false)} className="text-[11px] font-semibold text-[#2b4f8a] hover:underline">
               {tr("Ver todos", "See all")}
             </Link>
           </div>
-          <ul className="max-h-[60vh] divide-y divide-slate-100 overflow-y-auto">
+          <ul className="max-h-[60vh] divide-y divide-line-soft overflow-y-auto">
             {alerts === undefined ? (
-              <li className="px-3 py-6 text-center text-[12px] text-slate-400">…</li>
+              <li className="px-3 py-6 text-center text-[12px] text-faint">…</li>
             ) : alerts.length === 0 ? (
-              <li className="px-3 py-8 text-center text-[12px] text-slate-500">
+              <li className="px-3 py-8 text-center text-[12px] text-muted">
                 {tr("Nada precisa de você agora.", "Nothing needs you right now.")}
               </li>
             ) : (
@@ -67,9 +67,9 @@ export function AlertsBell() {
                     {severityLabel(alert.severity, locale)}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="text-[12px] font-medium text-[#0a1b33]">{alertLabel(alert.kind, locale)}</p>
-                    <p className="text-[11px] text-slate-500">{alert.title}</p>
-                    <p className="text-[10px] text-slate-400">{relativeTime(alert.createdAt, now, locale)}</p>
+                    <p className="text-[12px] font-medium text-ink">{alertLabel(alert.kind, locale)}</p>
+                    <p className="text-[11px] text-muted">{alert.title}</p>
+                    <p className="text-[10px] text-faint">{relativeTime(alert.createdAt, now, locale)}</p>
                     {alert.href && (
                       <Link href={alert.href} onClick={() => setOpen(false)} className="text-[11px] font-semibold text-[#2b4f8a] hover:underline">
                         {tr("Abrir", "Open")}
@@ -80,7 +80,7 @@ export function AlertsBell() {
                     type="button"
                     onClick={() => void acknowledge({ alertId: alert._id })}
                     title={tr("Marcar como visto", "Mark as seen")}
-                    className="mt-0.5 text-slate-400 hover:text-[#0d6b61]"
+                    className="mt-0.5 text-faint hover:text-[#0d6b61]"
                   >
                     <Check size={14} />
                   </button>
