@@ -13,6 +13,8 @@ import { setThreadAutomationMode } from "./lib/channels/automationControl";
 import { formatLocalDateTime, localDateOf } from "./lib/clinicTime";
 import { openHumanCaseInternal } from "./lib/humanCases";
 import { effectiveAiMode, type AiMode } from "./lib/ai/control";
+import { teamAvailability } from "./lib/escalation/availability";
+import { expectationInstruction, handoffNoticeText } from "./lib/escalation/handoffNotice";
 import { isWriteTool } from "./lib/ai/toolRegistry";
 import { upsertOpsAlert } from "./lib/opsAlerts";
 import { emitWebhookEvent } from "./lib/webhooks";
@@ -269,7 +271,18 @@ export const _loadTurnContext = internalQuery({
       turn,
       run,
       mode: turn.mode ?? "autopilot",
-      thread: { firstName: identity?.displayName?.trim().split(/\s+/)[0], leadStatus: thread.leadStatus, serviceWindowOpen: !!thread.serviceWindowExpiresAt && thread.serviceWindowExpiresAt > now },
+      // Read once per turn, here, instead of hoping the model calls a tool for
+      // it: what we may promise the patient is a fact of the tenant, not a
+      // choice of the model.
+      teamExpectation: expectationInstruction(await teamAvailability(ctx, turn.tenantId, now), "pt"),
+      thread: {
+        firstName: identity?.displayName?.trim().split(/\s+/)[0],
+        leadStatus: thread.leadStatus,
+        serviceWindowOpen: !!thread.serviceWindowExpiresAt && thread.serviceWindowExpiresAt > now,
+        // No accepted outbound yet means this is the clinic's first word to
+        // this person, and the reply has to say who is speaking.
+        firstOutbound: !thread.lastOutboundAt,
+      },
       agent: { name: agent.name, objective: agent.objective, config: version.config, knowledge: version.knowledgeSnapshot.map((k) => ({ kind: k.kind, title: k.title, body: k.body })), examples },
       settingsRow,
       clinic: {
@@ -409,8 +422,17 @@ export const _finishTurn = internalMutation({
       await ctx.db.patch(run._id, { status: "handed_off", pausedReason: r.handoff?.reason ?? r.reason, updatedAt: now });
       await recordThreadSystemEvent(ctx, { thread, kind: "ai.handoff", severity: "warning", actorType: "automation", payload: { turnId: turn._id, reason: r.handoff?.reason ?? r.reason }, dedupeKey: `aiturn:${turn._id}:handoff`, now });
       await emitWebhookEvent(ctx, { tenantId: turn.tenantId, type: "ai.handoff", eventId: `ai_turn:${turn._id}:handoff`, payload: { turnId: turn._id, threadId: thread._id, threadKey: thread.threadKey, reason: r.handoff?.reason ?? r.reason }, now });
-      if (r.text && thread.serviceWindowExpiresAt && thread.serviceWindowExpiresAt > now) {
-        await queueReply("handoff", { kind: "text", text: r.text });
+      // The notice is DETERMINISTIC and goes out before the AI goes quiet.
+      // Relying on the model having written a goodbye is how a patient ends up
+      // talking to nobody: the hand-off itself is what must speak.
+      const notice = handoffNoticeText({
+        reason: r.handoff?.reason ?? r.reason,
+        availability: await teamAvailability(ctx, turn.tenantId, now),
+        conversationKey: thread.threadKey,
+        locale: "pt",
+      });
+      if (thread.serviceWindowExpiresAt && thread.serviceWindowExpiresAt > now) {
+        await queueReply("handoff", { kind: "text", text: notice });
       } else {
         await ctx.db.patch(turn._id, { ...common, status: "completed", stage: "handoff", routerDecision: { intent: r.routerIntent, reason: r.reason, stages: r.stages }, completedAt: now });
       }
@@ -503,6 +525,7 @@ export const processTurn = internalAction({
         agent: context.agent,
         clinic: context.clinic,
         thread: context.thread,
+        teamExpectation: context.teamExpectation,
         history: context.history,
         inboundText: context.inboundText,
         hasMedia: context.hasMedia,
@@ -548,8 +571,9 @@ async function loadContextType() {
   return null as unknown as {
     turn: Doc<"aiTurns">;
     run: Doc<"aiRuns">;
-    thread: { firstName?: string; leadStatus?: string; serviceWindowOpen: boolean };
+    thread: { firstName?: string; leadStatus?: string; serviceWindowOpen: boolean; firstOutbound: boolean };
     mode: AiMode;
+    teamExpectation: string;
     agent: { name: string; objective: Doc<"aiAgents">["objective"]; config: Doc<"aiAgentVersions">["config"]; knowledge: Array<{ kind: string; title: string; body: string }>; examples: Array<{ patient: string; reply: string }> };
     settingsRow: Doc<"aiSettings"> | null;
     clinic: { clinicName: string; timeZone: string; localNow: string; services: Array<{ id: string; name: string; durationMinutes: number; professionalNames?: string[] }>; templates: Array<{ name: string; languageCode: string }>; allowedHosts: string[] };

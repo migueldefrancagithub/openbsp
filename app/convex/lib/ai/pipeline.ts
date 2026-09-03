@@ -1,5 +1,5 @@
 import type { ThreadIntent } from "../channels/intents";
-import { bookingFooter, clampReply, runGuards, type GuardViolation } from "./guards";
+import { applyDisclosure, bookingFooter, clampReply, runGuards, type GuardViolation } from "./guards";
 import { preroute, type PrerouteDecision } from "./prerouter";
 import { costUsdMicros } from "./pricing";
 import { buildRepairPrompt, buildRouterSystem, buildSpecialistSystem, ROUTE_TOOL_NAME, ROUTE_TOOL_SPEC, wrapPatientText, type SpecialistContext } from "./prompts";
@@ -31,7 +31,9 @@ export type PipelineInput = {
   settings: Pick<EffectiveAiSettings, "effort" | "extendedThinking" | "maxToolCallsPerTurn" | "replyLanguage">;
   agent: PipelineAgent;
   clinic: Pick<SpecialistContext, "clinicName" | "services" | "templates" | "localNow" | "timeZone"> & { allowedHosts: string[] };
-  thread: { firstName?: string; leadStatus?: string; serviceWindowOpen: boolean };
+  thread: { firstName?: string; leadStatus?: string; serviceWindowOpen: boolean; firstOutbound?: boolean };
+  /** Honest hand-off expectation, derived from real team availability. */
+  teamExpectation?: string;
   history: AiMessage[];
   inboundText: string;
   hasMedia?: boolean;
@@ -180,6 +182,7 @@ export async function runTurnPipeline(input: PipelineInput): Promise<PipelineRes
     handoffKeywords: input.agent.config.handoff.keywords,
     fallbackMessage: input.agent.config.fallbackMessage,
     examples: input.agent.examples,
+    teamExpectation: input.teamExpectation,
   });
   const tools = toolSpecsFor(input.agent.config.tools);
   const messages: AiMessage[] = [...input.history.slice(-HISTORY_LIMIT), { role: "user", content: wrapPatientText(inbound) }];
@@ -242,7 +245,17 @@ export async function runTurnPipeline(input: PipelineInput): Promise<PipelineRes
 
     text = response.response.text;
     if (response.response.finishReason === "length") text = clampReply(text);
-    const violations = runGuards({ text, verified: { booked: !!result.effects.booked, confirmed: !!result.effects.confirmed }, allowedHosts: input.clinic.allowedHosts });
+    text = applyDisclosure(text, {
+      firstOutbound: input.thread.firstOutbound,
+      clinicName: input.clinic.clinicName,
+      locale: input.settings.replyLanguage === "en" ? "en" : "pt",
+    });
+    const violations = runGuards({
+      text,
+      verified: { booked: !!result.effects.booked, confirmed: !!result.effects.confirmed },
+      allowedHosts: input.clinic.allowedHosts,
+      firstOutbound: input.thread.firstOutbound,
+    });
     if (violations.length === 0) break;
     result.violations.push(...violations.map((v: GuardViolation) => `${v.code}:${v.detail}`));
     if (!repaired) {

@@ -65,6 +65,14 @@ export const CONVEX_ERROR_MESSAGES: Record<string, Pair> = {
   SECRET_ENCRYPTION_NOT_CONFIGURED: ["A encriptação de segredos não está configurada nesta instalação.", "Secret encryption is not configured on this deployment."],
   HEALTHCARE_ADVICE: ["A resposta continha aconselhamento clínico e foi bloqueada.", "The reply contained clinical advice and was blocked."],
   UNVERIFIED_BOOKING: ["A resposta afirmava uma marcação que não foi feita e foi bloqueada.", "The reply claimed a booking that was not made and was blocked."],
+  DISCLOSURE_REQUIRED: [
+    "A primeira mensagem a um paciente novo tem de se apresentar como assistente virtual.",
+    "The first message to a new patient must introduce itself as a virtual assistant.",
+  ],
+  INTERNAL_VOCABULARY: [
+    "A resposta usava vocabulário interno do sistema e foi retida para correção.",
+    "The reply used internal system vocabulary and was held for correction.",
+  ],
   TOO_LONG: ["A resposta era demasiado longa e foi encurtada.", "The reply was too long and was shortened."],
   UNTRUSTED_LINK: ["A resposta continha um link não autorizado e foi bloqueada.", "The reply contained an unauthorised link and was blocked."],
   EMPTY: ["O modelo devolveu uma resposta vazia.", "The model returned an empty reply."],

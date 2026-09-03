@@ -43,6 +43,7 @@ import { HumanCaseChip } from "@/components/channel-inbox/HumanCaseChip";
 import { AiPresenceChip } from "@/components/channel-inbox/AiPresenceChip";
 import { AiComposerTools } from "@/components/channel-inbox/AiComposerTools";
 import { AiSuggestionCard } from "@/components/channel-inbox/AiSuggestionCard";
+import { RetentionNotice } from "@/components/channel-inbox/RetentionNotice";
 import { AiModeToggle } from "@/components/channel-inbox/AiModeToggle";
 import { SnoozeMenu } from "@/components/channel-inbox/SnoozeMenu";
 import {
@@ -1120,6 +1121,7 @@ export function ChannelThreadView({
             className="hidden"
           />
 
+          <RetentionNotice retention={threadOps?.retention} />
           {workspace?.role !== "marketing" && (
             <AiSuggestionCard
               threadId={summary._id}
@@ -1184,6 +1186,7 @@ export function ChannelThreadView({
                 </button>
                 <form onSubmit={submit} className="flex min-w-0 flex-1 items-center gap-1.5">
                 <textarea
+                  data-composer-input
                   ref={composerRef}
                   value={draft}
                   rows={1}

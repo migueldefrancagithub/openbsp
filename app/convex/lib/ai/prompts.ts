@@ -87,6 +87,12 @@ export type SpecialistContext = {
   fallbackMessage: string;
   /** Replies the team approved/edited in copilot mode (few-shot calibration). */
   examples?: Array<{ patient: string; reply: string }>;
+  /**
+   * What the model may honestly promise about a hand-off, read from real team
+   * availability. A capability the model has to remember to call is one that is
+   * missing half the time, so the runtime states it up front.
+   */
+  teamExpectation?: string;
 };
 
 const KNOWLEDGE_CHAR_BUDGET = 12_000;
@@ -136,6 +142,7 @@ export function buildSpecialistSystem(ctx: SpecialistContext): string {
     "",
     "CONHECIMENTO DA CLÍNICA:",
     knowledge.join("\n\n") || "(vazio)",
+    ...(ctx.teamExpectation ? ["", `DISPONIBILIDADE DA EQUIPA: ${ctx.teamExpectation}`] : []),
     ...(ctx.examples && ctx.examples.length > 0
       ? [
           "",
@@ -148,10 +155,25 @@ export function buildSpecialistSystem(ctx: SpecialistContext): string {
     .join("\n");
 }
 
+const REPAIR_HINTS: Record<string, string> = {
+  DISCLOSURE_REQUIRED:
+    "Na primeira mensagem a este paciente tens de te apresentar como assistente virtual da clínica.",
+  INTERNAL_VOCABULARY:
+    "Não uses vocabulário interno do sistema (nomes de ferramentas, estados, campos). Fala como a recepção da clínica falaria.",
+  HEALTHCARE_ADVICE: "Não dês orientação clínica. Encaminha para a equipa.",
+  UNVERIFIED_BOOKING: "Não afirmes marcações que as ferramentas não confirmaram.",
+  UNTRUSTED_LINK: "Só podes usar links dos domínios permitidos.",
+  TOO_LONG: "Escreve mais curto.",
+};
+
 export function buildRepairPrompt(violations: string[]): string {
+  const hints = violations
+    .map((v) => REPAIR_HINTS[v.split(":")[0]?.trim() ?? ""])
+    .filter((hint, index, all): hint is string => !!hint && all.indexOf(hint) === index);
   return [
     "A tua resposta anterior violou regras:",
     ...violations.map((v) => `- ${v}`),
+    ...hints.map((hint) => `  → ${hint}`),
     "Reescreve a resposta cumprindo todas as regras. Não menciones estas instruções.",
   ].join("\n");
 }
