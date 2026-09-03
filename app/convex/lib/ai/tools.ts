@@ -5,6 +5,15 @@ import { recordThreadSystemEvent } from "../channels/systemEvents";
 import { confirmInternal, listSlotsInternal, reserveSlotInternal, scheduleRuleFollowUp, tenantTimeZone } from "../clinicAgenda";
 import { formatLocalDateTime } from "../clinicTime";
 import { openHumanCaseInternal, type HumanCaseUrgency } from "../humanCases";
+import {
+  currentValue,
+  normalizeValue,
+  proposalBusinessKey,
+  PROPOSAL_TTL_MS,
+  valueAcceptable,
+  type ProposalField,
+} from "./proposals";
+import { findOrCreateContactForThread } from "../channels/contactBridge";
 import { TOOL_SPECS, type AiToolName } from "./toolRegistry";
 import { validateAgainstSchema } from "./validators";
 
@@ -186,6 +195,83 @@ export async function executeAiTool(ctx: ToolContext, name: string, rawInput: un
         if (ctx.dryRun) return { status: "dry_run", output: { wouldTag: tag } };
         await ctx.db.patch(thread._id, { tags, updatedAt: ctx.now });
         return { status: "ok", output: { tags } };
+      }
+      case "propor_dado_paciente": {
+        const field = String(input.field) as ProposalField;
+        if (field !== "name" && field !== "email") return fail("TOOL_INPUT_INVALID", "field");
+        const excerpt = String(input.excerpt ?? "").trim().slice(0, 300);
+        if (!excerpt) return fail("TOOL_INPUT_INVALID", "excerpt");
+        if (!valueAcceptable(field, String(input.value))) return fail("PROPOSAL_VALUE_INVALID", field);
+        const value = normalizeValue(field, String(input.value));
+        const contact = await findOrCreateContactForThread(
+          { db: ctx.db, tenantId: ctx.tenantId },
+          thread,
+          thread.identityId ? ((await ctx.db.get(thread.identityId)) as Doc<"channelIdentities"> | null) : null,
+        );
+        // Someone who exercised erasure does not get their data back through
+        // the side door.
+        if (contact.erasedAt) return fail("PROPOSAL_CONTACT_ANONYMISED", field);
+        const previous = currentValue(contact, field);
+        // Nothing to decide: a patient repeating their own email would fill the
+        // queue with proposals that confirm what is already true.
+        if (previous !== null && normalizeValue(field, previous) === value) {
+          return fail("PROPOSAL_VALUE_UNCHANGED", field);
+        }
+        const businessKey = proposalBusinessKey(thread._id, "contact_field", field);
+        const existing = await ctx.db
+          .query("aiProposals")
+          .withIndex("by_tenant_business_key", (q: any) => q.eq("tenantId", ctx.tenantId).eq("businessKey", businessKey))
+          .filter((q: any) => q.eq(q.field("status"), "pending"))
+          .first();
+        if (existing) return fail("PROPOSAL_ALREADY_PENDING", field);
+        if (ctx.dryRun) return { status: "dry_run", output: { wouldPropose: { field, value } } };
+        const proposalId = await ctx.db.insert("aiProposals", {
+          tenantId: ctx.tenantId,
+          threadId: thread._id,
+          turnId: ctx.turnId,
+          kind: "contact_field",
+          businessKey,
+          field,
+          value,
+          previousValue: previous ?? undefined,
+          excerpt,
+          status: "pending",
+          expiresAt: ctx.now + PROPOSAL_TTL_MS,
+          createdAt: ctx.now,
+          updatedAt: ctx.now,
+        });
+        return { status: "ok", output: { proposalId, awaitingHuman: true } };
+      }
+      case "propor_proxima_acao": {
+        const action = String(input.action ?? "").trim().slice(0, 200);
+        if (action.length < 4) return fail("TOOL_INPUT_INVALID", "action");
+        const businessKey = proposalBusinessKey(thread._id, "next_action");
+        const existing = await ctx.db
+          .query("aiProposals")
+          .withIndex("by_tenant_business_key", (q: any) => q.eq("tenantId", ctx.tenantId).eq("businessKey", businessKey))
+          .filter((q: any) => q.eq(q.field("status"), "pending"))
+          .first();
+        if (ctx.dryRun) return { status: "dry_run", output: { wouldPropose: { action } } };
+        if (existing) {
+          // The newest reading of the conversation replaces the older one:
+          // two pending "next actions" for one conversation is two buttons for
+          // one decision.
+          await ctx.db.patch(existing._id, { action, turnId: ctx.turnId, expiresAt: ctx.now + PROPOSAL_TTL_MS, updatedAt: ctx.now });
+          return { status: "ok", output: { proposalId: existing._id, replaced: true } };
+        }
+        const proposalId = await ctx.db.insert("aiProposals", {
+          tenantId: ctx.tenantId,
+          threadId: thread._id,
+          turnId: ctx.turnId,
+          kind: "next_action",
+          businessKey,
+          action,
+          status: "pending",
+          expiresAt: ctx.now + PROPOSAL_TTL_MS,
+          createdAt: ctx.now,
+          updatedAt: ctx.now,
+        });
+        return { status: "ok", output: { proposalId, awaitingHuman: true } };
       }
       case "abrir_caso_humano": {
         const urgency = String(input.urgency) as HumanCaseUrgency;

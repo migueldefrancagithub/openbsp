@@ -1164,6 +1164,45 @@ export default defineSchema({
     .index("by_thread_status", ["threadId", "status"])
     .index("by_tenant_created", ["tenantId", "createdAt"]),
 
+  /**
+   * What the AI heard and wants recorded, waiting for a person to decide.
+   *
+   * The AI proposes, a person confirms, and what nobody decides EXPIRES —
+   * a deadline nobody covers is worse than no deadline: it promises a limit
+   * that does not exist and the pending item becomes a permanent badge that
+   * simulates attention while postponing the decision.
+   */
+  aiProposals: defineTable({
+    tenantId: v.id("tenants"),
+    threadId: v.id("channelThreads"),
+    agentId: v.optional(v.id("aiAgents")),
+    turnId: v.optional(v.id("aiTurns")),
+    kind: v.union(v.literal("contact_field"), v.literal("next_action")),
+    /** One pending proposal per conversation + kind + field. */
+    businessKey: v.string(),
+    field: v.optional(v.union(v.literal("name"), v.literal("email"))),
+    value: v.optional(v.string()),
+    previousValue: v.optional(v.string()),
+    action: v.optional(v.string()),
+    /** What the patient wrote. Without it, confirming is an act of faith. */
+    excerpt: v.optional(v.string()),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("approved"),
+      v.literal("dismissed"),
+      v.literal("expired"),
+    ),
+    decidedBy: v.optional(v.id("members")),
+    decidedAt: v.optional(v.number()),
+    expiresAt: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_tenant_status", ["tenantId", "status", "createdAt"])
+    .index("by_thread_status", ["threadId", "status"])
+    .index("by_tenant_business_key", ["tenantId", "businessKey"])
+    .index("by_status_expires", ["status", "expiresAt"]),
+
   /** Every tool call the AI makes, with input/output and its verdict. */
   aiToolInvocations: defineTable({
     tenantId: v.id("tenants"),

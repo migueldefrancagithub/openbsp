@@ -28,6 +28,7 @@ import { relativeTime } from "@/lib/relativeTime";
 import { useI18n, type TranslationKey } from "@/lib/i18n";
 import { ClinicOpsPanel } from "@/components/operation/ClinicOpsPanel";
 import { OpsAlertsPanel } from "@/components/operation/OpsAlertsPanel";
+import { ProposalsPanel } from "@/components/operation/ProposalsPanel";
 import { TeamPresence } from "@/components/operation/TeamPresence";
 import { SegmentedTabs } from "@/components/app/SegmentedTabs";
 
@@ -225,6 +226,8 @@ export default function AppOverview() {
         </section>
 
         <OpsAlertsPanel compact />
+
+        <ProposalsPanel />
 
         <SegmentedTabs
           items={[

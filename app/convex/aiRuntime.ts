@@ -38,6 +38,25 @@ async function pickActiveAgent(ctx: { db: any }, tenantId: Id<"tenants">, channe
   return pool[0] ?? null;
 }
 
+/**
+ * The last next-action the team decided here. Feeding a dismissal back is what
+ * keeps "Ignorar" honest — otherwise the assistant re-proposes what was just
+ * refused, in the very next turn.
+ */
+async function lastProposalDecision(
+  ctx: { db: any },
+  threadId: Id<"channelThreads">,
+): Promise<{ action: string; decision: string } | null> {
+  const rows = (await ctx.db
+    .query("aiProposals")
+    .withIndex("by_thread_status", (q: any) => q.eq("threadId", threadId))
+    .take(20)) as Doc<"aiProposals">[];
+  const decided = rows
+    .filter((row) => row.kind === "next_action" && (row.status === "approved" || row.status === "dismissed"))
+    .sort((a, b) => (b.decidedAt ?? 0) - (a.decidedAt ?? 0))[0];
+  return decided?.action ? { action: decided.action, decision: decided.status } : null;
+}
+
 async function spentTodayMicros(ctx: { db: any }, tenantId: Id<"tenants">, day: string): Promise<number> {
   const rows = (await ctx.db
     .query("aiCostLedger")
@@ -276,6 +295,7 @@ export const _loadTurnContext = internalQuery({
       // it: what we may promise the patient is a fact of the tenant, not a
       // choice of the model.
       teamExpectation: expectationInstruction(await teamAvailability(ctx, turn.tenantId, now), "pt"),
+      lastDecision: await lastProposalDecision(ctx, thread._id),
       thread: {
         firstName: identity?.displayName?.trim().split(/\s+/)[0],
         leadStatus: thread.leadStatus,
@@ -604,6 +624,7 @@ export const processTurn = internalAction({
         clinic: context.clinic,
         thread: context.thread,
         teamExpectation: context.teamExpectation,
+        lastDecision: context.lastDecision ?? undefined,
         history: context.history,
         inboundText: context.inboundText,
         hasMedia: context.hasMedia,
@@ -653,6 +674,7 @@ async function loadContextType() {
     thread: { firstName?: string; leadStatus?: string; serviceWindowOpen: boolean; firstOutbound: boolean };
     mode: AiMode;
     teamExpectation: string;
+    lastDecision: { action: string; decision: string } | null;
     agent: { name: string; objective: Doc<"aiAgents">["objective"]; config: Doc<"aiAgentVersions">["config"]; knowledge: Array<{ kind: string; title: string; body: string }>; examples: Array<{ patient: string; reply: string }> };
     settingsRow: Doc<"aiSettings"> | null;
     clinic: { clinicName: string; timeZone: string; localNow: string; services: Array<{ id: string; name: string; durationMinutes: number; professionalNames?: string[] }>; templates: Array<{ name: string; languageCode: string }>; allowedHosts: string[] };

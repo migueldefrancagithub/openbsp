@@ -88,6 +88,12 @@ export type SpecialistContext = {
   /** Replies the team approved/edited in copilot mode (few-shot calibration). */
   examples?: Array<{ patient: string; reply: string }>;
   /**
+   * The last next-action the team approved or dismissed here. A dismissal that
+   * does not reach the prompt makes the "Ignorar" button a lie: the assistant
+   * proposes the same thing again in the next turn.
+   */
+  lastDecision?: { action: string; decision: string };
+  /**
    * What the model may honestly promise about a hand-off, read from real team
    * availability. A capability the model has to remember to call is one that is
    * missing half the time, so the runtime states it up front.
@@ -143,6 +149,14 @@ export function buildSpecialistSystem(ctx: SpecialistContext): string {
     "CONHECIMENTO DA CLÍNICA:",
     knowledge.join("\n\n") || "(vazio)",
     ...(ctx.teamExpectation ? ["", `DISPONIBILIDADE DA EQUIPA: ${ctx.teamExpectation}`] : []),
+    ...(ctx.lastDecision
+      ? [
+          "",
+          ctx.lastDecision.decision === "dismissed"
+            ? `DECISÃO DA EQUIPA: já recusaram esta próxima acção — "${ctx.lastDecision.action}". Não a proponhas outra vez nem uma reformulação dela.`
+            : `DECISÃO DA EQUIPA: já aprovaram esta próxima acção — "${ctx.lastDecision.action}". Apoia-a em vez de propor outra.`,
+        ]
+      : []),
     ...(ctx.examples && ctx.examples.length > 0
       ? [
           "",

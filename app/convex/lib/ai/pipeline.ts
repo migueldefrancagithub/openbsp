@@ -34,6 +34,8 @@ export type PipelineInput = {
   thread: { firstName?: string; leadStatus?: string; serviceWindowOpen: boolean; firstOutbound?: boolean };
   /** Honest hand-off expectation, derived from real team availability. */
   teamExpectation?: string;
+  /** The last next-action proposal the team decided on this conversation. */
+  lastDecision?: { action: string; decision: string };
   history: AiMessage[];
   inboundText: string;
   hasMedia?: boolean;
@@ -183,6 +185,7 @@ export async function runTurnPipeline(input: PipelineInput): Promise<PipelineRes
     fallbackMessage: input.agent.config.fallbackMessage,
     examples: input.agent.examples,
     teamExpectation: input.teamExpectation,
+    lastDecision: input.lastDecision,
   });
   const tools = toolSpecsFor(input.agent.config.tools);
   const messages: AiMessage[] = [...input.history.slice(-HISTORY_LIMIT), { role: "user", content: wrapPatientText(inbound) }];

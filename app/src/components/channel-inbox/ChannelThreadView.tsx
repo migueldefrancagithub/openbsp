@@ -44,6 +44,7 @@ import { AiPresenceChip } from "@/components/channel-inbox/AiPresenceChip";
 import { AiComposerTools } from "@/components/channel-inbox/AiComposerTools";
 import { AiSuggestionCard } from "@/components/channel-inbox/AiSuggestionCard";
 import { RetentionNotice } from "@/components/channel-inbox/RetentionNotice";
+import { ProposalsPanel } from "@/components/operation/ProposalsPanel";
 import { AiModeToggle } from "@/components/channel-inbox/AiModeToggle";
 import { SnoozeMenu } from "@/components/channel-inbox/SnoozeMenu";
 import {
@@ -1122,6 +1123,11 @@ export function ChannelThreadView({
           />
 
           <RetentionNotice retention={threadOps?.retention} />
+          {workspace?.role !== "marketing" && (
+            <div className="mb-2">
+              <ProposalsPanel threadId={summary._id} compact />
+            </div>
+          )}
           {workspace?.role !== "marketing" && (
             <AiSuggestionCard
               threadId={summary._id}

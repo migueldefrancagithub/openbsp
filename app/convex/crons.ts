@@ -78,6 +78,8 @@ crons.interval("ops sla breach sweep", { minutes: 5 }, internal.ops.sweepSlaBrea
 // Work that a person owes: suggestions awaiting approval, expired snoozes,
 // and replies the provider never took.
 crons.interval("ops pending work sweep", { minutes: 10 }, internal.ops.sweepPendingWork, {});
+// What nobody decides expires, and the expiry has a destination.
+crons.interval("ai proposal expiry", { hours: 1 }, internal.aiProposals.sweepExpired, {});
 
 // Reports: rebuild today + yesterday per tenant from index-bounded scans.
 crons.interval("analytics daily rollups", { hours: 1 }, internal.analyticsRollups.runHourly, {});

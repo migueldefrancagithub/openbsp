@@ -51,6 +51,8 @@ export const THREAD_SYSTEM_EVENT_KINDS = [
   "ai.mode_changed",
   /** The reply committed the clinic to something and nothing is carrying it. */
   "ai.promise_unowned",
+  "proposal.approved",
+  "proposal.dismissed",
 ] as const;
 
 export type ThreadSystemEventKind = (typeof THREAD_SYSTEM_EVENT_KINDS)[number];
