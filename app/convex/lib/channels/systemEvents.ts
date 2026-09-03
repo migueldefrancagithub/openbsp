@@ -39,6 +39,12 @@ export const THREAD_SYSTEM_EVENT_KINDS = [
   "followup.sent",
   "followup.failed",
   "followup.stopped",
+  "ai.replied",
+  "ai.handoff",
+  "ai.failed",
+  "ai.skipped",
+  "ai.paused",
+  "ai.resumed",
 ] as const;
 
 export type ThreadSystemEventKind = (typeof THREAD_SYSTEM_EVENT_KINDS)[number];

@@ -60,3 +60,32 @@ aplicar_tag, abrir_caso_humano (`openHumanCaseInternal`, pára a IA).
    passagem à equipa; "Pede pessoa" → `handoff/human_request`.
 3. Em produção (C4), o turno regista cada ferramenta com estado e duração em
    `aiToolInvocations`; repetir o mesmo passo devolve `replayed: true`.
+
+## C4 — Runtime (respostas reais)
+
+Fluxo: mensagem recebida → `channelAutomation.dispatchInbound` (sem fluxo por palavra-chave)
+→ `aiRuntime.claimTurn` (modo da conversa, caso humano, DND, allowlist do piloto, agente
+ativo publicado, orçamento diário, limites por conversa, coalescing) → `processTurn`
+(pré-router → router → especialista com ferramentas → guards → reparação → fallback)
+→ `_finishTurn` (ledger, caso humano em handoff/falha, `awaiting_send`) →
+`iaSolutionHub.dispatchOutboundJob({kind: ai_reply})` → `settleAiReply` (turno `completed`,
+evento "Agente IA respondeu"; falha de envio → conversa em modo humano + alerta).
+
+### Cron
+| Cron | Cadência | Função |
+|---|---|---|
+| ai stale turn sweep | 10 min | `aiRuntime:sweepStaleTurns` — turnos `processing` há >10 min → `failed/STALE_TURN`, próximo passo na conversa |
+
+### Verificações (número de teste na allowlist; agente publicado; provedor testado)
+1. Enviar "Quais são os horários?" → em segundos chega a resposta do agente; na
+   timeline "Agente IA respondeu"; Definições › IA mostra o custo no ledger (Relatórios em C5).
+2. "Quero marcar consulta" → o agente propõe horários reais (`consultar_agenda`) e, após
+   escolha, reserva (`reservar_slot`) com rodapé "📅 Marcado…"; a Agenda mostra a
+   marcação com origem IA.
+3. "Quero falar com uma pessoa" → resposta de passagem + caso humano aberto; a IA fica
+   `handed_off` e não volta a responder até o caso ser resolvido e a IA retomada.
+4. Responder manualmente do inbox → a IA pausa (`ai.paused`); "Retomar IA" (C5) reativa.
+5. Orçamento: pôr 0,01 USD em Definições › IA → próxima mensagem gera alerta
+   "Orçamento diário de IA esgotado" e a conversa fica para a equipa.
+6. Enviar 2 mensagens seguidas → uma resposta por mensagem, sem duplicados
+   (`aiTurns`: uma `completed`, outra `skipped/COALESCED` + `coalesce:` `completed`).

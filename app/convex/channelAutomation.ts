@@ -221,6 +221,10 @@ export const dispatchInbound = internalMutation({
       return { consumed: false };
     }
     if (!bot?.entryNodeKey || !bot.flowNodes?.length) {
+      // No keyword flow matched: the AI runtime decides (agent, caps, budget).
+      if (!bot && inbound.text) {
+        await ctx.scheduler.runAfter(0, internal.aiRuntime.claimTurn, { eventId: event._id });
+      }
       return { consumed: false };
     }
     const runId = await ctx.db.insert("channelAutomationRuns", {
@@ -317,6 +321,7 @@ export const pauseForHuman = internalMutation({
         dedupeKey: `run:${run._id}:paused`,
       });
     }
+    await pauseAiRunForHuman(ctx, thread, now);
     await setThreadMode(ctx, thread, "human", "human_operator_reply");
     return null;
   },
@@ -1197,6 +1202,35 @@ async function stopRun(
     sourceEventId: event._id,
     nodeKey: run.currentNodeKey,
     payload: { reason },
+  });
+}
+
+/** A human reply pauses the AI run and drops its queued turns (C5). */
+async function pauseAiRunForHuman(ctx: any, thread: Doc<"channelThreads">, now: number) {
+  const aiRun = await ctx.db
+    .query("aiRuns")
+    .withIndex("by_thread_status", (q: any) => q.eq("threadId", thread._id).eq("status", "active"))
+    .first();
+  if (!aiRun) return;
+  await ctx.db.patch(aiRun._id, { status: "paused", pausedReason: "human_operator_reply", updatedAt: now });
+  const queued = await ctx.db
+    .query("aiTurns")
+    .withIndex("by_run", (q: any) => q.eq("runId", aiRun._id))
+    .order("desc")
+    .take(5);
+  for (const turn of queued) {
+    if (turn.status === "queued" || turn.status === "awaiting_send") {
+      await ctx.db.patch(turn._id, { status: "skipped", failureCode: "HUMAN_TAKEOVER", updatedAt: now });
+    }
+  }
+  await recordThreadSystemEvent(ctx, {
+    thread,
+    kind: "ai.paused",
+    severity: "info",
+    code: "human_operator_reply",
+    actorType: "system",
+    dedupeKey: `airun:${aiRun._id}:paused:${now}`,
+    now,
   });
 }
 

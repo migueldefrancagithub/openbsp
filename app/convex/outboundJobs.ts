@@ -10,6 +10,7 @@ import {
   settleRecipientDispatch,
 } from "./lib/channelCampaignEngine";
 import { loadFollowUpDispatchTarget, settleFollowUpDispatch } from "./lib/followUpEngine";
+import { loadAiReplyTarget, settleAiReply } from "./lib/ai/runtime";
 
 /**
  * Router between `iaSolutionHub.dispatchOutboundJob` (the only place that
@@ -25,6 +26,8 @@ export const loadJob = internalQuery({
         return await loadRecipientDispatchTarget(ctx, args.job.recipientId);
       case "follow_up":
         return await loadFollowUpDispatchTarget(ctx, args.job.taskId);
+      case "ai_reply":
+        return await loadAiReplyTarget(ctx, args.job.turnId);
     }
   },
 });
@@ -52,6 +55,15 @@ export const settleJob = internalMutation({
       case "follow_up":
         await settleFollowUpDispatch(ctx, {
           taskId: args.job.taskId,
+          status: args.status,
+          outboxId: args.outboxId,
+          providerMessageId: args.providerMessageId,
+          failureReason: args.failureReason,
+        });
+        return null;
+      case "ai_reply":
+        await settleAiReply(ctx, {
+          turnId: args.job.turnId,
           status: args.status,
           outboxId: args.outboxId,
           providerMessageId: args.providerMessageId,

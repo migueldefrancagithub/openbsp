@@ -11,6 +11,7 @@
 import type * as ai from "../ai.js";
 import type * as aiAgents from "../aiAgents.js";
 import type * as aiProviders from "../aiProviders.js";
+import type * as aiRuntime from "../aiRuntime.js";
 import type * as aiSandbox from "../aiSandbox.js";
 import type * as aiSettings from "../aiSettings.js";
 import type * as aiTools from "../aiTools.js";
@@ -59,6 +60,7 @@ import type * as lib_ai_providers_google from "../lib/ai/providers/google.js";
 import type * as lib_ai_providers_mock from "../lib/ai/providers/mock.js";
 import type * as lib_ai_providers_openai from "../lib/ai/providers/openai.js";
 import type * as lib_ai_resilience from "../lib/ai/resilience.js";
+import type * as lib_ai_runtime from "../lib/ai/runtime.js";
 import type * as lib_ai_settings from "../lib/ai/settings.js";
 import type * as lib_ai_toolRegistry from "../lib/ai/toolRegistry.js";
 import type * as lib_ai_tools from "../lib/ai/tools.js";
@@ -127,6 +129,7 @@ declare const fullApi: ApiFromModules<{
   ai: typeof ai;
   aiAgents: typeof aiAgents;
   aiProviders: typeof aiProviders;
+  aiRuntime: typeof aiRuntime;
   aiSandbox: typeof aiSandbox;
   aiSettings: typeof aiSettings;
   aiTools: typeof aiTools;
@@ -175,6 +178,7 @@ declare const fullApi: ApiFromModules<{
   "lib/ai/providers/mock": typeof lib_ai_providers_mock;
   "lib/ai/providers/openai": typeof lib_ai_providers_openai;
   "lib/ai/resilience": typeof lib_ai_resilience;
+  "lib/ai/runtime": typeof lib_ai_runtime;
   "lib/ai/settings": typeof lib_ai_settings;
   "lib/ai/toolRegistry": typeof lib_ai_toolRegistry;
   "lib/ai/tools": typeof lib_ai_tools;

@@ -72,7 +72,12 @@ export type ResilienceOptions = {
   baseUrls?: Partial<Record<AiProviderId, string>>;
 };
 
-const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+let defaultSleep: (ms: number) => Promise<void> = (ms) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+/** Tests run under fake timers; they replace the backoff sleep with a no-op. */
+export function setDefaultSleep(sleep: ((ms: number) => Promise<void>) | null) {
+  defaultSleep = sleep ?? ((ms) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+}
 
 /**
  * Try the primary candidate (with bounded retries on transient failures),

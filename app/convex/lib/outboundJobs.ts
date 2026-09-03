@@ -15,6 +15,10 @@ export const outboundJobValidator = v.union(
     kind: v.literal("follow_up"),
     taskId: v.id("followUpTasks"),
   }),
+  v.object({
+    kind: v.literal("ai_reply"),
+    turnId: v.id("aiTurns"),
+  }),
 );
 
 export const outboundJobTargetValidator = v.object({

@@ -79,4 +79,7 @@ crons.interval("ops sla breach sweep", { minutes: 5 }, internal.ops.sweepSlaBrea
 // Reports: rebuild today + yesterday per tenant from index-bounded scans.
 crons.interval("analytics daily rollups", { hours: 1 }, internal.analyticsRollups.runHourly, {});
 
+// AI turns stuck in processing (action lost) are failed and the team notified.
+crons.interval("ai stale turn sweep", { minutes: 10 }, internal.aiRuntime.sweepStaleTurns, {});
+
 export default crons;

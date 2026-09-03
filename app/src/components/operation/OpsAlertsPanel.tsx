@@ -14,6 +14,8 @@ import { relativeTime } from "@/lib/relativeTime";
 function kindLabel(kind: string, locale: "pt" | "en"): string {
   const pt: Record<string, string> = {
     "campaign.auto_paused": "Campanha pausada",
+    "ai.provider_down": "IA sem resposta do provedor",
+    "ai.budget_exceeded": "Orçamento diário de IA esgotado",
     "campaign.unknown_delivery": "Campanha sem confirmação",
     "outbox.unknown": "Envios sem confirmação",
     "sla.human_case": "SLA de caso humano",
@@ -21,6 +23,8 @@ function kindLabel(kind: string, locale: "pt" | "en"): string {
   };
   const en: Record<string, string> = {
     "campaign.auto_paused": "Campaign paused",
+    "ai.provider_down": "AI provider not responding",
+    "ai.budget_exceeded": "Daily AI budget exhausted",
     "campaign.unknown_delivery": "Campaign unconfirmed",
     "outbox.unknown": "Unconfirmed sends",
     "sla.human_case": "Human case SLA",
