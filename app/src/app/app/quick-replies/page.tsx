@@ -183,7 +183,7 @@ export default function QuickRepliesPage() {
     !busy;
 
   return (
-    <div className="min-h-[calc(100vh-64px)] bg-[#f4f7fb] p-4 sm:p-6">
+    <div className="min-h-[calc(100vh-64px)] bg-background p-4 sm:p-6">
       <div className="mx-auto max-w-7xl space-y-4">
         <header className="flex flex-col gap-3 rounded-lg border border-line bg-surface px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex min-w-0 items-center gap-3">
@@ -327,7 +327,7 @@ export default function QuickRepliesPage() {
                     type="button"
                     onClick={handleDelete}
                     disabled={busy}
-                    className="inline-flex h-9 items-center gap-2 rounded-md border border-red-100 bg-red-50 px-3 text-sm font-semibold text-red-700 hover:bg-red-100 disabled:opacity-50"
+                    className="inline-flex h-9 items-center gap-2 rounded-md border border-chip-danger-fg/20 bg-chip-danger px-3 text-sm font-semibold text-chip-danger-fg hover:bg-red-100 disabled:opacity-50"
                   >
                     <Trash2 size={14} />
                     {tr("Eliminar", "Delete")}
@@ -420,7 +420,7 @@ export default function QuickRepliesPage() {
                   </span>
                 </div>
                 {error && (
-                  <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                  <div className="flex items-start gap-2 rounded-md border border-chip-danger-fg/25 bg-chip-danger px-3 py-2 text-sm text-chip-danger-fg">
                     <AlertCircle size={14} className="mt-0.5 shrink-0" />
                     {error}
                   </div>
@@ -458,7 +458,7 @@ function QuickReplyPreview({
   return (
     <aside className="rounded-lg border border-line bg-[#eef3f8] p-4">
       <div className="mb-3 flex items-center gap-2">
-        <span className="flex h-8 w-8 items-center justify-center rounded-md bg-emerald-50 text-emerald-700">
+        <span className="flex h-8 w-8 items-center justify-center rounded-md bg-chip-success text-chip-success-fg">
           <MessageSquare size={15} />
         </span>
         <div>

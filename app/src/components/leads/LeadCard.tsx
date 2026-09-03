@@ -81,13 +81,13 @@ export function LeadCard({
           </span>
         )}
         {lead.originCampaignName && (
-          <span className="inline-flex max-w-[140px] items-center gap-1 truncate rounded border border-[#cfe0f5] bg-[#eef4fc] px-1.5 py-0.5 text-[9px] font-semibold text-[#2b4f8a]" title={lead.originCampaignName}>
+          <span className="inline-flex max-w-[140px] items-center gap-1 truncate rounded border border-[#cfe0f5] bg-chip-info px-1.5 py-0.5 text-[9px] font-semibold text-chip-info-fg" title={lead.originCampaignName}>
             <Megaphone size={9} />
             <span className="truncate">{lead.originCampaignName}</span>
           </span>
         )}
         {lead.pilotBlocked && (
-          <span className="inline-flex items-center gap-1 rounded border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[9px] font-semibold text-amber-800">
+          <span className="inline-flex items-center gap-1 rounded border border-chip-warn-fg/25 bg-chip-warn px-1.5 py-0.5 text-[9px] font-semibold text-chip-warn-fg">
             <ShieldAlert size={9} />
             {t("inbox.pilotBlockedShort")}
           </span>
@@ -96,9 +96,9 @@ export function LeadCard({
           className={cn(
             "inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] font-bold",
             lead.command === "ai"
-              ? "bg-[#eef3fb] text-[#2b4f8a]"
+              ? "bg-chip-info text-chip-info-fg"
               : lead.command === "member"
-                ? "bg-[#edf8f6] text-[#0d6b61]"
+                ? "bg-chip-success text-chip-success-fg"
                 : "bg-surface-3 text-muted",
           )}
           title={
@@ -122,7 +122,7 @@ export function LeadCard({
         <div
           className={cn(
             "mt-2 inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[9px] font-bold",
-            lead.riskBucket === "critical" ? "bg-[#fdf1ef] text-[#b3261e]" : "bg-amber-50 text-amber-800",
+            lead.riskBucket === "critical" ? "bg-chip-danger text-chip-danger-fg" : "bg-chip-warn text-chip-warn-fg",
           )}
         >
           <ShieldAlert size={9} />
@@ -133,11 +133,11 @@ export function LeadCard({
       )}
       {lead.nextStep && (
         <div className="mt-2 flex items-start gap-1 text-[10px] text-body">
-          <Clock3 size={10} className={cn("mt-0.5 shrink-0", overdue ? "text-[#b3261e]" : "text-faint")} />
+          <Clock3 size={10} className={cn("mt-0.5 shrink-0", overdue ? "text-chip-danger-fg" : "text-faint")} />
           <span className="line-clamp-2">
             {lead.nextStep}
             {lead.nextStepDueAt && (
-              <span className={cn("ml-1", overdue ? "font-semibold text-[#b3261e]" : "text-faint")}>
+              <span className={cn("ml-1", overdue ? "font-semibold text-chip-danger-fg" : "text-faint")}>
                 · {relativeTime(lead.nextStepDueAt, now, locale)}
               </span>
             )}

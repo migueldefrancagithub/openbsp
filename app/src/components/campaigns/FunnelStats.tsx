@@ -25,7 +25,7 @@ export type Rates = {
 
 function Stat({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: "teal" | "blue" | "coral" | "amber" }) {
   const color =
-    tone === "teal" ? "text-[#0d6b61]" : tone === "blue" ? "text-[#2b4f8a]" : tone === "coral" ? "text-[#b3261e]" : tone === "amber" ? "text-amber-700" : "text-ink";
+    tone === "teal" ? "text-chip-success-fg" : tone === "blue" ? "text-chip-info-fg" : tone === "coral" ? "text-chip-danger-fg" : tone === "amber" ? "text-chip-warn-fg" : "text-ink";
   return (
     <div className="rounded-lg border border-line bg-surface px-3 py-2.5">
       <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-faint">{label}</div>

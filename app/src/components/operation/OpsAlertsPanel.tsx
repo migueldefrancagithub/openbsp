@@ -27,7 +27,7 @@ export function OpsAlertsPanel({ compact = false }: { compact?: boolean }) {
   if (alerts.length === 0) {
     if (compact) return null;
     return (
-      <div className="flex items-center gap-2 rounded-lg border border-[#0d6b61]/20 bg-[#edf8f6] px-4 py-3 text-[13px] text-[#0d6b61]">
+      <div className="flex items-center gap-2 rounded-lg border border-[#0d6b61]/20 bg-chip-success px-4 py-3 text-[13px] text-chip-success-fg">
         <Check size={14} /> {tr("Sem alertas operacionais.", "No operational alerts.")}
       </div>
     );
@@ -47,20 +47,20 @@ export function OpsAlertsPanel({ compact = false }: { compact?: boolean }) {
   }
 
   return (
-    <section className="overflow-hidden rounded-lg border border-amber-200 bg-surface">
-      <div className="flex items-center justify-between gap-2 border-b border-amber-100 bg-amber-50 px-4 py-2">
-        <div className="flex items-center gap-2 text-[13px] font-semibold text-amber-900">
+    <section className="overflow-hidden rounded-lg border border-chip-warn-fg/25 bg-surface">
+      <div className="flex items-center justify-between gap-2 border-b border-amber-100 bg-chip-warn px-4 py-2">
+        <div className="flex items-center gap-2 text-[13px] font-semibold text-chip-warn-fg">
           <BellRing size={14} /> {tr("Alertas", "Alerts")}
           <span className="rounded-full bg-amber-200 px-1.5 text-[11px]">{alerts.length}</span>
         </div>
-        {error && <span className="text-[11px] text-[#b3261e]">{error}</span>}
+        {error && <span className="text-[11px] text-chip-danger-fg">{error}</span>}
       </div>
       <ul className="divide-y divide-line-soft">
         {visible.map((alert) => {
           const critical = alert.severity === "critical";
           return (
             <li key={alert._id} className="flex items-start gap-3 px-4 py-2.5">
-              <span className={cn("mt-0.5 shrink-0", critical ? "text-[#b3261e]" : "text-amber-600")}>
+              <span className={cn("mt-0.5 shrink-0", critical ? "text-chip-danger-fg" : "text-amber-600")}>
                 {critical ? <ShieldAlert size={15} /> : <AlertTriangle size={15} />}
               </span>
               <div className="min-w-0 flex-1">
@@ -71,7 +71,7 @@ export function OpsAlertsPanel({ compact = false }: { compact?: boolean }) {
                 <p className="text-[12px] text-body">{alert.title}</p>
               </div>
               {alert.href && (
-                <Link href={alert.href} className="inline-flex h-8 items-center gap-1 rounded-md px-2 text-[12px] font-semibold text-[#2b4f8a] hover:bg-surface-2">
+                <Link href={alert.href} className="inline-flex h-8 items-center gap-1 rounded-md px-2 text-[12px] font-semibold text-chip-info-fg hover:bg-surface-2">
                   {tr("Abrir", "Open")} <ChevronRight size={13} />
                 </Link>
               )}

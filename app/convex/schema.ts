@@ -1610,6 +1610,8 @@ export default defineSchema({
     dueAt: v.number(),
     status: followUpTaskStatusValidator,
     attempts: v.number(),
+    /** How many times a claim went stale: the retry reuses the same nonce. */
+    staleReleases: v.optional(v.number()),
     lastAttemptAt: v.optional(v.number()),
     nextAttemptAt: v.optional(v.number()),
     stoppedReason: v.optional(v.string()),

@@ -218,7 +218,7 @@ export function IaSolutionHubSection() {
       </div>
 
       <div className="space-y-5 p-6">
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-800">
+        <div className="rounded-lg border border-chip-warn-fg/25 bg-chip-warn px-4 py-3 text-xs leading-5 text-chip-warn-fg">
           {tr(
             "A configuração bloqueia por padrão até o ID do canal, número e WABA autorizados serem validados no servidor. Os envios começam desativados e só entram em piloto após um ciclo de webhook assinado.",
             "Configuration remains default-deny until the authorized channel ID, phone number, and WABA are validated server-side. Outbound starts disabled and only enters pilot mode after a signed webhook round trip.",
@@ -293,7 +293,7 @@ export function IaSolutionHubSection() {
                           "Webhook secret generated and copied. Store it before saving.",
                         ));
                       }}
-                      className="text-[10px] font-medium text-emerald-700"
+                      className="text-[10px] font-medium text-chip-success-fg"
                     >
                       {tr("Gerar e copiar", "Generate & copy")}
                     </button>

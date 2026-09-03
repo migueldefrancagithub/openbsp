@@ -12,10 +12,10 @@ import { useI18n } from "@/lib/i18n";
 import { relativeTime } from "@/lib/relativeTime";
 
 function statusTone(status: string): string {
-  if (status === "completed") return "bg-[#edf8f6] text-[#0d6b61]";
-  if (status === "failed") return "bg-[#fdf1ef] text-[#b3261e]";
+  if (status === "completed") return "bg-chip-success text-chip-success-fg";
+  if (status === "failed") return "bg-chip-danger text-chip-danger-fg";
   if (status === "skipped") return "bg-surface-3 text-muted";
-  return "bg-amber-50 text-amber-800";
+  return "bg-chip-warn text-chip-warn-fg";
 }
 
 export function AgentRunsPanel({ agentId }: { agentId: Id<"aiAgents"> }) {
@@ -30,9 +30,9 @@ export function AgentRunsPanel({ agentId }: { agentId: Id<"aiAgents"> }) {
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-7">
           {[
             { label: tr("Turnos (7d)", "Turns (7d)"), value: String(stats.turns) },
-            { label: tr("Respondidos", "Replied"), value: String(stats.completed), tone: "text-[#0d6b61]" },
-            { label: tr("Passados à equipa", "Handed off"), value: String(stats.handoffs), tone: "text-[#2b4f8a]" },
-            { label: tr("Falhas", "Failures"), value: String(stats.failed), tone: stats.failed > 0 ? "text-[#b3261e]" : undefined },
+            { label: tr("Respondidos", "Replied"), value: String(stats.completed), tone: "text-chip-success-fg" },
+            { label: tr("Passados à equipa", "Handed off"), value: String(stats.handoffs), tone: "text-chip-info-fg" },
+            { label: tr("Falhas", "Failures"), value: String(stats.failed), tone: stats.failed > 0 ? "text-chip-danger-fg" : undefined },
             { label: tr("Ferramentas", "Tool calls"), value: String(stats.toolCalls) },
             { label: tr("Latência média", "Avg latency"), value: `${(stats.avgLatencyMs / 1000).toFixed(1)} s` },
             { label: tr("Custo (7d)", "Cost (7d)"), value: `$${(stats.costUsdMicros / 1_000_000).toFixed(3)}` },
@@ -59,7 +59,7 @@ export function AgentRunsPanel({ agentId }: { agentId: Id<"aiAgents"> }) {
                     <div className="flex flex-wrap items-center gap-1.5 text-[12px]">
                       <span className={cn("rounded-md px-1.5 py-0.5 text-[10px] font-semibold", statusTone(turn.status))}>{turn.status}{turn.stage ? ` · ${turn.stage}` : ""}</span>
                       {turn.routerIntent && <span className="text-[10px] text-faint">{turn.routerIntent}</span>}
-                      {turn.failureCode && <span className="text-[10px] text-[#b3261e]">{turn.failureCode}</span>}
+                      {turn.failureCode && <span className="text-[10px] text-chip-danger-fg">{turn.failureCode}</span>}
                       <span className="ml-auto text-[10px] text-faint">{relativeTime(turn.createdAt, now, locale)}</span>
                     </div>
                     <p className="mt-0.5 truncate text-[12px] text-ink">{turn.replyText ?? "—"}</p>
@@ -74,7 +74,7 @@ export function AgentRunsPanel({ agentId }: { agentId: Id<"aiAgents"> }) {
           </ul>
         )}
         {turns.status === "CanLoadMore" && (
-          <div className="border-t border-line-soft px-4 py-2"><button type="button" onClick={() => turns.loadMore(20)} className="text-[12px] font-semibold text-[#2b4f8a] hover:underline">{tr("Carregar mais", "Load more")}</button></div>
+          <div className="border-t border-line-soft px-4 py-2"><button type="button" onClick={() => turns.loadMore(20)} className="text-[12px] font-semibold text-chip-info-fg hover:underline">{tr("Carregar mais", "Load more")}</button></div>
         )}
       </div>
     </div>
@@ -90,13 +90,13 @@ function TurnDetail({ turnId, threadKey }: { turnId: Id<"aiTurns">; threadKey: s
         <ul className="space-y-1">
           {invocations.map((call) => (
             <li key={call._id} className="rounded-md border border-line-soft bg-surface px-2 py-1">
-              <span className={cn("font-semibold", call.status === "error" || call.status === "denied" ? "text-[#b3261e]" : "text-[#2b4f8a]")}>{toolLabel(call.name, locale)}</span> <span className="text-faint">{call.status}{call.errorCode ? ` · ${call.errorCode}` : ""} · {call.durationMs} ms</span>
+              <span className={cn("font-semibold", call.status === "error" || call.status === "denied" ? "text-chip-danger-fg" : "text-chip-info-fg")}>{toolLabel(call.name, locale)}</span> <span className="text-faint">{call.status}{call.errorCode ? ` · ${call.errorCode}` : ""} · {call.durationMs} ms</span>
               <pre className="mt-0.5 max-h-20 overflow-auto whitespace-pre-wrap text-[10px] text-muted">{JSON.stringify({ input: call.input, output: call.output }).slice(0, 500)}</pre>
             </li>
           ))}
         </ul>
       )}
-      <Link href={`/app/channel-inbox/${threadKey}`} className="mt-1 inline-block text-[11px] font-semibold text-[#2b4f8a] hover:underline">{tr("Abrir conversa", "Open conversation")}</Link>
+      <Link href={`/app/channel-inbox/${threadKey}`} className="mt-1 inline-block text-[11px] font-semibold text-chip-info-fg hover:underline">{tr("Abrir conversa", "Open conversation")}</Link>
     </div>
   );
 }

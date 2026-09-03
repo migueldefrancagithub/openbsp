@@ -32,16 +32,16 @@ const SCENARIOS: Record<string, string[]> = {
 };
 
 function outcomeTone(outcome: string): string {
-  if (outcome === "reply") return "bg-[#edf8f6] text-[#0d6b61]";
-  if (outcome === "handoff") return "bg-amber-50 text-amber-800";
-  if (outcome === "failed") return "bg-[#fdf1ef] text-[#b3261e]";
+  if (outcome === "reply") return "bg-chip-success text-chip-success-fg";
+  if (outcome === "handoff") return "bg-chip-warn text-chip-warn-fg";
+  if (outcome === "failed") return "bg-chip-danger text-chip-danger-fg";
   return "bg-surface-3 text-body";
 }
 
 function toolTone(status: string): string {
-  if (status === "ok") return "text-[#0d6b61]";
-  if (status === "dry_run") return "text-[#2b4f8a]";
-  return "text-[#b3261e]";
+  if (status === "ok") return "text-chip-success-fg";
+  if (status === "dry_run") return "text-chip-info-fg";
+  return "text-chip-danger-fg";
 }
 
 /**
@@ -121,7 +121,7 @@ export function AgentSandbox({ agentId }: { agentId: Id<"aiAgents"> }) {
                   {item.inbound}
                 </div>
                 {item.text ? (
-                  <div className="mr-auto max-w-[85%] rounded-2xl rounded-bl-sm bg-[#edf8f6] px-3 py-1.5 text-[12px] text-ink dark:bg-[#123029]">
+                  <div className="mr-auto max-w-[85%] rounded-2xl rounded-bl-sm bg-chip-success px-3 py-1.5 text-[12px] text-ink dark:bg-[#123029]">
                     {item.text}
                   </div>
                 ) : (
@@ -159,7 +159,7 @@ export function AgentSandbox({ agentId }: { agentId: Id<"aiAgents"> }) {
             </label>
             <span className="ml-auto text-[10px] text-faint">{tr("Nada é enviado.", "Nothing is sent.")}</span>
           </div>
-          {error && <p className="rounded-lg border border-[#e0533d]/30 bg-[#fdf1ef] px-3 py-2 text-[11px] text-[#b3261e]">{error}</p>}
+          {error && <p className="rounded-lg border border-[#e0533d]/30 bg-chip-danger px-3 py-2 text-[11px] text-chip-danger-fg">{error}</p>}
         </footer>
       </section>
 
@@ -200,7 +200,7 @@ export function AgentSandbox({ agentId }: { agentId: Id<"aiAgents"> }) {
                 <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.12em] text-faint">{tr("Provedores", "Providers")}</p>
                 <ul className="space-y-0.5">
                   {turn.attempts.map((attempt, index) => (
-                    <li key={index} className={cn("flex items-center justify-between gap-2 rounded-md bg-surface-2 px-2 py-1 text-[11px]", !attempt.ok && "text-[#b3261e]")}>
+                    <li key={index} className={cn("flex items-center justify-between gap-2 rounded-md bg-surface-2 px-2 py-1 text-[11px]", !attempt.ok && "text-chip-danger-fg")}>
                       <span className="truncate">
                         {attempt.provider}/{attempt.model} <span className="text-faint">· {attempt.stage}</span>
                       </span>
@@ -242,7 +242,7 @@ export function AgentSandbox({ agentId }: { agentId: Id<"aiAgents"> }) {
                   <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.12em] text-faint">{tr("Guards", "Guards")}</p>
                   <ul className="space-y-0.5">
                     {turn.violations.map((violation, index) => (
-                      <li key={index} className="rounded-md bg-[#fdf1ef] px-2 py-1 text-[11px] text-[#b3261e]">{violation}</li>
+                      <li key={index} className="rounded-md bg-chip-danger px-2 py-1 text-[11px] text-chip-danger-fg">{violation}</li>
                     ))}
                   </ul>
                 </div>

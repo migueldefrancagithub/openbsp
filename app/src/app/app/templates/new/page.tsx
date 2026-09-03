@@ -225,8 +225,8 @@ export default function NewTemplatePage() {
       <>
         <PageHeader eyebrow="Templates" title={tr("Novo template", "New template")} description="" />
         <div className="max-w-2xl px-4 py-5 sm:px-6">
-          <div className="space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-            <p className="font-semibold text-amber-900">
+          <div className="space-y-2 rounded-lg border border-chip-warn-fg/25 bg-chip-warn p-4 text-sm text-chip-warn-fg">
+            <p className="font-semibold text-chip-warn-fg">
               {tr(
                 "Criar templates aqui exige uma ligação WhatsApp direta (Meta).",
                 "Creating templates here requires a direct WhatsApp (Meta) connection.",
@@ -534,7 +534,7 @@ export default function NewTemplatePage() {
                       onClick={() =>
                         setButtons((prev) => prev.filter((_, i) => i !== index))
                       }
-                      className="flex h-10 w-10 items-center justify-center rounded-lg border border-line bg-surface text-muted transition-colors hover:text-red-600"
+                      className="flex h-10 w-10 items-center justify-center rounded-lg border border-line bg-surface text-muted transition-colors hover:text-chip-danger-fg"
                       title={tr("Remover botão", "Remove button")}
                     >
                       <Trash2 size={14} />
@@ -572,7 +572,7 @@ export default function NewTemplatePage() {
           )}
 
           {error && (
-            <div className="flex items-start gap-2 text-[12px] text-red-700 bg-red-50 border border-red-200 px-3 py-2 rounded-lg">
+            <div className="flex items-start gap-2 text-[12px] text-chip-danger-fg bg-chip-danger border border-chip-danger-fg/25 px-3 py-2 rounded-lg">
               <AlertCircle size={12} className="flex-shrink-0 mt-0.5" />
               <span>{error}</span>
             </div>

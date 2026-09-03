@@ -93,7 +93,7 @@ export default function AnalyticsPage() {
         <Tabs active={tab} onChange={(next) => setParam("tab", next)} />
       </header>
 
-      <div className="min-w-0 flex-1 bg-[#fafbfc] p-4 sm:p-6">
+      <div className="min-w-0 flex-1 bg-background p-4 sm:p-6">
         {loading ? (
           <LoadingState />
         ) : !report ? (

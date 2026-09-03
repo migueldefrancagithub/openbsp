@@ -200,9 +200,9 @@ type FlowRunRow = {
 };
 
 const STATUS_STYLES: Record<ChatbotStatus, string> = {
-  active: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  active: "border-chip-success-fg/25 bg-chip-success text-chip-success-fg",
   draft: "border-line bg-surface-2 text-body",
-  paused: "border-amber-200 bg-amber-50 text-amber-700",
+  paused: "border-chip-warn-fg/25 bg-chip-warn text-chip-warn-fg",
 };
 
 function pick(locale: Locale, pt: string, en: string) {
@@ -607,8 +607,8 @@ export default function ChatbotsPage() {
             <div
               className={`fixed left-1/2 top-4 z-50 -translate-x-1/2 rounded-lg border px-4 py-3 text-sm shadow-lg ${
                 error
-                  ? "border-red-200 bg-red-50 text-red-700"
-                  : "border-emerald-200 bg-emerald-50 text-emerald-700"
+                  ? "border-chip-danger-fg/25 bg-chip-danger text-chip-danger-fg"
+                  : "border-chip-success-fg/25 bg-chip-success text-chip-success-fg"
               }`}
             >
               {error ?? notice}
@@ -663,8 +663,8 @@ export default function ChatbotsPage() {
             <div
               className={`rounded-xl border px-4 py-3 text-sm ${
                 error
-                  ? "border-red-200 bg-red-50 text-red-700"
-                  : "border-emerald-200 bg-emerald-50 text-emerald-700"
+                  ? "border-chip-danger-fg/25 bg-chip-danger text-chip-danger-fg"
+                  : "border-chip-success-fg/25 bg-chip-success text-chip-success-fg"
               }`}
             >
               {error ?? notice}
@@ -778,11 +778,11 @@ export default function ChatbotsPage() {
                         onClick={() => setSelectedFolderId(folder._id)}
                         className={`flex min-h-20 items-center gap-3 rounded-lg border px-4 py-3 text-left transition-colors ${
                           active
-                            ? "border-emerald-300 bg-emerald-50"
-                            : "border-line bg-surface hover:border-emerald-200 hover:bg-surface-2"
+                            ? "border-emerald-300 bg-chip-success"
+                            : "border-line bg-surface hover:border-chip-success-fg/25 hover:bg-surface-2"
                         }`}
                       >
-                        <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
+                        <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-chip-success text-chip-success-fg">
                           <FolderPlus size={17} />
                         </span>
                         <span className="min-w-0 flex-1">
@@ -965,7 +965,7 @@ export default function ChatbotsPage() {
                       <div>
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex min-w-0 gap-3">
-                            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-white/70 bg-white/62 text-emerald-700 shadow-inner">
+                            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-white/70 bg-white/62 text-chip-success-fg shadow-inner">
                               <Bot size={19} />
                             </span>
                             <div className="min-w-0">
@@ -1053,7 +1053,7 @@ export default function ChatbotsPage() {
                               type="button"
                               onClick={() => setBotStatus(bot._id, "paused")}
                               disabled={busy !== null}
-                              className="inline-flex h-9 items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 text-sm font-medium text-amber-700 transition-colors hover:bg-amber-100 disabled:opacity-50"
+                              className="inline-flex h-9 items-center gap-2 rounded-lg border border-chip-warn-fg/25 bg-chip-warn px-3 text-sm font-medium text-chip-warn-fg transition-colors hover:bg-amber-100 disabled:opacity-50"
                             >
                               {busy === `status:${bot._id}` ? (
                                 <Loader2 size={14} className="animate-spin" />
@@ -1564,10 +1564,10 @@ function FlowBuilder({
           <span
             className={`hidden h-8 items-center gap-2 rounded-md px-3 text-xs font-semibold md:inline-flex ${
               errors.length > 0
-                ? "bg-red-50 text-red-700 ring-1 ring-red-200"
+                ? "bg-chip-danger text-chip-danger-fg ring-1 ring-red-200"
                 : warnings.length > 0
-                  ? "bg-amber-50 text-amber-700 ring-1 ring-amber-200"
-                  : "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"
+                  ? "bg-chip-warn text-chip-warn-fg ring-1 ring-amber-200"
+                  : "bg-chip-success text-chip-success-fg ring-1 ring-emerald-200"
             }`}
           >
             {errors.length > 0 ? (
@@ -1657,7 +1657,7 @@ function FlowBuilder({
                       onClick={() => handleAddStep(step.type)}
                       className="flex items-start gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-white/72"
                     >
-                      <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-emerald-100/80 bg-emerald-50/88 text-emerald-700 shadow-inner">
+                      <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-chip-success-fg/25 bg-chip-success text-chip-success-fg shadow-inner">
                         <Icon size={15} />
                       </span>
                       <span className="min-w-0">
@@ -2000,9 +2000,9 @@ function FlowCanvasStepNode({ data, selected }: NodeProps<FlowCanvasNode>) {
         <span
           className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border shadow-inner ${
             isEntry
-              ? "border-emerald-100/90 bg-emerald-50/92 text-emerald-700"
+              ? "border-chip-success-fg/25 bg-chip-success text-chip-success-fg"
               : hasError
-                ? "border-red-100/90 bg-red-50/92 text-red-700"
+                ? "border-chip-danger-fg/25 bg-chip-danger text-chip-danger-fg"
                 : "border-slate-100/90 bg-white/74 text-ink"
           }`}
         >
@@ -2014,7 +2014,7 @@ function FlowCanvasStepNode({ data, selected }: NodeProps<FlowCanvasNode>) {
               {flowNode.title}
             </span>
             {isEntry && (
-              <span className="rounded-full bg-emerald-100/90 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-emerald-700">
+              <span className="rounded-full bg-emerald-100/90 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-chip-success-fg">
                 {tr("Entrada", "Entry")}
               </span>
             )}
@@ -2027,8 +2027,8 @@ function FlowCanvasStepNode({ data, selected }: NodeProps<FlowCanvasNode>) {
           <span
             className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
               hasError
-                ? "bg-red-100 text-red-700"
-                : "bg-amber-100 text-amber-700"
+                ? "bg-red-100 text-chip-danger-fg"
+                : "bg-amber-100 text-chip-warn-fg"
             }`}
           >
             {issueCount}
@@ -2399,8 +2399,8 @@ function FlowInspectorPanel({
                     key={`${issue.message}-${issueIndex}`}
                     className={`rounded-md px-3 py-2 text-xs ${
                       issue.severity === "error"
-                        ? "bg-red-50 text-red-700"
-                        : "bg-amber-50 text-amber-700"
+                        ? "bg-chip-danger text-chip-danger-fg"
+                        : "bg-chip-warn text-chip-warn-fg"
                     }`}
                   >
                     {issue.message}
@@ -2489,7 +2489,7 @@ function ChoiceRowsEditor({
           choices.map((button, buttonIndex) => (
             <div key={`${button.replyId}-${buttonIndex}`} className="px-3 py-3">
               <div className="flex items-center gap-2">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-[11px] font-bold text-emerald-700">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-chip-success text-[11px] font-bold text-chip-success-fg">
                   {buttonIndex + 1}
                 </span>
                 <input
@@ -2514,7 +2514,7 @@ function ChoiceRowsEditor({
                       ),
                     })
                   }
-                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-line bg-surface text-faint transition-colors hover:bg-red-50 hover:text-red-600"
+                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-line bg-surface text-faint transition-colors hover:bg-chip-danger hover:text-chip-danger-fg"
                   aria-label={tr("Remover resposta rápida", "Remove quick reply")}
                 >
                   <Trash2 size={13} />
@@ -2599,7 +2599,7 @@ function WhatsAppFlowPreview({
       <div className="mx-auto max-w-[300px] 2xl:max-w-[332px]">
         <div className="mb-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-chip-success text-chip-success-fg">
               <Smartphone size={15} />
             </span>
             <div>
@@ -2688,7 +2688,7 @@ function PreviewBubble({ node }: { node: FlowNode }) {
   }
   if (node.type === "set_tag") {
     return (
-      <div className="rounded-lg border border-amber-200/40 bg-amber-50/95 px-3 py-2 text-xs leading-5 text-amber-900">
+      <div className="rounded-lg border border-chip-warn-fg/25 bg-chip-warn px-3 py-2 text-xs leading-5 text-chip-warn-fg">
         {tr("Etiqueta aplicada", "Tag set")}: {node.tag || "untitled_tag"}
       </div>
     );
@@ -2704,7 +2704,7 @@ function PreviewBubble({ node }: { node: FlowNode }) {
         </p>
       </div>
     ) : (
-      <div className="rounded-lg border border-amber-200/40 bg-amber-50/95 px-3 py-2 text-xs leading-5 text-amber-900">
+      <div className="rounded-lg border border-chip-warn-fg/25 bg-chip-warn px-3 py-2 text-xs leading-5 text-chip-warn-fg">
         {tr("Nenhum template selecionado", "No template selected")}
       </div>
     );
@@ -2761,7 +2761,7 @@ function FlowIssueDock({ issues }: { issues: FlowIssue[] }) {
       <div className="flex items-center gap-2">
         <span
           className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${
-            isError ? "bg-red-50 text-red-600" : "bg-amber-50 text-amber-600"
+            isError ? "bg-chip-danger text-chip-danger-fg" : "bg-chip-warn text-amber-600"
           }`}
         >
           <AlertTriangle size={14} />
@@ -2797,7 +2797,7 @@ function FlowValidationPanel({
   return (
     <section
       className={`rounded-lg border p-4 ${
-        clean ? "border-emerald-200 bg-emerald-50" : "border-red-200 bg-red-50"
+        clean ? "border-chip-success-fg/25 bg-chip-success" : "border-chip-danger-fg/25 bg-chip-danger"
       }`}
     >
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -2805,8 +2805,8 @@ function FlowValidationPanel({
           <span
             className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
               clean
-                ? "bg-emerald-100 text-emerald-700"
-                : "bg-red-100 text-red-700"
+                ? "bg-emerald-100 text-chip-success-fg"
+                : "bg-red-100 text-chip-danger-fg"
             }`}
           >
             {clean ? <CheckCircle2 size={17} /> : <AlertTriangle size={17} />}
@@ -2839,8 +2839,8 @@ function FlowValidationPanel({
                 key={`${issue.message}-${index}`}
                 className={`rounded-lg border px-3 py-2 text-xs ${
                   issue.severity === "error"
-                    ? "border-red-100 bg-surface text-red-800"
-                    : "border-amber-100 bg-surface text-amber-800"
+                    ? "border-chip-danger-fg/20 bg-surface text-red-800"
+                    : "border-amber-100 bg-surface text-chip-warn-fg"
                 }`}
               >
                 <span className="font-semibold uppercase">
@@ -2969,7 +2969,7 @@ function FlowMapPanel({
                       {node.title}
                     </span>
                     {node.key === entryNodeKey && (
-                      <span className="shrink-0 rounded bg-emerald-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-emerald-700">
+                      <span className="shrink-0 rounded bg-emerald-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-chip-success-fg">
                         {tr("Entrada", "Entry")}
                       </span>
                     )}
@@ -3327,8 +3327,8 @@ function FlowNodeCard({
               key={`${issue.message}-${issueIndex}`}
               className={`rounded-lg px-3 py-2 text-xs ${
                 issue.severity === "error"
-                  ? "bg-red-50 text-red-700"
-                  : "bg-amber-50 text-amber-700"
+                  ? "bg-chip-danger text-chip-danger-fg"
+                  : "bg-chip-warn text-chip-warn-fg"
               }`}
             >
               {issue.message}
@@ -3341,23 +3341,23 @@ function FlowNodeCard({
 }
 
 function runStatusClass(status: string) {
-  if (status === "active") return "border-emerald-200 bg-emerald-50 text-emerald-700";
-  if (status === "completed") return "border-sky-200 bg-sky-50 text-sky-700";
-  if (status === "handed_off") return "border-amber-200 bg-amber-50 text-amber-700";
+  if (status === "active") return "border-chip-success-fg/25 bg-chip-success text-chip-success-fg";
+  if (status === "completed") return "border-sky-200 bg-chip-info text-chip-info-fg";
+  if (status === "handed_off") return "border-chip-warn-fg/25 bg-chip-warn text-chip-warn-fg";
   if (status === "failed" || status === "timed_out") {
-    return "border-red-200 bg-red-50 text-red-700";
+    return "border-chip-danger-fg/25 bg-chip-danger text-chip-danger-fg";
   }
   return "border-line bg-surface-3 text-ink";
 }
 
 function eventStatusClass(eventType: string) {
-  if (eventType === "error" || eventType === "timeout") return "bg-red-100 text-red-700";
-  if (eventType === "handoff") return "bg-amber-100 text-amber-700";
+  if (eventType === "error" || eventType === "timeout") return "bg-red-100 text-chip-danger-fg";
+  if (eventType === "handoff") return "bg-amber-100 text-chip-warn-fg";
   if (eventType === "message_skipped" || eventType === "fallback_fired") {
     return "bg-orange-100 text-orange-700";
   }
-  if (eventType === "completed") return "bg-sky-100 text-sky-700";
-  if (eventType === "message_sent") return "bg-emerald-100 text-emerald-700";
+  if (eventType === "completed") return "bg-sky-100 text-chip-info-fg";
+  if (eventType === "message_sent") return "bg-emerald-100 text-chip-success-fg";
   return "bg-surface-3 text-body";
 }
 
@@ -3441,9 +3441,9 @@ function FlowRuntimePanel({ runs, loading }: { runs: FlowRunRow[]; loading: bool
 
       <div className="mt-4 grid gap-2 sm:grid-cols-3">
         {[
-          { label: tr("Ativas", "Active"), value: activeRuns, tone: "text-emerald-700" },
-          { label: tr("Concluídas", "Completed"), value: completedRuns, tone: "text-sky-700" },
-          { label: tr("Requer atenção", "Needs review"), value: attentionRuns, tone: "text-amber-700" },
+          { label: tr("Ativas", "Active"), value: activeRuns, tone: "text-chip-success-fg" },
+          { label: tr("Concluídas", "Completed"), value: completedRuns, tone: "text-chip-info-fg" },
+          { label: tr("Requer atenção", "Needs review"), value: attentionRuns, tone: "text-chip-warn-fg" },
         ].map((item) => (
           <div key={item.label} className="rounded-xl border border-line-soft bg-surface-2 px-3 py-2">
             <p className="text-[11px] font-semibold uppercase text-faint">
@@ -3656,7 +3656,7 @@ function SendTemplateConfig({
 
   if (templates && approved.length === 0) {
     return (
-      <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-[12px] text-amber-800">
+      <div className="mt-3 rounded-lg border border-chip-warn-fg/25 bg-chip-warn p-3 text-[12px] text-chip-warn-fg">
         {tr(
           "Ainda não há templates aprovados. Crie e submeta um em",
           "No approved templates yet. Create and submit one in",

@@ -45,11 +45,11 @@ export function PilotBanner({
   }
 
   return (
-    <div className="flex items-start gap-2.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5" data-pilot-banner>
+    <div className="flex items-start gap-2.5 rounded-lg border border-chip-warn-fg/25 bg-chip-warn px-3 py-2.5" data-pilot-banner>
       <ShieldAlert size={15} className="mt-0.5 shrink-0 text-amber-600" />
       <div className="min-w-0 flex-1">
-        <div className="text-[12px] font-semibold text-amber-900">{t("inbox.pilotTitle")}</div>
-        <div className="mt-0.5 text-[11px] leading-relaxed text-amber-800">{t("inbox.pilotDetail")}</div>
+        <div className="text-[12px] font-semibold text-chip-warn-fg">{t("inbox.pilotTitle")}</div>
+        <div className="mt-0.5 text-[11px] leading-relaxed text-chip-warn-fg">{t("inbox.pilotDetail")}</div>
         <div className="mt-2 flex flex-wrap items-center gap-2">
           {canEditAllowlist ? (
             <Link
@@ -74,12 +74,12 @@ export function PilotBanner({
             <button
               type="button"
               onClick={onHandoff}
-              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-amber-300 bg-surface px-3 text-[11px] font-semibold text-amber-900 hover:bg-amber-100"
+              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-amber-300 bg-surface px-3 text-[11px] font-semibold text-chip-warn-fg hover:bg-amber-100"
             >
               {t("handoff.button")}
             </button>
           )}
-          {notice && <span className="text-[11px] text-amber-900">{notice}</span>}
+          {notice && <span className="text-[11px] text-chip-warn-fg">{notice}</span>}
         </div>
       </div>
     </div>

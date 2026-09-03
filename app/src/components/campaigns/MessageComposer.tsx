@@ -150,7 +150,7 @@ export function MessageComposer({
                 ))}
               </select>
               {templates !== undefined && templates.length === 0 && (
-                <p className="mt-1.5 text-[11px] text-amber-700">
+                <p className="mt-1.5 text-[11px] text-chip-warn-fg">
                   {tr("Nenhum template aprovado neste canal. Sincronize em Templates.", "No approved template on this channel. Sync in Templates.")}
                 </p>
               )}
@@ -211,7 +211,7 @@ export function MessageComposer({
               <span>{draft.text.length}/4096</span>
             </div>
             {serviceWindowHint !== undefined && serviceWindowHint > 0 && (
-              <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-800">
+              <p className="mt-2 rounded-lg border border-chip-warn-fg/25 bg-chip-warn px-3 py-2 text-[12px] text-chip-warn-fg">
                 {tr(
                   `${serviceWindowHint} conversa(s) do público estão fora da janela de 24h e ficarão bloqueadas. Use um template para as alcançar.`,
                   `${serviceWindowHint} conversation(s) in the audience are outside the 24h window and will be blocked. Use a template to reach them.`,

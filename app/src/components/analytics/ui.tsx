@@ -73,10 +73,10 @@ export function RiskBadge({
   }
   const tone =
     risk === "low"
-      ? "text-emerald-700"
+      ? "text-chip-success-fg"
       : risk === "watch"
-        ? "text-amber-700"
-        : "text-red-700";
+        ? "text-chip-warn-fg"
+        : "text-chip-danger-fg";
   const dot =
     risk === "low"
       ? "bg-emerald-500"

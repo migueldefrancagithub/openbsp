@@ -228,9 +228,9 @@ export function AudienceBuilder({
         ) : (
           <>
             <div className="grid grid-cols-2 gap-2">
-              <div className="rounded-lg border border-[#0d6b61]/30 bg-[#edf8f6] px-3 py-2">
-                <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-[#0d6b61]">{tr("Elegíveis", "Eligible")}</div>
-                <div className="font-[var(--font-outfit)] text-[24px] font-medium text-[#0d6b61]">{preview.eligible}</div>
+              <div className="rounded-lg border border-[#0d6b61]/30 bg-chip-success px-3 py-2">
+                <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-chip-success-fg">{tr("Elegíveis", "Eligible")}</div>
+                <div className="font-[var(--font-outfit)] text-[24px] font-medium text-chip-success-fg">{preview.eligible}</div>
               </div>
               <div className="rounded-lg border border-line bg-surface-2 px-3 py-2">
                 <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-faint">{tr("Encontradas", "Matched")}</div>
@@ -241,7 +241,7 @@ export function AudienceBuilder({
               </div>
             </div>
             {!preview.pilotReady && (
-              <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-800">
+              <div className="flex items-start gap-2 rounded-lg border border-chip-warn-fg/25 bg-chip-warn px-3 py-2 text-[12px] text-chip-warn-fg">
                 <ShieldAlert size={14} className="mt-0.5 shrink-0" />
                 {tr(
                   "O canal não está pronto para envios (kill switch do piloto). Pode preparar a campanha, mas o lançamento fica bloqueado.",
@@ -260,7 +260,7 @@ export function AudienceBuilder({
                 </li>
               ))}
               {preview.matched > 0 && preview.eligible === preview.matched && (
-                <li className="flex items-center gap-1.5 text-[#0d6b61]">
+                <li className="flex items-center gap-1.5 text-chip-success-fg">
                   <CheckCircle2 size={12} /> {tr("Nenhum bloqueio.", "Nothing blocked.")}
                 </li>
               )}
@@ -270,7 +270,7 @@ export function AudienceBuilder({
                 <button
                   type="button"
                   onClick={() => setShowSample((v) => !v)}
-                  className="text-[12px] font-semibold text-[#2b4f8a] hover:underline"
+                  className="text-[12px] font-semibold text-chip-info-fg hover:underline"
                 >
                   {showSample ? tr("Esconder amostra", "Hide sample") : tr("Ver amostra", "Show sample")}
                 </button>
@@ -279,7 +279,7 @@ export function AudienceBuilder({
                     {preview.sample.map((row) => (
                       <li key={row.threadId} className="flex items-center justify-between gap-2 px-2.5 py-1.5 text-[12px]">
                         <span className="min-w-0 truncate text-ink">{row.label}</span>
-                        <span className={cn("shrink-0 text-[11px]", row.blocked ? "text-amber-700" : "text-[#0d6b61]")}>
+                        <span className={cn("shrink-0 text-[11px]", row.blocked ? "text-chip-warn-fg" : "text-chip-success-fg")}>
                           {row.blocked ? blockReasonLabel(row.blocked, locale) : leadStatusLabel(row.leadStatus, locale)}
                         </span>
                       </li>

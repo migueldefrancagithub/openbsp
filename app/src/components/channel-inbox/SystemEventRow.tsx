@@ -52,9 +52,9 @@ export function SystemEventRow({ item }: { item: TimelineSystemItem }) {
         className={cn(
           "flex max-w-[520px] items-start gap-2 rounded-lg border px-3 py-1.5 text-[11px] leading-4",
           item.severity === "error"
-            ? "border-[#f5c2b8] bg-[#fff1ee] text-[#8a2a1b]"
+            ? "border-[#f5c2b8] bg-chip-danger text-chip-danger-fg"
             : item.severity === "warning"
-              ? "border-amber-200 bg-amber-50 text-amber-900"
+              ? "border-chip-warn-fg/25 bg-chip-warn text-chip-warn-fg"
               : "border-line bg-surface text-body",
         )}
       >

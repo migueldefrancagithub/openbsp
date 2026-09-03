@@ -87,7 +87,7 @@ export function HandoffDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 p-0 sm:items-center sm:p-4"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-scrim p-0 sm:items-center sm:p-4"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
@@ -101,7 +101,7 @@ export function HandoffDialog({
       >
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-2.5">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-50 text-amber-700">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-chip-warn text-chip-warn-fg">
               <UsersRound size={17} />
             </span>
             <div>
@@ -170,7 +170,7 @@ export function HandoffDialog({
                   "h-9 rounded-md border px-2 text-[11px] font-semibold transition-colors",
                   urgency === value
                     ? value === "urgent"
-                      ? "border-[#e0533d] bg-[#fff1ee] text-[#8a2a1b]"
+                      ? "border-[#e0533d] bg-chip-danger text-chip-danger-fg"
                       : "border-brand-solid bg-brand-solid text-white"
                     : "border-line bg-surface text-body hover:border-line",
                 )}
@@ -193,7 +193,7 @@ export function HandoffDialog({
           />
         </label>
 
-        {error && <div className="mt-2 text-[11px] text-[#b3261e]">{error}</div>}
+        {error && <div className="mt-2 text-[11px] text-chip-danger-fg">{error}</div>}
 
         <div className="mt-4 flex items-center justify-end gap-2">
           <button type="button" onClick={onClose} className="h-9 rounded-md px-3 text-[12px] font-semibold text-muted hover:bg-surface-3">

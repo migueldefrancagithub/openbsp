@@ -30,16 +30,16 @@ type Props = { params: Promise<{ id: string }> };
 
 const STATUS_STYLES: Record<string, string> = {
   draft: "bg-surface-3 text-body border-line",
-  pending: "bg-amber-50 text-amber-700 border-amber-200",
-  approved: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  rejected: "bg-red-50 text-red-700 border-red-200",
+  pending: "bg-chip-warn text-chip-warn-fg border-chip-warn-fg/25",
+  approved: "bg-chip-success text-chip-success-fg border-chip-success-fg/25",
+  rejected: "bg-chip-danger text-chip-danger-fg border-chip-danger-fg/25",
   paused: "bg-surface-3 text-muted border-line",
   disabled: "bg-surface-3 text-faint border-line",
 };
 
 function StatusIcon({ status }: { status: string }) {
   if (status === "approved") return <CheckCircle2 size={14} className="text-emerald-600" />;
-  if (status === "rejected") return <XCircle size={14} className="text-red-600" />;
+  if (status === "rejected") return <XCircle size={14} className="text-chip-danger-fg" />;
   if (status === "pending") return <Clock size={14} className="text-amber-600" />;
   return <span className="w-3 h-3 rounded-full bg-faint/50" />;
 }
@@ -116,13 +116,13 @@ export default function TemplateDetailPage({ params }: Props) {
         <div className="space-y-6">
         <section className="rounded-lg border border-line bg-surface p-5">
           {submissionNotice === "submitted" && (
-            <div className="mb-4 flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[12px] text-emerald-700">
+            <div className="mb-4 flex items-start gap-2 rounded-lg border border-chip-success-fg/25 bg-chip-success px-3 py-2 text-[12px] text-chip-success-fg">
               <CheckCircle2 size={12} className="mt-0.5 flex-shrink-0" />
               <span>{tr("Template criado e submetido à Meta.", "Template created and submitted to Meta.")}</span>
             </div>
           )}
           {submissionNotice === "draft_saved" && (
-            <div className="mb-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-800">
+            <div className="mb-4 flex items-start gap-2 rounded-lg border border-chip-warn-fg/25 bg-chip-warn px-3 py-2 text-[12px] text-chip-warn-fg">
               <AlertCircle size={12} className="mt-0.5 flex-shrink-0" />
               <span>
                 {tr("Rascunho guardado, mas a Meta não aceitou a submissão", "Draft saved, but Meta did not accept the submission")}
@@ -169,19 +169,19 @@ export default function TemplateDetailPage({ params }: Props) {
             )}
           </div>
           {tpl.rejectionReason && (
-            <div className="mt-3 flex items-start gap-2 text-[12px] text-red-700 bg-red-50 border border-red-200 px-3 py-2 rounded-lg">
+            <div className="mt-3 flex items-start gap-2 text-[12px] text-chip-danger-fg bg-chip-danger border border-chip-danger-fg/25 px-3 py-2 rounded-lg">
               <AlertCircle size={12} className="flex-shrink-0 mt-0.5" />
               <span>{tpl.rejectionReason}</span>
             </div>
           )}
           {error && (
-            <div className="mt-3 flex items-start gap-2 text-[12px] text-red-700 bg-red-50 border border-red-200 px-3 py-2 rounded-lg">
+            <div className="mt-3 flex items-start gap-2 text-[12px] text-chip-danger-fg bg-chip-danger border border-chip-danger-fg/25 px-3 py-2 rounded-lg">
               <AlertCircle size={12} className="flex-shrink-0 mt-0.5" />
               <span>{error}</span>
             </div>
           )}
           {success && (
-            <div className="mt-3 flex items-start gap-2 text-[12px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-2 rounded-lg">
+            <div className="mt-3 flex items-start gap-2 text-[12px] text-chip-success-fg bg-chip-success border border-chip-success-fg/25 px-3 py-2 rounded-lg">
               <CheckCircle2 size={12} className="flex-shrink-0 mt-0.5" />
               <span>{success}</span>
             </div>
@@ -227,7 +227,7 @@ export default function TemplateDetailPage({ params }: Props) {
               <pre className="bg-surface-2 border border-line-soft rounded-lg p-3 text-[13px] text-ink whitespace-pre-wrap font-mono">
                 {currentVersion.bodyText}
               </pre>
-              <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-3 text-[13px] leading-6 text-emerald-800">
+              <div className="rounded-lg border border-emerald-100 bg-chip-success p-3 text-[13px] leading-6 text-chip-success-fg">
                 <span className="font-semibold">{tr("Resultado com exemplos:", "Rendered with examples:")}</span>{" "}
                 {renderTemplateText(
                   currentVersion.bodyText,
@@ -418,9 +418,9 @@ function categoryLabel(category: string, locale: Locale) {
 }
 
 function readinessClass(tone: "good" | "warn" | "bad") {
-  if (tone === "good") return "border-emerald-100 bg-emerald-50 text-emerald-800";
-  if (tone === "warn") return "border-amber-100 bg-amber-50 text-amber-900";
-  return "border-red-100 bg-red-50 text-red-800";
+  if (tone === "good") return "border-emerald-100 bg-chip-success text-chip-success-fg";
+  if (tone === "warn") return "border-amber-100 bg-chip-warn text-chip-warn-fg";
+  return "border-chip-danger-fg/20 bg-chip-danger text-red-800";
 }
 
 function examplesFromSchema(

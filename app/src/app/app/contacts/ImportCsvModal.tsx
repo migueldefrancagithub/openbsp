@@ -279,8 +279,8 @@ export function ImportCsvModal({ onClose, onImport }: Props) {
                     </span>
                   </div>
                   {parseErrors.length > 0 && (
-                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
-                      <div className="flex items-center gap-2 text-[12px] font-medium text-amber-800 mb-1.5">
+                    <div className="rounded-lg border border-chip-warn-fg/25 bg-chip-warn p-3">
+                      <div className="flex items-center gap-2 text-[12px] font-medium text-chip-warn-fg mb-1.5">
                         <AlertCircle size={14} />
                         {parseErrors.length}{" "}
                         {locale === "pt"
@@ -291,7 +291,7 @@ export function ImportCsvModal({ onClose, onImport }: Props) {
                             ? "parse issue"
                             : "parse issues"}
                       </div>
-                      <ul className="text-[11px] text-amber-700 space-y-0.5 max-h-32 overflow-y-auto font-[var(--font-mono)]">
+                      <ul className="text-[11px] text-chip-warn-fg space-y-0.5 max-h-32 overflow-y-auto font-[var(--font-mono)]">
                         {parseErrors.slice(0, 20).map((e, i) => (
                           <li key={i}>{e}</li>
                         ))}
@@ -310,12 +310,12 @@ export function ImportCsvModal({ onClose, onImport }: Props) {
 
           {result && (
             <div className="space-y-3">
-              <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
-                <div className="flex items-center gap-2 text-[13px] font-medium text-emerald-800 mb-1">
+              <div className="rounded-lg border border-chip-success-fg/25 bg-chip-success p-4">
+                <div className="flex items-center gap-2 text-[13px] font-medium text-chip-success-fg mb-1">
                   <Check size={16} />
                   {tr("Importação concluída", "Import complete")}
                 </div>
-                <div className="text-[12px] text-emerald-700 space-y-0.5">
+                <div className="text-[12px] text-chip-success-fg space-y-0.5">
                   <div>
                     <strong>{result.created}</strong> {tr("criados", "created")} ·{" "}
                     <strong>{result.updated}</strong> {tr("atualizados", "updated")}
@@ -335,8 +335,8 @@ export function ImportCsvModal({ onClose, onImport }: Props) {
                 </div>
               </div>
               {result.skipped.length > 0 && (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
-                  <div className="flex items-center gap-2 text-[12px] font-medium text-amber-800 mb-1.5">
+                <div className="rounded-lg border border-chip-warn-fg/25 bg-chip-warn p-3">
+                  <div className="flex items-center gap-2 text-[12px] font-medium text-chip-warn-fg mb-1.5">
                     <AlertCircle size={14} />
                     {result.skipped.length}{" "}
                     {locale === "pt"
@@ -345,7 +345,7 @@ export function ImportCsvModal({ onClose, onImport }: Props) {
                         : "contactos ignorados"
                       : "skipped"}
                   </div>
-                  <ul className="text-[11px] text-amber-700 space-y-0.5 max-h-32 overflow-y-auto font-[var(--font-mono)]">
+                  <ul className="text-[11px] text-chip-warn-fg space-y-0.5 max-h-32 overflow-y-auto font-[var(--font-mono)]">
                     {result.skipped.slice(0, 30).map((s, i) => (
                       <li key={i}>
                         {s.phone} — {s.reason}

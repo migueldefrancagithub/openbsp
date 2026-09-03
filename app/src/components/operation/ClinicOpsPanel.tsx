@@ -217,8 +217,8 @@ export function ClinicOpsPanel() {
         <div
           className={`mx-5 mt-5 rounded-lg border px-3 py-2 text-sm ${
             notice.tone === "success"
-              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-              : "border-rose-200 bg-rose-50 text-rose-700"
+              ? "border-chip-success-fg/25 bg-chip-success text-chip-success-fg"
+              : "border-chip-danger-fg/25 bg-chip-danger text-rose-700"
           }`}
         >
           {notice.text}
@@ -536,8 +536,8 @@ export function ClinicOpsPanel() {
           <span
             className={`inline-flex h-7 items-center gap-1 rounded-full px-2.5 font-semibold ${
               readyCount === 3
-                ? "bg-emerald-50 text-emerald-700"
-                : "bg-amber-50 text-amber-700"
+                ? "bg-chip-success text-chip-success-fg"
+                : "bg-chip-warn text-chip-warn-fg"
             }`}
           >
             {readyCount === 3 ? <CheckCircle2 size={13} /> : <AlertTriangle size={13} />}
@@ -566,7 +566,7 @@ function Panel({
   children: ReactNode;
 }) {
   return (
-    <div className="rounded-lg border border-line-soft bg-[#fbfcfe] p-4">
+    <div className="rounded-lg border border-line-soft bg-surface-2 p-4">
       <div className="mb-4 flex items-start gap-3">
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface text-[#0f766e] shadow-sm">
           <Icon size={17} />

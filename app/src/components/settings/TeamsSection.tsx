@@ -206,7 +206,7 @@ export function TeamsSection() {
                           onClick={() => setLeadMemberId(member._id)}
                           className={`rounded-md border px-2 py-1 text-[10px] font-semibold ${
                             lead
-                              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                              ? "border-chip-success-fg/25 bg-chip-success text-chip-success-fg"
                               : "border-line bg-surface-2 text-muted"
                           }`}
                         >
@@ -224,8 +224,8 @@ export function TeamsSection() {
             <div
               className={`mt-3 rounded-lg border px-3 py-2 text-xs ${
                 error
-                  ? "border-red-200 bg-red-50 text-red-700"
-                  : "border-emerald-200 bg-emerald-50 text-emerald-700"
+                  ? "border-chip-danger-fg/25 bg-chip-danger text-chip-danger-fg"
+                  : "border-chip-success-fg/25 bg-chip-success text-chip-success-fg"
               }`}
             >
               {error ?? notice}
@@ -286,7 +286,7 @@ export function TeamsSection() {
                             type="button"
                             onClick={() => void handleDelete(team)}
                             disabled={busy}
-                            className="rounded-md border border-line p-1.5 text-muted hover:border-rose-300 hover:text-rose-600 disabled:opacity-50"
+                            className="rounded-md border border-line p-1.5 text-muted hover:border-rose-300 hover:text-chip-danger-fg disabled:opacity-50"
                             aria-label={t("teams.delete")}
                             title={t("teams.delete")}
                           >
@@ -340,7 +340,7 @@ export function TeamsSection() {
                                     type="button"
                                     onClick={() => setEditing({ ...editing, leadMemberId: lead ? "" : member._id })}
                                     className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${
-                                      lead ? "bg-amber-100 text-amber-800" : "text-faint hover:text-body"
+                                      lead ? "bg-amber-100 text-chip-warn-fg" : "text-faint hover:text-body"
                                     }`}
                                   >
                                     {t("teams.lead")}

@@ -6,8 +6,8 @@ import { useI18n } from "@/lib/i18n";
 import { retentionCopy } from "@/lib/retentionCopy";
 
 const STYLES = {
-  protection: { box: "border-amber-200 bg-amber-50 text-amber-900", Icon: Clock3 },
-  compliance: { box: "border-[#e0533d]/30 bg-[#fdf1ef] text-[#b3261e]", Icon: ShieldAlert },
+  protection: { box: "border-chip-warn-fg/25 bg-chip-warn text-chip-warn-fg", Icon: Clock3 },
+  compliance: { box: "border-[#e0533d]/30 bg-chip-danger text-chip-danger-fg", Icon: ShieldAlert },
   quality: { box: "border-line bg-surface-2 text-ink", Icon: AlertTriangle },
 } as const;
 

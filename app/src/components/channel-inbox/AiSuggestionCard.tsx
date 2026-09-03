@@ -93,7 +93,7 @@ export function AiSuggestionCard({ threadId, onUseDraft, windowOpen }: { threadI
   return (
     <div
       className={cn(
-        "animate-rise-in mb-2 rounded-xl border border-[#2b4f8a]/30 bg-[#eef3fb] p-3 transition-shadow dark:bg-[#152238]",
+        "animate-rise-in mb-2 rounded-xl border border-[#2b4f8a]/30 bg-chip-info p-3 transition-shadow dark:bg-[#152238]",
         sent && "animate-success-glow",
       )}
       data-ai-suggestion
@@ -101,7 +101,7 @@ export function AiSuggestionCard({ threadId, onUseDraft, windowOpen }: { threadI
       <div className="mb-1.5 flex flex-wrap items-center gap-2 text-[11px]">
         <span className="inline-flex items-center gap-1 rounded-md bg-[#2b4f8a] px-1.5 py-0.5 font-bold text-white"><Sparkles size={11} /> {tr("Sugestão da IA", "AI suggestion")}</span>
         <span className="text-muted">{pending.agentName} · {relativeTime(pending.createdAt, Date.now(), locale)}{pending.routerIntent ? ` · ${pending.routerIntent}` : ""}</span>
-        {pending.stage === "handoff" && <span className="rounded-md bg-amber-100 px-1.5 py-0.5 font-semibold text-amber-800">{tr("sugere passar à equipa", "suggests a handoff")}</span>}
+        {pending.stage === "handoff" && <span className="rounded-md bg-amber-100 px-1.5 py-0.5 font-semibold text-chip-warn-fg">{tr("sugere passar à equipa", "suggests a handoff")}</span>}
         <span className="ml-auto text-[10px] text-faint">{tr("Nada foi enviado ainda.", "Nothing has been sent yet.")}</span>
       </div>
       {editing ? (
@@ -109,9 +109,9 @@ export function AiSuggestionCard({ threadId, onUseDraft, windowOpen }: { threadI
       ) : (
         <button type="button" onClick={() => setEditing(true)} className="w-full whitespace-pre-wrap rounded-md border border-transparent bg-white/70 p-2 text-left text-[12px] leading-5 text-ink hover:border-[#2b4f8a]/40" title={tr("Clique para editar", "Click to edit")}>{text}</button>
       )}
-      {pending.violations.length > 0 && <p className="mt-1 text-[10px] font-semibold text-[#b3261e]">{tr("Guards", "Guards")}: {pending.violations.map((v) => v.split(":")[0]).join(", ")}</p>}
+      {pending.violations.length > 0 && <p className="mt-1 text-[10px] font-semibold text-chip-danger-fg">{tr("Guards", "Guards")}: {pending.violations.map((v) => v.split(":")[0]).join(", ")}</p>}
       {pending.promiseWarning && (
-        <p className="mt-1 rounded bg-amber-50 px-1.5 py-1 text-[11px] text-amber-900">
+        <p className="mt-1 rounded bg-chip-warn px-1.5 py-1 text-[11px] text-chip-warn-fg">
           {tr(
             `Esta resposta compromete a clínica a ${pending.promiseWarning}, e nada está agendado para isso. Aprove uma acção ou assuma a conversa.`,
             `This reply commits the clinic to ${pending.promiseWarning}, and nothing is scheduled for it. Approve an action or take the conversation.`,
@@ -133,8 +133,8 @@ export function AiSuggestionCard({ threadId, onUseDraft, windowOpen }: { threadI
           })}
         </ul>
       )}
-      {!windowOpen && <p className="mt-1 text-[10px] text-amber-800">{tr("Janela de 24h fechada: só um template aprovado pode ser enviado.", "24h window closed: only an approved template can be sent.")}</p>}
-      {error && <p className="mt-1 text-[11px] text-[#b3261e]">{error}</p>}
+      {!windowOpen && <p className="mt-1 text-[10px] text-chip-warn-fg">{tr("Janela de 24h fechada: só um template aprovado pode ser enviado.", "24h window closed: only an approved template can be sent.")}</p>}
+      {error && <p className="mt-1 text-[11px] text-chip-danger-fg">{error}</p>}
       <div className="mt-2 flex flex-wrap items-center gap-1.5">
         <button
           type="button"
@@ -152,7 +152,7 @@ export function AiSuggestionCard({ threadId, onUseDraft, windowOpen }: { threadI
         </button>
         <button type="button" disabled={busy !== null} onClick={() => { onUseDraft(text); void run("discard", () => discard({ turnId: pending.turnId, reason: "moved_to_composer" })); }} className="h-8 rounded-md border border-line bg-surface px-2 text-[11px] font-semibold text-body">{tr("Editar no composer", "Edit in composer")}</button>
         <button type="button" disabled={busy !== null} onClick={() => void run("regen", () => regenerate({ turnId: pending.turnId }))} className="inline-flex h-8 items-center gap-1 rounded-md border border-line bg-surface px-2 text-[11px] font-semibold text-body"><RefreshCw size={11} /> {tr("Gerar de novo", "Regenerate")}</button>
-        <button type="button" disabled={busy !== null} onClick={() => void run("discard", () => discard({ turnId: pending.turnId }))} className="inline-flex h-8 items-center gap-1 rounded-md px-2 text-[11px] font-semibold text-muted hover:text-[#b3261e]"><X size={11} /> {tr("Descartar", "Discard")}</button>
+        <button type="button" disabled={busy !== null} onClick={() => void run("discard", () => discard({ turnId: pending.turnId }))} className="inline-flex h-8 items-center gap-1 rounded-md px-2 text-[11px] font-semibold text-muted hover:text-chip-danger-fg"><X size={11} /> {tr("Descartar", "Discard")}</button>
       </div>
     </div>
   );

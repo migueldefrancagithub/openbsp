@@ -155,7 +155,7 @@ export default function NewCampaignPage() {
             const done = s.n < step;
             const active = s.n === step;
             return (
-              <li key={s.n} className={cn("flex items-center gap-2 rounded-lg border px-3 py-2 text-[12px] font-semibold", active ? "border-brand-solid bg-brand-solid text-white" : done ? "border-[#0d6b61]/30 bg-[#edf8f6] text-[#0d6b61]" : "border-line bg-surface text-muted")}>
+              <li key={s.n} className={cn("flex items-center gap-2 rounded-lg border px-3 py-2 text-[12px] font-semibold", active ? "border-brand-solid bg-brand-solid text-white" : done ? "border-[#0d6b61]/30 bg-chip-success text-chip-success-fg" : "border-line bg-surface text-muted")}>
                 <span className={cn("flex h-5 w-5 items-center justify-center rounded-full text-[11px]", active ? "bg-white/15" : done ? "bg-[#0d6b61] text-white" : "bg-surface-3")}>
                   {done ? <CheckCircle2 size={12} /> : s.n}
                 </span>
@@ -165,7 +165,7 @@ export default function NewCampaignPage() {
           })}
         </ol>
 
-        {error && <div className="rounded-lg border border-[#e0533d]/30 bg-[#fdf1ef] px-4 py-3 text-[13px] text-[#b3261e]">{error}</div>}
+        {error && <div className="rounded-lg border border-[#e0533d]/30 bg-chip-danger px-4 py-3 text-[13px] text-chip-danger-fg">{error}</div>}
 
         {step === 1 && (
           <section className="space-y-5 rounded-lg border border-line bg-surface p-5">
@@ -246,13 +246,13 @@ export default function NewCampaignPage() {
                 ) : (
                   <>
                     <div className="grid grid-cols-2 gap-2">
-                      <div className="rounded-lg border border-[#0d6b61]/30 bg-[#edf8f6] px-3 py-2">
-                        <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-[#0d6b61]">{tr("Vão receber", "Will receive")}</div>
-                        <div className="font-[var(--font-outfit)] text-[26px] font-medium text-[#0d6b61]">{summary?.eligible ?? 0}</div>
+                      <div className="rounded-lg border border-[#0d6b61]/30 bg-chip-success px-3 py-2">
+                        <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-chip-success-fg">{tr("Vão receber", "Will receive")}</div>
+                        <div className="font-[var(--font-outfit)] text-[26px] font-medium text-chip-success-fg">{summary?.eligible ?? 0}</div>
                       </div>
-                      <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
-                        <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-amber-700">{tr("Bloqueadas", "Blocked")}</div>
-                        <div className="font-[var(--font-outfit)] text-[26px] font-medium text-amber-800">{(summary?.matched ?? 0) - (summary?.eligible ?? 0)}</div>
+                      <div className="rounded-lg border border-chip-warn-fg/25 bg-chip-warn px-3 py-2">
+                        <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-chip-warn-fg">{tr("Bloqueadas", "Blocked")}</div>
+                        <div className="font-[var(--font-outfit)] text-[26px] font-medium text-chip-warn-fg">{(summary?.matched ?? 0) - (summary?.eligible ?? 0)}</div>
                       </div>
                     </div>
                     <ul className="space-y-1 text-[12px] text-body">
@@ -261,7 +261,7 @@ export default function NewCampaignPage() {
                       ))}
                     </ul>
                     {audienceEmpty && (
-                      <p className="rounded-lg border border-[#e0533d]/30 bg-[#fdf1ef] px-3 py-2 text-[12px] text-[#b3261e]">
+                      <p className="rounded-lg border border-[#e0533d]/30 bg-chip-danger px-3 py-2 text-[12px] text-chip-danger-fg">
                         {tr("Nenhum destinatário elegível. Volte ao público ou peça a inclusão dos números no piloto.", "No eligible recipients. Revisit the audience or ask for the numbers to join the pilot.")}
                       </p>
                     )}
@@ -274,7 +274,7 @@ export default function NewCampaignPage() {
               <label className="flex items-start gap-2 text-[13px] text-ink">
                 <input type="checkbox" checked={attest} onChange={(e) => setAttest(e.target.checked)} className="mt-0.5 h-4 w-4 accent-[#0a1b33]" />
                 <span>
-                  <ShieldCheck size={13} className="mr-1 inline text-[#0d6b61]" />
+                  <ShieldCheck size={13} className="mr-1 inline text-chip-success-fg" />
                   {tr(
                     "Confirmo que estes pacientes deram consentimento para receber mensagens da clínica e que a mensagem respeita as regras do WhatsApp.",
                     "I confirm these patients consented to receive messages from the clinic and the message follows WhatsApp's rules.",

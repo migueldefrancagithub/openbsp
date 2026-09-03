@@ -164,15 +164,15 @@ function initials(label: string) {
 }
 
 function statusTone(status?: string) {
-  if (status === "awaiting_human") return "bg-amber-50 text-amber-700 border-amber-200";
+  if (status === "awaiting_human") return "bg-chip-warn text-chip-warn-fg border-chip-warn-fg/25";
   if (status === "confirmed" || status === "attended") {
-    return "bg-emerald-50 text-emerald-700 border-emerald-200";
+    return "bg-chip-success text-chip-success-fg border-chip-success-fg/25";
   }
   if (status === "no_show" || status === "lost") {
-    return "bg-rose-50 text-rose-700 border-rose-200";
+    return "bg-chip-danger text-rose-700 border-chip-danger-fg/25";
   }
   if (status === "booked" || status === "wants_booking") {
-    return "bg-blue-50 text-blue-700 border-blue-200";
+    return "bg-chip-info text-chip-info-fg border-blue-200";
   }
   return "bg-surface-2 text-body border-line";
 }
@@ -261,7 +261,7 @@ export function ChannelThreadList() {
                 {channels?.[0]?.displayName ?? t("inbox.title")}
               </div>
             )}
-            <span className="rounded-md bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-700">
+            <span className="rounded-md bg-chip-success px-2 py-1 text-[10px] font-semibold text-chip-success-fg">
               {threads.length}
             </span>
           </div>
@@ -306,15 +306,15 @@ export function ChannelThreadList() {
                   title={t(item.labelKey)}
                 >
                   <span className="flex items-center gap-1">
-                    <Icon size={13} className={cn(item.value === "at_risk" && (count ?? 0) > 0 && "text-[#b3261e]")} />
+                    <Icon size={13} className={cn(item.value === "at_risk" && (count ?? 0) > 0 && "text-chip-danger-fg")} />
                     {count !== undefined && count > 0 && (
                       <span
                         className={cn(
                           "rounded px-1 text-[9px] font-bold tabular-nums",
                           item.value === "at_risk"
-                            ? "bg-[#fdf1ef] text-[#b3261e]"
+                            ? "bg-chip-danger text-chip-danger-fg"
                             : item.value === "ai_suggestions"
-                              ? "bg-[#eef3fb] text-[#2b4f8a]"
+                              ? "bg-chip-info text-chip-info-fg"
                               : "bg-surface-3 text-muted",
                         )}
                       >
@@ -391,11 +391,11 @@ export function ChannelThreadList() {
                       className={cn(
                         "grid grid-cols-[40px_minmax(0,1fr)] gap-2.5 border-b border-line-soft px-3 py-3 transition-colors",
                         selected
-                          ? "border-l-2 border-l-[#0a1b33] bg-[#f0f5f7] pl-[10px]"
+                          ? "border-l-2 border-l-[#0a1b33] bg-surface-2 pl-[10px]"
                           : "hover:bg-surface-2",
                       )}
                     >
-                      <div className="relative flex h-10 w-10 items-center justify-center rounded-full bg-[#dff3ef] text-[11px] font-bold text-[#0d6b61]">
+                      <div className="relative flex h-10 w-10 items-center justify-center rounded-full bg-[#dff3ef] text-[11px] font-bold text-chip-success-fg">
                         {initials(label)}
                         <span
                           className={cn(
@@ -434,7 +434,7 @@ export function ChannelThreadList() {
                           {thread.automationMode === "bot" && <Bot size={11} className="shrink-0 text-blue-500" />}
                           {(thread.dueReminderCount ?? 0) > 0 && (
                             <span
-                              className="inline-flex shrink-0 items-center gap-0.5 rounded border border-[#f5c2b8] bg-[#fff1ee] px-1 py-0.5 text-[9px] font-semibold text-[#8a2a1b]"
+                              className="inline-flex shrink-0 items-center gap-0.5 rounded border border-[#f5c2b8] bg-chip-danger px-1 py-0.5 text-[9px] font-semibold text-chip-danger-fg"
                               title={t("inbox.dueReminders")}
                             >
                               <Bell size={9} />
@@ -460,7 +460,7 @@ export function ChannelThreadList() {
                             </span>
                           )}
                           {thread.aiSuggestionPending && (
-                            <span className="inline-flex items-center gap-1 rounded bg-[#eef3fb] px-1.5 py-0.5 text-[10px] font-semibold text-[#2b4f8a]" title={t("inbox.aiSuggestion")}>
+                            <span className="inline-flex items-center gap-1 rounded bg-chip-info px-1.5 py-0.5 text-[10px] font-semibold text-chip-info-fg" title={t("inbox.aiSuggestion")}>
                               ✦ {t("inbox.aiSuggestion")}
                             </span>
                           )}
@@ -468,7 +468,7 @@ export function ChannelThreadList() {
                             <span
                               className={cn(
                                 "inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold",
-                                thread.firstResponseDueAt < Date.now() ? "bg-[#fdf1ef] text-[#b3261e]" : "bg-amber-50 text-amber-700",
+                                thread.firstResponseDueAt < Date.now() ? "bg-chip-danger text-chip-danger-fg" : "bg-chip-warn text-chip-warn-fg",
                               )}
                               title={t("inbox.firstResponseSla")}
                             >
@@ -480,8 +480,8 @@ export function ChannelThreadList() {
                               className={cn(
                                 "inline-flex shrink-0 items-center gap-0.5 rounded border px-1 py-0.5 text-[9px] font-semibold",
                                 thread.openCaseSlaDueAt < Date.now()
-                                  ? "border-[#f5c2b8] bg-[#fff1ee] text-[#8a2a1b]"
-                                  : "border-amber-200 bg-amber-50 text-amber-800",
+                                  ? "border-[#f5c2b8] bg-chip-danger text-chip-danger-fg"
+                                  : "border-chip-warn-fg/25 bg-chip-warn text-chip-warn-fg",
                               )}
                               title={t("handoff.caseOpen")}
                             >
@@ -491,7 +491,7 @@ export function ChannelThreadList() {
                           )}
                           {thread.pilotBlocked && (
                             <span
-                              className="inline-flex shrink-0 items-center gap-0.5 rounded border border-amber-200 bg-amber-50 px-1 py-0.5 text-[9px] font-semibold text-amber-800"
+                              className="inline-flex shrink-0 items-center gap-0.5 rounded border border-chip-warn-fg/25 bg-chip-warn px-1 py-0.5 text-[9px] font-semibold text-chip-warn-fg"
                               title={t("inbox.pilotTitle")}
                             >
                               <ShieldAlert size={9} />

@@ -138,7 +138,7 @@ export function ActivityTable({ rows }: { rows: DetailRow[] }) {
       action={
         <div className="flex items-center gap-1.5">
           {notice && (
-            <span role="status" className="text-[11px] text-emerald-700">
+            <span role="status" className="text-[11px] text-chip-success-fg">
               {notice}
             </span>
           )}

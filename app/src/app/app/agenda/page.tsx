@@ -112,7 +112,7 @@ export default function AgendaPage() {
           <span className="ml-auto text-[11px] text-faint">{timeZone}</span>
         </div>
 
-        {error && <div className="rounded-lg border border-[#e0533d]/30 bg-[#fdf1ef] px-4 py-3 text-[13px] text-[#b3261e]">{error}</div>}
+        {error && <div className="rounded-lg border border-[#e0533d]/30 bg-chip-danger px-4 py-3 text-[13px] text-chip-danger-fg">{error}</div>}
 
         {agenda === undefined ? (
           <div className="flex items-center gap-2 px-2 py-8 text-sm text-faint"><Loader2 size={15} className="animate-spin" /> {tr("A carregar agenda…", "Loading calendar…")}</div>
@@ -123,8 +123,8 @@ export default function AgendaPage() {
               const isToday = day === todayLocalDate();
               return (
                 <section key={day} className={cn("min-w-0 rounded-lg border bg-surface", isToday ? "border-[#2b4f8a]/40" : "border-line")}>
-                  <header className={cn("flex items-center justify-between border-b px-3 py-2", isToday ? "border-[#2b4f8a]/20 bg-[#eef3fb]" : "border-line-soft")}>
-                    <span className={cn("text-[12px] font-semibold capitalize", isToday ? "text-[#2b4f8a]" : "text-ink")}>{formatDayIn(day, locale)}</span>
+                  <header className={cn("flex items-center justify-between border-b px-3 py-2", isToday ? "border-[#2b4f8a]/20 bg-chip-info" : "border-line-soft")}>
+                    <span className={cn("text-[12px] font-semibold capitalize", isToday ? "text-chip-info-fg" : "text-ink")}>{formatDayIn(day, locale)}</span>
                     <span className="text-[11px] text-faint">{rows.length}</span>
                   </header>
                   {rows.length === 0 ? (
@@ -142,7 +142,7 @@ export default function AgendaPage() {
                                 <div className="flex flex-wrap items-center gap-1.5">
                                   <span className="truncate text-[13px] font-semibold text-ink">{row.patientName ?? tr("Sem nome", "No name")}</span>
                                   <span className={cn("rounded-md border px-1.5 py-0.5 text-[10px] font-semibold", appointmentStatusTone(row.status))}>{appointmentStatusLabel(row.status, locale)}</span>
-                                  {row.pendingNotices > 0 && <span className="text-[10px] text-amber-700">{tr("aviso pendente", "notice pending")}</span>}
+                                  {row.pendingNotices > 0 && <span className="text-[10px] text-chip-warn-fg">{tr("aviso pendente", "notice pending")}</span>}
                                 </div>
                                 <div className="truncate text-[11px] text-muted">
                                   {row.serviceName}{row.professionalName ? ` · ${row.professionalName}` : ""}{row.confirmedVia === "reply" ? ` · ${tr("confirmou pelo WhatsApp", "confirmed on WhatsApp")}` : ""}
@@ -153,7 +153,7 @@ export default function AgendaPage() {
                                       <Link href={`/app/channel-inbox/${row.threadKey}?channel=${row.channelId}`} className="inline-flex h-7 items-center gap-1 rounded-md border border-line px-2 text-[11px] font-semibold text-body hover:text-ink"><MessageCircle size={11} /> {tr("Conversa", "Chat")}</Link>
                                     )}
                                     {row.status === "scheduled" && (
-                                      <button type="button" disabled={busy !== null} onClick={() => void run(row._id, () => confirm({ appointmentId: row._id }))} className="inline-flex h-7 items-center gap-1 rounded-md border border-[#0d6b61]/30 px-2 text-[11px] font-semibold text-[#0d6b61]"><Check size={11} /> {tr("Confirmar", "Confirm")}</button>
+                                      <button type="button" disabled={busy !== null} onClick={() => void run(row._id, () => confirm({ appointmentId: row._id }))} className="inline-flex h-7 items-center gap-1 rounded-md border border-[#0d6b61]/30 px-2 text-[11px] font-semibold text-chip-success-fg"><Check size={11} /> {tr("Confirmar", "Confirm")}</button>
                                     )}
                                     {row.threadId && !past && (
                                       <button type="button" disabled={busy !== null} onClick={() => void run(`n-${row._id}`, () => notice({ appointmentId: row._id, kind: row.status === "confirmed" ? "appointment_reminder" : "appointment_confirmation" }))} className="inline-flex h-7 items-center gap-1 rounded-md border border-line px-2 text-[11px] font-semibold text-body"><Send size={11} /> {row.status === "confirmed" ? tr("Lembrete", "Reminder") : tr("Pedir confirmação", "Ask to confirm")}</button>
@@ -163,11 +163,11 @@ export default function AgendaPage() {
                                     )}
                                     {past ? (
                                       <>
-                                        <button type="button" disabled={busy !== null} onClick={() => void run(`a-${row._id}`, () => outcome({ appointmentId: row._id, status: "completed" }))} className="inline-flex h-7 items-center gap-1 rounded-md border border-[#0d6b61]/30 px-2 text-[11px] font-semibold text-[#0d6b61]"><Check size={11} /> {tr("Compareceu", "Attended")}</button>
-                                        <button type="button" disabled={busy !== null} onClick={() => void run(`ns-${row._id}`, () => outcome({ appointmentId: row._id, status: "no_show" }))} className="inline-flex h-7 items-center gap-1 rounded-md border border-[#e0533d]/30 px-2 text-[11px] font-semibold text-[#b3261e]"><UserX size={11} /> {tr("Faltou", "No-show")}</button>
+                                        <button type="button" disabled={busy !== null} onClick={() => void run(`a-${row._id}`, () => outcome({ appointmentId: row._id, status: "completed" }))} className="inline-flex h-7 items-center gap-1 rounded-md border border-[#0d6b61]/30 px-2 text-[11px] font-semibold text-chip-success-fg"><Check size={11} /> {tr("Compareceu", "Attended")}</button>
+                                        <button type="button" disabled={busy !== null} onClick={() => void run(`ns-${row._id}`, () => outcome({ appointmentId: row._id, status: "no_show" }))} className="inline-flex h-7 items-center gap-1 rounded-md border border-[#e0533d]/30 px-2 text-[11px] font-semibold text-chip-danger-fg"><UserX size={11} /> {tr("Faltou", "No-show")}</button>
                                       </>
                                     ) : (
-                                      <button type="button" disabled={busy !== null} onClick={() => { if (window.confirm(tr("Cancelar esta marcação?", "Cancel this appointment?"))) void run(`c-${row._id}`, () => cancel({ appointmentId: row._id })); }} className="inline-flex h-7 items-center gap-1 rounded-md border border-line px-2 text-[11px] font-semibold text-muted hover:border-[#e0533d]/40 hover:text-[#b3261e]"><X size={11} /> {tr("Cancelar", "Cancel")}</button>
+                                      <button type="button" disabled={busy !== null} onClick={() => { if (window.confirm(tr("Cancelar esta marcação?", "Cancel this appointment?"))) void run(`c-${row._id}`, () => cancel({ appointmentId: row._id })); }} className="inline-flex h-7 items-center gap-1 rounded-md border border-line px-2 text-[11px] font-semibold text-muted hover:border-[#e0533d]/40 hover:text-chip-danger-fg"><X size={11} /> {tr("Cancelar", "Cancel")}</button>
                                     )}
                                   </div>
                                 )}
@@ -183,7 +183,7 @@ export default function AgendaPage() {
             })}
           </div>
         )}
-        {agenda?.capped && <p className="text-[11px] text-amber-700">{tr("Mostrando as primeiras 500 marcações do intervalo.", "Showing the first 500 appointments in range.")}</p>}
+        {agenda?.capped && <p className="text-[11px] text-chip-warn-fg">{tr("Mostrando as primeiras 500 marcações do intervalo.", "Showing the first 500 appointments in range.")}</p>}
       </div>
 
       {scheduler && (

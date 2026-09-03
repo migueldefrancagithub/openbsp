@@ -21,9 +21,9 @@ export function AgentFeedbackPanel({ agentId }: { agentId: Id<"aiAgents"> }) {
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {[
-          { label: tr("Aprovadas sem editar", "Approved as-is"), value: stats?.approved ?? 0, tone: "text-[#0d6b61]" },
-          { label: tr("Editadas pela equipa", "Edited by the team"), value: stats?.edited ?? 0, tone: "text-[#2b4f8a]" },
-          { label: tr("Descartadas", "Discarded"), value: stats?.discarded ?? 0, tone: "text-[#b3261e]" },
+          { label: tr("Aprovadas sem editar", "Approved as-is"), value: stats?.approved ?? 0, tone: "text-chip-success-fg" },
+          { label: tr("Editadas pela equipa", "Edited by the team"), value: stats?.edited ?? 0, tone: "text-chip-info-fg" },
+          { label: tr("Descartadas", "Discarded"), value: stats?.discarded ?? 0, tone: "text-chip-danger-fg" },
           { label: tr("Exemplos em uso", "Examples in use"), value: stats?.examples ?? 0 },
         ].map((item) => (
           <div key={item.label} className="rounded-lg border border-line-soft bg-surface-2 px-3 py-2">
@@ -33,7 +33,7 @@ export function AgentFeedbackPanel({ agentId }: { agentId: Id<"aiAgents"> }) {
         ))}
       </div>
       {stats?.graduation.ready && (
-        <div className="rounded-lg border border-[#0d6b61]/30 bg-[#edf8f6] px-3 py-2 text-[12px] text-[#0d6b61]">
+        <div className="rounded-lg border border-[#0d6b61]/30 bg-chip-success px-3 py-2 text-[12px] text-chip-success-fg">
           <span className="font-semibold">{tr("Pronto para Automático.", "Ready for Autopilot.")}</span>{" "}
           {tr(
             `A equipa aprovou ${Math.round(stats.graduation.approvalRate * 100)}% das sugestões sem editar, em ${stats.graduation.decided} decisões, e quase não corrigiu movimentos de etapa. A decisão continua sua.`,
@@ -60,13 +60,13 @@ export function AgentFeedbackPanel({ agentId }: { agentId: Id<"aiAgents"> }) {
             {feedback.results.map((row) => (
               <li key={row._id} className="px-4 py-2.5 text-[12px]">
                 <div className="flex items-center justify-between gap-2">
-                  <span className={cn("rounded-md px-1.5 py-0.5 text-[10px] font-semibold", row.outcome === "approved" ? "bg-[#edf8f6] text-[#0d6b61]" : row.outcome === "edited" ? "bg-[#eef3fb] text-[#2b4f8a]" : "bg-[#fdf1ef] text-[#b3261e]")}>{row.outcome === "approved" ? tr("aprovada", "approved") : row.outcome === "edited" ? tr("editada", "edited") : tr("descartada", "discarded")}</span>
+                  <span className={cn("rounded-md px-1.5 py-0.5 text-[10px] font-semibold", row.outcome === "approved" ? "bg-chip-success text-chip-success-fg" : row.outcome === "edited" ? "bg-chip-info text-chip-info-fg" : "bg-chip-danger text-chip-danger-fg")}>{row.outcome === "approved" ? tr("aprovada", "approved") : row.outcome === "edited" ? tr("editada", "edited") : tr("descartada", "discarded")}</span>
                   <span className="text-[10px] text-faint">{relativeTime(row.createdAt, now, locale)}</span>
-                  <button type="button" onClick={() => void remove({ feedbackId: row._id })} className="text-faint hover:text-[#b3261e]" title={tr("Remover exemplo", "Remove example")}><Trash2 size={12} /></button>
+                  <button type="button" onClick={() => void remove({ feedbackId: row._id })} className="text-faint hover:text-chip-danger-fg" title={tr("Remover exemplo", "Remove example")}><Trash2 size={12} /></button>
                 </div>
                 <p className="mt-1 text-muted"><span className="text-[10px] uppercase tracking-[0.12em]">{tr("Paciente", "Patient")}</span> {row.patientText}</p>
                 {row.outcome === "edited" && <p className="mt-0.5 text-faint line-through">{row.suggestedText}</p>}
-                {row.finalText && <p className="mt-0.5 text-ink"><span className="text-[10px] uppercase tracking-[0.12em] text-[#0d6b61]">{tr("Equipa", "Team")}</span> {row.finalText}</p>}
+                {row.finalText && <p className="mt-0.5 text-ink"><span className="text-[10px] uppercase tracking-[0.12em] text-chip-success-fg">{tr("Equipa", "Team")}</span> {row.finalText}</p>}
                 {(row.approvedActions.length > 0 || row.rejectedActions.length > 0) && (
                   <p className="mt-0.5 text-[10px] text-faint">
                     {row.approvedActions.length > 0 && `✓ ${row.approvedActions.map((a) => toolLabel(a, locale)).join(", ")}`}
@@ -77,7 +77,7 @@ export function AgentFeedbackPanel({ agentId }: { agentId: Id<"aiAgents"> }) {
             ))}
           </ul>
         )}
-        {feedback.status === "CanLoadMore" && <div className="border-t border-line-soft px-4 py-2"><button type="button" onClick={() => feedback.loadMore(20)} className="text-[12px] font-semibold text-[#2b4f8a] hover:underline">{tr("Carregar mais", "Load more")}</button></div>}
+        {feedback.status === "CanLoadMore" && <div className="border-t border-line-soft px-4 py-2"><button type="button" onClick={() => feedback.loadMore(20)} className="text-[12px] font-semibold text-chip-info-fg hover:underline">{tr("Carregar mais", "Load more")}</button></div>}
       </div>
     </div>
   );

@@ -334,7 +334,7 @@ export function PatientContextPanel({
   return (
     <aside className={cn("relative flex h-full w-[326px] shrink-0 flex-col border-l border-line bg-surface", className)}>
       <div className="flex items-center gap-3 border-b border-line px-4 py-3.5">
-        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#dff3ef] text-[11px] font-bold text-[#0d6b61]">
+        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#dff3ef] text-[11px] font-bold text-chip-success-fg">
           {patientName.slice(0, 2).toUpperCase()}
         </div>
         <div className="min-w-0 flex-1">
@@ -449,7 +449,7 @@ export function PatientContextPanel({
             </button>
           </div>
           {thread.nextStepDueAt && (
-            <div className="mt-1.5 flex items-center gap-1 text-[10px] text-amber-700">
+            <div className="mt-1.5 flex items-center gap-1 text-[10px] text-chip-warn-fg">
               <Clock3 size={11} /> {formatMoment(thread.nextStepDueAt, locale)}
             </div>
           )}
@@ -460,7 +460,7 @@ export function PatientContextPanel({
             <button
               type="button"
               onClick={() => void updateThread({ threadId: thread._id, dnd: !thread.dnd })}
-              className={cn("rounded-md border px-2 py-2 text-left font-semibold", thread.dnd ? "border-rose-200 bg-rose-50 text-rose-700" : "border-line text-body")}
+              className={cn("rounded-md border px-2 py-2 text-left font-semibold", thread.dnd ? "border-chip-danger-fg/25 bg-chip-danger text-rose-700" : "border-line text-body")}
             >
               DND · {thread.dnd ? tr("Ativo", "On") : tr("Inativo", "Off")}
             </button>
@@ -482,7 +482,7 @@ export function PatientContextPanel({
                 className={cn(
                   "inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[9px] font-semibold",
                   tag.startsWith("grupo:") || tag.startsWith("group:")
-                    ? "border-[#cfe0f5] bg-[#eef4fc] text-[#2b4f8a]"
+                    ? "border-[#cfe0f5] bg-chip-info text-chip-info-fg"
                     : "border-line bg-surface-2 text-muted",
                 )}
               >
@@ -490,7 +490,7 @@ export function PatientContextPanel({
                 <button
                   type="button"
                   onClick={() => void updateThread({ threadId: thread._id, tags: tags.filter((item) => item !== tag) })}
-                  className="text-faint hover:text-[#b3261e]"
+                  className="text-faint hover:text-chip-danger-fg"
                   aria-label={`${t("inbox.cancel")} ${tag}`}
                 >
                   <X size={9} />
@@ -542,7 +542,7 @@ export function PatientContextPanel({
                       ? tr("Atendimento", "Service")
                       : tr("Autenticação", "Authentication")}
                 </span>
-                <span className={cn("font-bold", item.status === "granted" ? "text-emerald-600" : "text-rose-600")}>
+                <span className={cn("font-bold", item.status === "granted" ? "text-emerald-600" : "text-chip-danger-fg")}>
                   {stateLabel(item.status, t)}
                 </span>
               </div>
@@ -560,7 +560,7 @@ export function PatientContextPanel({
                   onClick={() => setConsentDraft({ purpose, status: nextStatus, proof: "" })}
                   className={cn(
                     "rounded-md border px-2 py-1.5 text-left text-[10px] font-semibold",
-                    nextStatus === "granted" ? "border-emerald-200 text-emerald-700" : "border-rose-200 text-rose-600",
+                    nextStatus === "granted" ? "border-chip-success-fg/25 text-chip-success-fg" : "border-chip-danger-fg/25 text-chip-danger-fg",
                   )}
                 >
                   {nextStatus === "granted" ? t("consent.grant") : t("consent.revoke")} · {t(`consent.${purpose}` as TranslationKey)}
@@ -603,14 +603,14 @@ export function PatientContextPanel({
               </div>
             </form>
           )}
-          {error && !tool && <p className="mt-1 text-[10px] text-[#b3261e]">{error}</p>}
+          {error && !tool && <p className="mt-1 text-[10px] text-chip-danger-fg">{error}</p>}
         </Section>
 
         <Section title={t("inbox.actions")} icon={Archive}>
           {thread.closedAt || thread.inboxStatus === "closed" ? (
             <button type="button" onClick={() => void updateThread({ threadId: thread._id, inboxStatus: "open", automationMode: "human" })} className="w-full rounded-md border border-line py-2 text-[11px] font-semibold text-body">{t("inbox.reopen")}</button>
           ) : (
-            <button type="button" onClick={() => setTool("close")} className="w-full rounded-md border border-rose-200 py-2 text-[11px] font-semibold text-rose-600">{t("inbox.close")}</button>
+            <button type="button" onClick={() => setTool("close")} className="w-full rounded-md border border-chip-danger-fg/25 py-2 text-[11px] font-semibold text-chip-danger-fg">{t("inbox.close")}</button>
           )}
         </Section>
         </>}
@@ -619,7 +619,7 @@ export function PatientContextPanel({
         <Section
           title={t("inbox.notes")}
           icon={MessageSquareText}
-          action={<button type="button" onClick={() => setTool("note")} className="text-[10px] font-bold text-[#0d6b61]">+ {t("inbox.addNote")}</button>}
+          action={<button type="button" onClick={() => setTool("note")} className="text-[10px] font-bold text-chip-success-fg">+ {t("inbox.addNote")}</button>}
         >
           {context === undefined ? <Loader2 size={13} className="animate-spin text-faint" /> : context.notes.length === 0 ? (
             <p className="text-[10px] text-faint">{t("inbox.noNotes")}</p>
@@ -633,7 +633,7 @@ export function PatientContextPanel({
                       {item.mentionedMemberIds.map((id: Id<"members">) => {
                         const member = members?.find((row) => row._id === id);
                         return (
-                          <span key={id} className="rounded bg-[#eef4fc] px-1 py-0.5 text-[9px] font-semibold text-[#2b4f8a]">
+                          <span key={id} className="rounded bg-chip-info px-1 py-0.5 text-[9px] font-semibold text-chip-info-fg">
                             @{member ? memberDisplay(member) : "…"}
                           </span>
                         );
@@ -650,7 +650,7 @@ export function PatientContextPanel({
         <Section
           title={t("inbox.reminders")}
           icon={Bell}
-          action={<button type="button" onClick={() => setTool("reminder")} className="text-[10px] font-bold text-[#0d6b61]">+ {t("inbox.createReminder")}</button>}
+          action={<button type="button" onClick={() => setTool("reminder")} className="text-[10px] font-bold text-chip-success-fg">+ {t("inbox.createReminder")}</button>}
         >
           {context?.reminders?.length ? (
             <div className="space-y-2">
@@ -682,7 +682,7 @@ export function PatientContextPanel({
           icon={Clock3}
           action={
             followUps && followUps.some((task) => task.status === "scheduled" || task.status === "claimed") ? (
-              <button type="button" onClick={() => void stopFollowUps({ threadId: thread._id })} className="text-[10px] font-bold text-[#b3261e]">
+              <button type="button" onClick={() => void stopFollowUps({ threadId: thread._id })} className="text-[10px] font-bold text-chip-danger-fg">
                 {tr("Parar todos", "Stop all")}
               </button>
             ) : undefined
@@ -720,7 +720,7 @@ export function PatientContextPanel({
                       <span className="text-[9px] text-faint">{state}</span>
                     </div>
                     {pending && (
-                      <button type="button" onClick={() => void stopFollowUpTask({ taskId: task._id })} className="text-[9px] font-semibold text-faint hover:text-[#b3261e]">
+                      <button type="button" onClick={() => void stopFollowUpTask({ taskId: task._id })} className="text-[9px] font-semibold text-faint hover:text-chip-danger-fg">
                         {tr("Parar", "Stop")}
                       </button>
                     )}
@@ -737,7 +737,7 @@ export function PatientContextPanel({
         <Section
           title={t("inbox.appointments")}
           icon={CalendarDays}
-          action={<button type="button" onClick={() => setShowScheduler(true)} className="text-[10px] font-bold text-[#2b4f8a]">+ {tr("Agendar", "Book")}</button>}
+          action={<button type="button" onClick={() => setShowScheduler(true)} className="text-[10px] font-bold text-chip-info-fg">+ {tr("Agendar", "Book")}</button>}
         >
           {threadAppointments === undefined ? (
             <Loader2 size={13} className="animate-spin text-faint" />
@@ -749,24 +749,24 @@ export function PatientContextPanel({
                 const active = item.status === "scheduled" || item.status === "confirmed";
                 return (
                   <div key={item._id} className="flex items-start gap-2">
-                    <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-md", active ? "bg-[#eef3fb] text-[#2b4f8a]" : "bg-surface-3 text-faint")}><CalendarDays size={13} /></div>
+                    <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-md", active ? "bg-chip-info text-chip-info-fg" : "bg-surface-3 text-faint")}><CalendarDays size={13} /></div>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-[11px] font-semibold text-ink">{item.serviceName}{item.professionalName ? ` · ${item.professionalName}` : ""}</p>
                       <p className="text-[9px] text-faint">{formatMoment(item.startAt, locale)} · {appointmentStatusLabel(item.status, locale)}{item.pendingNotices > 0 ? ` · ${tr("aviso pendente", "notice pending")}` : ""}</p>
                       {active && (
                         <div className="mt-1 flex flex-wrap gap-1">
                           {item.status === "scheduled" && (
-                            <button type="button" onClick={() => void runAppointmentAction(() => confirmAppointment({ appointmentId: item._id }))} className="rounded border border-[#0d6b61]/30 px-1.5 py-0.5 text-[9px] font-semibold text-[#0d6b61]">{tr("Confirmar", "Confirm")}</button>
+                            <button type="button" onClick={() => void runAppointmentAction(() => confirmAppointment({ appointmentId: item._id }))} className="rounded border border-[#0d6b61]/30 px-1.5 py-0.5 text-[9px] font-semibold text-chip-success-fg">{tr("Confirmar", "Confirm")}</button>
                           )}
                           <button type="button" onClick={() => void runAppointmentAction(() => sendAppointmentNotice({ appointmentId: item._id, kind: item.status === "confirmed" ? "appointment_reminder" : "appointment_confirmation" }))} className="rounded border border-line px-1.5 py-0.5 text-[9px] font-semibold text-body">{item.status === "confirmed" ? tr("Lembrete", "Reminder") : tr("Pedir confirmação", "Ask to confirm")}</button>
-                          <button type="button" onClick={() => { if (window.confirm(tr("Cancelar esta marcação?", "Cancel this appointment?"))) void runAppointmentAction(() => cancelAppointment({ appointmentId: item._id })); }} className="rounded border border-line px-1.5 py-0.5 text-[9px] font-semibold text-muted hover:text-[#b3261e]">{tr("Cancelar", "Cancel")}</button>
+                          <button type="button" onClick={() => { if (window.confirm(tr("Cancelar esta marcação?", "Cancel this appointment?"))) void runAppointmentAction(() => cancelAppointment({ appointmentId: item._id })); }} className="rounded border border-line px-1.5 py-0.5 text-[9px] font-semibold text-muted hover:text-chip-danger-fg">{tr("Cancelar", "Cancel")}</button>
                         </div>
                       )}
                     </div>
                   </div>
                 );
               })}
-              {appointmentError && <p className="text-[10px] text-[#b3261e]">{appointmentError}</p>}
+              {appointmentError && <p className="text-[10px] text-chip-danger-fg">{appointmentError}</p>}
             </div>
           )}
         </Section>
@@ -808,7 +808,7 @@ export function PatientContextPanel({
         <Section title={tr("Ficheiros", "Files")} icon={Paperclip}>
           {context?.attachments?.length ? context.attachments.slice(0, 8).map((item: any) => (
             item.url ? (
-              <a key={item._id} href={item.url} target="_blank" rel="noreferrer" className="mb-1.5 flex items-center gap-2 text-[10px] text-body last:mb-0 hover:text-[#0d6b61]">
+              <a key={item._id} href={item.url} target="_blank" rel="noreferrer" className="mb-1.5 flex items-center gap-2 text-[10px] text-body last:mb-0 hover:text-chip-success-fg">
                 <Paperclip size={11} className="shrink-0" />
                 <span className="min-w-0 flex-1 truncate font-semibold">{item.fileName}</span>
                 <span className="shrink-0 text-[9px] text-faint">{relativeTime(item.createdAt, Date.now(), locale)}</span>
@@ -905,7 +905,7 @@ export function PatientContextPanel({
                 )}
               </>
             )}
-            {error && <p className="text-[11px] text-rose-600">{error}</p>}
+            {error && <p className="text-[11px] text-chip-danger-fg">{error}</p>}
             <button type="submit" disabled={busy} className="mt-auto flex h-10 items-center justify-center gap-2 rounded-md bg-brand-solid text-[12px] font-bold text-white disabled:opacity-50">
               {busy && <Loader2 size={13} className="animate-spin" />}{t("inbox.save")}
             </button>

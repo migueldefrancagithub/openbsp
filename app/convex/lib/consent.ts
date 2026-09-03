@@ -2,6 +2,14 @@ import { ConvexError } from "convex/values";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 
+/**
+ * Bounds for the opt-out path. A patient who asks to stop must be honoured
+ * inside one mutation, so the read is capped rather than left to grow with the
+ * conversation history.
+ */
+export const MAX_CONSENT_CONVERSATIONS = 200;
+export const MAX_CONSENT_MESSAGES = 100;
+
 export type Purpose = "transactional" | "marketing" | "authentication";
 export type ConsentStatus = "granted" | "revoked" | "unknown";
 
@@ -121,13 +129,17 @@ export async function cancelPendingForContact(
 ): Promise<{ messagesQueued: number }> {
   // Cancel queued outbound messages bound to this contact via conversation.
   // We need to find conversations for the contact, then queued messages.
+  // Indexed by (tenant, contact): the previous read bound only the tenant and
+  // filtered in JS, which is a full conversation scan inside the mutation an
+  // inbound "stop" triggers. At a few thousand conversations it trips the read
+  // limit and the opt-out fails silently — a compliance incident, not a slow
+  // page.
   const conversations = await ctx.db
     .query("conversations")
-    .withIndex("by_tenant_phone_contact", (q) =>
-      q.eq("tenantId", args.tenantId),
+    .withIndex("by_tenant_contact_lastmsg", (q) =>
+      q.eq("tenantId", args.tenantId).eq("contactId", args.contactId),
     )
-    .filter((q) => q.eq(q.field("contactId"), args.contactId))
-    .collect();
+    .take(MAX_CONSENT_CONVERSATIONS);
 
   let messagesQueued = 0;
   for (const conv of conversations) {
@@ -140,7 +152,7 @@ export async function cancelPendingForContact(
           q.eq(q.field("status"), "queued"),
         ),
       )
-      .collect();
+      .take(MAX_CONSENT_MESSAGES);
     for (const msg of queued) {
       await ctx.db.patch(msg._id, {
         status: "failed",

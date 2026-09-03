@@ -104,7 +104,7 @@ export function AppointmentScheduler({
 
   if (workspace !== undefined && services.length === 0) {
     return (
-      <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-800">
+      <p className="rounded-lg border border-chip-warn-fg/25 bg-chip-warn px-3 py-2 text-[12px] text-chip-warn-fg">
         {tr("Crie um serviço em Operação › Clínica antes de marcar.", "Create a service in Operations › Clinic before booking.")}
       </p>
     );
@@ -180,11 +180,11 @@ export function AppointmentScheduler({
       {mode.kind === "book" && mode.threadId && (
         <label className="flex items-center gap-2 text-[12px] text-ink">
           <input type="checkbox" checked={askConfirmation} onChange={(e) => setAskConfirmation(e.target.checked)} className="h-4 w-4 accent-[#0a1b33]" />
-          <Send size={12} className="text-[#0d6b61]" />
+          <Send size={12} className="text-chip-success-fg" />
           {tr("Enviar pedido de confirmação ao paciente", "Send a confirmation request to the patient")}
         </label>
       )}
-      {error && <p className="rounded-lg border border-[#e0533d]/30 bg-[#fdf1ef] px-3 py-2 text-[12px] text-[#b3261e]">{error}</p>}
+      {error && <p className="rounded-lg border border-[#e0533d]/30 bg-chip-danger px-3 py-2 text-[12px] text-chip-danger-fg">{error}</p>}
       <button
         type="button"
         disabled={busy || selected === null || !serviceId}

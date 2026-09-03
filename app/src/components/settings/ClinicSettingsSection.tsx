@@ -137,7 +137,7 @@ export function ClinicSettingsSection() {
   return (
     <div className="space-y-6">
       {(notice || error) && (
-        <div className={cn("rounded-lg border px-4 py-3 text-sm", error ? "border-[#e0533d]/30 bg-[#fdf1ef] text-[#b3261e]" : "border-[#0d6b61]/30 bg-[#edf8f6] text-[#0d6b61]")}>{error ?? notice}</div>
+        <div className={cn("rounded-lg border px-4 py-3 text-sm", error ? "border-[#e0533d]/30 bg-chip-danger text-chip-danger-fg" : "border-[#0d6b61]/30 bg-chip-success text-chip-success-fg")}>{error ?? notice}</div>
       )}
 
       <section className="overflow-hidden rounded-lg border border-line bg-surface">
@@ -254,7 +254,7 @@ export function ClinicSettingsSection() {
                   </div>
                   <div className="flex shrink-0 gap-1.5">
                     <button type="button" onClick={() => setEditing({ professionalId: p._id, name: p.name, specialty: p.specialty ?? "", color: p.color ?? COLORS[0], days: p.availability?.map((a) => a.weekday) ?? [], start: p.availability?.[0]?.start ?? "08:00", end: p.availability?.[0]?.end ?? "17:00", serviceIds: (workspace?.services ?? []).filter((s) => s.professionalIds?.includes(p._id)).map((s) => s._id) })} className="h-8 rounded-md border border-line px-2 text-[11px] font-semibold text-body">{tr("Editar", "Edit")}</button>
-                    <button type="button" disabled={busy !== null} onClick={() => { if (window.confirm(tr("Arquivar este profissional?", "Archive this professional?"))) void run(`arch-${p._id}`, () => archiveProfessional({ professionalId: p._id })); }} className="inline-flex h-8 items-center gap-1 rounded-md border border-line px-2 text-[11px] font-semibold text-muted hover:text-[#b3261e]"><Archive size={12} /></button>
+                    <button type="button" disabled={busy !== null} onClick={() => { if (window.confirm(tr("Arquivar este profissional?", "Archive this professional?"))) void run(`arch-${p._id}`, () => archiveProfessional({ professionalId: p._id })); }} className="inline-flex h-8 items-center gap-1 rounded-md border border-line px-2 text-[11px] font-semibold text-muted hover:text-chip-danger-fg"><Archive size={12} /></button>
                   </div>
                 </li>
               ))}

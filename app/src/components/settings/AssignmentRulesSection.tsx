@@ -77,7 +77,7 @@ export function AssignmentRulesSection() {
         </button>
       </div>
       <div className="p-6">
-        {error && <p className="mb-3 rounded-lg border border-[#e0533d]/30 bg-[#fdf1ef] px-3 py-2 text-[12px] text-[#b3261e]">{error}</p>}
+        {error && <p className="mb-3 rounded-lg border border-[#e0533d]/30 bg-chip-danger px-3 py-2 text-[12px] text-chip-danger-fg">{error}</p>}
         {(teams ?? []).length === 0 && <p className="text-[13px] text-muted">{tr("Crie uma equipa primeiro.", "Create a team first.")}</p>}
         {rules === undefined ? (
           <Loader2 size={15} className="animate-spin text-faint" />
@@ -98,7 +98,7 @@ export function AssignmentRulesSection() {
                 </div>
                 <div className="flex shrink-0 gap-1.5">
                   <button type="button" onClick={() => setEditing({ ruleId: rule._id, name: rule.name, teamId: rule.teamId, channelId: rule.channelId ?? "", strategy: rule.strategy, onlyOnline: rule.onlyOnline, leadStatuses: rule.leadStatuses ?? [], active: rule.active })} className="h-8 rounded-md border border-line px-2 text-[11px] font-semibold text-body">{tr("Editar", "Edit")}</button>
-                  <button type="button" onClick={() => { if (window.confirm(tr("Remover esta regra?", "Remove this rule?"))) void remove({ ruleId: rule._id }); }} className="inline-flex h-8 items-center rounded-md border border-line px-2 text-[11px] font-semibold text-muted hover:text-[#b3261e]"><Trash2 size={12} /></button>
+                  <button type="button" onClick={() => { if (window.confirm(tr("Remover esta regra?", "Remove this rule?"))) void remove({ ruleId: rule._id }); }} className="inline-flex h-8 items-center rounded-md border border-line px-2 text-[11px] font-semibold text-muted hover:text-chip-danger-fg"><Trash2 size={12} /></button>
                 </div>
               </li>
             ))}

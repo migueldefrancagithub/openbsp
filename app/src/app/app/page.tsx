@@ -125,7 +125,7 @@ export default function AppOverview() {
 
   if (!tenant || !dashboard) {
     return (
-      <main className="min-h-screen bg-[#f6f8fb] p-6">
+      <main className="min-h-screen bg-background p-6">
         <div className="mx-auto max-w-7xl space-y-4">
           <div className="h-28 rounded-lg border border-line bg-surface animate-pulse" />
           <div className="grid gap-3 md:grid-cols-3">
@@ -394,7 +394,7 @@ export default function AppOverview() {
                           </p>
                           <StatusBadge status={thread.leadStatus as LeadStatus} />
                           {thread.unreadCount > 0 && (
-                            <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+                            <span className="rounded-full bg-chip-success px-2 py-0.5 text-[11px] font-semibold text-chip-success-fg">
                               {thread.unreadCount} {t("op.unread").toLowerCase()}
                             </span>
                           )}
@@ -550,7 +550,7 @@ function AttentionCard({
     <div className="rounded-lg border border-line bg-surface p-3 sm:p-4">
       <span
         className={`inline-flex h-8 w-8 items-center justify-center rounded-lg sm:h-9 sm:w-9 ${
-          urgent ? "bg-amber-50 text-amber-600" : "bg-emerald-50 text-[#0f766e]"
+          urgent ? "bg-chip-warn text-amber-600" : "bg-chip-success text-[#0f766e]"
         }`}
       >
         <Icon size={17} />
@@ -569,14 +569,14 @@ function AttentionCard({
 function ActionIcon({ tone }: { tone: ActionTone }) {
   if (tone === "good") {
     return (
-      <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
+      <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-chip-success text-emerald-600">
         <CheckCircle2 size={16} />
       </span>
     );
   }
   if (tone === "warn") {
     return (
-      <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-50 text-amber-600">
+      <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-chip-warn text-amber-600">
         <AlertTriangle size={16} />
       </span>
     );

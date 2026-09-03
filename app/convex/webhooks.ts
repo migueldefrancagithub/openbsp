@@ -7,7 +7,7 @@ import {
 } from "./_generated/server";
 import { tryRegisterWebhookEvent } from "./lib/idempotency";
 import { parseMetaPayload } from "./lib/meta/parsePayload";
-import { recordConsentTransition } from "./lib/consent";
+import { MAX_CONSENT_CONVERSATIONS, MAX_CONSENT_MESSAGES, recordConsentTransition } from "./lib/consent";
 import { recordAiAuditEvent } from "./lib/aiControl";
 import type { Id } from "./_generated/dataModel";
 
@@ -299,13 +299,17 @@ export const handleStopKeyword = internalMutation({
     }
     // Cascade: cancel any queued outbound to this contact (handled inline
     // here since cancelPendingForContact lives in lib/consent.ts).
+    // Indexed by (tenant, contact): the previous read bound only the tenant and
+    // filtered in JS, which is a full conversation scan inside the mutation an
+    // inbound "stop" triggers. At a few thousand conversations it trips the read
+    // limit and the opt-out fails silently — a compliance incident, not a slow
+    // page.
     const conversations = await ctx.db
       .query("conversations")
-      .withIndex("by_tenant_phone_contact", (q) =>
-        q.eq("tenantId", args.tenantId),
+      .withIndex("by_tenant_contact_lastmsg", (q) =>
+        q.eq("tenantId", args.tenantId).eq("contactId", args.contactId),
       )
-      .filter((q) => q.eq(q.field("contactId"), args.contactId))
-      .collect();
+      .take(MAX_CONSENT_CONVERSATIONS);
     for (const conv of conversations) {
       const queued = await ctx.db
         .query("messages")
@@ -316,7 +320,7 @@ export const handleStopKeyword = internalMutation({
             q.eq(q.field("status"), "queued"),
           ),
         )
-        .collect();
+        .take(MAX_CONSENT_MESSAGES);
       for (const m of queued) {
         await ctx.db.patch(m._id, {
           status: "failed",
