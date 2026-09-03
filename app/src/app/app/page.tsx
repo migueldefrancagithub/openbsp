@@ -147,8 +147,8 @@ export default function AppOverview() {
   );
 
   return (
-    <main className="min-h-screen bg-[#f6f8fb]">
-      <header className="border-b border-line bg-surface">
+    <main className="flex h-full min-h-0 flex-col bg-background">
+      <header className="shrink-0 border-b border-line bg-surface">
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-6 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
           <div>
             <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-faint">
@@ -180,7 +180,7 @@ export default function AppOverview() {
         </div>
       </header>
 
-      <div className="mx-auto max-w-7xl space-y-5 px-4 py-6 sm:px-6 lg:px-8">
+      <div className="mx-auto w-full min-h-0 max-w-7xl flex-1 space-y-5 overflow-y-auto px-4 py-6 sm:px-6 lg:px-8">
         <section className="grid grid-cols-2 gap-2 [&>*:last-child]:col-span-2 sm:gap-3 md:grid-cols-3 md:[&>*:last-child]:col-span-1 xl:grid-cols-5">
           <AttentionCard
             icon={MessageCircle}

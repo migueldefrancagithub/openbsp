@@ -8,6 +8,7 @@ import { threadHasMessageEvent } from "./lib/channels/threadVisibility";
 import { threadLeadStatusValidator } from "./lib/channels/threadUpdate";
 import { tenantQuery } from "./lib/customFunctions";
 import { classifyRisk, compareRisk, resolveStageWindow } from "./lib/leads/riskRadar";
+import { threadCommand } from "./lib/channels/threadCommand";
 
 const PAGE_SIZE = 100;
 /** Column counts stop at 100+ — the kanban never needs the exact tail. */
@@ -49,6 +50,11 @@ const leadCardValidator = v.object({
   originCampaignName: v.optional(v.string()),
   automationMode: v.optional(v.string()),
   pilotBlocked: v.boolean(),
+  /** Who holds the conversation, by the same resolver the inbox uses. */
+  command: v.string(),
+  /** Cold enough to be on the radar, and how cold. */
+  riskBucket: v.optional(v.string()),
+  hoursSinceActivity: v.number(),
 });
 
 async function memberLabel(ctx: { db: any }, memberId?: Id<"members">) {
@@ -120,12 +126,25 @@ export const listByStatus = tenantQuery({
       if (thread.responsibleMemberId && !members.has(thread.responsibleMemberId)) {
         members.set(thread.responsibleMemberId, await memberLabel(ctx, thread.responsibleMemberId));
       }
+      // The card carries the two facts that decide whether someone acts on it:
+      // who holds the conversation, and whether it is going cold with nothing
+      // planned. Both are the same rules the inbox and the radar use.
+      const command = threadCommand(thread, Date.now());
+      const risk = classifyRisk({
+        lastActivityAt: Math.max(thread.lastInboundAt ?? 0, thread.lastOutboundAt ?? 0, thread.createdAt),
+        now: Date.now(),
+        inFlight: false,
+        window: resolveStageWindow(thread.leadStatus),
+      });
       page.push({
         _id: thread._id,
         channelId: thread.channelId,
         threadKey: thread.threadKey,
         displayName: identity?.displayName,
         phone: identity?.phone,
+        command: command.who,
+        riskBucket: risk.onRadar ? risk.bucket : undefined,
+        hoursSinceActivity: Math.round(risk.hoursSinceActivity),
         leadStatus: thread.leadStatus ?? args.leadStatus,
         leadSource: thread.leadSource,
         intent: thread.intent,

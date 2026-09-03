@@ -6,13 +6,18 @@ import { useQuery } from "convex/react";
 import {
   ArrowRight,
   BarChart3,
+  Bell,
+  Bot,
   FileText,
   Inbox,
   LayoutDashboard,
   LifeBuoy,
   MessageSquare,
+  Moon,
   MousePointerClick,
   Search,
+  ShieldAlert,
+  Sparkles,
   Send,
   Settings,
   Users,
@@ -31,7 +36,9 @@ type Item = {
   hint?: string;
   href: string;
   icon: LucideIcon;
-  group: "Navigate" | "Conversations" | "Settings";
+  group: "Actions" | "Navigate" | "Conversations" | "Settings";
+  /** Runs instead of navigating — used by the action group. */
+  run?: () => void | Promise<void>;
 };
 
 type StaticItem = Omit<Item, "label"> & {
@@ -172,7 +179,70 @@ export function CommandPalette() {
       icon: MessageSquare,
       group: "Conversations" as const,
     }));
-    return [...navItems, ...convItems, ...settingsItems];
+    const actionItems: Item[] = [
+      {
+        id: "action-suggestions",
+        label: t("palette.openSuggestions"),
+        hint: t("palette.openSuggestionsHint"),
+        href: "/app/channel-inbox?filter=ai_suggestions",
+        icon: Sparkles,
+        group: "Actions" as const,
+      },
+      {
+        id: "action-risk",
+        label: t("palette.openRisk"),
+        hint: t("palette.openRiskHint"),
+        href: "/app/channel-inbox?filter=at_risk",
+        icon: ShieldAlert,
+        group: "Actions" as const,
+      },
+      {
+        id: "action-queue",
+        label: t("palette.openQueue"),
+        hint: t("palette.openQueueHint"),
+        href: "/app/channel-inbox?filter=waiting",
+        icon: Users,
+        group: "Actions" as const,
+      },
+      {
+        id: "action-alerts",
+        label: t("palette.openAlerts"),
+        hint: t("palette.openAlertsHint"),
+        href: "/app?tab=alerts",
+        icon: Bell,
+        group: "Actions" as const,
+      },
+      {
+        id: "action-agents",
+        label: t("palette.openAgents"),
+        hint: t("palette.openAgentsHint"),
+        href: "/app/agents",
+        icon: Bot,
+        group: "Actions" as const,
+      },
+      {
+        id: "action-theme",
+        label: t("palette.toggleTheme"),
+        hint: t("palette.toggleThemeHint"),
+        href: "#",
+        icon: Moon,
+        group: "Actions" as const,
+        run: () => {
+          const root = document.documentElement;
+          const isDark =
+            root.getAttribute("data-theme") === "dark" ||
+            (!root.hasAttribute("data-theme") && window.matchMedia("(prefers-color-scheme: dark)").matches);
+          const next = isDark ? "light" : "dark";
+          root.setAttribute("data-theme", next);
+          try {
+            localStorage.setItem("openbsp-theme", next);
+          } catch {
+            /* storage blocked: the choice still applies to this session */
+          }
+        },
+      },
+    ];
+    return [...actionItems, ...navItems, ...convItems, ...settingsItems];
   }, [conversations, t]);
 
   const filtered = useMemo(() => {
@@ -192,6 +262,10 @@ export function CommandPalette() {
   function navigate(item: Item) {
     setOpen(false);
     setQuery("");
+    if (item.run) {
+      void item.run();
+      return;
+    }
     router.push(item.href);
   }
 
@@ -216,9 +290,10 @@ export function CommandPalette() {
     grouped[it.group] = grouped[it.group] ?? [];
     grouped[it.group].push(it);
   });
-  const groupOrder: Item["group"][] = ["Navigate", "Conversations", "Settings"];
+  const groupOrder: Item["group"][] = ["Actions", "Navigate", "Conversations", "Settings"];
 
   const groupLabel: Record<Item["group"], string> = {
+    Actions: t("shell.groupActions"),
     Navigate: t("shell.groupNavigate"),
     Conversations: t("shell.groupConversations"),
     Settings: t("shell.groupSettings"),

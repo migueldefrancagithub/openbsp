@@ -27,6 +27,9 @@ export type LeadCardData = {
   originCampaignName?: string;
   automationMode?: string;
   pilotBlocked: boolean;
+  command?: string;
+  riskBucket?: string;
+  hoursSinceActivity?: number;
 };
 
 export function LeadCard({
@@ -54,8 +57,9 @@ export function LeadCard({
         event.dataTransfer.effectAllowed = "move";
       }}
       className={cn(
-        "rounded-lg border border-line bg-surface p-2.5 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-opacity",
+        "rounded-xl border border-line bg-surface p-3 shadow-[var(--shadow-card)] transition-all hover:border-brand-solid/30 hover:shadow-[0_6px_18px_-10px_rgba(10,27,51,0.35)]",
         moving && "opacity-50",
+        lead.riskBucket === "critical" && "border-l-2 border-l-[#b3261e]",
       )}
       data-lead-card={lead._id}
     >
@@ -88,13 +92,45 @@ export function LeadCard({
             {t("inbox.pilotBlockedShort")}
           </span>
         )}
-        {lead.automationMode === "bot" && <Bot size={11} className="text-blue-500" />}
+        <span
+          className={cn(
+            "inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] font-bold",
+            lead.command === "ai"
+              ? "bg-[#eef3fb] text-[#2b4f8a]"
+              : lead.command === "member"
+                ? "bg-[#edf8f6] text-[#0d6b61]"
+                : "bg-surface-3 text-muted",
+          )}
+          title={
+            lead.command === "ai"
+              ? t("leads.commandAi")
+              : lead.command === "member"
+                ? t("leads.commandMember")
+                : t("leads.commandWaiting")
+          }
+        >
+          {lead.command === "ai" ? <Bot size={9} /> : <UserRound size={9} />}
+          {lead.command === "ai" ? "IA" : lead.command === "member" ? t("leads.human") : t("leads.queue")}
+        </span>
         {lead.unreadCount > 0 && (
           <span className="ml-auto min-w-5 rounded-full bg-[#0d6b61] px-1.5 py-0.5 text-center text-[9px] font-bold text-white">
             {lead.unreadCount}
           </span>
         )}
       </div>
+      {lead.riskBucket && lead.riskBucket !== "in_flight" && (
+        <div
+          className={cn(
+            "mt-2 inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[9px] font-bold",
+            lead.riskBucket === "critical" ? "bg-[#fdf1ef] text-[#b3261e]" : "bg-amber-50 text-amber-800",
+          )}
+        >
+          <ShieldAlert size={9} />
+          {!lead.nextStep ? t("leads.riskNoNextStep") : t("leads.riskCold")}
+          {typeof lead.hoursSinceActivity === "number" &&
+            ` · ${lead.hoursSinceActivity < 48 ? `${lead.hoursSinceActivity}h` : `${Math.round(lead.hoursSinceActivity / 24)}d`}`}
+        </div>
+      )}
       {lead.nextStep && (
         <div className="mt-2 flex items-start gap-1 text-[10px] text-body">
           <Clock3 size={10} className={cn("mt-0.5 shrink-0", overdue ? "text-[#b3261e]" : "text-faint")} />

@@ -32,7 +32,7 @@ export default function LeadsPage() {
   const counts = useQuery(api.leads.counts, channels === undefined ? "skip" : { channelId: channelId || undefined });
 
   return (
-    <div className="flex min-h-full flex-col">
+    <div className="flex h-full min-h-0 flex-col">
       <PageHeader
         eyebrow={t("leads.eyebrow")}
         title={t("leads.title")}
@@ -57,7 +57,7 @@ export default function LeadsPage() {
       ) : channels.length === 0 ? (
         <EmptyState icon={MousePointerClick} title={t("leads.title")} description={t("leads.noChannel")} />
       ) : (
-        <div className="pt-4">
+        <div className="flex min-h-0 flex-1 flex-col pt-4">
           <LeadsKanban channelId={channelId || undefined} counts={counts} />
         </div>
       )}
