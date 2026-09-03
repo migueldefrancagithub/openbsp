@@ -65,14 +65,14 @@ export function LogoMarquee() {
           {[...LOGOS, ...LOGOS].map((logo, i) => (
             <div
               key={`${logo.name}-${i}`}
-              className="group relative h-24 w-40 shrink-0 flex items-center justify-center rounded-full bg-white border border-slate-200/60 shadow-sm hover:border-slate-300 transition-all overflow-hidden"
+              className="group relative h-24 w-40 shrink-0 flex items-center justify-center rounded-full bg-surface border border-slate-200/60 shadow-sm hover:border-line transition-all overflow-hidden"
             >
               <div
                 className="absolute inset-0 scale-150 opacity-0 transition-all duration-300 group-hover:scale-100 group-hover:opacity-100"
                 style={{ background: logo.gradient }}
                 aria-hidden
               />
-              <span className="relative flex items-center gap-2 text-[#0a1b33] transition-colors duration-300 group-hover:text-white">
+              <span className="relative flex items-center gap-2 text-ink transition-colors duration-300 group-hover:text-white">
                 <span
                   className="flex h-9 w-9 items-center justify-center rounded-full text-[15px] font-semibold text-white shadow-sm"
                   style={{ background: logo.gradient }}

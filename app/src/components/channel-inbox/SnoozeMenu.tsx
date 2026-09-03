@@ -48,7 +48,7 @@ export function SnoozeMenu({
 
   if (snoozedUntil && snoozedUntil > Date.now()) {
     return (
-      <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[10px] font-semibold text-slate-600" data-snoozed>
+      <span className="inline-flex items-center gap-1 rounded-md border border-line bg-surface-2 px-2 py-1 text-[10px] font-semibold text-body" data-snoozed>
         <Clock size={11} />
         {t("inbox.snoozeUntil").replace("{time}", formatTime(snoozedUntil, locale))}
         <button type="button" onClick={onUnsnooze} className="ml-1 rounded px-1 text-[#0d6b61] hover:underline">
@@ -71,8 +71,8 @@ export function SnoozeMenu({
         type="button"
         onClick={() => setOpen((value) => !value)}
         className={cn(
-          "rounded-md p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-[#0a1b33]",
-          open && "bg-slate-100 text-[#0a1b33]",
+          "rounded-md p-2 text-faint transition-colors hover:bg-surface-3 hover:text-ink",
+          open && "bg-surface-3 text-ink",
         )}
         title={t("inbox.snooze")}
         aria-expanded={open}
@@ -81,10 +81,10 @@ export function SnoozeMenu({
         <Clock size={15} />
       </button>
       {open && (
-        <div className="absolute right-0 top-full z-40 mt-1 w-56 rounded-lg border border-slate-200 bg-white p-2 shadow-[0_18px_50px_-30px_rgba(15,23,42,0.6)]">
+        <div className="absolute right-0 top-full z-40 mt-1 w-56 rounded-lg border border-line bg-surface p-2 shadow-[0_18px_50px_-30px_rgba(15,23,42,0.6)]">
           <div className="flex items-center justify-between px-1 pb-1">
-            <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">{t("inbox.snooze")}</span>
-            <button type="button" onClick={() => setOpen(false)} className="rounded p-0.5 text-slate-400 hover:bg-slate-100" aria-label={t("inbox.cancel")}>
+            <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-faint">{t("inbox.snooze")}</span>
+            <button type="button" onClick={() => setOpen(false)} className="rounded p-0.5 text-faint hover:bg-surface-3" aria-label={t("inbox.cancel")}>
               <X size={12} />
             </button>
           </div>
@@ -96,20 +96,20 @@ export function SnoozeMenu({
                 onSnooze(until);
                 setOpen(false);
               }}
-              className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
+              className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-[11px] font-semibold text-ink hover:bg-surface-2"
             >
               <span>{label}</span>
-              <span className="text-[10px] font-normal text-slate-400">{formatTime(until, locale)}</span>
+              <span className="text-[10px] font-normal text-faint">{formatTime(until, locale)}</span>
             </button>
           ))}
-          <div className="mt-1 border-t border-slate-100 pt-2">
-            <div className="px-1 text-[10px] font-semibold text-slate-500">{t("inbox.snoozeCustom")}</div>
+          <div className="mt-1 border-t border-line-soft pt-2">
+            <div className="px-1 text-[10px] font-semibold text-muted">{t("inbox.snoozeCustom")}</div>
             <div className="mt-1 flex items-center gap-1">
               <input
                 type="datetime-local"
                 value={custom}
                 onChange={(event) => setCustom(event.target.value)}
-                className="h-8 min-w-0 flex-1 rounded-md border border-slate-200 px-2 text-[11px] outline-none focus:border-slate-400"
+                className="h-8 min-w-0 flex-1 rounded-md border border-line px-2 text-[11px] outline-none focus:border-brand-solid/40"
               />
               <button
                 type="button"
@@ -120,7 +120,7 @@ export function SnoozeMenu({
                     setOpen(false);
                   }
                 }}
-                className="h-8 rounded-md bg-[#0a1b33] px-2 text-[11px] font-semibold text-white"
+                className="h-8 rounded-md bg-brand-solid px-2 text-[11px] font-semibold text-white"
               >
                 {t("inbox.snooze")}
               </button>

@@ -30,9 +30,9 @@ export function ProposalsPanel({ threadId, compact = false }: { threadId?: Id<"c
   if (!pending || pending.length === 0) {
     if (compact || threadId) return null;
     return (
-      <div className="rounded-lg border border-slate-200 bg-white px-4 py-8 text-center">
-        <p className="text-[13px] font-medium text-[#0a1b33]">{tr("Nenhuma proposta à sua espera", "No proposals waiting for you")}</p>
-        <p className="mt-0.5 text-[12px] text-slate-500">
+      <div className="rounded-lg border border-line bg-surface px-4 py-8 text-center">
+        <p className="text-[13px] font-medium text-ink">{tr("Nenhuma proposta à sua espera", "No proposals waiting for you")}</p>
+        <p className="mt-0.5 text-[12px] text-muted">
           {tr(
             "Quando o assistente ouvir um dado novo ou sugerir um próximo passo, aparece aqui — e sai daqui assim que decidir.",
             "When the assistant hears a new detail or suggests a next step, it shows up here — and leaves as soon as you decide.",
@@ -55,14 +55,14 @@ export function ProposalsPanel({ threadId, compact = false }: { threadId?: Id<"c
   }
 
   return (
-    <div className={cn("rounded-lg border border-slate-200 bg-white", compact && "border-[#2b4f8a]/25 bg-[#f7f9fd]")}>
-      <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2">
-        <span className="text-[12px] font-semibold text-[#0a1b33]">
+    <div className={cn("rounded-lg border border-line bg-surface", compact && "border-[#2b4f8a]/25 bg-[#f7f9fd]")}>
+      <div className="flex items-center justify-between border-b border-line-soft px-3 py-2">
+        <span className="text-[12px] font-semibold text-ink">
           {tr("A IA ouviu, você decide", "The AI heard it, you decide")} ({pending.length})
         </span>
       </div>
       {error && <p className="px-3 pt-2 text-[11px] text-[#b3261e]">{error}</p>}
-      <ul className="divide-y divide-slate-100">
+      <ul className="divide-y divide-line-soft">
         {pending.map((proposal) => (
           <li key={proposal._id} className="px-3 py-2.5 text-[12px]">
             <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
@@ -74,23 +74,23 @@ export function ProposalsPanel({ threadId, compact = false }: { threadId?: Id<"c
                   {proposal.patientName ?? proposal.threadKey}
                 </Link>
               )}
-              <span className="text-[10px] uppercase tracking-[0.12em] text-slate-400">
+              <span className="text-[10px] uppercase tracking-[0.12em] text-faint">
                 {proposal.kind === "next_action"
                   ? tr("próxima acção", "next action")
                   : (locale === "pt" ? FIELD_PT : FIELD_EN)[proposal.field ?? ""] ?? proposal.field}
               </span>
-              <span className="text-[10px] text-slate-400">{relativeTime(proposal.createdAt, now, locale)}</span>
+              <span className="text-[10px] text-faint">{relativeTime(proposal.createdAt, now, locale)}</span>
             </div>
             {proposal.kind === "next_action" ? (
-              <p className="mt-0.5 text-[#0a1b33]">{proposal.action}</p>
+              <p className="mt-0.5 text-ink">{proposal.action}</p>
             ) : (
-              <p className="mt-0.5 text-[#0a1b33]">
-                {proposal.previousValue && <span className="text-slate-400 line-through">{proposal.previousValue} </span>}
+              <p className="mt-0.5 text-ink">
+                {proposal.previousValue && <span className="text-faint line-through">{proposal.previousValue} </span>}
                 <span className="font-semibold">{proposal.value}</span>
               </p>
             )}
             {proposal.excerpt && (
-              <p className="mt-0.5 rounded bg-slate-50 px-1.5 py-1 text-[11px] italic text-slate-500">“{proposal.excerpt}”</p>
+              <p className="mt-0.5 rounded bg-surface-2 px-1.5 py-1 text-[11px] italic text-muted">“{proposal.excerpt}”</p>
             )}
             <div className="mt-1.5 flex items-center gap-1.5">
               <button
@@ -106,12 +106,12 @@ export function ProposalsPanel({ threadId, compact = false }: { threadId?: Id<"c
                 type="button"
                 disabled={busy !== null}
                 onClick={() => void act(proposal._id, "dismiss")}
-                className="inline-flex h-7 items-center gap-1 rounded-md border border-slate-200 px-2 text-[11px] font-semibold text-slate-600 disabled:opacity-50"
+                className="inline-flex h-7 items-center gap-1 rounded-md border border-line px-2 text-[11px] font-semibold text-body disabled:opacity-50"
               >
                 <X size={11} />
                 {tr("Ignorar", "Ignore")}
               </button>
-              <span className="text-[10px] text-slate-400">
+              <span className="text-[10px] text-faint">
                 {tr("vence", "expires")} {relativeTime(proposal.expiresAt, now, locale)}
               </span>
             </div>

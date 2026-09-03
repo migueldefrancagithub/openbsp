@@ -31,7 +31,7 @@ import { useI18n, type Locale } from "@/lib/i18n";
 const CONSENT_PILL: Record<string, string> = {
   granted: "bg-emerald-50 text-emerald-700 border-emerald-200",
   revoked: "bg-red-50 text-red-700 border-red-200",
-  unknown: "bg-slate-100 text-slate-500 border-slate-200",
+  unknown: "bg-surface-3 text-muted border-line",
 };
 
 type ContactRow = {
@@ -179,7 +179,7 @@ export default function ContactsPage() {
           <button
             type="button"
             onClick={() => setOpen(true)}
-            className="inline-flex items-center gap-2 bg-[#0a152d] text-white text-[13px] font-medium px-4 py-2 rounded-lg shadow-[0_8px_24px_-8px_rgba(10,21,45,0.5)] hover:bg-[#0a1b33] transition-all"
+            className="inline-flex items-center gap-2 bg-nav-active text-white text-[13px] font-medium px-4 py-2 rounded-lg shadow-[0_8px_24px_-8px_rgba(10,21,45,0.5)] hover:bg-brand-solid transition-all"
           >
             <Upload size={14} strokeWidth={2.5} />
             {tr("Importar CSV", "Import CSV")}
@@ -200,7 +200,7 @@ export default function ContactsPage() {
           </div>
         )}
         {contacts === undefined ? (
-          <div className="text-sm text-slate-400">{tr("A carregar...", "Loading...")}</div>
+          <div className="text-sm text-faint">{tr("A carregar...", "Loading...")}</div>
         ) : contacts.length === 0 ? (
           <EmptyState
             icon={Users}
@@ -213,7 +213,7 @@ export default function ContactsPage() {
               <button
                 type="button"
                 onClick={() => setOpen(true)}
-                className="inline-flex items-center gap-2 bg-[#0a152d] text-white text-[13px] font-medium px-4 py-2 rounded-lg hover:bg-[#0a1b33] transition-all"
+                className="inline-flex items-center gap-2 bg-nav-active text-white text-[13px] font-medium px-4 py-2 rounded-lg hover:bg-brand-solid transition-all"
               >
                 <Upload size={14} strokeWidth={2.5} />
                 {tr("Importar primeiro CSV", "Import first CSV")}
@@ -222,7 +222,7 @@ export default function ContactsPage() {
           />
         ) : (
           <>
-            <section className="rounded-lg border border-slate-200 bg-white p-4">
+            <section className="rounded-lg border border-line bg-surface p-4">
               <div className="mb-4 grid gap-3 md:grid-cols-4">
                 <ContactStat icon={Users} label="Total" value={contactStats.total} tone="neutral" />
                 <ContactStat icon={Fingerprint} label={tr("Identidade conhecida", "Known identity")} value={contactStats.bsuid} tone="good" />
@@ -233,13 +233,13 @@ export default function ContactsPage() {
                 <label className="relative block">
                   <Search
                     size={16}
-                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-faint"
                   />
                   <input
                     value={search}
                     onChange={(event) => setSearch(event.target.value)}
                     placeholder={tr("Pesquisar nome, telefone ou identidade...", "Search name, phone, or identity...")}
-                    className="h-11 w-full rounded-lg border border-slate-200 bg-white pl-10 pr-3 text-sm text-[#0a1b33] outline-none transition-colors placeholder:text-slate-400 focus:border-slate-400"
+                    className="h-11 w-full rounded-lg border border-line bg-surface pl-10 pr-3 text-sm text-ink outline-none transition-colors placeholder:text-faint focus:border-brand-solid/40"
                   />
                 </label>
                 <select
@@ -247,7 +247,7 @@ export default function ContactsPage() {
                   onChange={(event) =>
                     setIdentityFilter(event.target.value as IdentityFilter)
                   }
-                  className="h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-[#0a1b33] outline-none focus:border-slate-400"
+                  className="h-11 rounded-lg border border-line bg-surface px-3 text-sm font-medium text-ink outline-none focus:border-brand-solid/40"
                 >
                   <option value="all">{tr("Todas as identidades", "All identities")}</option>
                   <option value="phone">{tr("Com telefone", "Has phone")}</option>
@@ -260,14 +260,14 @@ export default function ContactsPage() {
                   onChange={(event) =>
                     setConsentFilter(event.target.value as ConsentFilter)
                   }
-                  className="h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-[#0a1b33] outline-none focus:border-slate-400"
+                  className="h-11 rounded-lg border border-line bg-surface px-3 text-sm font-medium text-ink outline-none focus:border-brand-solid/40"
                 >
                   <option value="all">{tr("Todos os consentimentos", "All marketing consent")}</option>
                   <option value="marketing_granted">{tr("Marketing autorizado", "Marketing granted")}</option>
                   <option value="marketing_revoked">{tr("Marketing recusado", "Marketing revoked")}</option>
                   <option value="marketing_unknown">{tr("Marketing desconhecido", "Marketing unknown")}</option>
                 </select>
-                <label className="inline-flex h-11 items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-600">
+                <label className="inline-flex h-11 items-center justify-between gap-3 rounded-lg border border-line bg-surface px-3 text-sm font-medium text-body">
                   {tr("Explicar correspondência", "Explain match")}
                   <input
                     type="checkbox"
@@ -278,10 +278,10 @@ export default function ContactsPage() {
                 </label>
               </div>
               <div className="mt-4 flex flex-wrap items-center gap-3">
-                <span className="text-sm font-medium text-[#0a1b33]">
+                <span className="text-sm font-medium text-ink">
                   {tr("Ordenar por:", "Sort by:")}
                 </span>
-                <select className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-[#0a1b33]">
+                <select className="h-10 rounded-lg border border-line bg-surface px-3 text-sm text-ink">
                   <option>{tr("Última atividade", "Last activity")}</option>
                 </select>
                 {(identityFilter !== "all" || consentFilter !== "all" || search) && (
@@ -292,7 +292,7 @@ export default function ContactsPage() {
                       setIdentityFilter("all");
                       setConsentFilter("all");
                     }}
-                    className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-[#0a1b33] transition-colors hover:border-slate-300"
+                    className="inline-flex h-10 items-center gap-2 rounded-lg border border-line bg-surface px-3 text-sm font-medium text-ink transition-colors hover:border-line"
                   >
                     <SlidersHorizontal size={15} />
                     {tr("Limpar filtros", "Reset filters")}
@@ -303,7 +303,7 @@ export default function ContactsPage() {
                   onChange={(event) =>
                     setSortOrder(event.target.value as "desc" | "asc")
                   }
-                  className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-[#0a1b33]"
+                  className="h-10 rounded-lg border border-line bg-surface px-3 text-sm text-ink"
                 >
                   <option value="desc">{tr("Mais recentes", "Newest first")}</option>
                   <option value="asc">{tr("Mais antigos", "Oldest first")}</option>
@@ -323,17 +323,17 @@ export default function ContactsPage() {
                 return (
                   <article
                     key={contact._id}
-                    className="rounded-lg border border-slate-200 bg-white p-4"
+                    className="rounded-lg border border-line bg-surface p-4"
                   >
                     <div className="flex items-start gap-3">
                       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-sky-50 text-sm font-semibold text-sky-700">
                         {initial}
                       </span>
                       <div className="min-w-0 flex-1">
-                        <h2 className="truncate text-sm font-semibold text-[#0a1b33]">
+                        <h2 className="truncate text-sm font-semibold text-ink">
                           {primary}
                         </h2>
-                        <p className="mt-0.5 truncate text-xs text-slate-500">
+                        <p className="mt-0.5 truncate text-xs text-muted">
                           {contact.e164
                             ? maskPhone(contact.e164)
                             : tr("Telefone em falta", "Phone missing")}
@@ -361,16 +361,16 @@ export default function ContactsPage() {
                         </button>
                       </div>
                     </div>
-                    <div className="mt-3 grid grid-cols-2 gap-2 border-t border-slate-100 pt-3 text-xs">
+                    <div className="mt-3 grid grid-cols-2 gap-2 border-t border-line-soft pt-3 text-xs">
                       <div>
-                        <span className="text-slate-400">{tr("Etapa", "Stage")}</span>
-                        <p className="mt-1 truncate font-medium text-[#0a1b33]">
+                        <span className="text-faint">{tr("Etapa", "Stage")}</span>
+                        <p className="mt-1 truncate font-medium text-ink">
                           {contact.opportunityStatus ?? tr("Sem etapa", "No stage")}
                         </p>
                       </div>
                       <div>
-                        <span className="text-slate-400">{tr("Atividade", "Activity")}</span>
-                        <p className="mt-1 font-medium text-[#0a1b33]">
+                        <span className="text-faint">{tr("Atividade", "Activity")}</span>
+                        <p className="mt-1 font-medium text-ink">
                           {relativeTime(
                             contact.lastConversationAt ?? contact.createdAt,
                             Date.now(),
@@ -389,7 +389,7 @@ export default function ContactsPage() {
                       {contact.tags.slice(0, 3).map((tag) => (
                         <span
                           key={tag}
-                          className="rounded-md bg-slate-100 px-2 py-1 text-[10px] font-medium text-slate-600"
+                          className="rounded-md bg-surface-3 px-2 py-1 text-[10px] font-medium text-body"
                         >
                           {tag}
                         </span>
@@ -400,9 +400,9 @@ export default function ContactsPage() {
               })}
             </div>
 
-            <div className="hidden rounded-lg border border-slate-200 bg-white md:block">
+            <div className="hidden rounded-lg border border-line bg-surface md:block">
               <div>
-                <div className="grid grid-cols-[36px_minmax(0,1.2fr)_minmax(0,1.2fr)_minmax(0,0.8fr)_88px] gap-3 border-b border-slate-100 bg-slate-50 px-4 py-3 text-[12px] font-semibold text-slate-500 xl:grid-cols-[36px_1.25fr_1.25fr_1.1fr_1fr_0.9fr_1fr_88px] xl:px-5">
+                <div className="grid grid-cols-[36px_minmax(0,1.2fr)_minmax(0,1.2fr)_minmax(0,0.8fr)_88px] gap-3 border-b border-line-soft bg-surface-2 px-4 py-3 text-[12px] font-semibold text-muted xl:grid-cols-[36px_1.25fr_1.25fr_1.1fr_1fr_0.9fr_1fr_88px] xl:px-5">
                   <span />
                   <span>{tr("Nome", "Name")}</span>
                   <span>{tr("Identidade WhatsApp", "WhatsApp identity")}</span>
@@ -412,7 +412,7 @@ export default function ContactsPage() {
                   <span className="hidden xl:block">{tr("Etiquetas", "Tags")}</span>
                   <span>{tr("Ações", "Actions")}</span>
                 </div>
-                <ul className="divide-y divide-slate-100">
+                <ul className="divide-y divide-line-soft">
               {visibleContacts.map((c) => {
                 // Display name fallback chain: name → username → phone → BSUID
                 const primary =
@@ -432,7 +432,7 @@ export default function ContactsPage() {
                 return (
                 <li
                   key={c._id}
-                  className="grid grid-cols-[36px_minmax(0,1.2fr)_minmax(0,1.2fr)_minmax(0,0.8fr)_88px] items-center gap-3 px-4 py-3.5 transition-colors hover:bg-slate-50 xl:grid-cols-[36px_1.25fr_1.25fr_1.1fr_1fr_0.9fr_1fr_88px] xl:px-5"
+                  className="grid grid-cols-[36px_minmax(0,1.2fr)_minmax(0,1.2fr)_minmax(0,0.8fr)_88px] items-center gap-3 px-4 py-3.5 transition-colors hover:bg-surface-2 xl:grid-cols-[36px_1.25fr_1.25fr_1.1fr_1fr_0.9fr_1fr_88px] xl:px-5"
                 >
                   <input type="checkbox" className="h-4 w-4 accent-sky-600" />
                   <div className="flex min-w-0 items-center gap-3">
@@ -440,11 +440,11 @@ export default function ContactsPage() {
                       {initial}
                     </div>
                     <div className="min-w-0">
-                      <div className="truncate text-[14px] font-semibold text-[#0a1b33]">
+                      <div className="truncate text-[14px] font-semibold text-ink">
                         {primary}
                       </div>
                       {explainMatch && (
-                        <div className="mt-0.5 truncate text-[11px] text-slate-500">
+                        <div className="mt-0.5 truncate text-[11px] text-muted">
                           {secondaryParts}
                         </div>
                       )}
@@ -482,14 +482,14 @@ export default function ContactsPage() {
                     <ConsentPill label={tr("Transacional", "Transactional")} status={c.transactionalConsent} at={c.transactionalConsentAt} locale={locale} />
                   </div>
                   <div className="hidden min-w-0 space-y-1 text-sm xl:block">
-                    <div className="truncate font-semibold capitalize text-[#0a1b33]">
+                    <div className="truncate font-semibold capitalize text-ink">
                       {c.lastLeadSource ?? tr("origem desconhecida", "unknown source")}
                     </div>
-                    <div className="truncate text-xs font-medium text-slate-500">
+                    <div className="truncate text-xs font-medium text-muted">
                       {c.opportunityStatus ?? tr("sem etapa", "no stage")}
                     </div>
                   </div>
-                  <div className="space-y-1 text-sm text-slate-500">
+                  <div className="space-y-1 text-sm text-muted">
                     <div className="inline-flex items-center gap-1">
                       <Clock3 size={14} />
                       {c.lastConversationAt
@@ -500,7 +500,7 @@ export default function ContactsPage() {
                       {serviceWindowLabel(c.serviceWindowExpiresAt, locale)}
                     </div>
                   </div>
-                  <span className="hidden truncate text-sm text-slate-500 xl:block">
+                  <span className="hidden truncate text-sm text-muted xl:block">
                     {c.tags.length > 0 ? c.tags.join(", ") : "-"}
                   </span>
                   <div className="flex items-center gap-2">
@@ -531,7 +531,7 @@ export default function ContactsPage() {
                     )}
                     <button
                       type="button"
-                      className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"
+                      className="rounded-lg p-1.5 text-faint hover:bg-surface-3"
                       aria-label={tr("Mais ações", "More actions")}
                     >
                       <MoreVertical size={16} />
@@ -543,11 +543,11 @@ export default function ContactsPage() {
                 </ul>
                 {visibleContacts.length === 0 && (
                   <div className="p-10 text-center">
-                    <Users size={26} className="mx-auto text-slate-300" />
-                    <h2 className="mt-3 font-[var(--font-outfit)] text-lg font-semibold text-[#0a1b33]">
+                    <Users size={26} className="mx-auto text-faint" />
+                    <h2 className="mt-3 font-[var(--font-outfit)] text-lg font-semibold text-ink">
                       {tr("Nenhum contacto corresponde", "No contacts match")}
                     </h2>
-                    <p className="mt-1 text-sm text-slate-500">
+                    <p className="mt-1 text-sm text-muted">
                       {tr(
                         "Limpe os filtros ou importe uma lista mais completa.",
                         "Clear filters or import a richer contact list.",
@@ -569,41 +569,41 @@ export default function ContactsPage() {
       )}
       {requestContact && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4">
-          <div className="w-full max-w-md rounded-lg border border-slate-200 bg-white shadow-xl">
-            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+          <div className="w-full max-w-md rounded-lg border border-line bg-surface shadow-xl">
+            <div className="flex items-center justify-between border-b border-line-soft px-5 py-4">
               <div>
-                <h2 className="font-[var(--font-outfit)] text-[18px] font-medium text-[#0a1b33]">
+                <h2 className="font-[var(--font-outfit)] text-[18px] font-medium text-ink">
                   {tr("Pedir telefone", "Request phone")}
                 </h2>
-                <p className="mt-0.5 text-sm text-slate-500">
+                <p className="mt-0.5 text-sm text-muted">
                   {requestContact.name}
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setRequestContact(null)}
-                className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                className="rounded-lg p-2 text-faint hover:bg-surface-3 hover:text-body"
               >
                 <X size={16} />
               </button>
             </div>
             <div className="space-y-4 p-5">
               <label className="block">
-                <span className="mb-1 block text-[11px] font-medium text-slate-500">
+                <span className="mb-1 block text-[11px] font-medium text-muted">
                   {tr("Mensagem", "Message")}
                 </span>
                 <textarea
                   value={requestBody}
                   onChange={(event) => setRequestBody(event.target.value)}
                   rows={4}
-                  className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm text-[#0a1b33] outline-none transition-colors focus:border-slate-400"
+                  className="w-full resize-none rounded-lg border border-line px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-brand-solid/40"
                 />
               </label>
               <button
                 type="button"
                 onClick={handleSendContactRequest}
                 disabled={busy || requestBody.trim().length === 0}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#0a152d] px-4 py-2 text-[13px] font-medium text-white transition-all hover:bg-[#0a1b33] disabled:opacity-50"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-nav-active px-4 py-2 text-[13px] font-medium text-white transition-all hover:bg-brand-solid disabled:opacity-50"
               >
                 {busy ? <Loader2 size={14} className="animate-spin" /> : <PhoneCall size={14} />}
                 {tr("Enviar pedido", "Send request")}
@@ -637,7 +637,7 @@ function ContactStat({
       ? "border-emerald-100 bg-emerald-50 text-emerald-700"
       : tone === "warn"
         ? "border-amber-100 bg-amber-50 text-amber-700"
-        : "border-slate-200 bg-slate-50 text-slate-600";
+        : "border-line bg-surface-2 text-body";
   return (
     <div className={`rounded-xl border p-3 ${toneClass}`}>
       <div className="flex items-center justify-between gap-3">
@@ -670,19 +670,19 @@ function IdentityLine({
       ? "text-emerald-700"
       : tone === "warn"
         ? "text-amber-700"
-        : "text-slate-600";
+        : "text-body";
   return (
     <div className="flex min-w-0 items-center gap-2 text-xs">
       <Icon size={13} className={`shrink-0 ${toneClass}`} />
-      <span className="shrink-0 font-semibold text-slate-500">{label}</span>
-      <span className="min-w-0 flex-1 truncate font-medium text-[#0a1b33]">
+      <span className="shrink-0 font-semibold text-muted">{label}</span>
+      <span className="min-w-0 flex-1 truncate font-medium text-ink">
         {value}
       </span>
       {copy && (
         <button
           type="button"
           onClick={copy}
-          className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-[#0a1b33]"
+          className="rounded p-1 text-faint hover:bg-surface-3 hover:text-ink"
           aria-label={tr(`Copiar ${label}`, `Copy ${label}`)}
         >
           <Copy size={12} />
@@ -718,7 +718,7 @@ function ConsentPill({
         {label}: {consentLabel(status, locale)}
       </span>
       {at && (
-        <span className="text-[10px] text-slate-400">
+        <span className="text-[10px] text-faint">
           {relativeTime(at, Date.now(), locale)}
         </span>
       )}

@@ -28,10 +28,10 @@ export function RiskRadarPanel() {
   const nothingToShow = radar.items.length === 0 && radar.withoutNextStep.length === 0;
   if (nothingToShow) {
     return (
-      <div className="rounded-lg border border-slate-200 bg-white px-4 py-6 text-center">
+      <div className="rounded-lg border border-line bg-surface px-4 py-6 text-center">
         <CheckCircle2 size={22} className="mx-auto text-[#0d6b61]" />
-        <p className="mt-1 text-[13px] font-medium text-[#0a1b33]">{tr("Nada em risco", "Nothing at risk")}</p>
-        <p className="text-[12px] text-slate-500">
+        <p className="mt-1 text-[13px] font-medium text-ink">{tr("Nada em risco", "Nothing at risk")}</p>
+        <p className="text-[12px] text-muted">
           {tr(
             "Todas as conversas abertas tiveram actividade recente ou já têm um retorno agendado.",
             "Every open conversation had recent activity or already has a scheduled return.",
@@ -83,7 +83,7 @@ export function RiskRadarPanel() {
         ))}
       </div>
 
-      <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white">
+      <ul className="divide-y divide-line-soft rounded-lg border border-line bg-surface">
         {radar.items.slice(0, 10).map((item) => {
           const meta = BUCKET[item.bucket as keyof typeof BUCKET] ?? BUCKET.at_risk;
           return (
@@ -93,11 +93,11 @@ export function RiskRadarPanel() {
               </span>
               <Link
                 href={`/app/channel-inbox/${encodeURIComponent(item.threadKey)}?channel=${item.channelId}`}
-                className="min-w-0 flex-1 truncate font-medium text-[#0a1b33] hover:underline"
+                className="min-w-0 flex-1 truncate font-medium text-ink hover:underline"
               >
                 {item.displayName ?? item.threadKey}
               </Link>
-              <span className="shrink-0 text-[11px] text-slate-500">
+              <span className="shrink-0 text-[11px] text-muted">
                 {tr("parado há", "quiet for")} {item.hoursSinceActivity < 48 ? `${item.hoursSinceActivity}h` : `${Math.round(item.hoursSinceActivity / 24)}d`}
               </span>
             </li>

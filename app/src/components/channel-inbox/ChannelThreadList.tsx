@@ -164,7 +164,7 @@ function statusTone(status?: string) {
   if (status === "booked" || status === "wants_booking") {
     return "bg-blue-50 text-blue-700 border-blue-200";
   }
-  return "bg-slate-50 text-slate-600 border-slate-200";
+  return "bg-surface-2 text-body border-line";
 }
 
 function routeWithState(
@@ -219,12 +219,12 @@ export function ChannelThreadList() {
   return (
     <div
       className={cn(
-        "min-h-0 w-full shrink-0 border-r border-slate-200 bg-white sm:w-auto lg:h-full",
+        "min-h-0 w-full shrink-0 border-r border-line bg-surface sm:w-auto lg:h-full",
         selectedThreadKey ? "hidden sm:flex" : "flex",
       )}
     >
-      <aside className="flex h-full w-full min-w-0 flex-col bg-white sm:w-[360px] sm:shrink-0">
-        <div className="border-b border-slate-200 p-3">
+      <aside className="flex h-full w-full min-w-0 flex-col bg-surface sm:w-[360px] sm:shrink-0">
+        <div className="border-b border-line p-3">
           <div className="flex items-center gap-2">
             {channels && channels.length > 1 ? (
               <label className="relative min-w-0 flex-1">
@@ -235,7 +235,7 @@ export function ChannelThreadList() {
                       routeWithState("/app/channel-inbox", event.target.value, filter, search),
                     );
                   }}
-                  className="h-9 w-full appearance-none rounded-md border border-slate-200 bg-white px-3 pr-8 text-[12px] font-semibold text-[#0a1b33] outline-none focus:border-slate-400"
+                  className="h-9 w-full appearance-none rounded-md border border-line bg-surface px-3 pr-8 text-[12px] font-semibold text-ink outline-none focus:border-brand-solid/40"
                 >
                   {channels.map((channel) => (
                     <option key={channel._id} value={channel._id}>
@@ -243,10 +243,10 @@ export function ChannelThreadList() {
                     </option>
                   ))}
                 </select>
-                <ChevronDown size={13} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <ChevronDown size={13} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-faint" />
               </label>
             ) : (
-              <div className="min-w-0 flex-1 truncate text-[13px] font-semibold text-[#0a1b33]">
+              <div className="min-w-0 flex-1 truncate text-[13px] font-semibold text-ink">
                 {channels?.[0]?.displayName ?? t("inbox.title")}
               </div>
             )}
@@ -255,16 +255,16 @@ export function ChannelThreadList() {
             </span>
           </div>
           <label className="relative mt-2 block">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-faint" />
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder={t("inbox.search")}
-              className="h-9 w-full rounded-md border border-slate-200 bg-slate-50 pl-9 pr-3 text-[12px] text-[#0a1b33] outline-none transition-colors focus:border-slate-400 focus:bg-white"
+              className="h-9 w-full rounded-md border border-line bg-surface-2 pl-9 pr-3 text-[12px] text-ink outline-none transition-colors focus:border-brand-solid/40 focus:bg-surface"
             />
           </label>
           <nav
-            className="mt-2 grid grid-cols-5 gap-1 rounded-md bg-slate-100 p-1"
+            className="mt-2 grid grid-cols-5 gap-1 rounded-md bg-surface-3 p-1"
             aria-label={t("inbox.title")}
           >
             {PRIMARY_FILTERS.map((item) => {
@@ -276,8 +276,8 @@ export function ChannelThreadList() {
                 className={cn(
                   "flex h-11 min-w-0 flex-col items-center justify-center gap-0.5 rounded px-1 text-[9px] font-semibold transition-colors",
                   filter === item.value
-                    ? "bg-white text-[#0a1b33] shadow-sm"
-                    : "text-slate-500 hover:bg-white/70 hover:text-[#0a1b33]",
+                    ? "bg-surface text-ink shadow-sm"
+                    : "text-muted hover:bg-white/70 hover:text-ink",
                 )}
                 title={t(item.labelKey)}
               >
@@ -297,8 +297,8 @@ export function ChannelThreadList() {
                   className={cn(
                     "inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[10px] font-semibold transition-colors",
                     filter === item.value
-                      ? "border-[#0a1b33] bg-[#0a1b33] text-white"
-                      : "border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-[#0a1b33]",
+                      ? "border-brand-solid bg-brand-solid text-white"
+                      : "border-line bg-surface text-muted hover:border-line hover:text-ink",
                   )}
                 >
                   <Icon size={11} />
@@ -310,21 +310,21 @@ export function ChannelThreadList() {
         </div>
 
         {channels === undefined ? (
-          <div className="flex flex-1 items-center justify-center gap-2 text-[12px] text-slate-400">
+          <div className="flex flex-1 items-center justify-center gap-2 text-[12px] text-faint">
             <Loader2 size={14} className="animate-spin" />
             {t("inbox.loading")}
           </div>
         ) : channels.length === 0 || !activeChannelId ? (
-          <div className="flex flex-1 items-center justify-center px-8 text-center text-[12px] leading-5 text-slate-400">
+          <div className="flex flex-1 items-center justify-center px-8 text-center text-[12px] leading-5 text-faint">
             {t("inbox.noChannel")}
           </div>
         ) : status === "LoadingFirstPage" ? (
-          <div className="flex flex-1 items-center justify-center gap-2 text-[12px] text-slate-400">
+          <div className="flex flex-1 items-center justify-center gap-2 text-[12px] text-faint">
             <Loader2 size={14} className="animate-spin" />
             {t("inbox.loading")}
           </div>
         ) : threads.length === 0 ? (
-          <div className="flex flex-1 items-center justify-center px-8 text-center text-[12px] text-slate-400">
+          <div className="flex flex-1 items-center justify-center px-8 text-center text-[12px] text-faint">
             {t("inbox.noThreads")}
           </div>
         ) : (
@@ -349,10 +349,10 @@ export function ChannelThreadList() {
                         search,
                       )}
                       className={cn(
-                        "grid grid-cols-[40px_minmax(0,1fr)] gap-2.5 border-b border-slate-100 px-3 py-3 transition-colors",
+                        "grid grid-cols-[40px_minmax(0,1fr)] gap-2.5 border-b border-line-soft px-3 py-3 transition-colors",
                         selected
                           ? "border-l-2 border-l-[#0a1b33] bg-[#f0f5f7] pl-[10px]"
-                          : "hover:bg-slate-50",
+                          : "hover:bg-surface-2",
                       )}
                     >
                       <div className="relative flex h-10 w-10 items-center justify-center rounded-full bg-[#dff3ef] text-[11px] font-bold text-[#0d6b61]">
@@ -360,20 +360,20 @@ export function ChannelThreadList() {
                         <span
                           className={cn(
                             "absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white",
-                            windowOpen ? "bg-emerald-500" : "bg-slate-300",
+                            windowOpen ? "bg-emerald-500" : "bg-faint/50",
                           )}
                         />
                       </div>
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className={cn("min-w-0 flex-1 truncate text-[12px]", thread.unreadCount > 0 ? "font-bold text-[#0a1b33]" : "font-semibold text-slate-700")}>
+                          <span className={cn("min-w-0 flex-1 truncate text-[12px]", thread.unreadCount > 0 ? "font-bold text-ink" : "font-semibold text-ink")}>
                             {label}
                           </span>
                           {thread.starred && <Star size={11} className="fill-amber-400 text-amber-400" />}
-                          <span className="shrink-0 text-[9px] text-slate-400">{relativeTime(thread.lastEventAt, Date.now(), locale)}</span>
+                          <span className="shrink-0 text-[9px] text-faint">{relativeTime(thread.lastEventAt, Date.now(), locale)}</span>
                         </div>
                         <div className="mt-0.5 flex items-center gap-2">
-                          <span className="min-w-0 flex-1 truncate text-[11px] text-slate-500">
+                          <span className="min-w-0 flex-1 truncate text-[11px] text-muted">
                             {thread.lastPreview ?? thread.lastEventKind}
                           </span>
                           {thread.unreadCount > 0 && (
@@ -387,7 +387,7 @@ export function ChannelThreadList() {
                             {thread.leadStatus ? t(`status.${thread.leadStatus}` as TranslationKey) : t("status.new")}
                           </span>
                           {thread.responsibleName && (
-                            <span className="max-w-[110px] truncate rounded bg-slate-100 px-1.5 py-0.5 text-[9px] font-medium text-slate-500">
+                            <span className="max-w-[110px] truncate rounded bg-surface-3 px-1.5 py-0.5 text-[9px] font-medium text-muted">
                               {thread.responsibleName}
                             </span>
                           )}
@@ -403,7 +403,7 @@ export function ChannelThreadList() {
                           )}
                           {queuePosition !== undefined && (
                             <span
-                              className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[#0a1b33]/10 px-1 text-[10px] font-semibold tabular-nums text-[#0a1b33]"
+                              className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[#0a1b33]/10 px-1 text-[10px] font-semibold tabular-nums text-ink"
                               aria-label={`${tr("Posição", "Position")} ${queuePosition}`}
                               title={
                                 thread.waitingSince
@@ -415,7 +415,7 @@ export function ChannelThreadList() {
                             </span>
                           )}
                           {thread.commandReason && (
-                            <span className="text-[10px] text-slate-400" title={commandTitle(thread, locale)}>
+                            <span className="text-[10px] text-faint" title={commandTitle(thread, locale)}>
                               {silenceLabel(thread.commandReason, locale)}
                             </span>
                           )}
@@ -470,14 +470,14 @@ export function ChannelThreadList() {
                 <button
                   type="button"
                   onClick={() => loadMore(35)}
-                  className="rounded-md border border-slate-200 px-3 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50"
+                  className="rounded-md border border-line px-3 py-1.5 text-[11px] font-semibold text-body hover:bg-surface-2"
                 >
                   {t("inbox.loadMore")}
                 </button>
               ) : status === "LoadingMore" ? (
-                <Loader2 size={14} className="mx-auto animate-spin text-slate-400" />
+                <Loader2 size={14} className="mx-auto animate-spin text-faint" />
               ) : (
-                <span className="text-[10px] text-slate-300">{t("inbox.end")}</span>
+                <span className="text-[10px] text-faint">{t("inbox.end")}</span>
               )}
             </div>
           </div>

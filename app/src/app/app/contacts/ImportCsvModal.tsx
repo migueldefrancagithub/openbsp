@@ -208,21 +208,21 @@ export function ImportCsvModal({ onClose, onImport }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-      <div className="flex max-h-[88vh] w-full max-w-2xl flex-col rounded-lg border border-slate-200 bg-white shadow-xl">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+      <div className="flex max-h-[88vh] w-full max-w-2xl flex-col rounded-lg border border-line bg-surface shadow-xl">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-line-soft">
           <div>
-            <h2 className="font-[var(--font-outfit)] text-[18px] font-medium text-[#0a1b33]">
+            <h2 className="font-[var(--font-outfit)] text-[18px] font-medium text-ink">
               {tr("Importar contactos por CSV", "Import contacts from CSV")}
             </h2>
-            <p className="text-[12px] text-slate-500 mt-0.5">
-              {tr("A primeira linha deve conter os cabeçalhos. Obrigatório:", "The first row must contain headers. Required:")} <code className="rounded bg-slate-100 px-1 py-0.5 font-[var(--font-mono)] text-[11px]">phone</code>.
+            <p className="text-[12px] text-muted mt-0.5">
+              {tr("A primeira linha deve conter os cabeçalhos. Obrigatório:", "The first row must contain headers. Required:")} <code className="rounded bg-surface-3 px-1 py-0.5 font-[var(--font-mono)] text-[11px]">phone</code>.
               {" "}{tr("Opcionais: name, locale, tags, proofText e proofUrl.", "Optional: name, locale, tags, proofText and proofUrl.")}
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 transition-colors p-1"
+            className="text-faint hover:text-body transition-colors p-1"
             aria-label={tr("Fechar", "Close")}
           >
             <X size={18} />
@@ -233,12 +233,12 @@ export function ImportCsvModal({ onClose, onImport }: Props) {
           {!result && (
             <>
               <label className="block">
-                <div className="border-2 border-dashed border-slate-200 rounded-xl px-6 py-8 text-center hover:border-slate-300 transition-colors cursor-pointer">
-                  <Upload size={20} className="mx-auto text-slate-400 mb-2" />
-                  <div className="text-[13px] font-medium text-[#0a1b33]">
+                <div className="border-2 border-dashed border-line rounded-xl px-6 py-8 text-center hover:border-line transition-colors cursor-pointer">
+                  <Upload size={20} className="mx-auto text-faint mb-2" />
+                  <div className="text-[13px] font-medium text-ink">
                     {fileName ?? tr("Clique para carregar um CSV", "Click to upload a CSV")}
                   </div>
-                  <div className="text-[11px] text-slate-500 mt-1">
+                  <div className="text-[11px] text-muted mt-1">
                     {tr("ou cole os dados abaixo", "or paste the data below")}
                   </div>
                   <input
@@ -260,14 +260,14 @@ export function ImportCsvModal({ onClose, onImport }: Props) {
                   setFileName(null);
                 }}
                 placeholder={`phone,name,proofText\n+5511999999999,Maria,"Aceitou no formulário do site em 2026-05-10"\n+351912345678,João,`}
-                className="w-full mt-4 h-40 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] font-[var(--font-mono)] resize-none focus:outline-none focus:ring-2 focus:ring-[#0a152d]/20 focus:border-[#0a152d]/40"
+                className="w-full mt-4 h-40 rounded-lg border border-line bg-surface-2 px-3 py-2 text-[12px] font-[var(--font-mono)] resize-none focus:outline-none focus:ring-2 focus:ring-[#0a152d]/20 focus:border-[#0a152d]/40"
               />
 
               {parsed && (
                 <div className="mt-4 space-y-2">
                   <div className="flex items-center gap-2 text-[12px]">
                     <Check size={14} className="text-emerald-600" />
-                    <span className="text-slate-700">
+                    <span className="text-ink">
                       <strong>{validRows}</strong>{" "}
                       {locale === "pt"
                         ? validRows === 1
@@ -358,13 +358,13 @@ export function ImportCsvModal({ onClose, onImport }: Props) {
           )}
         </div>
 
-        <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-end gap-2">
+        <div className="px-6 py-4 border-t border-line-soft flex items-center justify-end gap-2">
           {!result ? (
             <>
               <button
                 type="button"
                 onClick={onClose}
-                className="text-[13px] text-slate-500 hover:text-slate-700 px-3 py-2"
+                className="text-[13px] text-muted hover:text-ink px-3 py-2"
               >
                 {tr("Cancelar", "Cancel")}
               </button>
@@ -372,7 +372,7 @@ export function ImportCsvModal({ onClose, onImport }: Props) {
                 type="button"
                 onClick={handleImport}
                 disabled={validRows === 0 || importing}
-                className="inline-flex items-center gap-2 bg-[#0a152d] text-white text-[13px] font-medium px-4 py-2 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#0a1b33] transition-all"
+                className="inline-flex items-center gap-2 bg-nav-active text-white text-[13px] font-medium px-4 py-2 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:bg-brand-solid transition-all"
               >
                 {importing && <Loader2 size={14} className="animate-spin" />}
                 {tr("Importar", "Import")} {validRows}{" "}
@@ -389,7 +389,7 @@ export function ImportCsvModal({ onClose, onImport }: Props) {
             <button
               type="button"
               onClick={onClose}
-              className="inline-flex items-center gap-2 bg-[#0a152d] text-white text-[13px] font-medium px-4 py-2 rounded-lg hover:bg-[#0a1b33] transition-all"
+              className="inline-flex items-center gap-2 bg-nav-active text-white text-[13px] font-medium px-4 py-2 rounded-lg hover:bg-brand-solid transition-all"
             >
               {tr("Concluir", "Done")}
             </button>

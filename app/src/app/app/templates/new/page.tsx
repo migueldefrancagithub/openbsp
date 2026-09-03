@@ -261,7 +261,7 @@ export default function NewTemplatePage() {
         action={
           <Link
             href="/app/templates"
-            className="inline-flex items-center gap-1 text-[13px] text-slate-600 hover:text-[#0a1b33] transition-colors"
+            className="inline-flex items-center gap-1 text-[13px] text-body hover:text-ink transition-colors"
           >
             <ChevronLeft size={14} />
             {tr("Voltar", "Back")}
@@ -298,16 +298,16 @@ export default function NewTemplatePage() {
 
           {templateTab === "setup" && (
           <>
-          <section className="rounded-lg border border-slate-200 bg-white p-5">
+          <section className="rounded-lg border border-line bg-surface p-5">
             <div className="mb-4 flex items-start gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-[#0a1b33]">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-surface-3 text-ink">
                 <ShieldCheck size={17} />
               </div>
               <div>
-                <h2 className="font-[var(--font-outfit)] text-[17px] font-medium text-[#0a1b33]">
+                <h2 className="font-[var(--font-outfit)] text-[17px] font-medium text-ink">
                   {tr("Cenários prontos", "Ready scenarios")}
                 </h2>
-                <p className="mt-0.5 text-[12px] text-slate-500">
+                <p className="mt-0.5 text-[12px] text-muted">
                   {tr("Comece com um caso clínico real e ajuste a mensagem com validação imediata.", "Start from a real clinic use case and adjust the message with immediate validation.")}
                 </p>
               </div>
@@ -318,7 +318,7 @@ export default function NewTemplatePage() {
                   key={preset.name}
                   type="button"
                   onClick={() => applyPreset(preset)}
-                  className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-left text-[12px] font-medium text-[#0a1b33] transition-colors hover:border-slate-300 hover:bg-white"
+                  className="rounded-lg border border-line bg-surface-2 px-3 py-2 text-left text-[12px] font-medium text-ink transition-colors hover:border-line hover:bg-surface"
                 >
                   {preset.label[locale === "pt" ? 0 : 1]}
                 </button>
@@ -332,7 +332,7 @@ export default function NewTemplatePage() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
-              className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm font-[var(--font-mono)] text-[#0a1b33] focus:outline-none focus:ring-2 focus:ring-[#0a152d]/10 focus:border-[#0a152d]"
+              className="w-full px-3 py-2 rounded-lg border border-line text-sm font-[var(--font-mono)] text-ink focus:outline-none focus:ring-2 focus:ring-[#0a152d]/10 focus:border-[#0a152d]"
             />
           </Field>
 
@@ -341,7 +341,7 @@ export default function NewTemplatePage() {
               <select
                 value={language}
                 onChange={(e) => setLanguage(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm text-[#0a1b33] focus:outline-none focus:ring-2 focus:ring-[#0a152d]/10 focus:border-[#0a152d]"
+                className="w-full px-3 py-2 rounded-lg border border-line text-sm text-ink focus:outline-none focus:ring-2 focus:ring-[#0a152d]/10 focus:border-[#0a152d]"
               >
                 <option value="pt_PT">pt_PT - {tr("Português (Portugal)", "Portuguese (Portugal)")}</option>
                 <option value="pt_BR">pt_BR - {tr("Português (Brasil)", "Portuguese (Brazil)")}</option>
@@ -357,7 +357,7 @@ export default function NewTemplatePage() {
                   setCategory(nextCategory);
                   if (nextCategory === "authentication") setButtons([]);
                 }}
-                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm text-[#0a1b33] focus:outline-none focus:ring-2 focus:ring-[#0a152d]/10 focus:border-[#0a152d]"
+                className="w-full px-3 py-2 rounded-lg border border-line text-sm text-ink focus:outline-none focus:ring-2 focus:ring-[#0a152d]/10 focus:border-[#0a152d]"
               >
                 <option value="utility">{tr("Utilidade (transacional)", "Utility (transactional)")}</option>
                 <option value="marketing">{tr("Marketing (exige opt-in)", "Marketing (requires opt-in)")}</option>
@@ -371,7 +371,7 @@ export default function NewTemplatePage() {
               value={whatsappAccountId}
               onChange={(e) => setWhatsappAccountId(e.target.value)}
               required
-              className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm text-[#0a1b33] focus:outline-none focus:ring-2 focus:ring-[#0a152d]/10 focus:border-[#0a152d]"
+              className="w-full px-3 py-2 rounded-lg border border-line text-sm text-ink focus:outline-none focus:ring-2 focus:ring-[#0a152d]/10 focus:border-[#0a152d]"
             >
               {accounts?.map((a) => (
                 <option key={a._id} value={a._id}>
@@ -384,16 +384,16 @@ export default function NewTemplatePage() {
           )}
 
           {templateTab === "message" && (
-          <section className="rounded-lg border border-slate-200 bg-white p-5">
+          <section className="rounded-lg border border-line bg-surface p-5">
             <div className="mb-4 flex items-start gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-[#0a1b33]">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-surface-3 text-ink">
                 <FileText size={17} />
               </div>
               <div>
-                <h2 className="font-[var(--font-outfit)] text-[17px] font-medium text-[#0a1b33]">
+                <h2 className="font-[var(--font-outfit)] text-[17px] font-medium text-ink">
                   {tr("Conteúdo da mensagem", "Message body")}
                 </h2>
-                <p className="mt-0.5 text-[12px] text-slate-500">
+                <p className="mt-0.5 text-[12px] text-muted">
                   {tr("As variáveis e os exemplos são enviados à Meta com o template.", "Variables and examples are sent to Meta with the template.")}
                 </p>
               </div>
@@ -404,9 +404,9 @@ export default function NewTemplatePage() {
               value={bodyText}
               onChange={(e) => setBodyText(e.target.value)}
               required
-              className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm text-[#0a1b33] focus:outline-none focus:ring-2 focus:ring-[#0a152d]/10 focus:border-[#0a152d] resize-none font-mono"
+              className="w-full px-3 py-2 rounded-lg border border-line text-sm text-ink focus:outline-none focus:ring-2 focus:ring-[#0a152d]/10 focus:border-[#0a152d] resize-none font-mono"
             />
-            <p className="text-[11px] text-slate-400 mt-1.5">
+            <p className="text-[11px] text-faint mt-1.5">
               {bodyText.length} / 1024 {tr("caracteres", "characters")} · {detectedIndices.length}{" "}
               {locale === "pt"
                 ? detectedIndices.length === 1 ? "variável detetada" : "variáveis detetadas"
@@ -419,7 +419,7 @@ export default function NewTemplatePage() {
               <div className="space-y-2">
                 {detectedIndices.map((i) => (
                   <div key={i} className="flex items-center gap-2">
-                    <span className="text-[12px] font-[var(--font-mono)] text-slate-500 w-12">
+                    <span className="text-[12px] font-[var(--font-mono)] text-muted w-12">
                       {`{{${i}}}`}
                     </span>
                     <input
@@ -430,7 +430,7 @@ export default function NewTemplatePage() {
                       }
                       required
                       placeholder={tr("Valor de exemplo", "Example value")}
-                      className="flex-1 px-3 py-2 rounded-lg border border-slate-200 text-sm text-[#0a1b33] focus:outline-none focus:ring-2 focus:ring-[#0a152d]/10 focus:border-[#0a152d]"
+                      className="flex-1 px-3 py-2 rounded-lg border border-line text-sm text-ink focus:outline-none focus:ring-2 focus:ring-[#0a152d]/10 focus:border-[#0a152d]"
                     />
                   </div>
                 ))}
@@ -441,13 +441,13 @@ export default function NewTemplatePage() {
           )}
 
           {templateTab === "buttons" && (
-          <section className="rounded-lg border border-slate-200 bg-white p-5">
+          <section className="rounded-lg border border-line bg-surface p-5">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
-                <h2 className="font-[var(--font-outfit)] text-[17px] font-medium text-[#0a1b33]">
+                <h2 className="font-[var(--font-outfit)] text-[17px] font-medium text-ink">
                   {tr("Botões do template", "Template buttons")}
                 </h2>
-                <p className="mt-0.5 text-[12px] text-slate-500">
+                <p className="mt-0.5 text-[12px] text-muted">
                   {tr("Respostas, links e chamadas são enviados com o pedido de aprovação.", "Replies, links and calls are sent with the approval request.")}
                 </p>
               </div>
@@ -457,7 +457,7 @@ export default function NewTemplatePage() {
                   setButtons((prev) => [...prev, defaultButton("quick_reply")])
                 }
                 disabled={buttons.length >= 3}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-[#0a1b33] transition-colors hover:bg-white disabled:opacity-40"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-line bg-surface-2 text-ink transition-colors hover:bg-surface disabled:opacity-40"
                 title={tr("Adicionar botão", "Add button")}
               >
                 <Plus size={15} />
@@ -465,7 +465,7 @@ export default function NewTemplatePage() {
             </div>
 
             {buttons.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-center text-[12px] text-slate-500">
+              <div className="rounded-lg border border-dashed border-line bg-surface-2 px-4 py-5 text-center text-[12px] text-muted">
                 {tr("Este template não tem botões.", "This template has no buttons.")}
               </div>
             ) : (
@@ -473,7 +473,7 @@ export default function NewTemplatePage() {
                 {buttons.map((button, index) => (
                   <div
                     key={`${button.type}-${index}`}
-                    className="grid gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 md:grid-cols-[150px_1fr_auto]"
+                    className="grid gap-2 rounded-lg border border-line bg-surface-2 p-3 md:grid-cols-[150px_1fr_auto]"
                   >
                     <select
                       value={button.type}
@@ -483,7 +483,7 @@ export default function NewTemplatePage() {
                           defaultButton(event.target.value as TemplateButton["type"]),
                         )
                       }
-                      className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-[12px] text-[#0a1b33] outline-none focus:border-slate-400"
+                      className="h-10 rounded-lg border border-line bg-surface px-3 text-[12px] text-ink outline-none focus:border-brand-solid/40"
                     >
                       <option value="quick_reply">{tr("Resposta rápida", "Quick reply")}</option>
                       <option value="url">URL</option>
@@ -498,7 +498,7 @@ export default function NewTemplatePage() {
                         }
                         maxLength={25}
                         placeholder={tr("Texto do botão", "Button text")}
-                        className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-[12px] text-[#0a1b33] outline-none focus:border-slate-400"
+                        className="h-10 rounded-lg border border-line bg-surface px-3 text-[12px] text-ink outline-none focus:border-brand-solid/40"
                       />
                       {button.type === "url" && (
                         <input
@@ -511,7 +511,7 @@ export default function NewTemplatePage() {
                             })
                           }
                           placeholder="https://..."
-                          className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-[12px] text-[#0a1b33] outline-none focus:border-slate-400"
+                          className="h-10 rounded-lg border border-line bg-surface px-3 text-[12px] text-ink outline-none focus:border-brand-solid/40"
                         />
                       )}
                       {button.type === "phone_number" && (
@@ -525,7 +525,7 @@ export default function NewTemplatePage() {
                             })
                           }
                           placeholder="+351..."
-                          className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-[12px] text-[#0a1b33] outline-none focus:border-slate-400"
+                          className="h-10 rounded-lg border border-line bg-surface px-3 text-[12px] text-ink outline-none focus:border-brand-solid/40"
                         />
                       )}
                     </div>
@@ -534,7 +534,7 @@ export default function NewTemplatePage() {
                       onClick={() =>
                         setButtons((prev) => prev.filter((_, i) => i !== index))
                       }
-                      className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:text-red-600"
+                      className="flex h-10 w-10 items-center justify-center rounded-lg border border-line bg-surface text-muted transition-colors hover:text-red-600"
                       title={tr("Remover botão", "Remove button")}
                     >
                       <Trash2 size={14} />
@@ -547,8 +547,8 @@ export default function NewTemplatePage() {
           )}
 
           {templateTab === "guardrails" && (
-          <section className="rounded-lg border border-slate-200 bg-white p-5">
-            <h2 className="font-[var(--font-outfit)] text-[17px] font-medium text-[#0a1b33]">
+          <section className="rounded-lg border border-line bg-surface p-5">
+            <h2 className="font-[var(--font-outfit)] text-[17px] font-medium text-ink">
               {tr("Condições de envio", "Sending context")}
             </h2>
             <div className="mt-4 grid gap-3 md:grid-cols-3">
@@ -578,11 +578,11 @@ export default function NewTemplatePage() {
             </div>
           )}
 
-          <div className="flex flex-wrap gap-2 rounded-lg border border-slate-200 bg-white p-3">
+          <div className="flex flex-wrap gap-2 rounded-lg border border-line bg-surface p-3">
             <button
               type="submit"
               disabled={busy !== null}
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-[13px] font-medium text-[#0a1b33] transition-all hover:border-slate-300 disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-lg border border-line bg-surface px-4 py-2.5 text-[13px] font-medium text-ink transition-all hover:border-line disabled:opacity-50"
             >
               {busy === "draft" && <Loader2 size={14} className="animate-spin" />}
               {tr("Guardar rascunho", "Save draft")}
@@ -591,7 +591,7 @@ export default function NewTemplatePage() {
               type="button"
               onClick={onCreateAndSubmit}
               disabled={busy !== null || !whatsappAccountId}
-              className="inline-flex items-center gap-2 rounded-lg bg-[#0a152d] px-4 py-2.5 text-[13px] font-medium text-white transition-all hover:bg-[#0a1b33] disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-lg bg-nav-active px-4 py-2.5 text-[13px] font-medium text-white transition-all hover:bg-brand-solid disabled:opacity-50"
             >
               {busy === "submit" && <Loader2 size={14} className="animate-spin" />}
               {tr("Criar e submeter à Meta", "Create and submit to Meta")}
@@ -618,7 +618,7 @@ export default function NewTemplatePage() {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-xs font-medium text-slate-700 mb-1.5">
+      <label className="block text-xs font-medium text-ink mb-1.5">
         {label}
       </label>
       {children}
@@ -636,7 +636,7 @@ function Toggle({
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <label className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] font-medium text-[#0a1b33]">
+    <label className="flex items-center justify-between gap-3 rounded-lg border border-line bg-surface-2 px-3 py-2 text-[12px] font-medium text-ink">
       <span>{label}</span>
       <input
         type="checkbox"

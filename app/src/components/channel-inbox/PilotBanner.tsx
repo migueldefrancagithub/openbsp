@@ -54,7 +54,7 @@ export function PilotBanner({
           {canEditAllowlist ? (
             <Link
               href={`/app/settings?tab=whatsapp&allowlistAdd=${encodeURIComponent(digits)}#hub`}
-              className="inline-flex h-8 items-center gap-1.5 rounded-md bg-[#0a152d] px-3 text-[11px] font-semibold text-white hover:bg-[#0a1b33]"
+              className="inline-flex h-8 items-center gap-1.5 rounded-md bg-nav-active px-3 text-[11px] font-semibold text-white hover:bg-brand-solid"
             >
               <UserRoundPlus size={13} />
               {t("inbox.pilotAddAdmin")}
@@ -64,7 +64,7 @@ export function PilotBanner({
               type="button"
               onClick={() => void handleRequest()}
               disabled={busy}
-              className="inline-flex h-8 items-center gap-1.5 rounded-md bg-[#0a152d] px-3 text-[11px] font-semibold text-white disabled:opacity-50"
+              className="inline-flex h-8 items-center gap-1.5 rounded-md bg-nav-active px-3 text-[11px] font-semibold text-white disabled:opacity-50"
             >
               {busy ? <Loader2 size={13} className="animate-spin" /> : <UserRoundPlus size={13} />}
               {t("inbox.pilotRequest")}
@@ -74,7 +74,7 @@ export function PilotBanner({
             <button
               type="button"
               onClick={onHandoff}
-              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-amber-300 bg-white px-3 text-[11px] font-semibold text-amber-900 hover:bg-amber-100"
+              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-amber-300 bg-surface px-3 text-[11px] font-semibold text-amber-900 hover:bg-amber-100"
             >
               {t("handoff.button")}
             </button>

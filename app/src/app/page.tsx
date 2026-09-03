@@ -59,26 +59,26 @@ const footerColumns = [
 
 export default function Home() {
   return (
-    <div className="min-h-full bg-[#f9fafb] text-slate-900">
+    <div className="min-h-full bg-background text-ink">
       {/* Top global nav (compact, only visible above hero) */}
       <header className="absolute top-0 left-0 right-0 z-40 px-6 py-5">
         <div className="mx-auto max-w-[1400px] flex items-center justify-between">
           <Link
             href="/"
-            className="inline-flex min-h-10 items-center text-[#0a1b33]"
+            className="inline-flex min-h-10 items-center text-ink"
           >
             <BrandLogo markClassName="h-6 w-6" />
           </Link>
           <div className="flex items-center gap-2 text-sm">
             <Link
               href="/login"
-              className="px-4 py-2 text-slate-600 hover:text-[#0a1b33] transition-colors"
+              className="px-4 py-2 text-body hover:text-ink transition-colors"
             >
               Sign in
             </Link>
             <Link
               href="/signup"
-              className="btn-primary px-4 py-2 rounded-full bg-[#0a152d] text-white text-[13px] font-medium"
+              className="btn-primary px-4 py-2 rounded-full bg-nav-active text-white text-[13px] font-medium"
             >
               Start building
             </Link>
@@ -107,7 +107,7 @@ export default function Home() {
       {/* Compliance band — back to light, hover lift */}
       <section
         id="compliance"
-        className="border-t border-slate-200 bg-[#f9fafb]"
+        className="border-t border-line bg-background"
       >
         <div className="mx-auto max-w-6xl px-6 py-24">
           <div className="grid md:grid-cols-2 gap-12 items-start">
@@ -125,10 +125,10 @@ export default function Home() {
               >
                 Compliance by default
               </div>
-              <h2 className="font-[var(--font-outfit)] text-[32px] md:text-[40px] font-medium tracking-tight text-[#0a1b33] leading-[1.1]">
+              <h2 className="font-[var(--font-outfit)] text-[32px] md:text-[40px] font-medium tracking-tight text-ink leading-[1.1]">
                 Built so Meta and your DPO sleep at night
               </h2>
-              <p className="mt-4 text-slate-600 leading-relaxed text-[15px]">
+              <p className="mt-4 text-body leading-relaxed text-[15px]">
                 Healthcare-mode allowlist, opt-in granular por finalidade,
                 webhook idempotency state machine, append-only audit com hash
                 chain. Não é uma caixa que ticas — é como cada mutation foi
@@ -146,10 +146,10 @@ export default function Home() {
               ].map(([title, sub]) => (
                 <li
                   key={title}
-                  className="compliance-card rounded-2xl bg-white border border-slate-200 p-5 cursor-default"
+                  className="compliance-card rounded-2xl bg-surface border border-line p-5 cursor-default"
                 >
-                  <div className="font-semibold text-[#0a1b33]">{title}</div>
-                  <div className="text-slate-500 text-xs mt-1">{sub}</div>
+                  <div className="font-semibold text-ink">{title}</div>
+                  <div className="text-muted text-xs mt-1">{sub}</div>
                 </li>
               ))}
             </ul>
@@ -157,7 +157,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section id="system" className="border-t border-slate-200 bg-white">
+      <section id="system" className="border-t border-line bg-surface">
         <div className="mx-auto max-w-6xl px-6 py-24">
           <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr] items-start">
             <div>
@@ -165,10 +165,10 @@ export default function Home() {
                 <ShieldCheck size={13} />
                 Official Cloud API, not browser automation
               </div>
-              <h2 className="mt-5 font-[var(--font-outfit)] text-[34px] md:text-[46px] font-medium tracking-tight text-[#0a1b33] leading-[1.05]">
+              <h2 className="mt-5 font-[var(--font-outfit)] text-[34px] md:text-[46px] font-medium tracking-tight text-ink leading-[1.05]">
                 The system from the live, built for coexistence.
               </h2>
-              <p className="mt-5 max-w-2xl text-[15px] leading-relaxed text-slate-600">
+              <p className="mt-5 max-w-2xl text-[15px] leading-relaxed text-body">
                 Keep the client&apos;s WhatsApp Business workflow, then add
                 official campaigns, contact folders, CTWA attribution, Meta
                 failure intelligence, and guarded AI handoff.
@@ -181,9 +181,9 @@ export default function Home() {
                 ["Coexistence", "Embedded Signup readiness path"],
                 ["Guarded AI", "Ad leads first, human override always"],
               ].map(([title, sub]) => (
-                <div key={title} className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-                  <div className="font-semibold text-[#0a1b33]">{title}</div>
-                  <div className="mt-1 text-[12px] leading-relaxed text-slate-500">
+                <div key={title} className="rounded-lg border border-line bg-surface-2 p-4">
+                  <div className="font-semibold text-ink">{title}</div>
+                  <div className="mt-1 text-[12px] leading-relaxed text-muted">
                     {sub}
                   </div>
                 </div>
@@ -217,7 +217,7 @@ export default function Home() {
               />
               <button
                 type="button"
-                className="h-12 rounded-md bg-white px-6 text-[14px] font-semibold text-black transition-colors hover:bg-zinc-200"
+                className="h-12 rounded-md bg-surface px-6 text-[14px] font-semibold text-black transition-colors hover:bg-zinc-200"
               >
                 Subscribe
               </button>

@@ -201,7 +201,7 @@ type FlowRunRow = {
 
 const STATUS_STYLES: Record<ChatbotStatus, string> = {
   active: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  draft: "border-slate-200 bg-slate-50 text-slate-600",
+  draft: "border-line bg-surface-2 text-body",
   paused: "border-amber-200 bg-amber-50 text-amber-700",
 };
 
@@ -633,7 +633,7 @@ export default function ChatbotsPage() {
           <div className="flex flex-wrap gap-2">
             <a
               href="#create-folder"
-              className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-[#0a1b33] transition-colors hover:border-slate-300"
+              className="inline-flex h-10 items-center gap-2 rounded-lg border border-line bg-surface px-3 text-sm font-medium text-ink transition-colors hover:border-line"
             >
               <FolderPlus size={15} />
               {tr("Nova pasta", "New folder")}
@@ -720,14 +720,14 @@ export default function ChatbotsPage() {
             />
           </section>
 
-          <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+          <section className="rounded-lg border border-line bg-surface p-4 shadow-sm">
             <div>
               <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <h2 className="font-[var(--font-outfit)] text-lg font-semibold text-[#0a1b33]">
+                  <h2 className="font-[var(--font-outfit)] text-lg font-semibold text-ink">
                     {tr("Pastas", "Folders")}
                   </h2>
-                  <p className="text-sm text-slate-500">
+                  <p className="text-sm text-muted">
                     {tr(
                       "Separe receção, vendas, confirmações e suporte.",
                       "Separate reception, sales, confirmations, and support.",
@@ -750,17 +750,17 @@ export default function ChatbotsPage() {
                   {[0, 1, 2].map((item) => (
                     <div
                       key={item}
-                      className="h-20 animate-pulse rounded-xl border border-slate-100 bg-slate-50"
+                      className="h-20 animate-pulse rounded-xl border border-line-soft bg-surface-2"
                     />
                   ))}
                 </div>
               ) : folders.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-slate-200 p-6 text-center">
-                  <FolderPlus size={24} className="mx-auto text-slate-300" />
-                  <p className="mt-3 text-sm font-semibold text-[#0a1b33]">
+                <div className="rounded-xl border border-dashed border-line p-6 text-center">
+                  <FolderPlus size={24} className="mx-auto text-faint" />
+                  <p className="mt-3 text-sm font-semibold text-ink">
                     {tr("Ainda não há pastas", "No folders yet")}
                   </p>
-                  <p className="mt-1 text-sm text-slate-500">
+                  <p className="mt-1 text-sm text-muted">
                     {tr(
                       "Crie uma pasta para organizar os agentes por objetivo.",
                       "Create a folder to organize agents by objective.",
@@ -779,17 +779,17 @@ export default function ChatbotsPage() {
                         className={`flex min-h-20 items-center gap-3 rounded-lg border px-4 py-3 text-left transition-colors ${
                           active
                             ? "border-emerald-300 bg-emerald-50"
-                            : "border-slate-200 bg-white hover:border-emerald-200 hover:bg-slate-50"
+                            : "border-line bg-surface hover:border-emerald-200 hover:bg-surface-2"
                         }`}
                       >
                         <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
                           <FolderPlus size={17} />
                         </span>
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-semibold text-[#0a1b33]">
+                          <span className="block truncate text-sm font-semibold text-ink">
                             {folder.name}
                           </span>
-                          <span className="mt-0.5 block text-xs text-slate-500">
+                          <span className="mt-0.5 block text-xs text-muted">
                             {folder.botCount} {tr("agente", "agent")}
                             {folder.botCount === 1 ? "" : "s"}
                           </span>
@@ -806,7 +806,7 @@ export default function ChatbotsPage() {
             <aside className="space-y-4">
               <section
                 id="create-folder"
-                className="scroll-mt-24 rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
+                className="scroll-mt-24 rounded-lg border border-line bg-surface p-4 shadow-sm"
               >
                 <PanelTitle
                   icon={FolderPlus}
@@ -835,7 +835,7 @@ export default function ChatbotsPage() {
 
               <section
                 id="create-bot"
-                className="scroll-mt-24 rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
+                className="scroll-mt-24 rounded-lg border border-line bg-surface p-4 shadow-sm"
               >
                 <PanelTitle
                   icon={Bot}
@@ -920,35 +920,35 @@ export default function ChatbotsPage() {
               </section>
             </aside>
 
-            <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-              <div className="flex flex-col gap-2 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <section className="overflow-hidden rounded-lg border border-line bg-surface shadow-sm">
+              <div className="flex flex-col gap-2 border-b border-line-soft px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <h2 className="font-[var(--font-outfit)] text-lg font-semibold text-[#0a1b33]">
+                  <h2 className="font-[var(--font-outfit)] text-lg font-semibold text-ink">
                     {selectedFolder ? selectedFolder.name : tr("Todos os agentes", "All agents")}
                   </h2>
-                  <p className="text-sm text-slate-500">
+                  <p className="text-sm text-muted">
                     {tr(
                       "A ativação é explícita: nenhum agente assume uma conversa humana por acidente.",
                       "Activation is explicit so an agent never takes over a human conversation by accident.",
                     )}
                   </p>
                 </div>
-                <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-faint">
                   {visibleBots.length} {tr("no total", "total")}
                 </span>
               </div>
 
               {studio === undefined ? (
                 <div className="p-5">
-                  <div className="h-40 animate-pulse rounded-xl bg-slate-50" />
+                  <div className="h-40 animate-pulse rounded-xl bg-surface-2" />
                 </div>
               ) : visibleBots.length === 0 ? (
                 <div className="p-10 text-center">
-                  <Bot size={28} className="mx-auto text-slate-300" />
-                  <h3 className="mt-3 font-[var(--font-outfit)] text-lg font-semibold text-[#0a1b33]">
+                  <Bot size={28} className="mx-auto text-faint" />
+                  <h3 className="mt-3 font-[var(--font-outfit)] text-lg font-semibold text-ink">
                     {tr("Não há agentes nesta vista", "No agents in this view")}
                   </h3>
-                  <p className="mt-1 text-sm text-slate-500">
+                  <p className="mt-1 text-sm text-muted">
                     {tr(
                       "Crie um agente de receção, vendas, confirmação ou suporte.",
                       "Create a reception, sales, confirmation, or support agent.",
@@ -960,7 +960,7 @@ export default function ChatbotsPage() {
                   {visibleBots.map((bot) => (
                     <article
                       key={bot._id}
-                      className="rounded-lg border border-slate-200 bg-white p-4 transition-colors hover:border-slate-300 hover:bg-slate-50/40"
+                      className="rounded-lg border border-line bg-surface p-4 transition-colors hover:border-line hover:bg-slate-50/40"
                     >
                       <div>
                         <div className="flex items-start justify-between gap-3">
@@ -969,10 +969,10 @@ export default function ChatbotsPage() {
                               <Bot size={19} />
                             </span>
                             <div className="min-w-0">
-                              <h3 className="truncate text-base font-semibold text-[#0a1b33]">
+                              <h3 className="truncate text-base font-semibold text-ink">
                                 {bot.name}
                               </h3>
-                              <p className="mt-1 text-sm leading-6 text-slate-500">
+                              <p className="mt-1 text-sm leading-6 text-muted">
                                 {bot.description ??
                                   tr(
                                     "Ainda sem objetivo. Defina-o antes de ativar.",
@@ -1006,7 +1006,7 @@ export default function ChatbotsPage() {
                           />
                         </div>
 
-                        <div className="mt-4 rounded-xl border border-slate-100 bg-white/55 p-3">
+                        <div className="mt-4 rounded-xl border border-line-soft bg-white/55 p-3">
                           <SelectBox
                             label={tr("Canal de automação", "Automation channel")}
                             value={bot.channelId ?? ""}
@@ -1024,7 +1024,7 @@ export default function ChatbotsPage() {
                             }))}
                             placeholder={tr("Obrigatório para ativar", "Required before activation")}
                           />
-                          <p className="mt-2 text-[11px] leading-5 text-slate-500">
+                          <p className="mt-2 text-[11px] leading-5 text-muted">
                             {tr(
                               "Alterar o canal devolve o agente a rascunho. Só aparecem canais ativos.",
                               "Changing channel returns the agent to draft. Only active channels appear here.",
@@ -1032,7 +1032,7 @@ export default function ChatbotsPage() {
                           </p>
                         </div>
 
-                        <div className="mt-5 flex flex-wrap gap-2 border-t border-slate-100 pt-4">
+                        <div className="mt-5 flex flex-wrap gap-2 border-t border-line-soft pt-4">
                           {bot.status !== "active" && (
                             <button
                               type="button"
@@ -1068,7 +1068,7 @@ export default function ChatbotsPage() {
                               type="button"
                               onClick={() => setBotStatus(bot._id, "draft")}
                               disabled={busy !== null}
-                              className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-[#0a1b33] transition-colors hover:border-slate-300 disabled:opacity-50"
+                              className="inline-flex h-9 items-center gap-2 rounded-lg border border-line bg-surface px-3 text-sm font-medium text-ink transition-colors hover:border-line disabled:opacity-50"
                             >
                               {tr("Voltar a rascunho", "Move to draft")}
                             </button>
@@ -1401,33 +1401,33 @@ function FlowBuilder({
   if (!selectedBot) {
     return (
       <main className="flex min-h-screen flex-col overflow-hidden bg-[#f7fafc] lg:h-screen">
-        <header className="flex h-14 shrink-0 items-center justify-between border-b border-slate-200 bg-white px-5">
+        <header className="flex h-14 shrink-0 items-center justify-between border-b border-line bg-surface px-5">
           <div>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-faint">
               {tr("AUTOMAÇÕES", "AUTOMATIONS")}
             </div>
-            <h1 className="text-sm font-semibold text-[#0a1b33]">
+            <h1 className="text-sm font-semibold text-ink">
               {tr("Editor de fluxos", "Flow builder")}
             </h1>
           </div>
           <button
             type="button"
             onClick={onOpenBots}
-            className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#0a152d] px-4 text-sm font-semibold text-white shadow-[0_18px_44px_-24px_rgba(15,23,42,0.8)] hover:bg-[#0a1b33]"
+            className="inline-flex h-9 items-center gap-2 rounded-lg bg-nav-active px-4 text-sm font-semibold text-white shadow-[0_18px_44px_-24px_rgba(15,23,42,0.8)] hover:bg-brand-solid"
           >
             <Plus size={15} />
             {tr("Criar agente", "Create agent")}
           </button>
         </header>
         <section className="flow-builder-canvas grid flex-1 place-items-center px-4 py-8">
-          <div className="max-w-md rounded-lg border border-slate-200 bg-white p-8 text-center shadow-sm">
-            <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-lg bg-[#0a152d] text-white">
+          <div className="max-w-md rounded-lg border border-line bg-surface p-8 text-center shadow-sm">
+            <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-lg bg-nav-active text-white">
               <Workflow size={21} />
             </span>
-            <h2 className="mt-4 font-[var(--font-outfit)] text-xl font-semibold text-[#0a1b33]">
+            <h2 className="mt-4 font-[var(--font-outfit)] text-xl font-semibold text-ink">
               {tr("Crie um agente para abrir o editor", "Create an agent to open the editor")}
             </h2>
-            <p className="mt-2 text-sm leading-6 text-slate-500">
+            <p className="mt-2 text-sm leading-6 text-muted">
               {tr(
                 "Escolha um fluxo inicial e ajuste passos, caminhos e a pré-visualização do WhatsApp no mesmo espaço.",
                 "Choose a starter flow and tune steps, paths, and the WhatsApp preview in one workspace.",
@@ -1436,7 +1436,7 @@ function FlowBuilder({
             <button
               type="button"
               onClick={onOpenBots}
-              className="mt-6 inline-flex h-10 items-center gap-2 rounded-lg bg-[#0a152d] px-4 text-sm font-semibold text-white hover:bg-[#0a1b33]"
+              className="mt-6 inline-flex h-10 items-center gap-2 rounded-lg bg-nav-active px-4 text-sm font-semibold text-white hover:bg-brand-solid"
             >
               <Plus size={15} />
               {tr("Criar agente", "Create agent")}
@@ -1449,16 +1449,16 @@ function FlowBuilder({
 
   return (
     <main className="flex min-h-screen flex-col overflow-hidden bg-[#f7fafc] lg:h-screen">
-      <header className="flex h-14 shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4">
-        <div className="flex min-w-0 items-center gap-2 text-xs text-slate-500">
-          <span className="font-medium text-slate-500">{tr("Automações", "Automations")}</span>
-          <ArrowRight size={12} className="text-slate-300" />
+      <header className="flex h-14 shrink-0 items-center justify-between border-b border-line bg-surface px-4">
+        <div className="flex min-w-0 items-center gap-2 text-xs text-muted">
+          <span className="font-medium text-muted">{tr("Automações", "Automations")}</span>
+          <ArrowRight size={12} className="text-faint" />
           <select
             value={selectedBotId || selectedBot._id}
             onChange={(event) =>
               onSelectBot(event.target.value as Id<"chatbots">)
             }
-            className="h-8 max-w-[260px] truncate rounded-md border border-transparent bg-transparent px-1 text-sm font-semibold text-[#0a1b33] outline-none hover:border-white/80 hover:bg-white/60"
+            className="h-8 max-w-[260px] truncate rounded-md border border-transparent bg-transparent px-1 text-sm font-semibold text-ink outline-none hover:border-white/80 hover:bg-white/60"
             aria-label={tr("Selecionar agente", "Select agent")}
           >
             {bots.map((bot) => (
@@ -1467,7 +1467,7 @@ function FlowBuilder({
               </option>
             ))}
           </select>
-          <span className="hidden h-1 w-1 rounded-full bg-slate-300 sm:inline-block" />
+          <span className="hidden h-1 w-1 rounded-full bg-faint/50 sm:inline-block" />
           <select
             value={selectedBot.channelId ?? ""}
             onChange={(event) => {
@@ -1478,7 +1478,7 @@ function FlowBuilder({
                 );
               }
             }}
-            className="hidden h-8 max-w-[220px] truncate rounded-md border border-transparent bg-transparent px-1 text-xs font-medium text-slate-600 outline-none hover:border-white/80 hover:bg-white/60 md:block"
+            className="hidden h-8 max-w-[220px] truncate rounded-md border border-transparent bg-transparent px-1 text-xs font-medium text-body outline-none hover:border-white/80 hover:bg-white/60 md:block"
             aria-label={tr("Selecionar canal da automação", "Select automation channel")}
           >
             <option value="">{tr("Sem canal", "No channel")}</option>
@@ -1488,11 +1488,11 @@ function FlowBuilder({
               </option>
             ))}
           </select>
-          <span className="hidden h-1 w-1 rounded-full bg-slate-300 md:inline-block" />
+          <span className="hidden h-1 w-1 rounded-full bg-faint/50 md:inline-block" />
           <span className="hidden whitespace-nowrap sm:inline">
             {nodes.length} {tr("passos", "steps")}
           </span>
-          <span className="hidden h-1 w-1 rounded-full bg-slate-300 sm:inline-block" />
+          <span className="hidden h-1 w-1 rounded-full bg-faint/50 sm:inline-block" />
           <span className="hidden whitespace-nowrap sm:inline">
             {runsLoading
               ? tr("A carregar execuções", "Loading runs")
@@ -1501,8 +1501,8 @@ function FlowBuilder({
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="hidden items-center gap-1.5 text-xs font-medium text-slate-500 sm:inline-flex">
-            <CheckCircle2 size={13} className="text-slate-400" />
+          <span className="hidden items-center gap-1.5 text-xs font-medium text-muted sm:inline-flex">
+            <CheckCircle2 size={13} className="text-faint" />
             {tr("Guardado", "Saved")}
           </span>
           <div className="relative">
@@ -1510,7 +1510,7 @@ function FlowBuilder({
               type="button"
               onClick={() => setTemplateMenuOpen((open) => !open)}
               disabled={busy !== null}
-              className="hidden h-8 items-center gap-2 rounded-md border border-white/80 bg-white/68 px-3 text-sm font-semibold text-[#0a1b33] shadow-sm backdrop-blur-xl hover:bg-white/88 disabled:opacity-50 md:inline-flex"
+              className="hidden h-8 items-center gap-2 rounded-md border border-white/80 bg-white/68 px-3 text-sm font-semibold text-ink shadow-sm backdrop-blur-xl hover:bg-white/88 disabled:opacity-50 md:inline-flex"
             >
               <CopyPlus size={15} />
               Templates
@@ -1528,10 +1528,10 @@ function FlowBuilder({
                     disabled={busy !== null}
                     className="block w-full rounded-xl px-3 py-2 text-left hover:bg-white/72 disabled:opacity-50"
                   >
-                    <span className="block text-sm font-semibold text-[#0a1b33]">
+                    <span className="block text-sm font-semibold text-ink">
                       {template.name}
                     </span>
-                    <span className="mt-0.5 block text-xs leading-5 text-slate-500">
+                    <span className="mt-0.5 block text-xs leading-5 text-muted">
                       {template.description}
                     </span>
                   </button>
@@ -1554,7 +1554,7 @@ function FlowBuilder({
           <button
             type="button"
             onClick={() => setDrawerMode("runs")}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-line bg-surface text-body hover:bg-surface-2"
             aria-label={tr("Abrir execuções", "Open runs")}
             title={tr("Execuções", "Runs")}
           >
@@ -1586,7 +1586,7 @@ function FlowBuilder({
             type="button"
             onClick={onSave}
             disabled={busy !== null}
-            className="hidden h-8 items-center gap-2 rounded-md border border-white/80 bg-white/68 px-3 text-sm font-semibold text-[#0a1b33] shadow-sm backdrop-blur-xl hover:bg-white/88 disabled:opacity-50 sm:inline-flex"
+            className="hidden h-8 items-center gap-2 rounded-md border border-white/80 bg-white/68 px-3 text-sm font-semibold text-ink shadow-sm backdrop-blur-xl hover:bg-white/88 disabled:opacity-50 sm:inline-flex"
           >
             {busy === "flow" ? (
               <Loader2 size={15} className="animate-spin" />
@@ -1611,7 +1611,7 @@ function FlowBuilder({
           <button
             type="button"
             onClick={onOpenBots}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-white/80 bg-white/68 text-slate-500 shadow-sm backdrop-blur-xl hover:bg-white/88"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-white/80 bg-white/68 text-muted shadow-sm backdrop-blur-xl hover:bg-white/88"
             aria-label={tr("Abrir biblioteca de agentes", "Open agent library")}
           >
             <Bot size={15} />
@@ -1620,13 +1620,13 @@ function FlowBuilder({
       </header>
 
       <div className="min-h-0 flex-1 bg-[#eef3f7] p-3">
-        <section className="grid h-full min-h-[680px] min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm lg:grid-cols-[minmax(0,1fr)_392px]">
+        <section className="grid h-full min-h-[680px] min-w-0 overflow-hidden rounded-lg border border-line bg-surface shadow-sm lg:grid-cols-[minmax(0,1fr)_392px]">
           <div className="relative min-h-[680px] min-w-0 overflow-hidden">
           {selectedNode && drawerMode === null && (
             <button
               type="button"
               onClick={() => setDrawerMode("edit")}
-              className="absolute left-1/2 top-3 z-20 inline-flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/80 bg-white/72 px-3 py-1.5 text-xs font-semibold text-slate-500 shadow-[0_16px_42px_-30px_rgba(15,23,42,0.7)] ring-1 ring-white/70 backdrop-blur-xl hover:text-[#0a1b33] lg:hidden"
+              className="absolute left-1/2 top-3 z-20 inline-flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/80 bg-white/72 px-3 py-1.5 text-xs font-semibold text-muted shadow-[0_16px_42px_-30px_rgba(15,23,42,0.7)] ring-1 ring-white/70 backdrop-blur-xl hover:text-ink lg:hidden"
             >
               {tr("Editar passo", "Edit step")}
             </button>
@@ -1635,13 +1635,13 @@ function FlowBuilder({
           {paletteOpen && (
             <div className="absolute right-20 top-16 z-30 w-[336px] overflow-hidden rounded-lg border border-white/78 bg-white/72 shadow-[0_28px_90px_-42px_rgba(15,23,42,0.72)] ring-1 ring-white/70 backdrop-blur-2xl">
               <div className="flex items-center justify-between px-2 py-1">
-                <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
+                <span className="text-xs font-semibold uppercase tracking-[0.14em] text-faint">
                   {tr("Adicionar passo", "Add step")}
                 </span>
                 <button
                   type="button"
                   onClick={() => setPaletteOpen(false)}
-                  className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-white/72 hover:text-[#0a1b33]"
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-md text-faint hover:bg-white/72 hover:text-ink"
                   aria-label={tr("Fechar lista de passos", "Close step list")}
                 >
                   <X size={14} />
@@ -1661,10 +1661,10 @@ function FlowBuilder({
                         <Icon size={15} />
                       </span>
                       <span className="min-w-0">
-                        <span className="block text-sm font-semibold text-[#0a1b33]">
+                        <span className="block text-sm font-semibold text-ink">
                           {step.label}
                         </span>
-                        <span className="mt-0.5 block text-xs leading-5 text-slate-500">
+                        <span className="mt-0.5 block text-xs leading-5 text-muted">
                           {step.detail}
                         </span>
                       </span>
@@ -1725,7 +1725,7 @@ function FlowBuilder({
               type="button"
               onClick={() => setDrawerMode("edit")}
               disabled={!selectedNode}
-              className={`inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/80 bg-white/72 text-slate-500 shadow-[0_16px_42px_-32px_rgba(15,23,42,0.78)] backdrop-blur-xl hover:text-[#0a1b33] disabled:opacity-40 ${
+              className={`inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/80 bg-white/72 text-muted shadow-[0_16px_42px_-32px_rgba(15,23,42,0.78)] backdrop-blur-xl hover:text-ink disabled:opacity-40 ${
                 drawerMode === "edit" ? "ring-2 ring-[#0a152d]/10" : ""
               }`}
               aria-label={tr("Editar passo selecionado", "Edit selected step")}
@@ -1735,7 +1735,7 @@ function FlowBuilder({
             <button
               type="button"
               onClick={() => setDrawerMode("preview")}
-              className={`inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/80 bg-white/72 text-slate-500 shadow-[0_16px_42px_-32px_rgba(15,23,42,0.78)] backdrop-blur-xl hover:text-[#0a1b33] ${
+              className={`inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/80 bg-white/72 text-muted shadow-[0_16px_42px_-32px_rgba(15,23,42,0.78)] backdrop-blur-xl hover:text-ink ${
                 drawerMode === "preview" ? "ring-2 ring-blue-500/20" : ""
               }`}
               aria-label={tr("Abrir pré-visualização", "Open preview")}
@@ -1746,11 +1746,11 @@ function FlowBuilder({
           <FlowIssueDock issues={issues} />
 
           {drawerMode === "edit" && (
-            <div className="absolute bottom-4 right-4 top-4 z-40 w-[380px] overflow-hidden rounded-lg border border-slate-200 bg-white shadow-[0_26px_90px_-42px_rgba(15,23,42,0.9)] lg:hidden">
+            <div className="absolute bottom-4 right-4 top-4 z-40 w-[380px] overflow-hidden rounded-lg border border-line bg-surface shadow-[0_26px_90px_-42px_rgba(15,23,42,0.9)] lg:hidden">
               <button
                 type="button"
                 onClick={() => setDrawerMode(null)}
-                className="absolute right-3 top-3 z-10 inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-400 hover:bg-slate-50 hover:text-[#0a1b33]"
+                className="absolute right-3 top-3 z-10 inline-flex h-8 w-8 items-center justify-center rounded-md text-faint hover:bg-surface-2 hover:text-ink"
                 aria-label={tr("Fechar editor", "Close editor")}
               >
                 <X size={16} />
@@ -1785,11 +1785,11 @@ function FlowBuilder({
           )}
 
           {drawerMode === "preview" && (
-            <div className="absolute bottom-4 right-4 top-4 z-40 w-[380px] overflow-y-auto rounded-lg border border-slate-200 bg-[#eef3f8] shadow-[0_26px_90px_-42px_rgba(15,23,42,0.9)] lg:hidden">
+            <div className="absolute bottom-4 right-4 top-4 z-40 w-[380px] overflow-y-auto rounded-lg border border-line bg-[#eef3f8] shadow-[0_26px_90px_-42px_rgba(15,23,42,0.9)] lg:hidden">
               <button
                 type="button"
                 onClick={() => setDrawerMode(null)}
-                className="absolute right-3 top-3 z-10 inline-flex h-8 w-8 items-center justify-center rounded-md bg-white/90 text-slate-400 hover:bg-white hover:text-[#0a1b33]"
+                className="absolute right-3 top-3 z-10 inline-flex h-8 w-8 items-center justify-center rounded-md bg-white/90 text-faint hover:bg-surface hover:text-ink"
                 aria-label={tr("Fechar pré-visualização", "Close preview")}
               >
                 <X size={16} />
@@ -1806,11 +1806,11 @@ function FlowBuilder({
           )}
 
           {drawerMode === "runs" && (
-            <div className="absolute bottom-4 right-4 top-4 z-40 w-[min(560px,calc(100%-2rem))] overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-[0_26px_90px_-42px_rgba(15,23,42,0.9)] lg:hidden">
+            <div className="absolute bottom-4 right-4 top-4 z-40 w-[min(560px,calc(100%-2rem))] overflow-y-auto rounded-lg border border-line bg-surface shadow-[0_26px_90px_-42px_rgba(15,23,42,0.9)] lg:hidden">
               <button
                 type="button"
                 onClick={() => setDrawerMode(null)}
-                className="absolute right-3 top-3 z-10 inline-flex h-8 w-8 items-center justify-center rounded-md bg-white text-slate-400 hover:bg-slate-50 hover:text-[#0a1b33]"
+                className="absolute right-3 top-3 z-10 inline-flex h-8 w-8 items-center justify-center rounded-md bg-surface text-faint hover:bg-surface-2 hover:text-ink"
                 aria-label={tr("Fechar execuções", "Close runs")}
               >
                 <X size={16} />
@@ -1821,14 +1821,14 @@ function FlowBuilder({
           </div>
 
           <aside className="hidden min-h-0 border-l border-white/80 bg-white/70 backdrop-blur-2xl lg:block">
-            <div className="flex h-12 items-center gap-2 border-b border-slate-100 bg-white/72 px-3">
+            <div className="flex h-12 items-center gap-2 border-b border-line-soft bg-white/72 px-3">
               <button
                 type="button"
                 onClick={() => setDrawerMode("edit")}
                 className={`inline-flex h-8 flex-1 items-center justify-center gap-2 rounded-lg text-xs font-semibold transition-colors ${
                   drawerMode !== "preview"
-                    ? "bg-[#0a152d] text-white"
-                    : "bg-white text-slate-500 ring-1 ring-slate-200 hover:text-[#0a1b33]"
+                    ? "bg-nav-active text-white"
+                    : "bg-surface text-muted ring-1 ring-slate-200 hover:text-ink"
                 }`}
               >
                 <Settings2 size={14} />
@@ -1839,8 +1839,8 @@ function FlowBuilder({
                 onClick={() => setDrawerMode("preview")}
                 className={`inline-flex h-8 flex-1 items-center justify-center gap-2 rounded-lg text-xs font-semibold transition-colors ${
                   drawerMode === "preview"
-                    ? "bg-[#0a152d] text-white"
-                    : "bg-white text-slate-500 ring-1 ring-slate-200 hover:text-[#0a1b33]"
+                    ? "bg-nav-active text-white"
+                    : "bg-surface text-muted ring-1 ring-slate-200 hover:text-ink"
                 }`}
               >
                 <Smartphone size={14} />
@@ -1851,8 +1851,8 @@ function FlowBuilder({
                 onClick={() => setDrawerMode("runs")}
                 className={`inline-flex h-8 flex-1 items-center justify-center gap-2 rounded-lg text-xs font-semibold transition-colors ${
                   drawerMode === "runs"
-                    ? "bg-[#0a152d] text-white"
-                    : "bg-white text-slate-500 ring-1 ring-slate-200 hover:text-[#0a1b33]"
+                    ? "bg-nav-active text-white"
+                    : "bg-surface text-muted ring-1 ring-slate-200 hover:text-ink"
                 }`}
               >
                 <History size={14} />
@@ -2003,14 +2003,14 @@ function FlowCanvasStepNode({ data, selected }: NodeProps<FlowCanvasNode>) {
               ? "border-emerald-100/90 bg-emerald-50/92 text-emerald-700"
               : hasError
                 ? "border-red-100/90 bg-red-50/92 text-red-700"
-                : "border-slate-100/90 bg-white/74 text-[#0a1b33]"
+                : "border-slate-100/90 bg-white/74 text-ink"
           }`}
         >
           <Icon size={16} />
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
-            <span className="truncate text-[13px] font-semibold text-[#0a1b33]">
+            <span className="truncate text-[13px] font-semibold text-ink">
               {flowNode.title}
             </span>
             {isEntry && (
@@ -2019,7 +2019,7 @@ function FlowCanvasStepNode({ data, selected }: NodeProps<FlowCanvasNode>) {
               </span>
             )}
           </div>
-          <div className="mt-0.5 truncate text-[11px] text-slate-500">
+          <div className="mt-0.5 truncate text-[11px] text-muted">
             {nodeTypeLabel(flowNode.type, locale)} · {flowNode.key}
           </div>
         </div>
@@ -2037,11 +2037,11 @@ function FlowCanvasStepNode({ data, selected }: NodeProps<FlowCanvasNode>) {
       </div>
       <div className="relative px-3 py-2.5">
         {preview ? (
-          <p className="line-clamp-3 text-xs leading-5 text-slate-600">
+          <p className="line-clamp-3 text-xs leading-5 text-body">
             {preview}
           </p>
         ) : (
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-faint">
             {tr("Ainda sem conteúdo", "No content yet")}
           </p>
         )}
@@ -2054,11 +2054,11 @@ function FlowCanvasStepNode({ data, selected }: NodeProps<FlowCanvasNode>) {
               >
                 <span className="min-w-0 flex items-center gap-1.5">
                   <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
-                  <span className="truncate font-medium text-[#0a1b33]">
+                  <span className="truncate font-medium text-ink">
                     {button.label || button.replyId}
                   </span>
                 </span>
-                <span className="max-w-[92px] truncate text-slate-400">
+                <span className="max-w-[92px] truncate text-faint">
                   {button.nextKey || tr("Sem destino", "No target")}
                 </span>
               </div>
@@ -2122,18 +2122,18 @@ function FlowInspectorPanel({
     .map((item) => ({ value: item.key, label: `${item.title} · ${item.key}` }));
 
   return (
-    <aside className="min-w-0 border-b border-slate-200 bg-white xl:border-b-0 xl:border-r">
+    <aside className="min-w-0 border-b border-line bg-surface xl:border-b-0 xl:border-r">
       <div className="h-full max-h-[780px] overflow-y-auto xl:max-h-none">
-        <section className="border-b border-slate-100 bg-[#fbfdff] p-4">
+        <section className="border-b border-line-soft bg-[#fbfdff] p-4">
           <div className="mb-3 flex items-center gap-2">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-[#0a1b33]">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-surface-3 text-ink">
               <Settings2 size={15} />
             </span>
             <div>
-              <h3 className="text-sm font-semibold text-[#0a1b33]">
+              <h3 className="text-sm font-semibold text-ink">
                 {tr("Configuração do fluxo", "Flow settings")}
               </h3>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-muted">
                 {tr("Gatilho e caminho de entrada.", "Trigger and entry path.")}
               </p>
             </div>
@@ -2172,11 +2172,11 @@ function FlowInspectorPanel({
 
         {!selectedNode ? (
           <section className="p-8 text-center">
-            <Workflow size={24} className="mx-auto text-slate-300" />
-            <p className="mt-3 text-sm font-semibold text-[#0a1b33]">
+            <Workflow size={24} className="mx-auto text-faint" />
+            <p className="mt-3 text-sm font-semibold text-ink">
               {tr("Selecione um passo", "Select a step")}
             </p>
-            <p className="mt-1 text-xs leading-5 text-slate-500">
+            <p className="mt-1 text-xs leading-5 text-muted">
               {tr(
                 "Clique num passo do mapa para editar conteúdo e caminhos.",
                 "Click any step on the map to edit content and routing.",
@@ -2187,17 +2187,17 @@ function FlowInspectorPanel({
           <section className="p-4">
             <div className="mb-4 flex items-start justify-between gap-3">
               <div className="flex min-w-0 items-start gap-3">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#0a152d] text-white">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-nav-active text-white">
                   {(() => {
                     const Icon = flowNodeIcon(selectedNode.type);
                     return <Icon size={16} />;
                   })()}
                 </span>
                 <div className="min-w-0">
-                  <h3 className="truncate text-sm font-semibold text-[#0a1b33]">
+                  <h3 className="truncate text-sm font-semibold text-ink">
                     {selectedNode.title}
                   </h3>
-                  <p className="mt-0.5 truncate text-xs text-slate-500">
+                  <p className="mt-0.5 truncate text-xs text-muted">
                     {nodeTypeLabel(selectedNode.type, locale)} · {selectedNode.key}
                   </p>
                 </div>
@@ -2206,7 +2206,7 @@ function FlowInspectorPanel({
                 type="button"
                 onClick={onRemove}
                 disabled={selectedNode.type === "start"}
-                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-400 transition-colors hover:bg-slate-50 disabled:opacity-40"
+                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-line text-faint transition-colors hover:bg-surface-2 disabled:opacity-40"
                 aria-label={tr(`Remover ${selectedNode.title}`, `Remove ${selectedNode.title}`)}
               >
                 <Trash2 size={14} />
@@ -2259,7 +2259,7 @@ function FlowInspectorPanel({
 
             {needsBody(selectedNode.type) && (
               <label className="mt-3 block">
-                <span className="mb-1 block text-[11px] font-medium text-slate-500">
+                <span className="mb-1 block text-[11px] font-medium text-muted">
                   {tr("Mensagem / instrução", "Message / prompt")}
                 </span>
                 <textarea
@@ -2271,7 +2271,7 @@ function FlowInspectorPanel({
                       ? 3
                       : 4
                   }
-                  className="w-full resize-none rounded-lg border border-slate-200 bg-[#f8fafc] px-3 py-2 text-sm text-[#0a1b33] outline-none transition-colors placeholder:text-slate-300 hover:bg-white focus:border-slate-400 focus:bg-white"
+                  className="w-full resize-none rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm text-ink outline-none transition-colors placeholder:text-faint hover:bg-surface focus:border-brand-solid/40 focus:bg-surface"
                   placeholder="Mensagem enviada ao cliente..."
                 />
               </label>
@@ -2313,7 +2313,7 @@ function FlowInspectorPanel({
             )}
 
             {selectedNode.type === "condition" && (
-              <div className="mt-4 grid gap-3 rounded-lg border border-slate-200 bg-[#fbfdff] p-3">
+              <div className="mt-4 grid gap-3 rounded-lg border border-line bg-[#fbfdff] p-3">
                 <TextInput
                   label={tr("Variável", "Variable")}
                   value={selectedNode.condition?.variableKey ?? ""}
@@ -2429,15 +2429,15 @@ function ChoiceRowsEditor({
   const limit = node.type === "send_buttons" ? 3 : 10;
 
   return (
-    <div className="mt-4 overflow-hidden rounded-lg border border-slate-200 bg-white">
-      <div className="flex items-center justify-between gap-2 border-b border-slate-100 bg-[#fbfdff] px-3 py-2.5">
+    <div className="mt-4 overflow-hidden rounded-lg border border-line bg-surface">
+      <div className="flex items-center justify-between gap-2 border-b border-line-soft bg-[#fbfdff] px-3 py-2.5">
         <div>
-          <div className="text-xs font-semibold text-[#0a1b33]">
+          <div className="text-xs font-semibold text-ink">
             {node.type === "send_buttons"
               ? tr("Respostas rápidas", "Quick replies")
               : tr("Opções da lista", "List rows")}
           </div>
-          <div className="mt-0.5 text-[11px] text-slate-500">
+          <div className="mt-0.5 text-[11px] text-muted">
             {tr(
               "Cada opção pode seguir para um passo diferente.",
               "Each choice can branch to a different step.",
@@ -2461,14 +2461,14 @@ function ChoiceRowsEditor({
             })
           }
           disabled={choices.length >= limit}
-          className="inline-flex h-8 items-center gap-1 rounded-lg bg-[#0a152d] px-2.5 text-xs font-semibold text-white transition-colors hover:bg-[#0a1b33] disabled:opacity-50"
+          className="inline-flex h-8 items-center gap-1 rounded-lg bg-nav-active px-2.5 text-xs font-semibold text-white transition-colors hover:bg-brand-solid disabled:opacity-50"
         >
           <Plus size={12} />
           {tr("Adicionar", "Add")}
         </button>
       </div>
 
-      <div className="border-b border-slate-100 px-3 py-3">
+      <div className="border-b border-line-soft px-3 py-3">
         <TextInput
           label={tr("Guardar resposta como", "Save reply as")}
           value={node.variableKey ?? ""}
@@ -2477,9 +2477,9 @@ function ChoiceRowsEditor({
         />
       </div>
 
-      <div className="divide-y divide-slate-100">
+      <div className="divide-y divide-line-soft">
         {choices.length === 0 ? (
-          <div className="px-3 py-5 text-center text-xs text-slate-400">
+          <div className="px-3 py-5 text-center text-xs text-faint">
             {tr(
               "Adicione uma opção para criar um novo caminho.",
               "Add a reply to create a new path.",
@@ -2502,7 +2502,7 @@ function ChoiceRowsEditor({
                       }),
                     })
                   }
-                  className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-[#f8fafc] px-3 py-2 text-sm font-medium text-[#0a1b33] outline-none transition-colors placeholder:text-slate-300 hover:bg-white focus:border-slate-400 focus:bg-white"
+                  className="min-w-0 flex-1 rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm font-medium text-ink outline-none transition-colors placeholder:text-faint hover:bg-surface focus:border-brand-solid/40 focus:bg-surface"
                   placeholder={tr("Texto do botão", "Button text")}
                 />
                 <button
@@ -2514,7 +2514,7 @@ function ChoiceRowsEditor({
                       ),
                     })
                   }
-                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-line bg-surface text-faint transition-colors hover:bg-red-50 hover:text-red-600"
                   aria-label={tr("Remover resposta rápida", "Remove quick reply")}
                 >
                   <Trash2 size={13} />
@@ -2532,7 +2532,7 @@ function ChoiceRowsEditor({
                       }),
                     })
                   }
-                  className="min-w-0 rounded-lg border border-slate-200 bg-[#f8fafc] px-3 py-2 text-xs text-slate-600 outline-none transition-colors placeholder:text-slate-300 hover:bg-white focus:border-slate-400 focus:bg-white"
+                  className="min-w-0 rounded-lg border border-line bg-surface-2 px-3 py-2 text-xs text-body outline-none transition-colors placeholder:text-faint hover:bg-surface focus:border-brand-solid/40 focus:bg-surface"
                   placeholder="reply_id"
                 />
                 <select
@@ -2545,7 +2545,7 @@ function ChoiceRowsEditor({
                       }),
                     })
                   }
-                  className="min-w-0 rounded-lg border border-slate-200 bg-[#f8fafc] px-3 py-2 text-xs font-medium text-[#0a1b33] outline-none transition-colors hover:bg-white focus:border-slate-400 focus:bg-white"
+                  className="min-w-0 rounded-lg border border-line bg-surface-2 px-3 py-2 text-xs font-medium text-ink outline-none transition-colors hover:bg-surface focus:border-brand-solid/40 focus:bg-surface"
                 >
                   <option value="">{tr("Sem destino", "No target")}</option>
                   {targetOptions.map((option) => (
@@ -2603,20 +2603,20 @@ function WhatsAppFlowPreview({
               <Smartphone size={15} />
             </span>
             <div>
-              <h3 className="text-sm font-semibold text-[#0a1b33]">
+              <h3 className="text-sm font-semibold text-ink">
                 {tr("Pré-visualização WhatsApp", "WhatsApp preview")}
               </h3>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-muted">
                 {tr("A testar o caminho selecionado", "Testing selected path")}
               </p>
             </div>
           </div>
-          <span className="rounded-full bg-white px-2 py-1 text-[10px] font-semibold text-slate-500 ring-1 ring-slate-200">
+          <span className="rounded-full bg-surface px-2 py-1 text-[10px] font-semibold text-muted ring-1 ring-slate-200">
             Local
           </span>
         </div>
 
-        <div className="overflow-hidden rounded-lg border border-slate-300 bg-[#111827] shadow-[0_28px_90px_-48px_rgba(15,23,42,0.9)]">
+        <div className="overflow-hidden rounded-lg border border-line bg-[#111827] shadow-[0_28px_90px_-48px_rgba(15,23,42,0.9)]">
           <div className="flex items-center gap-3 border-b border-white/10 bg-[#1f2937] px-3 py-2.5 text-white 2xl:px-4 2xl:py-3">
             <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-600 text-sm font-bold 2xl:h-9 2xl:w-9">
               {botName.slice(0, 1).toUpperCase()}
@@ -2644,7 +2644,7 @@ function WhatsAppFlowPreview({
             </div>
 
             {previewNodes.length === 0 ? (
-              <div className="rounded-lg bg-white/90 px-3 py-2 text-sm text-slate-600">
+              <div className="rounded-lg bg-white/90 px-3 py-2 text-sm text-body">
                 {tr(
                   "Adicione e selecione um passo para pré-visualizar a conversa.",
                   "Add and select a step to preview the conversation.",
@@ -2695,11 +2695,11 @@ function PreviewBubble({ node }: { node: FlowNode }) {
   }
   if (node.type === "send_template") {
     return node.template ? (
-      <div className="rounded-lg bg-white/95 px-3 py-2 text-sm leading-5 text-slate-800">
+      <div className="rounded-lg bg-white/95 px-3 py-2 text-sm leading-5 text-ink">
         <span className="text-xs font-medium text-[#0b7a5f]">
           {tr("Template aprovado", "Approved template")}
         </span>
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-muted">
           {tr("Pode ser enviado fora da janela de 24h.", "Works outside the 24h window.")}
         </p>
       </div>
@@ -2711,7 +2711,7 @@ function PreviewBubble({ node }: { node: FlowNode }) {
   }
   if (node.type === "handoff") {
     return (
-      <div className="rounded-lg bg-white/95 px-3 py-2 text-sm leading-5 text-slate-700">
+      <div className="rounded-lg bg-white/95 px-3 py-2 text-sm leading-5 text-ink">
         {node.body || tr("A equipa continuará a partir daqui.", "The team will continue from here.")}
       </div>
     );
@@ -2725,11 +2725,11 @@ function PreviewBubble({ node }: { node: FlowNode }) {
   }
 
   return (
-    <div className="max-w-[88%] rounded-lg bg-white/95 px-3 py-2 text-sm leading-5 text-slate-800">
+    <div className="max-w-[88%] rounded-lg bg-white/95 px-3 py-2 text-sm leading-5 text-ink">
       <p>{node.body || tr("Texto da mensagem...", "Message text...")}</p>
       {(node.type === "send_buttons" || node.type === "send_list") &&
         (node.buttons ?? []).length > 0 && (
-          <div className="mt-3 space-y-1.5 border-t border-slate-200 pt-2">
+          <div className="mt-3 space-y-1.5 border-t border-line pt-2">
             {(node.buttons ?? []).map((button) => (
               <div
                 key={button.replyId}
@@ -2741,11 +2741,11 @@ function PreviewBubble({ node }: { node: FlowNode }) {
           </div>
         )}
       {node.type === "collect_input" && (
-        <div className="mt-3 rounded-md bg-slate-100 px-2 py-1.5 text-xs font-medium text-slate-500">
+        <div className="mt-3 rounded-md bg-surface-3 px-2 py-1.5 text-xs font-medium text-muted">
           {tr("Guarda a resposta como", "Saves reply as")} {node.variableKey || "answer"}
         </div>
       )}
-      <div className="mt-1 text-right text-[10px] text-slate-400">9:42</div>
+      <div className="mt-1 text-right text-[10px] text-faint">9:42</div>
     </div>
   );
 }
@@ -2757,7 +2757,7 @@ function FlowIssueDock({ issues }: { issues: FlowIssue[] }) {
   const isError = first.severity === "error";
 
   return (
-    <div className="pointer-events-none absolute bottom-4 left-16 z-20 max-w-[520px] rounded-lg border border-slate-200 bg-white/95 px-3 py-2 shadow-[0_20px_70px_-42px_rgba(15,23,42,0.9)] backdrop-blur">
+    <div className="pointer-events-none absolute bottom-4 left-16 z-20 max-w-[520px] rounded-lg border border-line bg-white/95 px-3 py-2 shadow-[0_20px_70px_-42px_rgba(15,23,42,0.9)] backdrop-blur">
       <div className="flex items-center gap-2">
         <span
           className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${
@@ -2767,12 +2767,12 @@ function FlowIssueDock({ issues }: { issues: FlowIssue[] }) {
           <AlertTriangle size={14} />
         </span>
         <div className="min-w-0">
-          <div className="truncate text-xs font-semibold text-[#0a1b33]">
+          <div className="truncate text-xs font-semibold text-ink">
             {isError
               ? tr("Publicação bloqueada", "Activation blocked")
               : tr("Aviso do fluxo", "Flow warning")}
           </div>
-          <div className="truncate text-[11px] text-slate-500">
+          <div className="truncate text-[11px] text-muted">
             {first.nodeKey ? `${first.nodeKey}: ` : ""}
             {localizeFlowIssue(first.message, locale)}
             {issues.length > 1 ? ` (+${issues.length - 1})` : ""}
@@ -2812,12 +2812,12 @@ function FlowValidationPanel({
             {clean ? <CheckCircle2 size={17} /> : <AlertTriangle size={17} />}
           </span>
           <div>
-            <h3 className="font-semibold text-[#0a1b33]">
+            <h3 className="font-semibold text-ink">
               {clean
                 ? tr("Pronto para ativar", "Ready to activate")
                 : tr("Publicação bloqueada", "Activation blocked")}
             </h3>
-            <p className="mt-1 text-sm leading-6 text-slate-600">
+            <p className="mt-1 text-sm leading-6 text-body">
               {clean
                 ? warnings.length > 0
                   ? tr(
@@ -2839,8 +2839,8 @@ function FlowValidationPanel({
                 key={`${issue.message}-${index}`}
                 className={`rounded-lg border px-3 py-2 text-xs ${
                   issue.severity === "error"
-                    ? "border-red-100 bg-white text-red-800"
-                    : "border-amber-100 bg-white text-amber-800"
+                    ? "border-red-100 bg-surface text-red-800"
+                    : "border-amber-100 bg-surface text-amber-800"
                 }`}
               >
                 <span className="font-semibold uppercase">
@@ -2851,7 +2851,7 @@ function FlowValidationPanel({
               </div>
             ))}
             {issues.length > 3 && (
-              <p className="text-xs font-medium text-slate-500">
+              <p className="text-xs font-medium text-muted">
                 +{issues.length - 3} {tr("problemas adicionais", "more issues")}
               </p>
             )}
@@ -2889,16 +2889,16 @@ function FlowMapPanel({
   }, [issues]);
 
   return (
-    <aside className="border-b border-slate-100 bg-slate-50/70 lg:border-b-0 lg:border-r">
-      <div className="border-b border-slate-100 bg-white px-4 py-4">
+    <aside className="border-b border-line-soft bg-slate-50/70 lg:border-b-0 lg:border-r">
+      <div className="border-b border-line-soft bg-surface px-4 py-4">
         <div className="flex items-center justify-between gap-2">
           <div>
-            <h3 className="font-[var(--font-outfit)] text-base font-semibold text-[#0a1b33]">
+            <h3 className="font-[var(--font-outfit)] text-base font-semibold text-ink">
               {tr("Mapa do fluxo", "Flow map")}
             </h3>
-            <p className="text-xs text-slate-500">{tr("Selecione um bloco para editar.", "Pick a block to edit.")}</p>
+            <p className="text-xs text-muted">{tr("Selecione um bloco para editar.", "Pick a block to edit.")}</p>
           </div>
-          <span className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-500">
+          <span className="rounded-full bg-surface-3 px-2 py-1 text-[11px] font-semibold text-muted">
             {nodes.length}
           </span>
         </div>
@@ -2908,7 +2908,7 @@ function FlowMapPanel({
             onChange={(event) =>
               setNewNodeType(event.target.value as FlowNodeType)
             }
-            className="h-10 min-w-0 rounded-lg border border-slate-200 bg-white px-2 text-xs font-medium text-[#0a1b33] outline-none focus:border-slate-400"
+            className="h-10 min-w-0 rounded-lg border border-line bg-surface px-2 text-xs font-medium text-ink outline-none focus:border-brand-solid/40"
           >
             {FLOW_NODE_TYPES.map((type) => (
               <option key={type} value={type}>
@@ -2919,7 +2919,7 @@ function FlowMapPanel({
           <button
             type="button"
             onClick={() => onAddNode(newNodeType)}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-[#0a152d] text-white hover:bg-[#0a1b33]"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-nav-active text-white hover:bg-brand-solid"
             aria-label={tr("Adicionar bloco", "Add node")}
           >
             <Plus size={15} />
@@ -2949,23 +2949,23 @@ function FlowMapPanel({
               onClick={() => onSelect(node.key)}
               className={`group w-full rounded-xl border px-3 py-3 text-left transition-colors ${
                 active
-                  ? "border-[#0a152d] bg-white shadow-sm"
-                  : "border-transparent bg-white/70 hover:border-slate-200 hover:bg-white"
+                  ? "border-[#0a152d] bg-surface shadow-sm"
+                  : "border-transparent bg-white/70 hover:border-line hover:bg-surface"
               }`}
             >
               <div className="flex items-center gap-3">
                 <span
                   className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
                     active
-                      ? "bg-[#0a152d] text-white"
-                      : "bg-slate-100 text-slate-500 group-hover:text-[#0a1b33]"
+                      ? "bg-nav-active text-white"
+                      : "bg-surface-3 text-muted group-hover:text-ink"
                   }`}
                 >
                   <NodeIcon size={15} />
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-1.5">
-                    <span className="truncate text-sm font-semibold text-[#0a1b33]">
+                    <span className="truncate text-sm font-semibold text-ink">
                       {node.title}
                     </span>
                     {node.key === entryNodeKey && (
@@ -2974,14 +2974,14 @@ function FlowMapPanel({
                       </span>
                     )}
                   </span>
-                  <span className="mt-0.5 block truncate text-[11px] text-slate-500">
+                  <span className="mt-0.5 block truncate text-[11px] text-muted">
                     {nodeTypeLabel(node.type, locale)} · {node.key}
                   </span>
                 </span>
                 {hasError ? (
                   <AlertTriangle size={15} className="shrink-0 text-red-500" />
                 ) : (
-                  <ArrowRight size={14} className="shrink-0 text-slate-300" />
+                  <ArrowRight size={14} className="shrink-0 text-faint" />
                 )}
               </div>
             </button>
@@ -3022,21 +3022,21 @@ function FlowNodeCard({
     <article className="p-5">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div className="flex min-w-0 items-start gap-3">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-[#0a1b33]">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-3 text-ink">
             <NodeIcon size={17} />
           </span>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h4 className="font-semibold text-[#0a1b33]">{node.title}</h4>
-              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+              <h4 className="font-semibold text-ink">{node.title}</h4>
+              <span className="rounded-full bg-surface-3 px-2 py-0.5 text-[11px] font-semibold text-body">
                 {nodeTypeLabel(node.type, locale)}
               </span>
-              <span className="rounded-full bg-slate-50 px-2 py-0.5 text-[11px] font-mono text-slate-500">
+              <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-mono text-muted">
                 {node.key}
               </span>
             </div>
             {node.body && (
-              <p className="mt-1 line-clamp-2 text-sm leading-6 text-slate-500">
+              <p className="mt-1 line-clamp-2 text-sm leading-6 text-muted">
                 {node.body}
               </p>
             )}
@@ -3046,7 +3046,7 @@ function FlowNodeCard({
           type="button"
           onClick={onRemove}
           disabled={node.type === "start" && index === 0}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:bg-slate-50 disabled:opacity-40"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-line text-faint hover:bg-surface-2 disabled:opacity-40"
           aria-label={`${tr("Remover", "Remove")} ${node.title}`}
         >
           <Trash2 size={15} />
@@ -3097,14 +3097,14 @@ function FlowNodeCard({
 
       {needsBody(node.type) && (
         <label className="mt-3 block">
-          <span className="mb-1 block text-[11px] font-medium text-slate-500">
+          <span className="mb-1 block text-[11px] font-medium text-muted">
             {tr("Mensagem ou instrução", "Message or prompt")}
           </span>
           <textarea
             value={node.body ?? ""}
             onChange={(event) => onUpdate({ body: event.target.value })}
             rows={3}
-            className="w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-[#0a1b33] outline-none transition-colors placeholder:text-slate-300 focus:border-slate-400"
+            className="w-full resize-none rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink outline-none transition-colors placeholder:text-faint focus:border-brand-solid/40"
             placeholder="Mensagem enviada ao cliente..."
           />
         </label>
@@ -3133,9 +3133,9 @@ function FlowNodeCard({
       )}
 
       {(node.type === "send_buttons" || node.type === "send_list") && (
-        <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50 p-3">
+        <div className="mt-4 rounded-xl border border-line-soft bg-surface-2 p-3">
           <div className="mb-3 flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500">
+            <span className="text-xs font-semibold text-muted">
               {node.type === "send_buttons" ? tr("Botões", "Buttons") : tr("Opções da lista", "List rows")}
             </span>
             <button
@@ -3156,7 +3156,7 @@ function FlowNodeCard({
                 (node.buttons ?? []).length >=
                 (node.type === "send_buttons" ? 3 : 10)
               }
-              className="inline-flex h-8 items-center gap-1 rounded-lg bg-white px-2 text-xs font-semibold text-[#0a1b33] ring-1 ring-slate-200 disabled:opacity-50"
+              className="inline-flex h-8 items-center gap-1 rounded-lg bg-surface px-2 text-xs font-semibold text-ink ring-1 ring-slate-200 disabled:opacity-50"
             >
               <Plus size={12} />
               {tr("Adicionar", "Add")}
@@ -3188,7 +3188,7 @@ function FlowNodeCard({
                       }),
                     })
                   }
-                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs outline-none"
+                  className="rounded-lg border border-line bg-surface px-3 py-2 text-xs outline-none"
                   placeholder="reply_id"
                 />
                 <input
@@ -3201,7 +3201,7 @@ function FlowNodeCard({
                       }),
                     })
                   }
-                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs outline-none"
+                  className="rounded-lg border border-line bg-surface px-3 py-2 text-xs outline-none"
                   placeholder={tr("Rótulo", "Label")}
                 />
                 <select
@@ -3214,7 +3214,7 @@ function FlowNodeCard({
                       }),
                     })
                   }
-                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs outline-none"
+                  className="rounded-lg border border-line bg-surface px-3 py-2 text-xs outline-none"
                 >
                   <option value="">{tr("Próximo", "Next")}</option>
                   {targetOptions.map((option) => (
@@ -3232,7 +3232,7 @@ function FlowNodeCard({
                       ),
                     })
                   }
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400"
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-line bg-surface text-faint"
                   aria-label={tr("Remover botão", "Remove button")}
                 >
                   <Trash2 size={13} />
@@ -3244,7 +3244,7 @@ function FlowNodeCard({
       )}
 
       {node.type === "condition" && (
-        <div className="mt-4 grid gap-3 rounded-lg border border-slate-100 bg-slate-50 p-3 md:grid-cols-2">
+        <div className="mt-4 grid gap-3 rounded-lg border border-line-soft bg-surface-2 p-3 md:grid-cols-2">
           <TextInput
             label={tr("Variável", "Variable")}
             value={node.condition?.variableKey ?? ""}
@@ -3347,7 +3347,7 @@ function runStatusClass(status: string) {
   if (status === "failed" || status === "timed_out") {
     return "border-red-200 bg-red-50 text-red-700";
   }
-  return "border-slate-200 bg-slate-100 text-slate-700";
+  return "border-line bg-surface-3 text-ink";
 }
 
 function eventStatusClass(eventType: string) {
@@ -3358,7 +3358,7 @@ function eventStatusClass(eventType: string) {
   }
   if (eventType === "completed") return "bg-sky-100 text-sky-700";
   if (eventType === "message_sent") return "bg-emerald-100 text-emerald-700";
-  return "bg-slate-100 text-slate-600";
+  return "bg-surface-3 text-body";
 }
 
 function runtimeEventLabel(eventType: string, locale: Locale) {
@@ -3429,7 +3429,7 @@ function FlowRuntimePanel({ runs, loading }: { runs: FlowRunRow[]; loading: bool
   ).length;
 
   return (
-    <section className="bg-white p-4">
+    <section className="bg-surface p-4">
       <PanelTitle
         icon={History}
         title={tr("Histórico de execuções", "Runtime history")}
@@ -3445,8 +3445,8 @@ function FlowRuntimePanel({ runs, loading }: { runs: FlowRunRow[]; loading: bool
           { label: tr("Concluídas", "Completed"), value: completedRuns, tone: "text-sky-700" },
           { label: tr("Requer atenção", "Needs review"), value: attentionRuns, tone: "text-amber-700" },
         ].map((item) => (
-          <div key={item.label} className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
-            <p className="text-[11px] font-semibold uppercase text-slate-400">
+          <div key={item.label} className="rounded-xl border border-line-soft bg-surface-2 px-3 py-2">
+            <p className="text-[11px] font-semibold uppercase text-faint">
               {item.label}
             </p>
             <p className={`mt-1 text-lg font-semibold ${item.tone}`}>{item.value}</p>
@@ -3456,12 +3456,12 @@ function FlowRuntimePanel({ runs, loading }: { runs: FlowRunRow[]; loading: bool
 
       <div className="mt-4 space-y-3">
         {loading ? (
-          <div className="flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-3 text-sm text-slate-500">
+          <div className="flex items-center gap-2 rounded-xl bg-surface-2 px-3 py-3 text-sm text-muted">
             <Loader2 size={14} className="animate-spin" />
             {tr("A carregar execuções", "Loading runs")}
           </div>
         ) : runs.length === 0 ? (
-          <p className="rounded-xl bg-slate-50 px-3 py-3 text-sm text-slate-500">
+          <p className="rounded-xl bg-surface-2 px-3 py-3 text-sm text-muted">
             {tr(
               "Ainda não há execuções. Envie uma mensagem WhatsApp que corresponda ao gatilho.",
               "No runs yet. Send a matching WhatsApp message to start this flow.",
@@ -3471,12 +3471,12 @@ function FlowRuntimePanel({ runs, loading }: { runs: FlowRunRow[]; loading: bool
           runs.map((run) => (
             <div
               key={run._id}
-              className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
+              className="rounded-lg border border-line bg-surface p-4 shadow-sm"
             >
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   <div className="flex min-w-0 items-center gap-2">
-                    <p className="truncate text-sm font-semibold text-[#0a1b33]">
+                    <p className="truncate text-sm font-semibold text-ink">
                       {run.contactName ?? run.contactHandle ?? tr("Contacto desconhecido", "Unknown contact")}
                     </p>
                     <span
@@ -3487,41 +3487,41 @@ function FlowRuntimePanel({ runs, loading }: { runs: FlowRunRow[]; loading: bool
                       {runStatusLabel(run.status, locale)}
                     </span>
                   </div>
-                  <p className="mt-1 truncate text-xs text-slate-500">
+                  <p className="mt-1 truncate text-xs text-muted">
                     {run.contactHandle ?? tr("Sem identificador", "No handle")} · {tr("Iniciada", "Started")} {relativeTime(run.startedAt, Date.now(), locale)}
                   </p>
                 </div>
-                <div className="rounded-xl bg-slate-50 px-3 py-2 text-right">
-                  <p className="text-[11px] font-semibold text-slate-500">{tr("Duração", "Duration")}</p>
-                  <p className="text-sm font-semibold text-[#0a1b33]">
+                <div className="rounded-xl bg-surface-2 px-3 py-2 text-right">
+                  <p className="text-[11px] font-semibold text-muted">{tr("Duração", "Duration")}</p>
+                  <p className="text-sm font-semibold text-ink">
                     {formatDuration(run.startedAt, run.endedAt, run.lastAdvancedAt)}
                   </p>
                 </div>
               </div>
 
               <div className="mt-3 grid gap-2 text-xs sm:grid-cols-4">
-                <div className="rounded-xl bg-slate-50 px-3 py-2">
-                  <p className="font-semibold text-slate-500">{tr("Atual", "Current")}</p>
-                  <p className="mt-1 truncate text-[#0a1b33]">
+                <div className="rounded-xl bg-surface-2 px-3 py-2">
+                  <p className="font-semibold text-muted">{tr("Atual", "Current")}</p>
+                  <p className="mt-1 truncate text-ink">
                     {run.currentNodeKey ?? run.endReason ?? tr("Terminada", "Finished")}
                   </p>
                 </div>
-                <div className="rounded-xl bg-slate-50 px-3 py-2">
-                  <p className="font-semibold text-slate-500">{tr("Eventos", "Events")}</p>
-                  <p className="mt-1 text-[#0a1b33]">
+                <div className="rounded-xl bg-surface-2 px-3 py-2">
+                  <p className="font-semibold text-muted">{tr("Eventos", "Events")}</p>
+                  <p className="mt-1 text-ink">
                     {run.eventCount}
                     {run.eventCount > run.events.length
                       ? tr(` no total · ${run.events.length} visíveis`, ` total · ${run.events.length} shown`)
                       : ""}
                   </p>
                 </div>
-                <div className="rounded-xl bg-slate-50 px-3 py-2">
-                  <p className="font-semibold text-slate-500">{tr("Novas tentativas", "Reprompts")}</p>
-                  <p className="mt-1 text-[#0a1b33]">{run.repromptCount}</p>
+                <div className="rounded-xl bg-surface-2 px-3 py-2">
+                  <p className="font-semibold text-muted">{tr("Novas tentativas", "Reprompts")}</p>
+                  <p className="mt-1 text-ink">{run.repromptCount}</p>
                 </div>
-                <div className="rounded-xl bg-slate-50 px-3 py-2">
-                  <p className="font-semibold text-slate-500">{tr("Variáveis", "Variables")}</p>
-                  <p className="mt-1 text-[#0a1b33]">{Object.keys(run.vars ?? {}).length}</p>
+                <div className="rounded-xl bg-surface-2 px-3 py-2">
+                  <p className="font-semibold text-muted">{tr("Variáveis", "Variables")}</p>
+                  <p className="mt-1 text-ink">{Object.keys(run.vars ?? {}).length}</p>
                 </div>
               </div>
 
@@ -3530,7 +3530,7 @@ function FlowRuntimePanel({ runs, loading }: { runs: FlowRunRow[]; loading: bool
                   {Object.keys(run.vars ?? {}).map((key) => (
                     <span
                       key={key}
-                      className="rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-medium text-slate-600"
+                      className="rounded-full border border-line bg-surface-2 px-2 py-1 text-[11px] font-medium text-body"
                     >
                       {key}: {tr("recolhida", "captured")}
                     </span>
@@ -3540,7 +3540,7 @@ function FlowRuntimePanel({ runs, loading }: { runs: FlowRunRow[]; loading: bool
 
               <div className="mt-4 space-y-2">
                 {run.events.map((event) => (
-                  <div key={event._id} className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
+                  <div key={event._id} className="rounded-xl border border-line-soft bg-surface-2 px-3 py-2">
                     <div className="flex items-center justify-between gap-3">
                       <div className="min-w-0">
                         <div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -3552,13 +3552,13 @@ function FlowRuntimePanel({ runs, loading }: { runs: FlowRunRow[]; loading: bool
                             {runtimeEventLabel(event.eventType, locale)}
                           </span>
                           {event.nodeKey && (
-                            <span className="truncate text-xs font-medium text-slate-600">
+                            <span className="truncate text-xs font-medium text-body">
                               {event.nodeKey}
                             </span>
                           )}
                         </div>
                       </div>
-                      <span className="shrink-0 text-xs text-slate-400">
+                      <span className="shrink-0 text-xs text-faint">
                         {relativeTime(event.createdAt, Date.now(), locale)}
                       </span>
                     </div>
@@ -3567,7 +3567,7 @@ function FlowRuntimePanel({ runs, loading }: { runs: FlowRunRow[]; loading: bool
                         {compactRuntimePayload(event.payload).map((item) => (
                           <span
                             key={`${event._id}-${item.key}`}
-                            className="rounded-md bg-white px-2 py-1 text-[11px] text-slate-500"
+                            className="rounded-md bg-surface px-2 py-1 text-[11px] text-muted"
                           >
                             {item.key}: {item.value}
                           </span>
@@ -3597,15 +3597,15 @@ function StatCard({
   note: string;
 }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-5">
-      <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-[#0a1b33]">
+    <div className="rounded-lg border border-line bg-surface p-5">
+      <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-surface-3 text-ink">
         <Icon size={18} />
       </span>
-      <div className="mt-4 text-3xl font-semibold tracking-tight text-[#0a1b33]">
+      <div className="mt-4 text-3xl font-semibold tracking-tight text-ink">
         {value}
       </div>
-      <div className="mt-1 text-sm font-medium text-slate-600">{label}</div>
-      <p className="mt-1 text-xs text-slate-500">{note}</p>
+      <div className="mt-1 text-sm font-medium text-body">{label}</div>
+      <p className="mt-1 text-xs text-muted">{note}</p>
     </div>
   );
 }
@@ -3621,14 +3621,14 @@ function PanelTitle({
 }) {
   return (
     <div className="flex items-start gap-3">
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-[#0a1b33]">
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-3 text-ink">
         <Icon size={16} />
       </span>
       <div>
-        <h2 className="font-[var(--font-outfit)] text-lg font-semibold text-[#0a1b33]">
+        <h2 className="font-[var(--font-outfit)] text-lg font-semibold text-ink">
           {title}
         </h2>
-        <p className="mt-0.5 text-sm leading-6 text-slate-500">{body}</p>
+        <p className="mt-0.5 text-sm leading-6 text-muted">{body}</p>
       </div>
     </div>
   );
@@ -3673,7 +3673,7 @@ function SendTemplateConfig({
   }
 
   return (
-    <div className="mt-4 grid gap-3 rounded-lg border border-slate-200 bg-[#fbfdff] p-3">
+    <div className="mt-4 grid gap-3 rounded-lg border border-line bg-[#fbfdff] p-3">
       <SelectBox
         label={tr("Template aprovado", "Approved template")}
         value={node.template?.templateId ?? ""}
@@ -3711,7 +3711,7 @@ function SendTemplateConfig({
           />
         ))}
       {selected && (
-        <p className="text-[11px] text-slate-400">
+        <p className="text-[11px] text-faint">
           {tr("Os valores aceitam", "Values support")} {"{{vars.x}}"} {tr("e", "and")} {"{{contact.name}}"}.
         </p>
       )}
@@ -3732,14 +3732,14 @@ function TextInput({
 }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-[11px] font-medium text-slate-500">
+      <span className="mb-1 block text-[11px] font-medium text-muted">
         {label}
       </span>
       <input
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
-        className="w-full rounded-lg border border-slate-200 bg-[#f8fafc] px-3 py-2 text-sm text-[#0a1b33] outline-none transition-colors placeholder:text-slate-300 hover:bg-white focus:border-slate-400 focus:bg-white"
+        className="w-full rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm text-ink outline-none transition-colors placeholder:text-faint hover:bg-surface focus:border-brand-solid/40 focus:bg-surface"
       />
     </label>
   );
@@ -3760,13 +3760,13 @@ function SelectBox({
 }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-[11px] font-medium text-slate-500">
+      <span className="mb-1 block text-[11px] font-medium text-muted">
         {label}
       </span>
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="w-full rounded-lg border border-slate-200 bg-[#f8fafc] px-3 py-2 text-sm text-[#0a1b33] outline-none transition-colors hover:bg-white focus:border-slate-400 focus:bg-white"
+        className="w-full rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm text-ink outline-none transition-colors hover:bg-surface focus:border-brand-solid/40 focus:bg-surface"
       >
         <option value="">{placeholder}</option>
         {options.map((option) => (
@@ -3794,7 +3794,7 @@ function SubmitButton({
     <button
       type="submit"
       disabled={disabled}
-      className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#0a152d] px-4 py-2 text-sm font-medium text-white transition-all hover:bg-[#0a1b33] disabled:opacity-50"
+      className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-nav-active px-4 py-2 text-sm font-medium text-white transition-all hover:bg-brand-solid disabled:opacity-50"
     >
       {loading ? (
         <Loader2 size={14} className="animate-spin" />
@@ -3816,12 +3816,12 @@ function BotMeta({
   value: string;
 }) {
   return (
-    <div className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
-      <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+    <div className="rounded-xl border border-line-soft bg-surface-2 px-3 py-2">
+      <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-faint">
         <Icon size={12} />
         {label}
       </div>
-      <div className="mt-1 truncate text-xs font-semibold text-[#0a1b33]">
+      <div className="mt-1 truncate text-xs font-semibold text-ink">
         {value}
       </div>
     </div>

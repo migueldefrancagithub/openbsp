@@ -32,6 +32,6 @@ export function leadColumnTone(status: LeadStatus): {
     case "lost":
       return { header: "text-[#b3261e]", accent: "bg-[#e0533d]" };
     default:
-      return { header: "text-[#0a1b33]", accent: "bg-[#0a1b33]" };
+      return { header: "text-ink", accent: "bg-brand-solid" };
   }
 }

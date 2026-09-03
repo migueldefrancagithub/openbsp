@@ -46,13 +46,13 @@ export default function AnalyticsPage() {
 
   return (
     <div className="@container flex min-w-0 flex-col">
-      <header className="min-w-0 border-b border-slate-200 bg-white px-4 pt-4 sm:px-6">
+      <header className="min-w-0 border-b border-line bg-surface px-4 pt-4 sm:px-6">
         <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 pb-3">
           <div className="min-w-0">
-            <h1 className="truncate font-[var(--font-display)] text-[19px] font-medium tracking-tight text-[#0a1b33]">
+            <h1 className="truncate font-[var(--font-display)] text-[19px] font-medium tracking-tight text-ink">
               {tr("Desempenho", "Analytics")}
             </h1>
-            <p className="truncate text-[11px] text-slate-400">
+            <p className="truncate text-[11px] text-faint">
               {loading
                 ? tr("A carregar...", "Loading...")
                 : `${rangeLabel(range, locale)} · ${tr("atualizado às", "updated at")} ${formatUpdatedAt(snapshotAt, locale)}`}
@@ -82,7 +82,7 @@ export default function AnalyticsPage() {
             <button
               type="button"
               onClick={() => setSnapshotAt(Date.now())}
-              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-[12px] font-medium text-[#0a1b33] outline-none hover:border-slate-300 focus-visible:ring-2 focus-visible:ring-[#3d52d5]"
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-line bg-surface px-2.5 text-[12px] font-medium text-ink outline-none hover:border-line focus-visible:ring-2 focus-visible:ring-[#3d52d5]"
             >
               <RefreshCcw size={13} />
               {tr("Atualizar", "Refresh")}
@@ -157,7 +157,7 @@ export default function AnalyticsPage() {
                         value={summary!.failed === 0 ? tr("Estável", "Stable") : tr("Precisa de revisão", "Needs review")}
                       />
                       <div className="flex items-center justify-between gap-3 px-4 py-2">
-                        <span className="text-[13px] text-slate-500">
+                        <span className="text-[13px] text-muted">
                           {tr("Saúde da entrega", "Delivery health")}
                         </span>
                         <RiskBadge
@@ -248,7 +248,7 @@ function Breakdown({
   return (
     <Module title={title}>
       {rows.length === 0 ? (
-        <div className="px-4 py-10 text-center text-[13px] text-slate-400">
+        <div className="px-4 py-10 text-center text-[13px] text-faint">
           {locale === "pt" ? "Sem dados neste período" : "No data for this period"}
         </div>
       ) : (
@@ -256,14 +256,14 @@ function Breakdown({
           {rows.map((row) => (
             <div key={row.key} className="min-w-0 px-4 py-2.5">
               <div className="flex min-w-0 items-baseline justify-between gap-3">
-                <span className="truncate text-[13px] capitalize text-[#0a1b33]">
+                <span className="truncate text-[13px] capitalize text-ink">
                   {row.label}
                 </span>
-                <span className="shrink-0 text-[13px] font-medium tabular-nums text-slate-600">
+                <span className="shrink-0 text-[13px] font-medium tabular-nums text-body">
                   {row.value}
                 </span>
               </div>
-              <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-slate-100">
+              <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-surface-3">
                 <div
                   className="h-full rounded-full bg-[#3d52d5]"
                   style={{ width: `${Math.round((row.sent / peak) * 100)}%` }}
@@ -294,7 +294,7 @@ function Select({
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="h-8 max-w-[9.5rem] truncate rounded-lg border border-slate-200 bg-white px-2 text-[12px] font-medium text-[#0a1b33] outline-none focus-visible:ring-2 focus-visible:ring-[#3d52d5]"
+        className="h-8 max-w-[9.5rem] truncate rounded-lg border border-line bg-surface px-2 text-[12px] font-medium text-ink outline-none focus-visible:ring-2 focus-visible:ring-[#3d52d5]"
       >
         {options.map((option) => (
           <option key={option.value} value={option.value}>
@@ -309,10 +309,10 @@ function Select({
 function LoadingState() {
   return (
     <div className="mx-auto flex min-w-0 max-w-[1400px] flex-col gap-4">
-      <div className="h-[76px] animate-pulse rounded-lg border border-slate-200/80 bg-white" />
+      <div className="h-[76px] animate-pulse rounded-lg border border-slate-200/80 bg-surface" />
       <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4 @4xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-        <div className="h-[280px] animate-pulse rounded-lg border border-slate-200/80 bg-white" />
-        <div className="h-[280px] animate-pulse rounded-lg border border-slate-200/80 bg-white" />
+        <div className="h-[280px] animate-pulse rounded-lg border border-slate-200/80 bg-surface" />
+        <div className="h-[280px] animate-pulse rounded-lg border border-slate-200/80 bg-surface" />
       </div>
     </div>
   );
@@ -322,16 +322,16 @@ function ErrorState({ onRetry }: { onRetry: () => void }) {
   const { tr } = useI18n();
   return (
     <div className="flex min-h-[50vh] flex-col items-center justify-center px-6 text-center">
-      <h2 className="font-[var(--font-display)] text-[17px] font-medium text-[#0a1b33]">
+      <h2 className="font-[var(--font-display)] text-[17px] font-medium text-ink">
         {tr("Não foi possível carregar os indicadores", "Analytics could not be loaded")}
       </h2>
-      <p className="mt-1.5 max-w-sm text-sm text-slate-500">
+      <p className="mt-1.5 max-w-sm text-sm text-muted">
         {tr("O pedido do relatório não terminou. Nenhum dado foi alterado.", "The report request did not complete. Nothing was changed.")}
       </p>
       <button
         type="button"
         onClick={onRetry}
-        className="mt-4 inline-flex h-9 items-center rounded-lg border border-slate-200 bg-white px-4 text-[13px] font-medium text-[#0a1b33] outline-none hover:border-slate-300 focus-visible:ring-2 focus-visible:ring-[#3d52d5]"
+        className="mt-4 inline-flex h-9 items-center rounded-lg border border-line bg-surface px-4 text-[13px] font-medium text-ink outline-none hover:border-line focus-visible:ring-2 focus-visible:ring-[#3d52d5]"
       >
         {tr("Tentar novamente", "Try again")}
       </button>

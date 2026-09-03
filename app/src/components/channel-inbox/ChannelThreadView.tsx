@@ -380,13 +380,13 @@ function ChannelMessageBubble({ event, locale }: { event: ThreadEvent; locale: "
             "inline-flex max-w-[80%] items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.12em]",
             isFailed
               ? "border-red-200 bg-red-50 text-red-700"
-              : "border-slate-200 bg-white text-slate-400",
+              : "border-line bg-surface text-faint",
           )}
           title={event.lastError}
         >
           <Info size={10} />
           {statusText(event.payload, event.eventKind, locale)}
-          <span className="text-slate-300">·</span>
+          <span className="text-faint">·</span>
           {formatTime(eventAt, locale)}
         </div>
       </div>
@@ -399,13 +399,13 @@ function ChannelMessageBubble({ event, locale }: { event: ThreadEvent; locale: "
         className={cn(
           "max-w-[78%] rounded-2xl px-3.5 py-2 text-[13px] leading-relaxed shadow-sm",
           incoming
-            ? "rounded-bl-md border border-slate-200 bg-white text-[#0a1b33]"
-            : "rounded-br-md bg-[#0a152d] text-white",
+            ? "rounded-bl-md border border-line bg-surface text-ink"
+            : "rounded-br-md bg-nav-active text-white",
           isFailed && "border-red-300",
         )}
       >
         {incoming && event.actorDisplayName && (
-          <div className="mb-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+          <div className="mb-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-faint">
             {event.actorDisplayName}
           </div>
         )}
@@ -413,7 +413,7 @@ function ChannelMessageBubble({ event, locale }: { event: ThreadEvent; locale: "
           <div
             className={cn(
               "mb-1 inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium",
-              incoming ? "bg-slate-100 text-slate-500" : "bg-white/10 text-white/70",
+              incoming ? "bg-surface-3 text-muted" : "bg-white/10 text-white/70",
             )}
           >
             <MessageSquareText size={10} />
@@ -425,7 +425,7 @@ function ChannelMessageBubble({ event, locale }: { event: ThreadEvent; locale: "
             {short(rendered.primary, 2_000)}
           </p>
         ) : (
-          <p className={cn("italic", incoming ? "text-slate-400" : "text-white/60")}>
+          <p className={cn("italic", incoming ? "text-faint" : "text-white/60")}>
             {eventLabel(event.eventKind, locale)}
           </p>
         )}
@@ -433,7 +433,7 @@ function ChannelMessageBubble({ event, locale }: { event: ThreadEvent; locale: "
           <div
             className={cn(
               "mt-1 rounded-md px-2 py-1 text-[11px]",
-              incoming ? "bg-slate-50 text-slate-500" : "bg-white/10 text-white/65",
+              incoming ? "bg-surface-2 text-muted" : "bg-white/10 text-white/65",
             )}
           >
             {short(rendered.detail)}
@@ -452,7 +452,7 @@ function ChannelMessageBubble({ event, locale }: { event: ThreadEvent; locale: "
         <div
           className={cn(
             "mt-1 flex items-center justify-end gap-1 text-[10px]",
-            incoming ? "text-slate-400" : "text-white/50",
+            incoming ? "text-faint" : "text-white/50",
           )}
         >
           <span>{formatTime(eventAt, locale)}</span>
@@ -767,7 +767,7 @@ export function ChannelThreadView({
 
   if (thread === undefined || events === undefined) {
     return (
-      <div className="flex flex-1 items-center justify-center text-sm text-slate-400">
+      <div className="flex flex-1 items-center justify-center text-sm text-faint">
         {t("inbox.loadingThread")}
       </div>
     );
@@ -775,7 +775,7 @@ export function ChannelThreadView({
 
   if (thread === null) {
     return (
-      <div className="flex flex-1 items-center justify-center text-sm text-slate-400">
+      <div className="flex flex-1 items-center justify-center text-sm text-faint">
         {t("inbox.missingThread")}
       </div>
     );
@@ -792,12 +792,12 @@ export function ChannelThreadView({
   return (
     <div className="flex min-h-0 flex-1 bg-[#f4f6f9]">
       <section className="flex min-w-0 flex-1 flex-col">
-        <header className="border-b border-slate-200 bg-white">
+        <header className="border-b border-line bg-surface">
           <div className="flex items-center justify-between gap-3 px-3 py-2.5 sm:px-4">
             <div className="flex min-w-0 items-center gap-3">
               <Link
                 href={`/app/channel-inbox?channel=${channelId}`}
-                className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 sm:hidden"
+                className="rounded-md p-1.5 text-faint hover:bg-surface-3 sm:hidden"
                 title={t("inbox.all")}
               >
                 <ArrowLeft size={17} />
@@ -806,10 +806,10 @@ export function ChannelThreadView({
                 {initials(label)}
               </div>
               <div className="min-w-0">
-                <div className="truncate text-[13px] font-bold text-[#0a1b33]">
+                <div className="truncate text-[13px] font-bold text-ink">
                   {label}
                 </div>
-                <div className="mt-0.5 truncate text-[10px] text-slate-400">
+                <div className="mt-0.5 truncate text-[10px] text-faint">
                   {summary.phone ?? summary.threadKey} · {summary.channelDisplayName}
                 </div>
               </div>
@@ -822,7 +822,7 @@ export function ChannelThreadView({
                     ? "border-emerald-200 bg-emerald-50 text-emerald-700"
                     : window.state === "closed"
                       ? "border-amber-200 bg-amber-50 text-amber-700"
-                      : "border-slate-200 bg-slate-50 text-slate-500",
+                      : "border-line bg-surface-2 text-muted",
                 )}
                 title={window.detail}
               >
@@ -832,7 +832,7 @@ export function ChannelThreadView({
               <button
                 type="button"
                 onClick={() => void updateThread({ threadId: summary._id, starred: !summary.starredAt })}
-                className={cn("rounded-md p-2 transition-colors hover:bg-slate-100", summary.starredAt ? "text-amber-500" : "text-slate-400")}
+                className={cn("rounded-md p-2 transition-colors hover:bg-surface-3", summary.starredAt ? "text-amber-500" : "text-faint")}
                 title={summary.starredAt ? t("inbox.unfavorite") : t("inbox.favorite")}
               >
                 <Star size={15} className={summary.starredAt ? "fill-current" : undefined} />
@@ -847,7 +847,7 @@ export function ChannelThreadView({
                 <button
                   type="button"
                   onClick={() => setHandoffOpen(true)}
-                  className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-[10px] font-semibold text-slate-600 transition-colors hover:border-amber-300 hover:bg-amber-50 hover:text-amber-800"
+                  className="inline-flex items-center gap-1 rounded-md border border-line px-2 py-1 text-[10px] font-semibold text-body transition-colors hover:border-amber-300 hover:bg-amber-50 hover:text-amber-800"
                   title={t("handoff.title")}
                   data-handoff-button
                 >
@@ -869,7 +869,7 @@ export function ChannelThreadView({
                   }).catch((cause) => setHeaderNotice(errorMessage(cause, locale)));
                 }}
                 className={cn(
-                  "rounded-md p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-[#0a1b33]",
+                  "rounded-md p-2 text-faint transition-colors hover:bg-surface-3 hover:text-ink",
                   summary.automationMode !== "bot" && threadOps?.openCase && "opacity-40",
                 )}
                 title={summary.automationMode === "bot" ? t("inbox.pauseAi") : t("inbox.resumeAi")}
@@ -890,7 +890,7 @@ export function ChannelThreadView({
               <button
                 type="button"
                 onClick={() => setPatientPanelOpen(true)}
-                className="rounded-md p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-[#0a1b33] xl:hidden"
+                className="rounded-md p-2 text-faint transition-colors hover:bg-surface-3 hover:text-ink xl:hidden"
                 title={t("inbox.patient")}
               >
                 <PanelRightOpen size={15} />
@@ -915,7 +915,7 @@ export function ChannelThreadView({
           className="flex-1 space-y-2 overflow-y-auto px-6 py-5"
         >
           {timeline.length === 0 ? (
-            <div className="py-10 text-center text-sm text-slate-400">
+            <div className="py-10 text-center text-sm text-faint">
               {t("inbox.noMessages")}
             </div>
           ) : (
@@ -929,7 +929,7 @@ export function ChannelThreadView({
           )}
         </div>
 
-        <div className="border-t border-slate-200 bg-white px-3 py-3 sm:px-4">
+        <div className="border-t border-line bg-surface px-3 py-3 sm:px-4">
           {blocked?.kind === "allowlist" && (
             <PilotBanner
               threadId={summary._id}
@@ -956,9 +956,9 @@ export function ChannelThreadView({
           )}
 
           {quickRepliesOpen && !blocked && (
-                <div className="mb-3 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_18px_60px_-44px_rgba(15,23,42,0.65)]">
-                  <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2">
-                    <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                <div className="mb-3 overflow-hidden rounded-xl border border-line bg-surface shadow-[0_18px_60px_-44px_rgba(15,23,42,0.65)]">
+                  <div className="flex items-center justify-between border-b border-line-soft px-3 py-2">
+                    <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
                       {t("inbox.quickReplies")}
                     </span>
                     <button
@@ -968,16 +968,16 @@ export function ChannelThreadView({
                         setQuickReplySearch("");
                         if (draft.startsWith("/")) setDraft("");
                       }}
-                      className="text-[11px] text-slate-500 hover:text-slate-900"
+                      className="text-[11px] text-muted hover:text-ink"
                     >
                       {t("inbox.cancel")}
                     </button>
                   </div>
-                  <div className="border-b border-slate-100 p-2">
+                  <div className="border-b border-line-soft p-2">
                     <label className="relative block">
                       <Search
                         size={13}
-                        className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                        className="absolute left-3 top-1/2 -translate-y-1/2 text-faint"
                       />
                       <input
                         value={quickReplySearch}
@@ -985,36 +985,36 @@ export function ChannelThreadView({
                           setQuickReplySearch(event.target.value)
                         }
                         placeholder={t("inbox.searchQuickReplies")}
-                        className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50 pl-8 pr-3 text-[12px] text-[#0a1b33] outline-none focus:border-slate-400 focus:bg-white"
+                        className="h-9 w-full rounded-lg border border-line bg-surface-2 pl-8 pr-3 text-[12px] text-ink outline-none focus:border-brand-solid/40 focus:bg-surface"
                       />
                     </label>
                   </div>
                   {quickReplies === undefined ? (
-                    <div className="px-3 py-4 text-center text-[12px] text-slate-500">
+                    <div className="px-3 py-4 text-center text-[12px] text-muted">
                       {t("inbox.loadingQuickReplies")}
                     </div>
                   ) : quickReplies.length === 0 ? (
-                    <div className="px-3 py-4 text-center text-[12px] text-slate-500">
+                    <div className="px-3 py-4 text-center text-[12px] text-muted">
                       {t("inbox.noQuickReplies")}
                     </div>
                   ) : (
-                    <ul className="max-h-64 divide-y divide-slate-100 overflow-y-auto">
+                    <ul className="max-h-64 divide-y divide-line-soft overflow-y-auto">
                       {filteredQuickReplies.map((reply) => (
                         <li key={reply._id}>
                           <button
                             type="button"
                             onClick={() => insertQuickReply(reply.content)}
-                            className="flex w-full items-start gap-2 px-3 py-2.5 text-left transition-colors hover:bg-slate-50"
+                            className="flex w-full items-start gap-2 px-3 py-2.5 text-left transition-colors hover:bg-surface-2"
                           >
                             <Zap
                               size={12}
                               className="mt-0.5 shrink-0 text-amber-500"
                             />
                             <div className="min-w-0 flex-1">
-                              <div className="font-[var(--font-mono)] text-[12px] font-semibold text-[#0a1b33]">
+                              <div className="font-[var(--font-mono)] text-[12px] font-semibold text-ink">
                                 /{reply.name}
                               </div>
-                              <div className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-slate-500">
+                              <div className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-muted">
                                 {reply.content}
                               </div>
                             </div>
@@ -1022,7 +1022,7 @@ export function ChannelThreadView({
                         </li>
                       ))}
                       {filteredQuickReplies.length === 0 && (
-                        <li className="px-3 py-4 text-center text-[12px] text-slate-500">
+                        <li className="px-3 py-4 text-center text-[12px] text-muted">
                           {t("inbox.noMatch")}
                         </li>
                       )}
@@ -1032,10 +1032,10 @@ export function ChannelThreadView({
           )}
 
           {showTemplates && (
-            <div className="mb-3 grid max-h-[310px] overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xl sm:grid-cols-[minmax(190px,0.8fr)_minmax(220px,1.2fr)]">
-              <div className="overflow-y-auto border-b border-slate-100 p-2 sm:border-b-0 sm:border-r">
+            <div className="mb-3 grid max-h-[310px] overflow-hidden rounded-lg border border-line bg-surface shadow-xl sm:grid-cols-[minmax(190px,0.8fr)_minmax(220px,1.2fr)]">
+              <div className="overflow-y-auto border-b border-line-soft p-2 sm:border-b-0 sm:border-r">
                 <div className="flex items-center justify-between px-1 pb-2">
-                  <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted">
                     {t("inbox.templates")}
                   </span>
                   <button
@@ -1045,15 +1045,15 @@ export function ChannelThreadView({
                       setSelectedTemplate(null);
                       setTemplateVariables([]);
                     }}
-                    className="text-[10px] font-semibold text-slate-400 hover:text-slate-700"
+                    className="text-[10px] font-semibold text-faint hover:text-ink"
                   >
                     {t("inbox.cancel")}
                   </button>
                 </div>
                 {templates === undefined ? (
-                  <div className="flex justify-center py-6"><Loader2 size={15} className="animate-spin text-slate-300" /></div>
+                  <div className="flex justify-center py-6"><Loader2 size={15} className="animate-spin text-faint" /></div>
                 ) : templates.length === 0 ? (
-                  <p className="px-2 py-4 text-center text-[11px] text-slate-400">{t("inbox.noTemplates")}</p>
+                  <p className="px-2 py-4 text-center text-[11px] text-faint">{t("inbox.noTemplates")}</p>
                 ) : (
                   <div className="space-y-1">
                     {templates.map((template) => (
@@ -1065,11 +1065,11 @@ export function ChannelThreadView({
                           "w-full rounded-md border px-2.5 py-2 text-left transition-colors",
                           selectedTemplate?._id === template._id
                             ? "border-[#0d6b61] bg-[#edf8f6]"
-                            : "border-transparent hover:bg-slate-50",
+                            : "border-transparent hover:bg-surface-2",
                         )}
                       >
-                        <div className="truncate text-[11px] font-semibold text-[#0a1b33]">{template.name}</div>
-                        <div className="mt-0.5 text-[9px] uppercase text-slate-400">{template.languageCode}{template.category ? ` · ${templateCategoryLabel(template.category, locale)}` : ""}</div>
+                        <div className="truncate text-[11px] font-semibold text-ink">{template.name}</div>
+                        <div className="mt-0.5 text-[9px] uppercase text-faint">{template.languageCode}{template.category ? ` · ${templateCategoryLabel(template.category, locale)}` : ""}</div>
                       </button>
                     ))}
                   </div>
@@ -1079,8 +1079,8 @@ export function ChannelThreadView({
                 {selectedTemplate ? (
                   <div className="flex h-full flex-col">
                     <div>
-                      <div className="text-[12px] font-bold text-[#0a1b33]">{selectedTemplate.name}</div>
-                      <p className="mt-1 text-[10px] text-slate-400">{t("inbox.templateVariables")}</p>
+                      <div className="text-[12px] font-bold text-ink">{selectedTemplate.name}</div>
+                      <p className="mt-1 text-[10px] text-faint">{t("inbox.templateVariables")}</p>
                     </div>
                     {templateVariables.length > 0 ? (
                       <div className="mt-3 grid gap-2 sm:grid-cols-2">
@@ -1090,25 +1090,25 @@ export function ChannelThreadView({
                             value={value}
                             onChange={(event) => setTemplateVariables((current) => current.map((item, itemIndex) => itemIndex === index ? event.target.value : item))}
                             placeholder={`{{${index + 1}}}`}
-                            className="h-9 rounded-md border border-slate-200 px-2.5 text-[11px] outline-none focus:border-slate-400"
+                            className="h-9 rounded-md border border-line px-2.5 text-[11px] outline-none focus:border-brand-solid/40"
                           />
                         ))}
                       </div>
                     ) : (
-                      <p className="mt-4 rounded-md bg-slate-50 px-3 py-2 text-[10px] text-slate-500">{t("inbox.noTemplateVariables")}</p>
+                      <p className="mt-4 rounded-md bg-surface-2 px-3 py-2 text-[10px] text-muted">{t("inbox.noTemplateVariables")}</p>
                     )}
                     <button
                       type="button"
                       onClick={() => void sendSelectedTemplate()}
                       disabled={sending || templateVariables.some((value) => !value.trim())}
-                      className="mt-3 inline-flex h-9 items-center justify-center gap-2 rounded-md bg-[#0a1b33] px-3 text-[11px] font-bold text-white disabled:opacity-40 sm:mt-auto"
+                      className="mt-3 inline-flex h-9 items-center justify-center gap-2 rounded-md bg-brand-solid px-3 text-[11px] font-bold text-white disabled:opacity-40 sm:mt-auto"
                     >
                       {sending ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
                       {t("inbox.sendTemplate")}
                     </button>
                   </div>
                 ) : (
-                  <div className="flex h-full min-h-[120px] items-center justify-center text-center text-[11px] text-slate-400">{t("inbox.pickTemplate")}</div>
+                  <div className="flex h-full min-h-[120px] items-center justify-center text-center text-[11px] text-faint">{t("inbox.pickTemplate")}</div>
                 )}
               </div>
             </div>
@@ -1156,7 +1156,7 @@ export function ChannelThreadView({
                   onClick={() => setShowQuickReplies((value) => !value)}
                   disabled={sending || Boolean(blocked)}
                   title={t("inbox.quickReplies")}
-                  className="rounded-md p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-[#0a152d] disabled:opacity-30"
+                  className="rounded-md p-2 text-muted transition-colors hover:bg-surface-3 hover:text-[#0a152d] disabled:opacity-30"
                 >
                   <Zap size={15} />
                 </button>
@@ -1165,7 +1165,7 @@ export function ChannelThreadView({
                   onClick={() => setShowTemplates((value) => !value)}
                   disabled={sending || !templateAllowed}
                   title={t("inbox.templates")}
-                  className="rounded-md p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-[#0a152d] disabled:opacity-30"
+                  className="rounded-md p-2 text-muted transition-colors hover:bg-surface-3 hover:text-[#0a152d] disabled:opacity-30"
                 >
                   <FileText size={15} />
                 </button>
@@ -1174,7 +1174,7 @@ export function ChannelThreadView({
                   onClick={() => fileInputRef.current?.click()}
                   disabled={sending || Boolean(blocked)}
                   title={t("inbox.attachment")}
-                  className="rounded-md p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-[#0a152d] disabled:opacity-30"
+                  className="rounded-md p-2 text-muted transition-colors hover:bg-surface-3 hover:text-[#0a152d] disabled:opacity-30"
                 >
                   <Paperclip size={15} />
                 </button>
@@ -1185,7 +1185,7 @@ export function ChannelThreadView({
                     setPanelToolRequest({ tool: "reminder", nonce: Date.now() });
                   }}
                   title={t("inbox.createReminder")}
-                  className="rounded-md p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-[#0a152d]"
+                  className="rounded-md p-2 text-muted transition-colors hover:bg-surface-3 hover:text-[#0a152d]"
                   data-reminder-button
                 >
                   <Bell size={15} />
@@ -1214,13 +1214,13 @@ export function ChannelThreadView({
                   title={t("inbox.sendHint")}
                   maxLength={4096}
                   disabled={sending || Boolean(blocked)}
-                  className="max-h-40 min-h-10 min-w-0 flex-1 resize-none rounded-md border border-slate-200 px-3 py-2.5 text-[13px] leading-5 outline-none focus:border-slate-400 disabled:bg-slate-50 disabled:text-slate-400"
+                  className="max-h-40 min-h-10 min-w-0 flex-1 resize-none rounded-md border border-line px-3 py-2.5 text-[13px] leading-5 outline-none focus:border-brand-solid/40 disabled:bg-surface-2 disabled:text-faint"
                 />
                 <button
                   type="submit"
                   disabled={sending || !draft.trim() || Boolean(blocked)}
                   title={t("inbox.send")}
-                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-[#0a152d] text-white disabled:opacity-35"
+                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-nav-active text-white disabled:opacity-35"
                 >
                   {sending ? (
                     <Loader2 size={14} className="animate-spin" />

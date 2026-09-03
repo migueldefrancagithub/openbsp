@@ -149,7 +149,7 @@ export function Composer({ conversationId, serviceWindowExpiresAt }: ComposerPro
   }
 
   return (
-    <div className="border-t border-slate-200 bg-white p-4">
+    <div className="border-t border-line bg-surface p-4">
       {!within24h && !showTemplates && (
         <div className="flex items-start gap-2 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 px-3 py-2 rounded-lg mb-3">
           <Lock size={12} strokeWidth={2.5} className="flex-shrink-0 mt-0.5" />
@@ -166,41 +166,41 @@ export function Composer({ conversationId, serviceWindowExpiresAt }: ComposerPro
         </div>
       )}
       {showTemplates && (
-        <div className="mb-3 border border-slate-200 rounded-lg bg-white max-h-48 overflow-y-auto">
-          <div className="px-3 py-2 border-b border-slate-100 flex items-center justify-between">
-            <span className="text-[11px] font-semibold text-slate-700">
+        <div className="mb-3 border border-line rounded-lg bg-surface max-h-48 overflow-y-auto">
+          <div className="px-3 py-2 border-b border-line-soft flex items-center justify-between">
+            <span className="text-[11px] font-semibold text-ink">
               Approved templates
             </span>
             <button
               type="button"
               onClick={() => setShowTemplates(false)}
-              className="text-[11px] text-slate-500 hover:text-slate-900"
+              className="text-[11px] text-muted hover:text-ink"
             >
               Cancel
             </button>
           </div>
           {approvedTemplates.length === 0 ? (
-            <div className="px-3 py-4 text-[12px] text-slate-500 text-center">
+            <div className="px-3 py-4 text-[12px] text-muted text-center">
               No approved templates yet.
             </div>
           ) : (
-            <ul className="divide-y divide-slate-100">
+            <ul className="divide-y divide-line-soft">
               {approvedTemplates.map((t) => (
                 <li key={t._id}>
                   <button
                     type="button"
                     disabled={busy}
                     onClick={() => selectTemplate(t._id)}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-slate-50 disabled:opacity-50 transition-colors"
+                    className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-surface-2 disabled:opacity-50 transition-colors"
                   >
                     <FileText
                       size={12}
-                      className="text-slate-400 flex-shrink-0"
+                      className="text-faint flex-shrink-0"
                     />
-                    <span className="text-[12px] font-medium text-[#0a1b33] flex-1 truncate">
+                    <span className="text-[12px] font-medium text-ink flex-1 truncate">
                       {t.name}
                     </span>
-                    <span className="text-[10px] text-slate-400">
+                    <span className="text-[10px] text-faint">
                       {t.category} · {t.language}
                       {t.parameterCount > 0 && ` · ${t.parameterCount} vars`}
                     </span>
@@ -210,12 +210,12 @@ export function Composer({ conversationId, serviceWindowExpiresAt }: ComposerPro
             </ul>
           )}
           {selectedTemplate && (
-            <div className="border-t border-slate-100 p-3">
-              <div className="mb-2 text-[11px] font-semibold text-slate-700">
+            <div className="border-t border-line-soft p-3">
+              <div className="mb-2 text-[11px] font-semibold text-ink">
                 {selectedTemplate.name}
               </div>
               {selectedTemplate.bodyText && (
-                <p className="mb-3 rounded-lg bg-slate-50 px-3 py-2 text-[11px] leading-relaxed text-slate-500">
+                <p className="mb-3 rounded-lg bg-surface-2 px-3 py-2 text-[11px] leading-relaxed text-muted">
                   {selectedTemplate.bodyText}
                 </p>
               )}
@@ -223,7 +223,7 @@ export function Composer({ conversationId, serviceWindowExpiresAt }: ComposerPro
                 <div className="mb-3 grid gap-2">
                   {selectedTemplate.parameterSchema.map((param) => (
                     <label key={param.index} className="block">
-                      <span className="mb-1 block text-[10px] font-medium uppercase tracking-wider text-slate-400">
+                      <span className="mb-1 block text-[10px] font-medium uppercase tracking-wider text-faint">
                         {param.name || `Variable ${param.index}`}
                       </span>
                       <input
@@ -235,7 +235,7 @@ export function Composer({ conversationId, serviceWindowExpiresAt }: ComposerPro
                           }))
                         }
                         placeholder={param.example}
-                        className="w-full rounded-lg border border-slate-200 px-3 py-2 text-[12px] text-[#0a1b33] outline-none transition-colors focus:border-slate-400"
+                        className="w-full rounded-lg border border-line px-3 py-2 text-[12px] text-ink outline-none transition-colors focus:border-brand-solid/40"
                       />
                     </label>
                   ))}
@@ -245,7 +245,7 @@ export function Composer({ conversationId, serviceWindowExpiresAt }: ComposerPro
                 type="button"
                 disabled={busy}
                 onClick={() => onSendTemplate(selectedTemplate._id)}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#0a152d] px-3 py-2 text-[12px] font-medium text-white transition-all hover:bg-[#0a1b33] disabled:opacity-50"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-nav-active px-3 py-2 text-[12px] font-medium text-white transition-all hover:bg-brand-solid disabled:opacity-50"
               >
                 {busy ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
                 Send template
@@ -255,9 +255,9 @@ export function Composer({ conversationId, serviceWindowExpiresAt }: ComposerPro
         </div>
       )}
       {showQuickReplies && (
-        <div className="mb-3 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_18px_60px_-44px_rgba(15,23,42,0.65)]">
-          <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+        <div className="mb-3 overflow-hidden rounded-xl border border-line bg-surface shadow-[0_18px_60px_-44px_rgba(15,23,42,0.65)]">
+          <div className="flex items-center justify-between border-b border-line-soft px-3 py-2">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
               Quick replies
             </span>
             <button
@@ -266,27 +266,27 @@ export function Composer({ conversationId, serviceWindowExpiresAt }: ComposerPro
                 setShowQuickReplies(false);
                 setQuickReplySearch("");
               }}
-              className="text-[11px] text-slate-500 hover:text-slate-900"
+              className="text-[11px] text-muted hover:text-ink"
             >
               Cancel
             </button>
           </div>
-          <div className="border-b border-slate-100 p-2">
+          <div className="border-b border-line-soft p-2">
             <label className="relative block">
               <Search
                 size={13}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-faint"
               />
               <input
                 value={quickReplySearch}
                 onChange={(event) => setQuickReplySearch(event.target.value)}
                 placeholder="Search shortcut..."
-                className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50 pl-8 pr-3 text-[12px] text-[#0a1b33] outline-none focus:border-slate-400 focus:bg-white"
+                className="h-9 w-full rounded-lg border border-line bg-surface-2 pl-8 pr-3 text-[12px] text-ink outline-none focus:border-brand-solid/40 focus:bg-surface"
               />
             </label>
           </div>
           {(quickReplies ?? []).length === 0 ? (
-            <div className="px-3 py-4 text-[12px] text-slate-500 text-center">
+            <div className="px-3 py-4 text-[12px] text-muted text-center">
               No quick replies yet.{" "}
               <a
                 href="/app/quick-replies"
@@ -296,23 +296,23 @@ export function Composer({ conversationId, serviceWindowExpiresAt }: ComposerPro
               </a>
             </div>
           ) : (
-            <ul className="max-h-72 divide-y divide-slate-100 overflow-y-auto">
+            <ul className="max-h-72 divide-y divide-line-soft overflow-y-auto">
               {filteredQuickReplies.map((q) => (
                 <li key={q._id}>
                   <button
                     type="button"
                     onClick={() => insertQuickReply(q.content)}
-                    className="flex w-full items-start gap-2 px-3 py-2.5 text-left transition-colors hover:bg-slate-50"
+                    className="flex w-full items-start gap-2 px-3 py-2.5 text-left transition-colors hover:bg-surface-2"
                   >
                     <Zap
                       size={12}
                       className="text-amber-500 flex-shrink-0 mt-0.5"
                     />
                     <div className="flex-1 min-w-0">
-                      <div className="font-[var(--font-mono)] text-[12px] font-semibold text-[#0a1b33]">
+                      <div className="font-[var(--font-mono)] text-[12px] font-semibold text-ink">
                         /{q.name}
                       </div>
-                      <div className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-slate-500">
+                      <div className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-muted">
                         {q.content}
                       </div>
                     </div>
@@ -320,7 +320,7 @@ export function Composer({ conversationId, serviceWindowExpiresAt }: ComposerPro
                 </li>
               ))}
               {filteredQuickReplies.length === 0 && (
-                <li className="px-3 py-4 text-center text-[12px] text-slate-500">
+                <li className="px-3 py-4 text-center text-[12px] text-muted">
                   No match
                 </li>
               )}
@@ -348,9 +348,9 @@ export function Composer({ conversationId, serviceWindowExpiresAt }: ComposerPro
           disabled={!within24h || busy}
           placeholder={within24h ? "Type a message…" : "Service window closed"}
           className={cn(
-            "flex-1 resize-none rounded-xl border border-slate-200 px-3.5 py-2.5 text-[14px] text-[#0a1b33] placeholder:text-slate-400",
+            "flex-1 resize-none rounded-xl border border-line px-3.5 py-2.5 text-[14px] text-ink placeholder:text-faint",
             "focus:outline-none focus:ring-2 focus:ring-[#0a152d]/10 focus:border-[#0a152d] transition-all",
-            "disabled:bg-slate-50 disabled:cursor-not-allowed",
+            "disabled:bg-surface-2 disabled:cursor-not-allowed",
           )}
         />
         <button
@@ -358,14 +358,14 @@ export function Composer({ conversationId, serviceWindowExpiresAt }: ComposerPro
           onClick={() => setShowQuickReplies((v) => !v)}
           disabled={!within24h || busy}
           title="Quick replies"
-          className="text-slate-500 hover:text-[#0a152d] p-2.5 rounded-xl border border-slate-200 hover:border-slate-300 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex-shrink-0"
+          className="text-muted hover:text-[#0a152d] p-2.5 rounded-xl border border-line hover:border-line disabled:opacity-40 disabled:cursor-not-allowed transition-all flex-shrink-0"
         >
           <Zap size={16} strokeWidth={2.5} />
         </button>
         <button
           type="submit"
           disabled={!within24h || busy || !text.trim()}
-          className="bg-[#0a152d] text-white p-2.5 rounded-xl shadow-[0_8px_24px_-8px_rgba(10,21,45,0.5)] hover:bg-[#0a1b33] disabled:opacity-40 disabled:cursor-not-allowed transition-all flex-shrink-0"
+          className="bg-nav-active text-white p-2.5 rounded-xl shadow-[0_8px_24px_-8px_rgba(10,21,45,0.5)] hover:bg-brand-solid disabled:opacity-40 disabled:cursor-not-allowed transition-all flex-shrink-0"
         >
           {busy ? (
             <Loader2 size={16} className="animate-spin" />

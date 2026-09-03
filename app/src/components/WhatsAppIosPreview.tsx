@@ -69,13 +69,13 @@ export function WhatsAppIosPreview({
 
   return (
     <aside className="space-y-4">
-      <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="rounded-lg border border-line bg-surface p-4 shadow-sm">
         <div className="mb-3 flex items-start justify-between gap-3">
           <div>
-            <h2 className="font-[var(--font-outfit)] text-[17px] font-medium text-[#0a1b33]">
+            <h2 className="font-[var(--font-outfit)] text-[17px] font-medium text-ink">
               {effectiveTitle}
             </h2>
-            <p className="mt-0.5 text-[12px] leading-relaxed text-slate-500">
+            <p className="mt-0.5 text-[12px] leading-relaxed text-muted">
               {effectiveSubtitle}
             </p>
           </div>
@@ -86,7 +86,7 @@ export function WhatsAppIosPreview({
           </span>
         </div>
 
-        <div className="mx-auto w-full max-w-[320px] rounded-[38px] border border-slate-300 bg-slate-950 p-2 shadow-[0_22px_70px_-34px_rgba(15,23,42,0.8)]">
+        <div className="mx-auto w-full max-w-[320px] rounded-[38px] border border-line bg-slate-950 p-2 shadow-[0_22px_70px_-34px_rgba(15,23,42,0.8)]">
           <div className="overflow-hidden rounded-[30px] bg-[#e5ddd5]">
             <div className="flex items-center gap-2 bg-[#075e54] px-3 py-2 text-white">
               <BrandMark className="h-8 w-8 rounded-full" />
@@ -98,10 +98,10 @@ export function WhatsAppIosPreview({
             </div>
             <div className="min-h-[310px] bg-[radial-gradient(circle_at_10%_10%,rgba(255,255,255,0.38),transparent_18%),linear-gradient(135deg,#e9ddd2,#d7e6dc)] p-3">
               <div className="ml-auto max-w-[86%] rounded-2xl rounded-tr-md bg-[#dcf8c6] px-3 py-2 shadow-sm">
-                <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-[#0a1b33]">
+                <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-ink">
                   {analysis.previewText || tr("A pré-visualização aparece aqui.", "Your message preview appears here.")}
                 </p>
-                <div className="mt-1 text-right text-[10px] text-slate-500">
+                <div className="mt-1 text-right text-[10px] text-muted">
                   10:24 ✓✓
                 </div>
               </div>
@@ -118,7 +118,7 @@ export function WhatsAppIosPreview({
                 </div>
               )}
               {category === "marketing" && (
-                <div className="mt-2 ml-auto max-w-[86%] rounded-xl bg-white/85 px-3 py-2 text-[11px] text-slate-600 shadow-sm">
+                <div className="mt-2 ml-auto max-w-[86%] rounded-xl bg-white/85 px-3 py-2 text-[11px] text-body shadow-sm">
                   {tr(
                     "Respostas rápidas e botões são registados como sinais de intenção da campanha.",
                     "Quick replies and CTA buttons are tracked as campaign intent signals.",
@@ -130,7 +130,7 @@ export function WhatsAppIosPreview({
         </div>
       </div>
 
-      <div className="rounded-lg border border-slate-200 bg-white p-4">
+      <div className="rounded-lg border border-line bg-surface p-4">
         <div className="grid grid-cols-2 gap-2">
           <Signal
             icon={MessageCircle}
@@ -157,7 +157,7 @@ export function WhatsAppIosPreview({
             tone={analysis.suggestedCategory === category ? "good" : "warn"}
           />
         </div>
-        <p className="mt-3 text-[12px] leading-relaxed text-slate-500">
+        <p className="mt-3 text-[12px] leading-relaxed text-muted">
           {primaryRisk
             ? riskContent(primaryRisk.code, locale).detail
             : tr(
@@ -184,15 +184,15 @@ export function WhatsAppIosPreview({
         </div>
       )}
 
-      <div className="rounded-lg border border-slate-200 bg-white p-4">
-        <div className="mb-2 flex items-center gap-2 text-[13px] font-semibold text-[#0a1b33]">
+      <div className="rounded-lg border border-line bg-surface p-4">
+        <div className="mb-2 flex items-center gap-2 text-[13px] font-semibold text-ink">
           <Info size={15} />
           {tr("Estratégia recomendada", "Recommended strategy")}
         </div>
         <ul className="space-y-2">
           {analysis.recommendations.slice(0, 4).map((item) => (
-            <li key={item.code} className="text-[12px] leading-relaxed text-slate-600">
-              <span className="font-semibold text-[#0a1b33]">{recommendationContent(item.code, locale).title}:</span>{" "}
+            <li key={item.code} className="text-[12px] leading-relaxed text-body">
+              <span className="font-semibold text-ink">{recommendationContent(item.code, locale).title}:</span>{" "}
               {recommendationContent(item.code, locale).detail}
             </li>
           ))}
@@ -218,16 +218,16 @@ function Signal({
       ? "bg-emerald-50 text-emerald-700"
       : tone === "warn"
         ? "bg-amber-50 text-amber-700"
-        : "bg-slate-100 text-slate-600";
+        : "bg-surface-3 text-body";
   return (
-    <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+    <div className="rounded-lg border border-line bg-surface-2 p-3">
       <div className={`mb-2 flex h-7 w-7 items-center justify-center rounded-lg ${toneClass}`}>
         <Icon size={14} />
       </div>
-      <div className="text-[10px] font-medium uppercase tracking-wider text-slate-400">
+      <div className="text-[10px] font-medium uppercase tracking-wider text-faint">
         {label}
       </div>
-      <div className="mt-0.5 truncate text-[12px] font-semibold text-[#0a1b33]">
+      <div className="mt-0.5 truncate text-[12px] font-semibold text-ink">
         {value}
       </div>
     </div>

@@ -96,12 +96,12 @@ export function AudienceBuilder({
   }
 
   const inputClass =
-    "h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-[#0a1b33] outline-none focus:border-slate-400";
+    "h-10 w-full rounded-lg border border-line bg-surface px-3 text-sm text-ink outline-none focus:border-brand-solid/40";
 
   return (
     <div className="grid gap-5 xl:grid-cols-[1.2fr_1fr]">
       <div className="space-y-5">
-        <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1 text-[12px] font-semibold">
+        <div className="inline-flex rounded-lg border border-line bg-surface-2 p-1 text-[12px] font-semibold">
           {(["filters", "picked"] as const).map((mode) => (
             <button
               key={mode}
@@ -109,7 +109,7 @@ export function AudienceBuilder({
               onClick={() => onChange({ ...draft, mode })}
               className={cn(
                 "rounded-md px-3 py-1.5",
-                draft.mode === mode ? "bg-white text-[#0a1b33] shadow-sm" : "text-slate-500 hover:text-[#0a1b33]",
+                draft.mode === mode ? "bg-surface text-ink shadow-sm" : "text-muted hover:text-ink",
               )}
             >
               {mode === "filters" ? tr("Por etapa e filtros", "By stage and filters") : tr("Conversas escolhidas", "Picked conversations")}
@@ -120,7 +120,7 @@ export function AudienceBuilder({
         {draft.mode === "filters" ? (
           <>
             <div>
-              <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.14em] text-slate-400">
+              <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.14em] text-faint">
                 {tr("Etapas do lead", "Lead stages")}
               </div>
               <div className="flex flex-wrap gap-1.5">
@@ -134,23 +134,23 @@ export function AudienceBuilder({
                       onClick={() => toggleStatus(status)}
                       className={cn(
                         "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12px] font-semibold transition-colors",
-                        active ? "border-[#0a1b33] bg-[#0a1b33] text-white" : "border-slate-200 bg-white text-slate-600 hover:border-slate-300",
+                        active ? "border-brand-solid bg-brand-solid text-white" : "border-line bg-surface text-body hover:border-line",
                       )}
                     >
-                      <span className={cn("h-1.5 w-1.5 rounded-full", active ? "bg-white" : tone.accent)} />
+                      <span className={cn("h-1.5 w-1.5 rounded-full", active ? "bg-surface" : tone.accent)} />
                       {leadStatusLabel(status, locale)}
                     </button>
                   );
                 })}
               </div>
-              <p className="mt-1.5 text-[11px] text-slate-500">
+              <p className="mt-1.5 text-[11px] text-muted">
                 {tr("Sem etapas selecionadas = todas as conversas do canal.", "No stage selected = every conversation on the channel.")}
               </p>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="block">
-                <span className="text-[11px] font-medium text-slate-500">{tr("Última mensagem há menos de", "Last message within")}</span>
+                <span className="text-[11px] font-medium text-muted">{tr("Última mensagem há menos de", "Last message within")}</span>
                 <select
                   value={draft.inboundWithinDays ?? ""}
                   onChange={(e) => onChange({ ...draft, inboundWithinDays: e.target.value ? Number(e.target.value) : undefined })}
@@ -163,7 +163,7 @@ export function AudienceBuilder({
                 </select>
               </label>
               <label className="block">
-                <span className="text-[11px] font-medium text-slate-500">{tr("Etiquetas (separadas por vírgula)", "Tags (comma separated)")}</span>
+                <span className="text-[11px] font-medium text-muted">{tr("Etiquetas (separadas por vírgula)", "Tags (comma separated)")}</span>
                 <input
                   value={draft.tags}
                   onChange={(e) => onChange({ ...draft, tags: e.target.value })}
@@ -175,7 +175,7 @@ export function AudienceBuilder({
           </>
         ) : (
           <label className="block">
-            <span className="text-[11px] font-medium text-slate-500">
+            <span className="text-[11px] font-medium text-muted">
               {tr("Números (um por linha, até 200)", "Numbers (one per line, up to 200)")}
             </span>
             <textarea
@@ -183,29 +183,29 @@ export function AudienceBuilder({
               onChange={(e) => onChange({ ...draft, threadKeys: e.target.value })}
               rows={6}
               placeholder={"258840000001\n258840000002"}
-              className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 font-mono text-[13px] text-[#0a1b33] outline-none focus:border-slate-400"
+              className="mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2 font-mono text-[13px] text-ink outline-none focus:border-brand-solid/40"
             />
-            <p className="mt-1.5 text-[11px] text-slate-500">
+            <p className="mt-1.5 text-[11px] text-muted">
               {tr("Só conversas já existentes no canal podem receber campanhas.", "Only conversations that already exist on the channel can receive campaigns.")}
             </p>
           </label>
         )}
 
-        <div className="grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4 sm:grid-cols-3">
-          <label className="flex items-center gap-2 text-[13px] text-[#0a1b33]">
+        <div className="grid gap-3 rounded-lg border border-line bg-surface-2 p-4 sm:grid-cols-3">
+          <label className="flex items-center gap-2 text-[13px] text-ink">
             <input type="checkbox" checked={draft.excludeDnd} onChange={(e) => onChange({ ...draft, excludeDnd: e.target.checked })} className="h-4 w-4 accent-[#0a1b33]" />
             {tr("Excluir “não incomodar”", "Exclude do-not-disturb")}
           </label>
-          <label className="flex items-center gap-2 text-[13px] text-[#0a1b33]">
+          <label className="flex items-center gap-2 text-[13px] text-ink">
             <input type="checkbox" checked={draft.excludeLost} onChange={(e) => onChange({ ...draft, excludeLost: e.target.checked })} className="h-4 w-4 accent-[#0a1b33]" />
             {tr("Excluir perdidos", "Exclude lost")}
           </label>
-          <label className="block text-[13px] text-[#0a1b33]">
-            <span className="text-[11px] font-medium text-slate-500">{tr("Sem campanha nos últimos", "No campaign in the last")}</span>
+          <label className="block text-[13px] text-ink">
+            <span className="text-[11px] font-medium text-muted">{tr("Sem campanha nos últimos", "No campaign in the last")}</span>
             <select
               value={draft.excludeRecentCampaignDays ?? ""}
               onChange={(e) => onChange({ ...draft, excludeRecentCampaignDays: e.target.value ? Number(e.target.value) : undefined })}
-              className="mt-1 h-9 w-full rounded-lg border border-slate-200 bg-white px-2 text-[13px] outline-none"
+              className="mt-1 h-9 w-full rounded-lg border border-line bg-surface px-2 text-[13px] outline-none"
             >
               <option value="">{tr("Não filtrar", "Do not filter")}</option>
               <option value="7">{tr("7 dias", "7 days")}</option>
@@ -215,16 +215,16 @@ export function AudienceBuilder({
         </div>
       </div>
 
-      <aside className="space-y-3 rounded-lg border border-slate-200 bg-white p-4">
-        <div className="flex items-center gap-2 text-[13px] font-semibold text-[#0a1b33]">
+      <aside className="space-y-3 rounded-lg border border-line bg-surface p-4">
+        <div className="flex items-center gap-2 text-[13px] font-semibold text-ink">
           <Users size={15} />
           {tr("Pré-visualização do público", "Audience preview")}
-          {channelId && preview === undefined && <Loader2 size={14} className="animate-spin text-slate-400" />}
+          {channelId && preview === undefined && <Loader2 size={14} className="animate-spin text-faint" />}
         </div>
         {!channelId ? (
-          <p className="text-[13px] text-slate-500">{tr("Escolha um canal.", "Pick a channel.")}</p>
+          <p className="text-[13px] text-muted">{tr("Escolha um canal.", "Pick a channel.")}</p>
         ) : preview === undefined ? (
-          <div className="h-24 animate-pulse rounded-lg bg-slate-50" />
+          <div className="h-24 animate-pulse rounded-lg bg-surface-2" />
         ) : (
           <>
             <div className="grid grid-cols-2 gap-2">
@@ -232,11 +232,11 @@ export function AudienceBuilder({
                 <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-[#0d6b61]">{tr("Elegíveis", "Eligible")}</div>
                 <div className="font-[var(--font-outfit)] text-[24px] font-medium text-[#0d6b61]">{preview.eligible}</div>
               </div>
-              <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-slate-400">{tr("Encontradas", "Matched")}</div>
-                <div className="font-[var(--font-outfit)] text-[24px] font-medium text-[#0a1b33]">
+              <div className="rounded-lg border border-line bg-surface-2 px-3 py-2">
+                <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-faint">{tr("Encontradas", "Matched")}</div>
+                <div className="font-[var(--font-outfit)] text-[24px] font-medium text-ink">
                   {preview.matched}
-                  {preview.capped && <span className="ml-1 text-[12px] text-slate-400">+</span>}
+                  {preview.capped && <span className="ml-1 text-[12px] text-faint">+</span>}
                 </div>
               </div>
             </div>
@@ -251,12 +251,12 @@ export function AudienceBuilder({
             )}
             <ul className="space-y-1 text-[12px]">
               {BLOCK_ORDER.filter((code) => preview.blocked[code] > 0).map((code) => (
-                <li key={code} className="flex items-center justify-between gap-2 text-slate-600">
+                <li key={code} className="flex items-center justify-between gap-2 text-body">
                   <span className="flex items-center gap-1.5">
                     <AlertTriangle size={12} className="text-amber-500" />
                     {blockReasonLabel(code, locale)}
                   </span>
-                  <span className="font-semibold text-[#0a1b33]">{preview.blocked[code]}</span>
+                  <span className="font-semibold text-ink">{preview.blocked[code]}</span>
                 </li>
               ))}
               {preview.matched > 0 && preview.eligible === preview.matched && (
@@ -275,10 +275,10 @@ export function AudienceBuilder({
                   {showSample ? tr("Esconder amostra", "Hide sample") : tr("Ver amostra", "Show sample")}
                 </button>
                 {showSample && (
-                  <ul className="mt-2 divide-y divide-slate-100 rounded-lg border border-slate-100">
+                  <ul className="mt-2 divide-y divide-line-soft rounded-lg border border-line-soft">
                     {preview.sample.map((row) => (
                       <li key={row.threadId} className="flex items-center justify-between gap-2 px-2.5 py-1.5 text-[12px]">
-                        <span className="min-w-0 truncate text-[#0a1b33]">{row.label}</span>
+                        <span className="min-w-0 truncate text-ink">{row.label}</span>
                         <span className={cn("shrink-0 text-[11px]", row.blocked ? "text-amber-700" : "text-[#0d6b61]")}>
                           {row.blocked ? blockReasonLabel(row.blocked, locale) : leadStatusLabel(row.leadStatus, locale)}
                         </span>

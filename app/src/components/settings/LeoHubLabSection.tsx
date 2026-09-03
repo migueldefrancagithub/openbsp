@@ -192,24 +192,24 @@ export function LeoHubLabSection() {
   }
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-violet-200 bg-white">
+    <section className="overflow-hidden rounded-2xl border border-violet-200 bg-surface">
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-violet-100 bg-violet-50/50 px-6 py-4">
         <div className="flex items-start gap-3">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-100 text-violet-700">
             <FlaskConical size={17} />
           </div>
           <div>
-            <h2 className="text-[15px] font-semibold text-[#0a1b33]">
+            <h2 className="text-[15px] font-semibold text-ink">
               WhatsApp laboratory bridge
             </h2>
-            <p className="mt-0.5 max-w-2xl text-xs leading-5 text-slate-500">
+            <p className="mt-0.5 max-w-2xl text-xs leading-5 text-muted">
               Temporary Leo Hub adapter for a second test channel. It never
               enters the official Meta dispatcher, existing WABA, campaigns,
               or production inbox.
             </p>
           </div>
         </div>
-        <span className="inline-flex items-center gap-1.5 rounded-md border border-violet-200 bg-white px-2 py-1 text-[11px] font-semibold text-violet-700">
+        <span className="inline-flex items-center gap-1.5 rounded-md border border-violet-200 bg-surface px-2 py-1 text-[11px] font-semibold text-violet-700">
           <AlertTriangle size={12} /> Lab only
         </span>
       </div>
@@ -245,7 +245,7 @@ export function LeoHubLabSection() {
                 onChange={(event) =>
                   setSelectedId(event.target.value as Id<"channels">)
                 }
-                className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-[#0a1b33] outline-none focus:border-violet-400 md:max-w-sm"
+                className="h-10 w-full rounded-lg border border-line bg-surface px-3 text-sm text-ink outline-none focus:border-violet-400 md:max-w-sm"
               >
                 {labChannels.map((channel) => (
                   <option key={channel._id} value={channel._id}>
@@ -255,12 +255,12 @@ export function LeoHubLabSection() {
               </select>
             )}
 
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+            <div className="rounded-xl border border-line bg-surface-2 p-4">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-faint">
                 Dedicated webhook
               </div>
               <div className="mt-2 flex flex-col gap-2 sm:flex-row">
-                <code className="min-w-0 flex-1 break-all rounded-lg bg-white px-3 py-2 text-[11px] text-slate-600">
+                <code className="min-w-0 flex-1 break-all rounded-lg bg-surface px-3 py-2 text-[11px] text-body">
                   {selected.webhookUrl ??
                     `/provider-webhook/leo-hub/${selected.publicId}`}
                 </code>
@@ -268,7 +268,7 @@ export function LeoHubLabSection() {
                   type="button"
                   disabled={!selected.webhookUrl}
                   onClick={copyWebhook}
-                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 hover:border-slate-300 disabled:opacity-40"
+                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-line bg-surface px-3 py-2 text-xs font-medium text-body hover:border-line disabled:opacity-40"
                 >
                   <Copy size={13} /> Copy
                 </button>
@@ -301,7 +301,7 @@ export function LeoHubLabSection() {
                 type="button"
                 disabled={busy !== null}
                 onClick={handleHealth}
-                className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 hover:border-slate-300 disabled:opacity-50"
+                className="inline-flex items-center gap-2 rounded-lg border border-line bg-surface px-3 py-2 text-xs font-medium text-body hover:border-line disabled:opacity-50"
               >
                 {busy === "health" ? (
                   <Loader2 size={13} className="animate-spin" />
@@ -314,7 +314,7 @@ export function LeoHubLabSection() {
 
             <form
               onSubmit={handleSend}
-              className="grid gap-3 rounded-xl border border-slate-200 p-4 md:grid-cols-[220px_1fr_auto] md:items-end"
+              className="grid gap-3 rounded-xl border border-line p-4 md:grid-cols-[220px_1fr_auto] md:items-end"
             >
               <Field
                 label="Allowlisted recipient"
@@ -331,7 +331,7 @@ export function LeoHubLabSection() {
               <button
                 type="submit"
                 disabled={busy !== null || selected.sendMode === "disabled"}
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#0a152d] px-4 text-xs font-medium text-white hover:bg-[#0a1b33] disabled:opacity-40"
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-nav-active px-4 text-xs font-medium text-white hover:bg-brand-solid disabled:opacity-40"
               >
                 {busy === "send" ? (
                   <Loader2 size={13} className="animate-spin" />
@@ -368,7 +368,7 @@ export function LeoHubLabSection() {
         )}
 
         <details open={labChannels.length === 0} className="group">
-          <summary className="cursor-pointer list-none text-sm font-semibold text-[#0a1b33]">
+          <summary className="cursor-pointer list-none text-sm font-semibold text-ink">
             {labChannels.length === 0
               ? "Connect the second Hub channel"
               : "Connect or rotate a laboratory channel"}
@@ -419,7 +419,7 @@ export function LeoHubLabSection() {
                           "HMAC secret copied. Configure this exact value in the Hub before submitting.",
                       });
                     }}
-                    className="text-[11px] font-medium text-slate-500 hover:text-slate-800 disabled:opacity-40"
+                    className="text-[11px] font-medium text-muted hover:text-ink disabled:opacity-40"
                   >
                     Copy secret
                   </button>
@@ -434,7 +434,7 @@ export function LeoHubLabSection() {
                 />
               </div>
             </div>
-            <p className="text-[11px] leading-5 text-slate-500">
+            <p className="text-[11px] leading-5 text-muted">
               The token and HMAC secret are encrypted server-side. The channel
               starts with the kill switch active, even after successful token
               validation.
@@ -469,7 +469,7 @@ function Field({
 }) {
   return (
     <label className="block">
-      <span className="mb-1.5 block text-xs font-medium text-slate-600">
+      <span className="mb-1.5 block text-xs font-medium text-body">
         {label}
       </span>
       <input
@@ -477,7 +477,7 @@ function Field({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
-        className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm text-[#0a1b33] outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+        className="h-10 w-full rounded-lg border border-line px-3 text-sm text-ink outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
       />
     </label>
   );
@@ -486,7 +486,7 @@ function Field({
 function SecretField(props: Parameters<typeof Field>[0]) {
   return (
     <label className="block">
-      <span className="mb-1.5 block text-xs font-medium text-slate-600">
+      <span className="mb-1.5 block text-xs font-medium text-body">
         {props.label}
       </span>
       <input
@@ -496,7 +496,7 @@ function SecretField(props: Parameters<typeof Field>[0]) {
         value={props.value}
         onChange={(event) => props.onChange(event.target.value)}
         placeholder={props.placeholder}
-        className="h-10 w-full rounded-lg border border-slate-200 px-3 font-mono text-sm text-[#0a1b33] outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+        className="h-10 w-full rounded-lg border border-line px-3 font-mono text-sm text-ink outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
       />
     </label>
   );
@@ -504,11 +504,11 @@ function SecretField(props: Parameters<typeof Field>[0]) {
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-      <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+    <div className="rounded-xl border border-line bg-surface-2 px-4 py-3">
+      <div className="text-[10px] font-semibold uppercase tracking-wide text-faint">
         {label}
       </div>
-      <div className="mt-1 truncate text-sm font-semibold text-[#0a1b33]">
+      <div className="mt-1 truncate text-sm font-semibold text-ink">
         {value}
       </div>
     </div>
@@ -525,25 +525,25 @@ function ActivityList({
   rows: Array<{ id: string; title: string; detail: string; status: string }>;
 }) {
   return (
-    <div className="rounded-xl border border-slate-200 p-4">
-      <div className="flex items-center gap-2 text-xs font-semibold text-[#0a1b33]">
+    <div className="rounded-xl border border-line p-4">
+      <div className="flex items-center gap-2 text-xs font-semibold text-ink">
         <Activity size={13} /> {title}
       </div>
       {rows.length === 0 ? (
-        <p className="mt-3 text-xs text-slate-400">{empty}</p>
+        <p className="mt-3 text-xs text-faint">{empty}</p>
       ) : (
         <div className="mt-3 space-y-2">
           {rows.map((row) => (
-            <div key={row.id} className="rounded-lg bg-slate-50 px-3 py-2">
+            <div key={row.id} className="rounded-lg bg-surface-2 px-3 py-2">
               <div className="flex items-center justify-between gap-2">
-                <span className="truncate text-xs font-medium text-[#0a1b33]">
+                <span className="truncate text-xs font-medium text-ink">
                   {row.title}
                 </span>
-                <span className="rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-slate-500">
+                <span className="rounded-md border border-line bg-surface px-1.5 py-0.5 text-[10px] font-medium text-muted">
                   {row.status}
                 </span>
               </div>
-              <div className="mt-1 truncate font-mono text-[10px] text-slate-400">
+              <div className="mt-1 truncate font-mono text-[10px] text-faint">
                 {row.detail}
               </div>
             </div>

@@ -3,18 +3,18 @@ import { BRAND_NAME } from "@/components/Brand";
 
 export default function TermsPage() {
   return (
-    <main className="min-h-full bg-[#f9fafb] text-[#0a1b33]">
+    <main className="min-h-full bg-background text-ink">
       <div className="mx-auto max-w-3xl px-6 py-16">
         <Link
           href="/"
-          className="inline-flex min-h-10 items-center text-sm text-slate-500 hover:text-[#0a1b33]"
+          className="inline-flex min-h-10 items-center text-sm text-muted hover:text-ink"
         >
           Back to {BRAND_NAME}
         </Link>
         <h1 className="mt-8 font-[var(--font-outfit)] text-4xl font-medium tracking-tight">
           Terms of Use
         </h1>
-        <section className="mt-8 space-y-5 text-sm leading-6 text-slate-600">
+        <section className="mt-8 space-y-5 text-sm leading-6 text-body">
           <p>
             {BRAND_NAME} is a WhatsApp Business Platform workspace for official API
             messaging, inbox workflows, templates, contact management, campaign

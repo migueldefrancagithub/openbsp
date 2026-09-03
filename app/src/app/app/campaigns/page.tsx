@@ -43,7 +43,7 @@ export default function CampaignsPage() {
           productChannels.length > 0 ? (
             <Link
               href="/app/campaigns/new"
-              className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#0a1b33] px-4 text-[13px] font-semibold text-white hover:bg-[#12264a]"
+              className="inline-flex h-10 items-center gap-2 rounded-lg bg-brand-solid px-4 text-[13px] font-semibold text-white hover:bg-[#12264a]"
             >
               <Plus size={15} /> {tr("Nova campanha", "New campaign")}
             </Link>
@@ -61,7 +61,7 @@ export default function CampaignsPage() {
               "Campaigns use the WhatsApp channel connected to the Hub. Set it up in Settings › Channels.",
             )}
             action={
-              <Link href="/app/settings?tab=channels" className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-[13px] font-semibold text-[#0a1b33]">
+              <Link href="/app/settings?tab=channels" className="inline-flex h-10 items-center gap-2 rounded-lg border border-line bg-surface px-4 text-[13px] font-semibold text-ink">
                 {tr("Abrir Definições", "Open Settings")} <ArrowRight size={14} />
               </Link>
             }
@@ -75,52 +75,52 @@ export default function CampaignsPage() {
                 { label: tr("Mensagens enviadas", "Messages sent"), value: String(kpis.sent) },
                 { label: tr("Taxa de resposta", "Reply rate"), value: percent(kpis.replyRate) },
               ].map((item) => (
-                <div key={item.label} className="rounded-lg border border-slate-200 bg-white px-3 py-2.5">
-                  <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-slate-400">{item.label}</div>
-                  <div className="mt-1 font-[var(--font-outfit)] text-[22px] font-medium tracking-tight text-[#0a1b33]">{item.value}</div>
+                <div key={item.label} className="rounded-lg border border-line bg-surface px-3 py-2.5">
+                  <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-faint">{item.label}</div>
+                  <div className="mt-1 font-[var(--font-outfit)] text-[22px] font-medium tracking-tight text-ink">{item.value}</div>
                 </div>
               ))}
             </div>
 
-            <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+            <section className="overflow-hidden rounded-lg border border-line bg-surface">
               {status === "LoadingFirstPage" ? (
-                <div className="flex items-center gap-2 px-4 py-8 text-sm text-slate-400">
+                <div className="flex items-center gap-2 px-4 py-8 text-sm text-faint">
                   <Loader2 size={15} className="animate-spin" /> {tr("A carregar campanhas…", "Loading campaigns…")}
                 </div>
               ) : results.length === 0 ? (
                 <div className="px-4 py-12 text-center">
-                  <div className="text-[15px] font-semibold text-[#0a1b33]">{tr("Ainda sem campanhas", "No campaigns yet")}</div>
-                  <p className="mx-auto mt-1 max-w-md text-[13px] text-slate-500">
+                  <div className="text-[15px] font-semibold text-ink">{tr("Ainda sem campanhas", "No campaigns yet")}</div>
+                  <p className="mx-auto mt-1 max-w-md text-[13px] text-muted">
                     {tr("Crie a primeira em 3 passos: público, mensagem e confirmação.", "Create the first one in 3 steps: audience, message and confirmation.")}
                   </p>
-                  <Link href="/app/campaigns/new" className="mt-4 inline-flex h-9 items-center gap-2 rounded-lg bg-[#0a1b33] px-3 text-[13px] font-semibold text-white">
+                  <Link href="/app/campaigns/new" className="mt-4 inline-flex h-9 items-center gap-2 rounded-lg bg-brand-solid px-3 text-[13px] font-semibold text-white">
                     <Plus size={14} /> {tr("Nova campanha", "New campaign")}
                   </Link>
                 </div>
               ) : (
-                <ul className="divide-y divide-slate-100">
+                <ul className="divide-y divide-line-soft">
                   {results.map((row) => (
                     <li key={row._id}>
-                      <Link href={`/app/campaigns/${row._id}`} className="grid gap-2 px-4 py-3 hover:bg-slate-50 sm:grid-cols-[1.4fr_1fr_1fr_auto] sm:items-center">
+                      <Link href={`/app/campaigns/${row._id}`} className="grid gap-2 px-4 py-3 hover:bg-surface-2 sm:grid-cols-[1.4fr_1fr_1fr_auto] sm:items-center">
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
-                            <span className="truncate text-[14px] font-semibold text-[#0a1b33]">{row.name}</span>
+                            <span className="truncate text-[14px] font-semibold text-ink">{row.name}</span>
                             <CampaignStatusBadge status={row.status} />
                           </div>
-                          <div className="mt-0.5 truncate text-[12px] text-slate-500">
+                          <div className="mt-0.5 truncate text-[12px] text-muted">
                             {campaignKindLabel(row.kind, locale)}
                             {row.contentPreview ? ` · ${row.contentPreview}` : ""}
                           </div>
                         </div>
-                        <div className="flex gap-3 text-[12px] text-slate-600">
-                          <span><b className="text-[#0a1b33]">{row.rates.sent}</b> {tr("enviadas", "sent")}</span>
-                          <span><b className="text-[#0a1b33]">{percent(row.rates.deliveryRate)}</b> {tr("entregues", "delivered")}</span>
+                        <div className="flex gap-3 text-[12px] text-body">
+                          <span><b className="text-ink">{row.rates.sent}</b> {tr("enviadas", "sent")}</span>
+                          <span><b className="text-ink">{percent(row.rates.deliveryRate)}</b> {tr("entregues", "delivered")}</span>
                         </div>
-                        <div className="flex gap-3 text-[12px] text-slate-600">
+                        <div className="flex gap-3 text-[12px] text-body">
                           <span><b className="text-[#0d6b61]">{percent(row.rates.replyRate)}</b> {tr("respostas", "replies")}</span>
                           <span><b className="text-[#0d6b61]">{row.rates.converted}</b> {tr("conversões", "conversions")}</span>
                         </div>
-                        <div className="text-[11px] text-slate-400">
+                        <div className="text-[11px] text-faint">
                           {relativeTime(row.startedAt ?? row.createdAt, now, locale)}
                         </div>
                       </Link>
@@ -129,7 +129,7 @@ export default function CampaignsPage() {
                 </ul>
               )}
               {status === "CanLoadMore" && (
-                <div className="border-t border-slate-100 px-4 py-2">
+                <div className="border-t border-line-soft px-4 py-2">
                   <button type="button" onClick={() => loadMore(20)} className="text-[12px] font-semibold text-[#2b4f8a] hover:underline">
                     {tr("Carregar mais", "Load more")}
                   </button>
@@ -137,9 +137,9 @@ export default function CampaignsPage() {
               )}
             </section>
 
-            <p className="text-[11px] text-slate-400">
+            <p className="text-[11px] text-faint">
               {tr("Campanhas antigas (Meta direto) continuam no ", "Older campaigns (Meta direct) remain in the ")}
-              <Link href="/app/campaigns/legacy" className="font-semibold text-slate-500 hover:underline">
+              <Link href="/app/campaigns/legacy" className="font-semibold text-muted hover:underline">
                 {tr("estúdio legado", "legacy studio")}
               </Link>
               .

@@ -55,21 +55,21 @@ export function SystemEventRow({ item }: { item: TimelineSystemItem }) {
             ? "border-[#f5c2b8] bg-[#fff1ee] text-[#8a2a1b]"
             : item.severity === "warning"
               ? "border-amber-200 bg-amber-50 text-amber-900"
-              : "border-slate-200 bg-white text-slate-600",
+              : "border-line bg-surface text-body",
         )}
       >
         <Icon size={13} className="mt-0.5 shrink-0" />
         <div className="min-w-0">
           <span className="font-semibold">{title}</span>
           {codeLabel && (
-            <span className="text-slate-500"> · {codeLabel}</span>
+            <span className="text-muted"> · {codeLabel}</span>
           )}
           {item.detail && (
-            <div className="mt-0.5 truncate text-[10px] text-slate-500" title={item.detail}>
+            <div className="mt-0.5 truncate text-[10px] text-muted" title={item.detail}>
               {item.detail}
             </div>
           )}
-          <div className="mt-0.5 text-[9px] uppercase tracking-wide text-slate-400">
+          <div className="mt-0.5 text-[9px] uppercase tracking-wide text-faint">
             {formatTime(item.at, locale)}
           </div>
         </div>

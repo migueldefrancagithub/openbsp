@@ -25,7 +25,7 @@ export function SegmentedTabs({
   return (
     <div
       role="tablist"
-      className={`rounded-lg border border-slate-200 bg-white p-1 ${className}`}
+      className={`rounded-lg border border-line bg-surface p-1 ${className}`}
     >
       <div className={`grid gap-1 ${gridClass}`}>
         {items.map((item) => {
@@ -40,8 +40,8 @@ export function SegmentedTabs({
               onClick={() => onChange(item.key)}
               className={`group flex min-h-12 min-w-0 items-center gap-1.5 rounded-md px-2 text-left transition-colors sm:gap-2 sm:px-2.5 ${
                 active
-                  ? "bg-[#0a152d] text-white"
-                  : "text-slate-600 hover:bg-slate-50 hover:text-[#0a1b33]"
+                  ? "bg-nav-active text-white"
+                  : "text-body hover:bg-surface-2 hover:text-ink"
               }`}
             >
               {Icon && (
@@ -49,7 +49,7 @@ export function SegmentedTabs({
                   className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md ${
                     active
                       ? "bg-white/10 text-white"
-                      : "bg-slate-100 text-slate-500 group-hover:bg-white"
+                      : "bg-surface-3 text-muted group-hover:bg-surface"
                   }`}
                 >
                   <Icon size={15} />
@@ -62,7 +62,7 @@ export function SegmentedTabs({
                 {item.value && (
                   <span
                     className={`block truncate text-[11px] font-medium ${
-                      active ? "text-white/65" : "text-slate-400"
+                      active ? "text-white/65" : "text-faint"
                     }`}
                   >
                     {item.value}

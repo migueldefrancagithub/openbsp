@@ -24,7 +24,7 @@ function statusTone(status: string): string {
   if (["accepted", "processed", "sent", "delivered", "read"].includes(status)) return "bg-[#edf8f6] text-[#0d6b61]";
   if (["failed", "rejected"].includes(status)) return "bg-[#fdf1ef] text-[#b3261e]";
   if (["unknown", "claimed", "dispatching", "scheduled"].includes(status)) return "bg-amber-50 text-amber-800";
-  return "bg-slate-100 text-slate-600";
+  return "bg-surface-3 text-body";
 }
 
 export default function AdminLogsPage() {
@@ -65,26 +65,26 @@ export default function AdminLogsPage() {
       <PageHeader eyebrow="Admin" title={tr("Registos", "Logs")} description={tr("O que entrou, o que saiu e quem mudou o quê. Sem conteúdo bruto nem números completos.", "What came in, what went out and who changed what. No raw payloads or full numbers.")} />
       <div className="mx-auto w-full max-w-6xl space-y-4 px-4 py-5 sm:px-6 xl:px-8">
         <div className="flex flex-wrap items-center gap-2">
-          <div className="inline-flex flex-wrap rounded-lg border border-slate-200 bg-white p-1 text-[12px] font-semibold">
+          <div className="inline-flex flex-wrap rounded-lg border border-line bg-surface p-1 text-[12px] font-semibold">
             {tabs.map((item) => (
-              <button key={item.key} type="button" onClick={() => setTab(item.key)} className={cn("rounded-md px-3 py-1.5", tab === item.key ? "bg-[#0a1b33] text-white" : "text-slate-500")}>{item.label}</button>
+              <button key={item.key} type="button" onClick={() => setTab(item.key)} className={cn("rounded-md px-3 py-1.5", tab === item.key ? "bg-brand-solid text-white" : "text-muted")}>{item.label}</button>
             ))}
           </div>
           {(tab === "events" || tab === "outbox") && productChannels.length > 1 && (
-            <select value={channelId} onChange={(e) => setChannelId(e.target.value as Id<"channels">)} className="h-9 rounded-lg border border-slate-200 bg-white px-2 text-[12px] text-[#0a1b33] outline-none">
+            <select value={channelId} onChange={(e) => setChannelId(e.target.value as Id<"channels">)} className="h-9 rounded-lg border border-line bg-surface px-2 text-[12px] text-ink outline-none">
               {productChannels.map((c) => <option key={c._id} value={c._id}>{c.displayName}</option>)}
             </select>
           )}
           {tab === "outbox" && (
             <div className="flex flex-wrap gap-1">
               {["all", "accepted", "failed", "unknown", "dispatching"].map((status) => (
-                <button key={status} type="button" onClick={() => setOutboxStatus(status)} className={cn("rounded-full border px-2 py-0.5 text-[11px] font-semibold", outboxStatus === status ? "border-[#0a1b33] bg-[#0a1b33] text-white" : "border-slate-200 text-slate-500")}>{status === "all" ? tr("Todos", "All") : status}</button>
+                <button key={status} type="button" onClick={() => setOutboxStatus(status)} className={cn("rounded-full border px-2 py-0.5 text-[11px] font-semibold", outboxStatus === status ? "border-brand-solid bg-brand-solid text-white" : "border-line text-muted")}>{status === "all" ? tr("Todos", "All") : status}</button>
               ))}
             </div>
           )}
         </div>
 
-        <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+        <section className="overflow-hidden rounded-lg border border-line bg-surface">
           {tab === "events" && (
             events === undefined ? <Loading /> : events.length === 0 ? <Empty /> : (
               <Table
@@ -113,7 +113,7 @@ export default function AdminLogsPage() {
               <>
                 <Table
                   head={[tr("Quando", "When"), tr("Ação", "Action"), tr("Alvo", "Target"), tr("Ator", "Actor"), "Hash"]}
-                  rows={audit.results.map((row) => [relativeTime(row.createdAt, now, locale), row.action, `${row.targetType ?? ""} ${row.targetId ? maskKey(row.targetId) : ""}`, `${row.actorType}${row.actorRoleSnapshot ? ` · ${row.actorRoleSnapshot}` : ""}`, <code key="h" className="text-[10px] text-slate-400">{row.selfHash.slice(0, 10)}…</code>])}
+                  rows={audit.results.map((row) => [relativeTime(row.createdAt, now, locale), row.action, `${row.targetType ?? ""} ${row.targetId ? maskKey(row.targetId) : ""}`, `${row.actorType}${row.actorRoleSnapshot ? ` · ${row.actorRoleSnapshot}` : ""}`, <code key="h" className="text-[10px] text-faint">{row.selfHash.slice(0, 10)}…</code>])}
                 />
                 {audit.status === "CanLoadMore" && <LoadMore onClick={() => audit.loadMore(40)} />}
               </>
@@ -138,15 +138,15 @@ export default function AdminLogsPage() {
 
 function Loading() {
   const { tr } = useI18n();
-  return <div className="flex items-center gap-2 px-4 py-6 text-sm text-slate-400"><Loader2 size={14} className="animate-spin" /> {tr("A carregar…", "Loading…")}</div>;
+  return <div className="flex items-center gap-2 px-4 py-6 text-sm text-faint"><Loader2 size={14} className="animate-spin" /> {tr("A carregar…", "Loading…")}</div>;
 }
 function Empty() {
   const { tr } = useI18n();
-  return <div className="px-4 py-8 text-center text-[13px] text-slate-500">{tr("Sem registos.", "No records.")}</div>;
+  return <div className="px-4 py-8 text-center text-[13px] text-muted">{tr("Sem registos.", "No records.")}</div>;
 }
 function LoadMore({ onClick }: { onClick: () => void }) {
   const { tr } = useI18n();
-  return <div className="border-t border-slate-100 px-4 py-2"><button type="button" onClick={onClick} className="text-[12px] font-semibold text-[#2b4f8a] hover:underline">{tr("Carregar mais", "Load more")}</button></div>;
+  return <div className="border-t border-line-soft px-4 py-2"><button type="button" onClick={onClick} className="text-[12px] font-semibold text-[#2b4f8a] hover:underline">{tr("Carregar mais", "Load more")}</button></div>;
 }
 function Badge({ status }: { status: string }) {
   return <span className={cn("rounded-md px-2 py-0.5 text-[11px] font-semibold", statusTone(status))}>{status}</span>;
@@ -155,12 +155,12 @@ function Table({ head, rows }: { head: string[]; rows: Array<Array<string | Reac
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-[12px]">
-        <thead className="bg-slate-50 text-left text-[10px] uppercase tracking-[0.12em] text-slate-400">
+        <thead className="bg-surface-2 text-left text-[10px] uppercase tracking-[0.12em] text-faint">
           <tr>{head.map((h) => <th key={h} className="px-4 py-2 font-medium">{h}</th>)}</tr>
         </thead>
-        <tbody className="divide-y divide-slate-100">
+        <tbody className="divide-y divide-line-soft">
           {rows.map((cells, index) => (
-            <tr key={index} className="hover:bg-slate-50">{cells.map((cell, i) => <td key={i} className="px-4 py-1.5 text-[#0a1b33]">{cell}</td>)}</tr>
+            <tr key={index} className="hover:bg-surface-2">{cells.map((cell, i) => <td key={i} className="px-4 py-1.5 text-ink">{cell}</td>)}</tr>
           ))}
         </tbody>
       </table>

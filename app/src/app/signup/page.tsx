@@ -56,21 +56,21 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center bg-[#f9fafb] px-4">
+    <div className="relative flex min-h-screen items-center justify-center bg-background px-4">
       <LanguageSwitcher compact className="absolute right-4 top-4" />
       <div className="w-full max-w-sm">
         <Link
           href="/"
-          className="mb-10 flex justify-center text-[#0a1b33]"
+          className="mb-10 flex justify-center text-ink"
         >
           <BrandLogo />
         </Link>
 
-        <div className="rounded-lg border border-slate-200 bg-white p-8 shadow-[0_20px_60px_-30px_rgba(0,0,0,0.15)]">
-          <h1 className="font-[var(--font-outfit)] text-[26px] font-medium tracking-tight text-[#0a1b33]">
+        <div className="rounded-lg border border-line bg-surface p-8 shadow-[0_20px_60px_-30px_rgba(0,0,0,0.15)]">
+          <h1 className="font-[var(--font-outfit)] text-[26px] font-medium tracking-tight text-ink">
             {inviteToken ? tr("Aceitar convite", "Accept invite") : tr("Criar espaço de trabalho", "Create your workspace")}
           </h1>
-          <p className="text-slate-500 text-sm mt-1">
+          <p className="text-muted text-sm mt-1">
             {inviteToken
               ? tr("Crie uma conta para entrar no espaço de trabalho para o qual recebeu convite.", "Create an account to join the workspace you were invited to.")
               : tr("Comece sem cartão de crédito.", "Start without a credit card.")}
@@ -80,7 +80,7 @@ export default function SignupPage() {
             <div>
               <label
                 htmlFor="email"
-                className="block text-xs font-medium text-slate-700 mb-1.5"
+                className="block text-xs font-medium text-ink mb-1.5"
               >
                 {tr("Email profissional", "Work email")}
               </label>
@@ -91,14 +91,14 @@ export default function SignupPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm text-[#0a1b33] focus:outline-none focus:ring-2 focus:ring-[#0a152d]/10 focus:border-[#0a152d] transition-all"
+                className="w-full px-3 py-2.5 rounded-lg border border-line text-sm text-ink focus:outline-none focus:ring-2 focus:ring-[#0a152d]/10 focus:border-[#0a152d] transition-all"
                 placeholder="you@clinic.pt"
               />
             </div>
             <div>
               <label
                 htmlFor="password"
-                className="block text-xs font-medium text-slate-700 mb-1.5"
+                className="block text-xs font-medium text-ink mb-1.5"
               >
                 {tr("Palavra-passe", "Password")}
               </label>
@@ -110,10 +110,10 @@ export default function SignupPage() {
                 minLength={8}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm text-[#0a1b33] focus:outline-none focus:ring-2 focus:ring-[#0a152d]/10 focus:border-[#0a152d] transition-all"
+                className="w-full px-3 py-2.5 rounded-lg border border-line text-sm text-ink focus:outline-none focus:ring-2 focus:ring-[#0a152d]/10 focus:border-[#0a152d] transition-all"
                 placeholder={tr("Pelo menos 8 caracteres", "At least 8 characters")}
               />
-              <p className="text-[11px] text-slate-400 mt-1.5">
+              <p className="text-[11px] text-faint mt-1.5">
                 {tr("Mínimo de 8 caracteres.", "At least 8 characters.")}
               </p>
             </div>
@@ -127,21 +127,21 @@ export default function SignupPage() {
             <button
               type="submit"
               disabled={busy}
-              className="w-full bg-[#0a152d] text-white text-sm font-medium px-4 py-2.5 rounded-lg shadow-[0_8px_24px_-8px_rgba(10,21,45,0.5)] hover:bg-[#0a1b33] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              className="w-full bg-nav-active text-white text-sm font-medium px-4 py-2.5 rounded-lg shadow-[0_8px_24px_-8px_rgba(10,21,45,0.5)] hover:bg-brand-solid disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >
               {busy ? tr("A criar…", "Creating…") : tr("Criar conta", "Create account")}
             </button>
           </form>
 
-          <p className="text-[11px] text-slate-400 mt-4 leading-relaxed">
+          <p className="text-[11px] text-faint mt-4 leading-relaxed">
             {tr("Ao criar a conta, concorda com os Termos e a Política de Privacidade.", "By creating an account, you agree to the Terms and Privacy Policy.")}
           </p>
 
-          <p className="text-center text-sm text-slate-500 mt-6">
+          <p className="text-center text-sm text-muted mt-6">
             {tr("Já tem uma conta?", "Already have an account?")}{" "}
             <Link
               href="/login"
-              className="text-[#0a1b33] font-medium hover:underline"
+              className="text-ink font-medium hover:underline"
             >
               {tr("Entrar", "Sign in")}
             </Link>

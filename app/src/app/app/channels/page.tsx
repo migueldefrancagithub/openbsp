@@ -167,8 +167,8 @@ export default function ChannelsPage() {
         description={tr("Estado dos números, ligação à Meta e segurança de envio.", "Phone health, Meta connection and send safety.")}
       />
 
-      <div className="grid min-h-[calc(100vh-105px)] border-t border-slate-100 bg-white lg:grid-cols-[310px_330px_1fr]">
-        <aside className="border-b border-slate-200 p-4 lg:border-b-0 lg:border-r">
+      <div className="grid min-h-[calc(100vh-105px)] border-t border-line-soft bg-surface lg:grid-cols-[310px_330px_1fr]">
+        <aside className="border-b border-line p-4 lg:border-b-0 lg:border-r">
           <SectionLabel label={`${tr("Contas empresariais", "Business accounts")} (${accounts?.length ?? 0})`} />
           {accounts === undefined ? (
             <SkeletonRows />
@@ -193,8 +193,8 @@ export default function ChannelsPage() {
                     }}
                     className={`flex w-full items-center gap-3 rounded-lg border px-3 py-3 text-left transition-all ${
                       active
-                        ? "border-slate-300 bg-slate-50"
-                        : "border-transparent hover:border-slate-200 hover:bg-slate-50"
+                        ? "border-line bg-surface-2"
+                        : "border-transparent hover:border-line hover:bg-surface-2"
                     }`}
                   >
                     <span
@@ -205,10 +205,10 @@ export default function ChannelsPage() {
                       <Building2 size={18} />
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-semibold text-[#0a1b33]">
+                      <span className="block truncate text-sm font-semibold text-ink">
                         WABA {account.wabaId}
                       </span>
-                      <span className="mt-0.5 block truncate text-xs text-slate-500">
+                      <span className="mt-0.5 block truncate text-xs text-muted">
                         {accountHealth.label} · {account.phoneNumbers.length}{" "}
                         {locale === "pt"
                           ? account.phoneNumbers.length === 1 ? "canal" : "canais"
@@ -223,7 +223,7 @@ export default function ChannelsPage() {
           )}
         </aside>
 
-        <aside className="border-b border-slate-200 p-4 lg:border-b-0 lg:border-r">
+        <aside className="border-b border-line p-4 lg:border-b-0 lg:border-r">
           <SectionLabel
             label={`${tr("Canais", "Channels")} (${selectedAccount?.phoneNumbers.length ?? 0})`}
           />
@@ -251,8 +251,8 @@ export default function ChannelsPage() {
                     onClick={() => setSelectedPhoneId(phone._id)}
                     className={`flex w-full items-center gap-3 rounded-lg border px-3 py-3 text-left transition-all ${
                       active
-                        ? "border-slate-300 bg-slate-50"
-                        : "border-transparent hover:border-slate-200 hover:bg-slate-50"
+                        ? "border-line bg-surface-2"
+                        : "border-transparent hover:border-line hover:bg-surface-2"
                     }`}
                   >
                     <span
@@ -263,10 +263,10 @@ export default function ChannelsPage() {
                       <Phone size={17} />
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-semibold text-[#0a1b33]">
+                      <span className="block truncate text-sm font-semibold text-ink">
                         {phone.displayName}
                       </span>
-                      <span className="mt-0.5 block truncate text-xs text-slate-500">
+                      <span className="mt-0.5 block truncate text-xs text-muted">
                         {phone.e164} · {phoneHealth.label}
                       </span>
                     </span>
@@ -274,18 +274,18 @@ export default function ChannelsPage() {
                   </button>
                 );
               })}
-              <div className="rounded-lg border border-dashed border-slate-200 px-3 py-3 text-center text-sm font-medium text-slate-500">
-                <Link2 size={15} className="mx-auto mb-1 text-slate-400" />
+              <div className="rounded-lg border border-dashed border-line px-3 py-3 text-center text-sm font-medium text-muted">
+                <Link2 size={15} className="mx-auto mb-1 text-faint" />
                 {tr("Ligar canal", "Connect channel")}
               </div>
             </div>
           )}
         </aside>
 
-        <section className="min-w-0 bg-[#f8fafc]">
+        <section className="min-w-0 bg-surface-2">
           {selectedPhone && selectedAccount && channelHealth ? (
             <div>
-              <div className="flex flex-col gap-4 border-b border-slate-200 bg-white p-6 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex flex-col gap-4 border-b border-line bg-surface p-6 lg:flex-row lg:items-center lg:justify-between">
                 <div className="flex items-center gap-4">
                   <div
                     className={`flex h-20 w-20 items-center justify-center rounded-full border text-xl font-semibold ${toneAvatarClass(
@@ -296,7 +296,7 @@ export default function ChannelsPage() {
                   </div>
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="font-[var(--font-outfit)] text-2xl font-semibold text-[#0a1b33]">
+                      <h2 className="font-[var(--font-outfit)] text-2xl font-semibold text-ink">
                         {selectedPhone.displayName}
                       </h2>
                       <StatusBadge tone={channelHealth.tone}>
@@ -304,7 +304,7 @@ export default function ChannelsPage() {
                         {channelHealth.label}
                       </StatusBadge>
                     </div>
-                    <p className="mt-1 text-sm text-slate-500">
+                    <p className="mt-1 text-sm text-muted">
                       {selectedPhone.verifiedName
                         ? `${tr("Nome verificado", "Verified name")}: ${selectedPhone.verifiedName}`
                         : `${tr("Ligado como", "Connected as")} ${selectedPhone.displayName}`}
@@ -313,7 +313,7 @@ export default function ChannelsPage() {
                 </div>
                 <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center">
                   {lastRefreshAt && (
-                    <span className="text-xs font-medium text-slate-500">
+                    <span className="text-xs font-medium text-muted">
                       {tr("Atualizado", "Refreshed")} {formatRelative(lastRefreshAt, locale)}
                     </span>
                   )}
@@ -321,7 +321,7 @@ export default function ChannelsPage() {
                     type="button"
                     onClick={handleRefreshHealth}
                     disabled={refreshing}
-                    className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-[#0a1b33] transition-colors hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-line bg-surface px-3 text-sm font-medium text-ink transition-colors hover:border-line disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <RefreshCw
                       size={15}
@@ -602,8 +602,8 @@ export default function ChannelsPage() {
                       />
                     </div>
 
-                    <div className="mt-4 rounded-lg border border-slate-100 bg-slate-50 p-3">
-                      <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                    <div className="mt-4 rounded-lg border border-line-soft bg-surface-2 p-3">
+                      <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-muted">
                         <ListChecks size={14} />
                         {tr("Sinais da Meta", "Meta signals")}
                       </div>
@@ -611,7 +611,7 @@ export default function ChannelsPage() {
                         {selectedAccount.coexRecovery.evidence.map((item) => (
                           <span
                             key={item}
-                            className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600"
+                            className="rounded-full border border-line bg-surface px-2.5 py-1 text-xs font-medium text-body"
                           >
                             {item}
                           </span>
@@ -778,7 +778,7 @@ function evaluateChannelHealth(
 
 function SectionLabel({ label }: { label: string }) {
   return (
-    <div className="mb-4 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+    <div className="mb-4 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">
       {label}
     </div>
   );
@@ -794,10 +794,10 @@ function EmptyPanel({
   body: string;
 }) {
   return (
-    <div className="rounded-lg border border-dashed border-slate-200 bg-white p-6 text-center">
-      <Icon size={24} className="mx-auto text-slate-300" />
-      <div className="mt-3 text-sm font-semibold text-[#0a1b33]">{title}</div>
-      <p className="mt-1 text-sm leading-6 text-slate-500">{body}</p>
+    <div className="rounded-lg border border-dashed border-line bg-surface p-6 text-center">
+      <Icon size={24} className="mx-auto text-faint" />
+      <div className="mt-3 text-sm font-semibold text-ink">{title}</div>
+      <p className="mt-1 text-sm leading-6 text-muted">{body}</p>
     </div>
   );
 }
@@ -808,7 +808,7 @@ function SkeletonRows() {
       {[0, 1, 2].map((index) => (
         <div
           key={index}
-          className="h-[68px] animate-pulse rounded-lg border border-slate-100 bg-slate-50"
+          className="h-[68px] animate-pulse rounded-lg border border-line-soft bg-surface-2"
         />
       ))}
     </div>
@@ -849,11 +849,11 @@ function ChannelCard({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-5">
+    <section className="rounded-lg border border-line bg-surface p-5">
       <div className="mb-4 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <Icon size={17} className="text-slate-500" />
-          <h3 className="font-[var(--font-outfit)] text-lg font-semibold text-[#0a1b33]">
+          <Icon size={17} className="text-muted" />
+          <h3 className="font-[var(--font-outfit)] text-lg font-semibold text-ink">
             {title}
           </h3>
         </div>
@@ -878,11 +878,11 @@ function DetailRow({
   const { tr } = useI18n();
 
   return (
-    <div className="border-b border-slate-100 py-3 last:border-b-0">
-      <div className="text-xs font-medium text-slate-500">{label}</div>
+    <div className="border-b border-line-soft py-3 last:border-b-0">
+      <div className="text-xs font-medium text-muted">{label}</div>
       <div className="mt-1 flex items-center gap-2">
         <div
-          className={`min-w-0 flex-1 truncate text-sm font-semibold text-[#0a1b33] ${
+          className={`min-w-0 flex-1 truncate text-sm font-semibold text-ink ${
             mono ? "font-[var(--font-mono)]" : ""
           }`}
         >
@@ -892,7 +892,7 @@ function DetailRow({
           <button
             type="button"
             onClick={copy}
-            className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-[#0a1b33]"
+            className="rounded-md p-1.5 text-faint hover:bg-surface-3 hover:text-ink"
             aria-label={`${tr("Copiar", "Copy")} ${label}`}
           >
             <Copy size={14} />
@@ -936,7 +936,7 @@ function ChecklistRow({
   tone: Tone;
 }) {
   return (
-    <div className="flex items-start gap-3 border-b border-slate-100 py-3 last:border-b-0">
+    <div className="flex items-start gap-3 border-b border-line-soft py-3 last:border-b-0">
       <span
         className={`mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${toneIconClass(
           tone,
@@ -945,8 +945,8 @@ function ChecklistRow({
         <Icon size={15} />
       </span>
       <div className="min-w-0 flex-1">
-        <div className="text-xs font-medium text-slate-500">{label}</div>
-        <div className="mt-0.5 break-words text-sm font-semibold text-[#0a1b33]">
+        <div className="text-xs font-medium text-muted">{label}</div>
+        <div className="mt-0.5 break-words text-sm font-semibold text-ink">
           {value}
         </div>
       </div>
@@ -956,15 +956,15 @@ function ChecklistRow({
 
 function RecoverySteps({ title, steps }: { title: string; steps: string[] }) {
   return (
-    <div className="rounded-lg border border-slate-100 bg-white p-4">
-      <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-[#0a1b33]">
-        <ListChecks size={15} className="text-slate-500" />
+    <div className="rounded-lg border border-line-soft bg-surface p-4">
+      <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink">
+        <ListChecks size={15} className="text-muted" />
         {title}
       </div>
       <ol className="space-y-2">
         {steps.map((step, index) => (
-          <li key={step} className="flex gap-3 text-sm leading-6 text-slate-600">
-            <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[11px] font-semibold text-slate-500">
+          <li key={step} className="flex gap-3 text-sm leading-6 text-body">
+            <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-surface-3 text-[11px] font-semibold text-muted">
               {index + 1}
             </span>
             <span>{step}</span>
@@ -1028,42 +1028,42 @@ function toneAvatarClass(tone: Tone) {
   if (tone === "good") return "border-emerald-200 bg-emerald-50 text-emerald-700";
   if (tone === "bad") return "border-red-200 bg-red-50 text-red-700";
   if (tone === "warn") return "border-amber-200 bg-amber-50 text-amber-700";
-  return "border-slate-200 bg-slate-50 text-[#0a1b33]";
+  return "border-line bg-surface-2 text-ink";
 }
 
 function toneIconClass(tone: Tone) {
   if (tone === "good") return "bg-emerald-50 text-emerald-600";
   if (tone === "bad") return "bg-red-50 text-red-600";
   if (tone === "warn") return "bg-amber-50 text-amber-600";
-  return "bg-slate-50 text-slate-500";
+  return "bg-surface-2 text-muted";
 }
 
 function badgeClass(tone: Tone) {
   if (tone === "good") return "border-emerald-200 bg-emerald-50 text-emerald-700";
   if (tone === "bad") return "border-red-200 bg-red-50 text-red-700";
   if (tone === "warn") return "border-amber-200 bg-amber-50 text-amber-700";
-  return "border-slate-200 bg-slate-50 text-slate-600";
+  return "border-line bg-surface-2 text-body";
 }
 
 function dotClass(tone: Tone) {
   if (tone === "good") return "bg-emerald-500";
   if (tone === "bad") return "bg-red-500";
   if (tone === "warn") return "bg-amber-400";
-  return "bg-slate-300";
+  return "bg-faint/50";
 }
 
 function metricClass(tone: Tone) {
   if (tone === "good") return "border-emerald-100 bg-emerald-50 text-emerald-700";
   if (tone === "bad") return "border-red-100 bg-red-50 text-red-700";
   if (tone === "warn") return "border-amber-100 bg-amber-50 text-amber-700";
-  return "border-slate-200 bg-slate-50 text-slate-600";
+  return "border-line bg-surface-2 text-body";
 }
 
 function tonePanelClass(tone: Tone) {
   if (tone === "good") return "border-emerald-100 bg-emerald-50 text-emerald-800";
   if (tone === "bad") return "border-red-100 bg-red-50 text-red-800";
   if (tone === "warn") return "border-amber-100 bg-amber-50 text-amber-800";
-  return "border-slate-200 bg-slate-50 text-slate-700";
+  return "border-line bg-surface-2 text-ink";
 }
 
 function formatDateTime(value?: number, locale: Locale = "en") {

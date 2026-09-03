@@ -44,7 +44,7 @@ export function campaignStatusTone(status: string): string {
     case "cancelled":
       return "border-[#e0533d]/30 bg-[#fdf1ef] text-[#b3261e]";
     default:
-      return "border-slate-200 bg-slate-50 text-slate-600";
+      return "border-line bg-surface-2 text-body";
   }
 }
 
@@ -104,7 +104,7 @@ export function recipientStatusTone(status: string): string {
     case "dispatching":
       return "bg-amber-50 text-amber-800";
     default:
-      return "bg-slate-100 text-slate-600";
+      return "bg-surface-3 text-body";
   }
 }
 

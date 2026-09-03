@@ -38,16 +38,16 @@ export function ComplianceSection() {
 
   if (status === undefined) {
     return (
-      <div className="h-40 animate-pulse rounded-lg border border-slate-200 bg-white" />
+      <div className="h-40 animate-pulse rounded-lg border border-line bg-surface" />
     );
   }
 
   if (status.ready) {
     return (
-      <section className="rounded-lg border border-slate-200 bg-white">
-        <header className="flex items-center gap-2.5 border-b border-slate-100 px-4 py-3">
+      <section className="rounded-lg border border-line bg-surface">
+        <header className="flex items-center gap-2.5 border-b border-line-soft px-4 py-3">
           <ShieldCheck size={16} className="text-emerald-600" />
-          <h2 className="font-[var(--font-display)] text-[14px] font-medium text-[#0a1b33]">
+          <h2 className="font-[var(--font-display)] text-[14px] font-medium text-ink">
             {tr("Proteção de dados", "Data protection")}
           </h2>
         </header>
@@ -62,7 +62,7 @@ export function ComplianceSection() {
             label={tr("Avaliação de impacto", "Impact assessment")}
             value={formatDate(status.dpiaCompletedAt!, locale)}
           />
-          <p className="pt-2 text-[12px] text-slate-500">
+          <p className="pt-2 text-[12px] text-muted">
             {tr(
               "Os canais já podem ser ligados. A aceitação é registada uma única vez e não muda ao reabrir esta página.",
               "Channels can be connected. Acceptance is recorded once and is not re-dated when this page is reopened.",
@@ -99,14 +99,14 @@ export function ComplianceSection() {
     /^[^@\s]+@[^@\s.]+\.[^@\s]+$/.test(controllerEmail.trim());
 
   return (
-    <section className="rounded-lg border border-amber-200 bg-white">
-      <header className="flex items-center gap-2.5 border-b border-slate-100 px-4 py-3">
+    <section className="rounded-lg border border-amber-200 bg-surface">
+      <header className="flex items-center gap-2.5 border-b border-line-soft px-4 py-3">
         <ShieldCheck size={16} className="text-amber-600" />
         <div>
-          <h2 className="font-[var(--font-display)] text-[14px] font-medium text-[#0a1b33]">
+          <h2 className="font-[var(--font-display)] text-[14px] font-medium text-ink">
             {tr("Proteção de dados", "Data protection")}
           </h2>
-          <p className="text-[12px] text-slate-500">
+          <p className="text-[12px] text-muted">
             {tr("Obrigatório antes de ligar qualquer canal.", "Required before any channel can be connected.")}
           </p>
         </div>
@@ -154,7 +154,7 @@ export function ComplianceSection() {
         <button
           type="submit"
           disabled={!complete || saving || !status.canAccept}
-          className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#0a152d] px-4 text-[13px] font-medium text-white outline-none hover:bg-[#132145] disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-[#3d52d5] focus-visible:ring-offset-2"
+          className="inline-flex h-9 items-center gap-2 rounded-lg bg-nav-active px-4 text-[13px] font-medium text-white outline-none hover:bg-[#132145] disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-[#3d52d5] focus-visible:ring-offset-2"
         >
           {saving ? (
             <Loader2 size={14} className="animate-spin" />
@@ -171,8 +171,8 @@ export function ComplianceSection() {
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-baseline justify-between gap-3">
-      <span className="text-slate-500">{label}</span>
-      <span className="text-right font-medium text-[#0a1b33]">{value}</span>
+      <span className="text-muted">{label}</span>
+      <span className="text-right font-medium text-ink">{value}</span>
     </div>
   );
 }
@@ -192,7 +192,7 @@ function Field({
 }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-[12px] font-medium text-slate-600">
+      <span className="mb-1 block text-[12px] font-medium text-body">
         {label}
       </span>
       <input
@@ -200,7 +200,7 @@ function Field({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
-        className="h-9 w-full rounded-lg border border-slate-200 px-3 text-[13px] outline-none focus:border-slate-400"
+        className="h-9 w-full rounded-lg border border-line px-3 text-[13px] outline-none focus:border-brand-solid/40"
       />
     </label>
   );
@@ -216,7 +216,7 @@ function Check({
   label: string;
 }) {
   return (
-    <label className="flex cursor-pointer items-start gap-2.5 text-[12px] leading-relaxed text-slate-600">
+    <label className="flex cursor-pointer items-start gap-2.5 text-[12px] leading-relaxed text-body">
       <input
         type="checkbox"
         checked={checked}

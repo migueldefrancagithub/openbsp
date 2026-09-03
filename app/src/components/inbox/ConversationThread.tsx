@@ -39,14 +39,14 @@ export function ConversationThread({ conversationId }: Props) {
 
   if (conversation === undefined || messages === undefined) {
     return (
-      <div className="flex-1 flex items-center justify-center text-slate-400 text-sm">
+      <div className="flex-1 flex items-center justify-center text-faint text-sm">
         Loading conversation…
       </div>
     );
   }
   if (conversation === null) {
     return (
-      <div className="flex-1 flex items-center justify-center text-slate-400 text-sm">
+      <div className="flex-1 flex items-center justify-center text-faint text-sm">
         Conversation not found.
       </div>
     );
@@ -59,7 +59,7 @@ export function ConversationThread({ conversationId }: Props) {
   return (
     <div className="flex-1 flex flex-col h-full bg-[#f4f6f9]">
       {/* Header */}
-      <div className="px-6 py-3 border-b border-slate-200 bg-white flex items-center justify-between">
+      <div className="px-6 py-3 border-b border-line bg-surface flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-full flex-shrink-0 bg-gradient-to-br from-[#F5C344] via-[#F28482] to-[#B567C2] flex items-center justify-center text-white text-[12px] font-semibold">
             {(conversation.contactName ?? conversation.contactE164)
@@ -68,19 +68,19 @@ export function ConversationThread({ conversationId }: Props) {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <div className="text-[14px] font-semibold text-[#0a1b33] leading-tight">
+              <div className="text-[14px] font-semibold text-ink leading-tight">
                 {conversation.contactName ?? conversation.contactE164}
               </div>
-              <span className="text-[10px] font-[var(--font-mono)] text-slate-400">
+              <span className="text-[10px] font-[var(--font-mono)] text-faint">
                 {friendlyId("CONV", conversationId)}
               </span>
             </div>
-            <div className="flex items-center gap-1.5 text-[11px] text-slate-500 mt-0.5">
+            <div className="flex items-center gap-1.5 text-[11px] text-muted mt-0.5">
               <Phone size={10} />
               <span>{conversation.contactE164}</span>
               {conversation.leadSource === "ctwa" && (
                 <>
-                  <span className="text-slate-300">·</span>
+                  <span className="text-faint">·</span>
                   <span className="inline-flex items-center gap-1 text-emerald-700">
                     <Megaphone size={10} />
                     CTWA lead
@@ -89,8 +89,8 @@ export function ConversationThread({ conversationId }: Props) {
               )}
               {conversation.aiState && (
                 <>
-                  <span className="text-slate-300">·</span>
-                  <span className="inline-flex items-center gap-1 text-slate-600">
+                  <span className="text-faint">·</span>
+                  <span className="inline-flex items-center gap-1 text-body">
                     <Bot size={10} />
                     AI {conversation.aiState}
                   </span>
@@ -116,8 +116,8 @@ export function ConversationThread({ conversationId }: Props) {
         )}
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white px-6 py-2.5 text-[11px]">
-        <span className="inline-flex items-center gap-1 font-medium text-slate-500">
+      <div className="flex flex-wrap items-center gap-2 border-b border-line bg-surface px-6 py-2.5 text-[11px]">
+        <span className="inline-flex items-center gap-1 font-medium text-muted">
           <Users size={11} />
           Queue
         </span>
@@ -136,7 +136,7 @@ export function ConversationThread({ conversationId }: Props) {
               setAssignmentBusy(false);
             }
           }}
-          className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[#0a1b33] outline-none disabled:opacity-50"
+          className="rounded-md border border-line bg-surface-2 px-2 py-1 text-ink outline-none disabled:opacity-50"
         >
           <option value="">No team</option>
           {(teams ?? []).map((team) => (
@@ -145,7 +145,7 @@ export function ConversationThread({ conversationId }: Props) {
             </option>
           ))}
         </select>
-        <span className="inline-flex items-center gap-1 font-medium text-slate-500">
+        <span className="inline-flex items-center gap-1 font-medium text-muted">
           <UserRound size={11} />
           Agent
         </span>
@@ -164,7 +164,7 @@ export function ConversationThread({ conversationId }: Props) {
               setAssignmentBusy(false);
             }
           }}
-          className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[#0a1b33] outline-none disabled:opacity-50"
+          className="rounded-md border border-line bg-surface-2 px-2 py-1 text-ink outline-none disabled:opacity-50"
         >
           <option value="">Unassigned</option>
           {(members ?? [])
@@ -176,7 +176,7 @@ export function ConversationThread({ conversationId }: Props) {
             ))}
         </select>
         {(conversation.assignedTeamName || conversation.assignedAgentName) && (
-          <span className="text-slate-400">
+          <span className="text-faint">
             {conversation.assignedTeamName ?? "No team"}
             {conversation.assignedAgentName
               ? ` · ${conversation.assignedAgentName}`
@@ -186,8 +186,8 @@ export function ConversationThread({ conversationId }: Props) {
       </div>
 
       {(conversation.leadSource === "ctwa" || conversation.aiState) && (
-        <div className="border-b border-slate-200 bg-white px-6 py-2.5 flex flex-wrap items-center gap-2 text-[11px]">
-          <span className="font-medium text-slate-500">Lead</span>
+        <div className="border-b border-line bg-surface px-6 py-2.5 flex flex-wrap items-center gap-2 text-[11px]">
+          <span className="font-medium text-muted">Lead</span>
           <select
             value={conversation.opportunityStatus ?? "new"}
             onChange={(event) =>
@@ -202,7 +202,7 @@ export function ConversationThread({ conversationId }: Props) {
                   | "lost",
               })
             }
-            className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[#0a1b33] outline-none"
+            className="rounded-md border border-line bg-surface-2 px-2 py-1 text-ink outline-none"
           >
             <option value="new">new</option>
             <option value="contacted">contacted</option>
@@ -211,7 +211,7 @@ export function ConversationThread({ conversationId }: Props) {
             <option value="booked">booked</option>
             <option value="lost">lost</option>
           </select>
-          <span className="ml-2 font-medium text-slate-500">AI</span>
+          <span className="ml-2 font-medium text-muted">AI</span>
           <button
             type="button"
             onClick={() =>
@@ -224,12 +224,12 @@ export function ConversationThread({ conversationId }: Props) {
                     : "manual_override",
               })
             }
-            className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 font-medium text-[#0a1b33] hover:border-slate-300"
+            className="rounded-md border border-line bg-surface-2 px-2 py-1 font-medium text-ink hover:border-line"
           >
             {conversation.aiState === "paused" ? "Resume AI" : "Pause AI"}
           </button>
           {conversation.aiPausedReason && (
-            <span className="text-slate-400">
+            <span className="text-faint">
               reason: {conversation.aiPausedReason}
             </span>
           )}
@@ -247,12 +247,12 @@ export function ConversationThread({ conversationId }: Props) {
                 },
               })
             }
-            className="ml-auto rounded-md border border-slate-200 bg-slate-50 px-2 py-1 font-medium text-[#0a1b33] hover:border-slate-300"
+            className="ml-auto rounded-md border border-line bg-surface-2 px-2 py-1 font-medium text-ink hover:border-line"
           >
             Audit AI
           </button>
           {(aiAuditEvents ?? []).length > 0 && (
-            <span className="text-slate-400">
+            <span className="text-faint">
               last audit: {aiAuditEvents![0].kind}
             </span>
           )}
@@ -262,7 +262,7 @@ export function ConversationThread({ conversationId }: Props) {
       {/* Messages */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-6 py-5 space-y-3">
         {messages.length === 0 ? (
-          <div className="text-center text-slate-400 text-sm py-12">
+          <div className="text-center text-faint text-sm py-12">
             No messages in this conversation yet.
           </div>
         ) : (

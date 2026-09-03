@@ -54,25 +54,25 @@ export function LeadCard({
         event.dataTransfer.effectAllowed = "move";
       }}
       className={cn(
-        "rounded-lg border border-slate-200 bg-white p-2.5 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-opacity",
+        "rounded-lg border border-line bg-surface p-2.5 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-opacity",
         moving && "opacity-50",
       )}
       data-lead-card={lead._id}
     >
       <div className="flex items-start justify-between gap-2">
         <Link href={href} className="min-w-0 flex-1" title={t("leads.openChat")}>
-          <div className={cn("truncate text-[12px]", lead.unreadCount > 0 ? "font-bold text-[#0a1b33]" : "font-semibold text-slate-700")}>
+          <div className={cn("truncate text-[12px]", lead.unreadCount > 0 ? "font-bold text-ink" : "font-semibold text-ink")}>
             {label}
           </div>
           {lead.lastPreview && (
-            <div className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-slate-500">{lead.lastPreview}</div>
+            <div className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-muted">{lead.lastPreview}</div>
           )}
         </Link>
-        <span className={cn("mt-1 h-2 w-2 shrink-0 rounded-full", windowOpen ? "bg-emerald-500" : "bg-slate-300")} title={t("leads.window")} />
+        <span className={cn("mt-1 h-2 w-2 shrink-0 rounded-full", windowOpen ? "bg-emerald-500" : "bg-faint/50")} title={t("leads.window")} />
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-1">
         {intentKey && (
-          <span className="rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[9px] font-semibold text-slate-600">
+          <span className="rounded border border-line bg-surface-2 px-1.5 py-0.5 text-[9px] font-semibold text-body">
             {t(intentKey) === intentKey ? lead.intent : t(intentKey)}
           </span>
         )}
@@ -96,19 +96,19 @@ export function LeadCard({
         )}
       </div>
       {lead.nextStep && (
-        <div className="mt-2 flex items-start gap-1 text-[10px] text-slate-600">
-          <Clock3 size={10} className={cn("mt-0.5 shrink-0", overdue ? "text-[#b3261e]" : "text-slate-400")} />
+        <div className="mt-2 flex items-start gap-1 text-[10px] text-body">
+          <Clock3 size={10} className={cn("mt-0.5 shrink-0", overdue ? "text-[#b3261e]" : "text-faint")} />
           <span className="line-clamp-2">
             {lead.nextStep}
             {lead.nextStepDueAt && (
-              <span className={cn("ml-1", overdue ? "font-semibold text-[#b3261e]" : "text-slate-400")}>
+              <span className={cn("ml-1", overdue ? "font-semibold text-[#b3261e]" : "text-faint")}>
                 · {relativeTime(lead.nextStepDueAt, now, locale)}
               </span>
             )}
           </span>
         </div>
       )}
-      <div className="mt-2 flex items-center justify-between gap-2 text-[9px] text-slate-400">
+      <div className="mt-2 flex items-center justify-between gap-2 text-[9px] text-faint">
         <span className="inline-flex min-w-0 items-center gap-1">
           <UserRound size={10} />
           <span className="truncate">{lead.responsibleName ?? t("inbox.unassignedShort")}</span>
@@ -122,7 +122,7 @@ export function LeadCard({
         }}
         disabled={moving}
         aria-label={t("leads.moveTo")}
-        className="mt-2 h-7 w-full rounded-md border border-slate-200 bg-white px-1.5 text-[10px] font-semibold text-slate-600 outline-none focus:border-slate-400"
+        className="mt-2 h-7 w-full rounded-md border border-line bg-surface px-1.5 text-[10px] font-semibold text-body outline-none focus:border-brand-solid/40"
       >
         <option value="">{t("leads.moveTo")}</option>
         {LEAD_STATUSES.filter((status) => status !== lead.leadStatus).map((status) => (

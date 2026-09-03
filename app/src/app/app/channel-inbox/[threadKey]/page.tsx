@@ -18,7 +18,7 @@ export default function ChannelThreadPage({
 
   if (!channelId) {
     return (
-      <div className="flex-1 flex items-center justify-center text-slate-400 text-sm">
+      <div className="flex-1 flex items-center justify-center text-faint text-sm">
         {t("inbox.pickChannel")}
       </div>
     );

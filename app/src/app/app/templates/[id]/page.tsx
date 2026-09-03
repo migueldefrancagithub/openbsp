@@ -29,19 +29,19 @@ import { useI18n, type Locale } from "@/lib/i18n";
 type Props = { params: Promise<{ id: string }> };
 
 const STATUS_STYLES: Record<string, string> = {
-  draft: "bg-slate-100 text-slate-600 border-slate-200",
+  draft: "bg-surface-3 text-body border-line",
   pending: "bg-amber-50 text-amber-700 border-amber-200",
   approved: "bg-emerald-50 text-emerald-700 border-emerald-200",
   rejected: "bg-red-50 text-red-700 border-red-200",
-  paused: "bg-slate-100 text-slate-500 border-slate-200",
-  disabled: "bg-slate-100 text-slate-400 border-slate-200",
+  paused: "bg-surface-3 text-muted border-line",
+  disabled: "bg-surface-3 text-faint border-line",
 };
 
 function StatusIcon({ status }: { status: string }) {
   if (status === "approved") return <CheckCircle2 size={14} className="text-emerald-600" />;
   if (status === "rejected") return <XCircle size={14} className="text-red-600" />;
   if (status === "pending") return <Clock size={14} className="text-amber-600" />;
-  return <span className="w-3 h-3 rounded-full bg-slate-300" />;
+  return <span className="w-3 h-3 rounded-full bg-faint/50" />;
 }
 
 export default function TemplateDetailPage({ params }: Props) {
@@ -81,12 +81,12 @@ export default function TemplateDetailPage({ params }: Props) {
 
   if (tpl === undefined) {
     return (
-      <div className="px-4 py-12 text-sm text-slate-400 sm:px-6">{tr("A carregar...", "Loading...")}</div>
+      <div className="px-4 py-12 text-sm text-faint sm:px-6">{tr("A carregar...", "Loading...")}</div>
     );
   }
   if (tpl === null) {
     return (
-      <div className="px-4 py-12 text-sm text-slate-500 sm:px-6">{tr("Template não encontrado.", "Template not found.")}</div>
+      <div className="px-4 py-12 text-sm text-muted sm:px-6">{tr("Template não encontrado.", "Template not found.")}</div>
     );
   }
 
@@ -104,7 +104,7 @@ export default function TemplateDetailPage({ params }: Props) {
         action={
           <Link
             href="/app/templates"
-            className="inline-flex items-center gap-1 text-[13px] text-slate-600 hover:text-[#0a1b33] transition-colors"
+            className="inline-flex items-center gap-1 text-[13px] text-body hover:text-ink transition-colors"
           >
             <ChevronLeft size={14} />
             {tr("Voltar", "Back")}
@@ -114,7 +114,7 @@ export default function TemplateDetailPage({ params }: Props) {
 
       <div className="grid gap-5 px-4 py-5 sm:px-6 xl:grid-cols-[minmax(0,760px)_360px]">
         <div className="space-y-6">
-        <section className="rounded-lg border border-slate-200 bg-white p-5">
+        <section className="rounded-lg border border-line bg-surface p-5">
           {submissionNotice === "submitted" && (
             <div className="mb-4 flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[12px] text-emerald-700">
               <CheckCircle2 size={12} className="mt-0.5 flex-shrink-0" />
@@ -135,7 +135,7 @@ export default function TemplateDetailPage({ params }: Props) {
               <StatusIcon status={tpl.status} />
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="font-semibold text-[#0a1b33] text-sm">
+                  <span className="font-semibold text-ink text-sm">
                     {tr("Estado", "Status")}
                   </span>
                   <span
@@ -144,7 +144,7 @@ export default function TemplateDetailPage({ params }: Props) {
                     {statusLabel(tpl.status, locale)}
                   </span>
                 </div>
-                <div className="text-[11px] text-slate-500 mt-0.5">
+                <div className="text-[11px] text-muted mt-0.5">
                   {tpl.syncedAt
                     ? `${tr("Última sincronização", "Last synced")} ${relativeTime(tpl.syncedAt, Date.now(), locale)}`
                     : tr("Ainda não submetido à Meta", "Not yet submitted to Meta")}
@@ -157,7 +157,7 @@ export default function TemplateDetailPage({ params }: Props) {
                 type="button"
                 onClick={onSubmit}
                 disabled={busy}
-                className="inline-flex items-center gap-2 bg-[#0a152d] text-white text-[13px] font-medium px-4 py-2 rounded-lg shadow-[0_8px_24px_-8px_rgba(10,21,45,0.5)] hover:bg-[#0a1b33] disabled:opacity-50 transition-all"
+                className="inline-flex items-center gap-2 bg-nav-active text-white text-[13px] font-medium px-4 py-2 rounded-lg shadow-[0_8px_24px_-8px_rgba(10,21,45,0.5)] hover:bg-brand-solid disabled:opacity-50 transition-all"
               >
                 {busy ? (
                   <Loader2 size={14} className="animate-spin" />
@@ -197,12 +197,12 @@ export default function TemplateDetailPage({ params }: Props) {
         />
 
         {currentVersion && (
-          <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-            <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
-              <h3 className="font-semibold text-[#0a1b33] text-sm">
+          <section className="overflow-hidden rounded-lg border border-line bg-surface">
+            <div className="px-5 py-3 border-b border-line-soft flex items-center justify-between">
+              <h3 className="font-semibold text-ink text-sm">
                 {tr("Conteúdo enviado à Meta", "Meta payload")} (v{currentVersion.version})
               </h3>
-              <span className="text-[11px] text-slate-400">
+              <span className="text-[11px] text-faint">
                 {currentVersion.isLocked ? tr("Bloqueado (submetido)", "Locked (submitted)") : tr("Editável", "Editable")}
               </span>
             </div>
@@ -224,7 +224,7 @@ export default function TemplateDetailPage({ params }: Props) {
                   value={String(currentVersion.buttons?.length ?? 0)}
                 />
               </div>
-              <pre className="bg-slate-50 border border-slate-100 rounded-lg p-3 text-[13px] text-[#0a1b33] whitespace-pre-wrap font-mono">
+              <pre className="bg-surface-2 border border-line-soft rounded-lg p-3 text-[13px] text-ink whitespace-pre-wrap font-mono">
                 {currentVersion.bodyText}
               </pre>
               <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-3 text-[13px] leading-6 text-emerald-800">
@@ -236,7 +236,7 @@ export default function TemplateDetailPage({ params }: Props) {
               </div>
               {currentVersion.parameterSchema.length > 0 && (
                 <div>
-                  <div className="text-[11px] uppercase tracking-wider text-slate-400 mb-2">
+                  <div className="text-[11px] uppercase tracking-wider text-faint mb-2">
                     {tr("Variáveis", "Variables")}
                   </div>
                   <ul className="space-y-1.5">
@@ -245,10 +245,10 @@ export default function TemplateDetailPage({ params }: Props) {
                         key={p.index}
                         className="flex items-center gap-3 text-[12px]"
                       >
-                        <span className="font-[var(--font-mono)] text-slate-500 w-12">
+                        <span className="font-[var(--font-mono)] text-muted w-12">
                           {`{{${p.index}}}`}
                         </span>
-                        <span className="text-[#0a1b33]">{p.example}</span>
+                        <span className="text-ink">{p.example}</span>
                       </li>
                     ))}
                   </ul>
@@ -331,14 +331,14 @@ function PayloadMetric({
   value: string;
 }) {
   return (
-    <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
-      <div className="mb-2 flex h-8 w-8 items-center justify-center rounded-lg bg-white text-slate-500">
+    <div className="rounded-lg border border-line-soft bg-surface-2 p-3">
+      <div className="mb-2 flex h-8 w-8 items-center justify-center rounded-lg bg-surface text-muted">
         <Icon size={15} />
       </div>
-      <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+      <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-faint">
         {label}
       </div>
-      <div className="mt-1 truncate text-sm font-semibold text-[#0a1b33] capitalize">
+      <div className="mt-1 truncate text-sm font-semibold text-ink capitalize">
         {value}
       </div>
     </div>

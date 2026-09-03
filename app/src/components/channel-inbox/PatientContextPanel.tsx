@@ -187,10 +187,10 @@ function Section({
   children: ReactNode;
 }) {
   return (
-    <section className="border-b border-slate-100 px-4 py-3.5 last:border-b-0">
+    <section className="border-b border-line-soft px-4 py-3.5 last:border-b-0">
       <div className="mb-2.5 flex items-center gap-2">
-        <Icon size={13} className="text-slate-400" />
-        <h3 className="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">
+        <Icon size={13} className="text-faint" />
+        <h3 className="text-[11px] font-bold uppercase tracking-[0.12em] text-muted">
           {title}
         </h3>
         {action && <div className="ml-auto">{action}</div>}
@@ -330,23 +330,23 @@ export function PatientContextPanel({
   const tags = Array.from(new Set([...(thread.tags ?? []), ...(context?.contact?.tags ?? [])]));
 
   return (
-    <aside className={cn("relative flex h-full w-[326px] shrink-0 flex-col border-l border-slate-200 bg-white", className)}>
-      <div className="flex items-center gap-3 border-b border-slate-200 px-4 py-3.5">
+    <aside className={cn("relative flex h-full w-[326px] shrink-0 flex-col border-l border-line bg-surface", className)}>
+      <div className="flex items-center gap-3 border-b border-line px-4 py-3.5">
         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#dff3ef] text-[11px] font-bold text-[#0d6b61]">
           {patientName.slice(0, 2).toUpperCase()}
         </div>
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[13px] font-bold text-[#0a1b33]">{patientName}</div>
-          <div className="mt-0.5 truncate text-[10px] text-slate-400">{patientPhone}</div>
+          <div className="truncate text-[13px] font-bold text-ink">{patientName}</div>
+          <div className="mt-0.5 truncate text-[10px] text-faint">{patientPhone}</div>
         </div>
         {onClose && (
-          <button type="button" onClick={onClose} className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100" title={t("inbox.cancel")}>
+          <button type="button" onClick={onClose} className="rounded-md p-1.5 text-faint hover:bg-surface-3" title={t("inbox.cancel")}>
             <X size={15} />
           </button>
         )}
       </div>
 
-      <div className="grid grid-cols-3 border-b border-slate-200 bg-slate-50 p-1.5">
+      <div className="grid grid-cols-3 border-b border-line bg-surface-2 p-1.5">
         {([
           ["summary", t("inbox.summary"), CircleUserRound],
           ["tasks", t("inbox.tasks"), ListTodo],
@@ -359,8 +359,8 @@ export function PatientContextPanel({
             className={cn(
               "flex h-9 min-w-0 items-center justify-center gap-1.5 rounded text-[10px] font-semibold transition-colors",
               activeTab === value
-                ? "bg-white text-[#0a1b33] shadow-sm"
-                : "text-slate-500 hover:text-[#0a1b33]",
+                ? "bg-surface text-ink shadow-sm"
+                : "text-muted hover:text-ink",
             )}
           >
             <Icon size={13} />
@@ -373,26 +373,26 @@ export function PatientContextPanel({
         {activeTab === "summary" && <>
         <Section title={t("inbox.flow")} icon={ChevronRight}>
           <div className="grid grid-cols-2 gap-2">
-            <label className="text-[10px] font-semibold text-slate-400">
+            <label className="text-[10px] font-semibold text-faint">
               {t("inbox.stage")}
               <select
                 value={thread.leadStatus ?? "new"}
                 onChange={(event) => void updateThread({ threadId: thread._id, leadStatus: event.target.value as LeadStatus })}
-                className="mt-1 h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-[11px] font-semibold text-[#0a1b33] outline-none"
+                className="mt-1 h-8 w-full rounded-md border border-line bg-surface px-2 text-[11px] font-semibold text-ink outline-none"
               >
                 {["new", "interested", "asked_price", "wants_booking", "awaiting_human", "booked", "confirmed", "attended", "no_show", "lost"].map((status) => (
                   <option key={status} value={status}>{t(`status.${status}` as TranslationKey)}</option>
                 ))}
               </select>
             </label>
-            <label className="text-[10px] font-semibold text-slate-400">
+            <label className="text-[10px] font-semibold text-faint">
               {t("inbox.intent")}
               <select
                 value={thread.intent ?? ""}
                 onChange={(event) => void updateThread(event.target.value
                   ? { threadId: thread._id, intent: event.target.value as never }
                   : { threadId: thread._id, clearIntent: true })}
-                className="mt-1 h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-[11px] font-semibold text-[#0a1b33] outline-none"
+                className="mt-1 h-8 w-full rounded-md border border-line bg-surface px-2 text-[11px] font-semibold text-ink outline-none"
               >
                 <option value="">{t("inbox.noIntent")}</option>
                 {["greeting", "info_request", "price_request", "booking_request", "reschedule", "cancel", "confirm_attendance", "complaint", "support", "human_request", "opt_out", "clinical_question", "out_of_scope", "other"].map((intent) => (
@@ -400,14 +400,14 @@ export function PatientContextPanel({
                 ))}
               </select>
             </label>
-            <label className="text-[10px] font-semibold text-slate-400">
+            <label className="text-[10px] font-semibold text-faint">
               {t("inbox.owner")}
               <select
                 value={thread.responsibleMemberId ?? ""}
                 onChange={(event) => void updateThread(event.target.value
                   ? { threadId: thread._id, responsibleMemberId: event.target.value as Id<"members"> }
                   : { threadId: thread._id, clearResponsible: true })}
-                className="mt-1 h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-[11px] font-semibold text-[#0a1b33] outline-none"
+                className="mt-1 h-8 w-full rounded-md border border-line bg-surface px-2 text-[11px] font-semibold text-ink outline-none"
               >
                 <option value="">{t("inbox.unassignedShort")}</option>
                 {(members ?? []).filter((member) => member.status === "active").map((member) => (
@@ -415,14 +415,14 @@ export function PatientContextPanel({
                 ))}
               </select>
             </label>
-            <label className="col-span-2 text-[10px] font-semibold text-slate-400">
+            <label className="col-span-2 text-[10px] font-semibold text-faint">
               {t("inbox.team")}
               <select
                 value={thread.assignedTeamId ?? ""}
                 onChange={(event) => void updateThread(event.target.value
                   ? { threadId: thread._id, assignedTeamId: event.target.value as Id<"teams"> }
                   : { threadId: thread._id, clearTeam: true })}
-                className="mt-1 h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-[11px] font-semibold text-[#0a1b33] outline-none"
+                className="mt-1 h-8 w-full rounded-md border border-line bg-surface px-2 text-[11px] font-semibold text-ink outline-none"
               >
                 <option value="">{t("inbox.unassignedShort")}</option>
                 {(teams ?? []).map((team) => <option key={team._id} value={team._id}>{team.name}</option>)}
@@ -434,12 +434,12 @@ export function PatientContextPanel({
               value={nextStep}
               onChange={(event) => setNextStep(event.target.value)}
               placeholder={t("inbox.nextAction")}
-              className="h-8 min-w-0 flex-1 rounded-md border border-slate-200 px-2 text-[11px] outline-none focus:border-slate-400"
+              className="h-8 min-w-0 flex-1 rounded-md border border-line px-2 text-[11px] outline-none focus:border-brand-solid/40"
             />
             <button
               type="button"
               onClick={() => void updateThread({ threadId: thread._id, nextStep })}
-              className="rounded-md bg-[#0a1b33] px-2.5 text-white"
+              className="rounded-md bg-brand-solid px-2.5 text-white"
               title={t("inbox.save")}
             >
               <Check size={13} />
@@ -457,7 +457,7 @@ export function PatientContextPanel({
             <button
               type="button"
               onClick={() => void updateThread({ threadId: thread._id, dnd: !thread.dnd })}
-              className={cn("rounded-md border px-2 py-2 text-left font-semibold", thread.dnd ? "border-rose-200 bg-rose-50 text-rose-700" : "border-slate-200 text-slate-600")}
+              className={cn("rounded-md border px-2 py-2 text-left font-semibold", thread.dnd ? "border-rose-200 bg-rose-50 text-rose-700" : "border-line text-body")}
             >
               DND · {thread.dnd ? tr("Ativo", "On") : tr("Inativo", "Off")}
             </button>
@@ -467,7 +467,7 @@ export function PatientContextPanel({
                 threadId: thread._id,
                 automationMode: thread.automationMode === "bot" ? "human" : "bot",
               })}
-              className="rounded-md border border-slate-200 px-2 py-2 text-left font-semibold text-slate-600"
+              className="rounded-md border border-line px-2 py-2 text-left font-semibold text-body"
             >
               IA · {thread.automationMode === "bot" ? tr("Ativa", "On") : tr("Pausada", "Paused")}
             </button>
@@ -480,21 +480,21 @@ export function PatientContextPanel({
                   "inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[9px] font-semibold",
                   tag.startsWith("grupo:") || tag.startsWith("group:")
                     ? "border-[#cfe0f5] bg-[#eef4fc] text-[#2b4f8a]"
-                    : "border-slate-200 bg-slate-50 text-slate-500",
+                    : "border-line bg-surface-2 text-muted",
                 )}
               >
                 {tag}
                 <button
                   type="button"
                   onClick={() => void updateThread({ threadId: thread._id, tags: tags.filter((item) => item !== tag) })}
-                  className="text-slate-400 hover:text-[#b3261e]"
+                  className="text-faint hover:text-[#b3261e]"
                   aria-label={`${t("inbox.cancel")} ${tag}`}
                 >
                   <X size={9} />
                 </button>
               </span>
             ))}
-            {tags.length === 0 && <span className="text-[10px] text-slate-400">{t("inbox.noTags")}</span>}
+            {tags.length === 0 && <span className="text-[10px] text-faint">{t("inbox.noTags")}</span>}
           </div>
           <form
             className="mt-1.5 flex gap-1"
@@ -511,15 +511,15 @@ export function PatientContextPanel({
               onChange={(event) => setTagDraft(event.target.value)}
               placeholder={t("tags.placeholder")}
               maxLength={40}
-              className="h-7 min-w-0 flex-1 rounded-md border border-slate-200 px-2 text-[10px] outline-none focus:border-slate-400"
+              className="h-7 min-w-0 flex-1 rounded-md border border-line px-2 text-[10px] outline-none focus:border-brand-solid/40"
             />
-            <button type="submit" className="rounded-md border border-slate-200 px-2 text-[10px] font-semibold text-slate-600" title={t("tags.add")}>
+            <button type="submit" className="rounded-md border border-line px-2 text-[10px] font-semibold text-body" title={t("tags.add")}>
               +
             </button>
           </form>
           {context?.contact?.locale && (
-            <div className="mt-2 text-[10px] text-slate-400">
-              {tr("Idioma do paciente", "Patient language")}: <span className="font-semibold text-slate-600">{context.contact.locale}</span>
+            <div className="mt-2 text-[10px] text-faint">
+              {tr("Idioma do paciente", "Patient language")}: <span className="font-semibold text-body">{context.contact.locale}</span>
             </div>
           )}
         </Section>
@@ -532,7 +532,7 @@ export function PatientContextPanel({
           <div className="space-y-1.5">
             {(context?.consents ?? []).map((item: any) => (
               <div key={item.purpose} className="flex items-center justify-between text-[10px]">
-                <span className="capitalize text-slate-500">
+                <span className="capitalize text-muted">
                   {item.purpose === "marketing"
                     ? tr("Marketing", "Marketing")
                     : item.purpose === "transactional"
@@ -544,7 +544,7 @@ export function PatientContextPanel({
                 </span>
               </div>
             ))}
-            {context?.consents?.length === 0 && <span className="text-[10px] text-slate-400">{t("inbox.noConsents")}</span>}
+            {context?.consents?.length === 0 && <span className="text-[10px] text-faint">{t("inbox.noConsents")}</span>}
           </div>
           <div className="mt-2 grid grid-cols-2 gap-1" data-consent-actions>
             {(["marketing", "transactional"] as const).map((purpose) => {
@@ -567,7 +567,7 @@ export function PatientContextPanel({
           </div>
           {consentDraft && (
             <form
-              className="mt-2 space-y-1.5 rounded-md bg-slate-50 p-2"
+              className="mt-2 space-y-1.5 rounded-md bg-surface-2 p-2"
               onSubmit={(event) => {
                 event.preventDefault();
                 void run(async () => {
@@ -581,7 +581,7 @@ export function PatientContextPanel({
                 });
               }}
             >
-              <label className="block text-[10px] font-semibold text-slate-500">
+              <label className="block text-[10px] font-semibold text-muted">
                 {t("consent.proof")}
                 <input
                   value={consentDraft.proof}
@@ -591,12 +591,12 @@ export function PatientContextPanel({
                   maxLength={500}
                   required
                   autoFocus
-                  className="mt-1 h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-[10px] outline-none focus:border-slate-400"
+                  className="mt-1 h-8 w-full rounded-md border border-line bg-surface px-2 text-[10px] outline-none focus:border-brand-solid/40"
                 />
               </label>
               <div className="flex justify-end gap-1">
-                <button type="button" onClick={() => setConsentDraft(null)} className="rounded-md px-2 py-1 text-[10px] font-semibold text-slate-500">{t("inbox.cancel")}</button>
-                <button type="submit" disabled={busy || consentDraft.proof.trim().length < 5} className="rounded-md bg-[#0a1b33] px-2 py-1 text-[10px] font-bold text-white disabled:opacity-50">{t("consent.save")}</button>
+                <button type="button" onClick={() => setConsentDraft(null)} className="rounded-md px-2 py-1 text-[10px] font-semibold text-muted">{t("inbox.cancel")}</button>
+                <button type="submit" disabled={busy || consentDraft.proof.trim().length < 5} className="rounded-md bg-brand-solid px-2 py-1 text-[10px] font-bold text-white disabled:opacity-50">{t("consent.save")}</button>
               </div>
             </form>
           )}
@@ -605,7 +605,7 @@ export function PatientContextPanel({
 
         <Section title={t("inbox.actions")} icon={Archive}>
           {thread.closedAt || thread.inboxStatus === "closed" ? (
-            <button type="button" onClick={() => void updateThread({ threadId: thread._id, inboxStatus: "open", automationMode: "human" })} className="w-full rounded-md border border-slate-200 py-2 text-[11px] font-semibold text-slate-600">{t("inbox.reopen")}</button>
+            <button type="button" onClick={() => void updateThread({ threadId: thread._id, inboxStatus: "open", automationMode: "human" })} className="w-full rounded-md border border-line py-2 text-[11px] font-semibold text-body">{t("inbox.reopen")}</button>
           ) : (
             <button type="button" onClick={() => setTool("close")} className="w-full rounded-md border border-rose-200 py-2 text-[11px] font-semibold text-rose-600">{t("inbox.close")}</button>
           )}
@@ -618,13 +618,13 @@ export function PatientContextPanel({
           icon={MessageSquareText}
           action={<button type="button" onClick={() => setTool("note")} className="text-[10px] font-bold text-[#0d6b61]">+ {t("inbox.addNote")}</button>}
         >
-          {context === undefined ? <Loader2 size={13} className="animate-spin text-slate-300" /> : context.notes.length === 0 ? (
-            <p className="text-[10px] text-slate-400">{t("inbox.noNotes")}</p>
+          {context === undefined ? <Loader2 size={13} className="animate-spin text-faint" /> : context.notes.length === 0 ? (
+            <p className="text-[10px] text-faint">{t("inbox.noNotes")}</p>
           ) : (
             <div className="space-y-2">
               {context.notes.slice(0, 4).map((item: any) => (
                 <div key={item._id} className="border-l-2 border-amber-300 pl-2">
-                  <p className="text-[11px] leading-4 text-slate-700">{item.body}</p>
+                  <p className="text-[11px] leading-4 text-ink">{item.body}</p>
                   {item.mentionedMemberIds?.length > 0 && (
                     <div className="mt-0.5 flex flex-wrap gap-1">
                       {item.mentionedMemberIds.map((id: Id<"members">) => {
@@ -637,7 +637,7 @@ export function PatientContextPanel({
                       })}
                     </div>
                   )}
-                  <span className="text-[9px] text-slate-400">{item.authorName ?? t("inbox.team")} · {relativeTime(item.createdAt, Date.now(), locale)}</span>
+                  <span className="text-[9px] text-faint">{item.authorName ?? t("inbox.team")} · {relativeTime(item.createdAt, Date.now(), locale)}</span>
                 </div>
               ))}
             </div>
@@ -657,18 +657,18 @@ export function PatientContextPanel({
                     type="button"
                     disabled={["completed", "cancelled"].includes(item.status)}
                     onClick={() => void setReminderStatus({ reminderId: item._id, status: "completed" })}
-                    className={cn("mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border", item.status === "completed" ? "border-emerald-500 bg-emerald-500 text-white" : "border-slate-300")}
+                    className={cn("mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border", item.status === "completed" ? "border-emerald-500 bg-emerald-500 text-white" : "border-line")}
                   >
                     {item.status === "completed" && <Check size={10} />}
                   </button>
                   <div className="min-w-0">
-                    <p className="truncate text-[11px] text-slate-700">{item.note}</p>
-                    <span className="text-[9px] text-slate-400">{formatMoment(item.dueAt, locale)} · {stateLabel(item.status, t)}</span>
+                    <p className="truncate text-[11px] text-ink">{item.note}</p>
+                    <span className="text-[9px] text-faint">{formatMoment(item.dueAt, locale)} · {stateLabel(item.status, t)}</span>
                   </div>
                 </div>
               ))}
             </div>
-          ) : <p className="text-[10px] text-slate-400">{t("inbox.noReminders")}</p>}
+          ) : <p className="text-[10px] text-faint">{t("inbox.noReminders")}</p>}
         </Section>
 
         <Section
@@ -683,9 +683,9 @@ export function PatientContextPanel({
           }
         >
           {followUps === undefined ? (
-            <Loader2 size={13} className="animate-spin text-slate-300" />
+            <Loader2 size={13} className="animate-spin text-faint" />
           ) : followUps.length === 0 ? (
-            <p className="text-[10px] text-slate-400">{tr("Sem follow-ups nesta conversa.", "No follow-ups on this conversation.")}</p>
+            <p className="text-[10px] text-faint">{tr("Sem follow-ups nesta conversa.", "No follow-ups on this conversation.")}</p>
           ) : (
             <div className="space-y-1.5">
               {followUps.slice(0, 5).map((task) => {
@@ -708,13 +708,13 @@ export function PatientContextPanel({
                           : `${tr("Parado", "Stopped")}${task.stoppedReason ? ` · ${task.stoppedReason}` : ""}`;
                 return (
                   <div key={task._id} className="flex items-start gap-2">
-                    <span className={cn("mt-1 h-1.5 w-1.5 shrink-0 rounded-full", pending ? "bg-[#2b4f8a]" : task.status === "sent" ? "bg-[#0d6b61]" : task.status === "failed" ? "bg-[#e0533d]" : "bg-slate-300")} />
+                    <span className={cn("mt-1 h-1.5 w-1.5 shrink-0 rounded-full", pending ? "bg-[#2b4f8a]" : task.status === "sent" ? "bg-[#0d6b61]" : task.status === "failed" ? "bg-[#e0533d]" : "bg-faint/50")} />
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-[11px] text-slate-700">{label}{task.attempts > 1 ? ` · ${task.attempts}×` : ""}</p>
-                      <span className="text-[9px] text-slate-400">{state}</span>
+                      <p className="truncate text-[11px] text-ink">{label}{task.attempts > 1 ? ` · ${task.attempts}×` : ""}</p>
+                      <span className="text-[9px] text-faint">{state}</span>
                     </div>
                     {pending && (
-                      <button type="button" onClick={() => void stopFollowUpTask({ taskId: task._id })} className="text-[9px] font-semibold text-slate-400 hover:text-[#b3261e]">
+                      <button type="button" onClick={() => void stopFollowUpTask({ taskId: task._id })} className="text-[9px] font-semibold text-faint hover:text-[#b3261e]">
                         {tr("Parar", "Stop")}
                       </button>
                     )}
@@ -731,26 +731,26 @@ export function PatientContextPanel({
           action={<button type="button" onClick={() => setShowScheduler(true)} className="text-[10px] font-bold text-[#2b4f8a]">+ {tr("Agendar", "Book")}</button>}
         >
           {threadAppointments === undefined ? (
-            <Loader2 size={13} className="animate-spin text-slate-300" />
+            <Loader2 size={13} className="animate-spin text-faint" />
           ) : threadAppointments.length === 0 ? (
-            <p className="text-[10px] text-slate-400">{t("inbox.noAppointments")}</p>
+            <p className="text-[10px] text-faint">{t("inbox.noAppointments")}</p>
           ) : (
             <div className="space-y-2">
               {threadAppointments.slice(0, 3).map((item) => {
                 const active = item.status === "scheduled" || item.status === "confirmed";
                 return (
                   <div key={item._id} className="flex items-start gap-2">
-                    <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-md", active ? "bg-[#eef3fb] text-[#2b4f8a]" : "bg-slate-100 text-slate-400")}><CalendarDays size={13} /></div>
+                    <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-md", active ? "bg-[#eef3fb] text-[#2b4f8a]" : "bg-surface-3 text-faint")}><CalendarDays size={13} /></div>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-[11px] font-semibold text-slate-700">{item.serviceName}{item.professionalName ? ` · ${item.professionalName}` : ""}</p>
-                      <p className="text-[9px] text-slate-400">{formatMoment(item.startAt, locale)} · {appointmentStatusLabel(item.status, locale)}{item.pendingNotices > 0 ? ` · ${tr("aviso pendente", "notice pending")}` : ""}</p>
+                      <p className="truncate text-[11px] font-semibold text-ink">{item.serviceName}{item.professionalName ? ` · ${item.professionalName}` : ""}</p>
+                      <p className="text-[9px] text-faint">{formatMoment(item.startAt, locale)} · {appointmentStatusLabel(item.status, locale)}{item.pendingNotices > 0 ? ` · ${tr("aviso pendente", "notice pending")}` : ""}</p>
                       {active && (
                         <div className="mt-1 flex flex-wrap gap-1">
                           {item.status === "scheduled" && (
                             <button type="button" onClick={() => void runAppointmentAction(() => confirmAppointment({ appointmentId: item._id }))} className="rounded border border-[#0d6b61]/30 px-1.5 py-0.5 text-[9px] font-semibold text-[#0d6b61]">{tr("Confirmar", "Confirm")}</button>
                           )}
-                          <button type="button" onClick={() => void runAppointmentAction(() => sendAppointmentNotice({ appointmentId: item._id, kind: item.status === "confirmed" ? "appointment_reminder" : "appointment_confirmation" }))} className="rounded border border-slate-200 px-1.5 py-0.5 text-[9px] font-semibold text-slate-600">{item.status === "confirmed" ? tr("Lembrete", "Reminder") : tr("Pedir confirmação", "Ask to confirm")}</button>
-                          <button type="button" onClick={() => { if (window.confirm(tr("Cancelar esta marcação?", "Cancel this appointment?"))) void runAppointmentAction(() => cancelAppointment({ appointmentId: item._id })); }} className="rounded border border-slate-200 px-1.5 py-0.5 text-[9px] font-semibold text-slate-500 hover:text-[#b3261e]">{tr("Cancelar", "Cancel")}</button>
+                          <button type="button" onClick={() => void runAppointmentAction(() => sendAppointmentNotice({ appointmentId: item._id, kind: item.status === "confirmed" ? "appointment_reminder" : "appointment_confirmation" }))} className="rounded border border-line px-1.5 py-0.5 text-[9px] font-semibold text-body">{item.status === "confirmed" ? tr("Lembrete", "Reminder") : tr("Pedir confirmação", "Ask to confirm")}</button>
+                          <button type="button" onClick={() => { if (window.confirm(tr("Cancelar esta marcação?", "Cancel this appointment?"))) void runAppointmentAction(() => cancelAppointment({ appointmentId: item._id })); }} className="rounded border border-line px-1.5 py-0.5 text-[9px] font-semibold text-muted hover:text-[#b3261e]">{tr("Cancelar", "Cancel")}</button>
                         </div>
                       )}
                     </div>
@@ -766,19 +766,19 @@ export function PatientContextPanel({
         {activeTab === "history" && <>
         <Section title={t("inbox.changes")} icon={History}>
           {history === undefined ? (
-            <p className="text-[10px] text-slate-400">{t("shell.loading")}</p>
+            <p className="text-[10px] text-faint">{t("shell.loading")}</p>
           ) : history.length === 0 ? (
-            <p className="text-[10px] text-slate-400">{t("inbox.historyEmpty")}</p>
+            <p className="text-[10px] text-faint">{t("inbox.historyEmpty")}</p>
           ) : (
             history.map((row) => (
               <div key={row._id} className="mb-2 text-[10px] last:mb-0">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="min-w-0 truncate font-semibold text-slate-600">
+                  <span className="min-w-0 truncate font-semibold text-body">
                     {auditActionLabel(row.action, t)}
                   </span>
-                  <span className="shrink-0 text-[9px] text-slate-400">{relativeTime(row.createdAt, Date.now(), locale)}</span>
+                  <span className="shrink-0 text-[9px] text-faint">{relativeTime(row.createdAt, Date.now(), locale)}</span>
                 </div>
-                <div className="text-[9px] text-slate-400">
+                <div className="text-[9px] text-faint">
                   {row.actorName ?? (row.actorKind === "ai" ? "IA" : t("inbox.team"))}
                   {describeChanges(row.payload, t)}
                 </div>
@@ -790,35 +790,35 @@ export function PatientContextPanel({
         <Section title={t("inbox.campaigns")} icon={Megaphone}>
           {context?.campaigns?.length ? context.campaigns.slice(0, 4).map((item: any) => (
             <div key={`${item.campaignId}-${item.updatedAt}`} className="mb-1.5 flex items-center justify-between gap-2 text-[10px] last:mb-0">
-              <span className="min-w-0 truncate font-semibold text-slate-600">{item.name}</span>
-              <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-slate-500">{stateLabel(item.recipientStatus, t)}</span>
+              <span className="min-w-0 truncate font-semibold text-body">{item.name}</span>
+              <span className="shrink-0 rounded bg-surface-3 px-1.5 py-0.5 text-muted">{stateLabel(item.recipientStatus, t)}</span>
             </div>
-          )) : <p className="text-[10px] text-slate-400">{t("inbox.noCampaigns")}</p>}
+          )) : <p className="text-[10px] text-faint">{t("inbox.noCampaigns")}</p>}
         </Section>
 
         <Section title={tr("Ficheiros", "Files")} icon={Paperclip}>
           {context?.attachments?.length ? context.attachments.slice(0, 8).map((item: any) => (
             item.url ? (
-              <a key={item._id} href={item.url} target="_blank" rel="noreferrer" className="mb-1.5 flex items-center gap-2 text-[10px] text-slate-600 last:mb-0 hover:text-[#0d6b61]">
+              <a key={item._id} href={item.url} target="_blank" rel="noreferrer" className="mb-1.5 flex items-center gap-2 text-[10px] text-body last:mb-0 hover:text-[#0d6b61]">
                 <Paperclip size={11} className="shrink-0" />
                 <span className="min-w-0 flex-1 truncate font-semibold">{item.fileName}</span>
-                <span className="shrink-0 text-[9px] text-slate-400">{relativeTime(item.createdAt, Date.now(), locale)}</span>
+                <span className="shrink-0 text-[9px] text-faint">{relativeTime(item.createdAt, Date.now(), locale)}</span>
               </a>
             ) : (
-              <div key={item._id} className="mb-1.5 flex items-center gap-2 text-[10px] text-slate-400 last:mb-0">
+              <div key={item._id} className="mb-1.5 flex items-center gap-2 text-[10px] text-faint last:mb-0">
                 <Paperclip size={11} /><span className="truncate">{item.fileName}</span>
               </div>
             )
-          )) : <p className="text-[10px] text-slate-400">{tr("Sem ficheiros nesta conversa", "No files in this conversation")}</p>}
+          )) : <p className="text-[10px] text-faint">{tr("Sem ficheiros nesta conversa", "No files in this conversation")}</p>}
         </Section>
         </>}
       </div>
 
       {showScheduler && (
-        <div className="absolute inset-0 z-20 flex flex-col bg-white">
-          <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-            <div className="text-[13px] font-bold text-[#0a1b33]">{tr("Agendar consulta", "Book appointment")}</div>
-            <button type="button" onClick={() => setShowScheduler(false)} className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100"><X size={15} /></button>
+        <div className="absolute inset-0 z-20 flex flex-col bg-surface">
+          <div className="flex items-center justify-between border-b border-line px-4 py-3">
+            <div className="text-[13px] font-bold text-ink">{tr("Agendar consulta", "Book appointment")}</div>
+            <button type="button" onClick={() => setShowScheduler(false)} className="rounded-md p-1.5 text-faint hover:bg-surface-3"><X size={15} /></button>
           </div>
           <div className="flex-1 overflow-y-auto p-4">
             <AppointmentScheduler
@@ -831,23 +831,23 @@ export function PatientContextPanel({
       )}
 
       {tool && (
-        <div className="absolute inset-0 z-20 flex flex-col bg-white">
-          <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-            <div className="text-[13px] font-bold text-[#0a1b33]">
+        <div className="absolute inset-0 z-20 flex flex-col bg-surface">
+          <div className="flex items-center justify-between border-b border-line px-4 py-3">
+            <div className="text-[13px] font-bold text-ink">
               {tool === "note" ? t("inbox.internalNote") : tool === "reminder" ? t("inbox.reminder") : t("inbox.close")}
             </div>
-            <button type="button" onClick={() => setTool(null)} className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100"><X size={15} /></button>
+            <button type="button" onClick={() => setTool(null)} className="rounded-md p-1.5 text-faint hover:bg-surface-3"><X size={15} /></button>
           </div>
           <form onSubmit={tool === "note" ? saveNote : tool === "reminder" ? saveReminder : closeConversation} className="flex flex-1 flex-col gap-3 p-4">
             {tool === "close" ? (
               <>
-                <label className="text-[11px] font-semibold text-slate-600">{t("inbox.closeReason")}</label>
-                <input list="close-reasons" value={closeReason} onChange={(event) => setCloseReason(event.target.value)} className="h-10 rounded-md border border-slate-200 px-3 text-[12px] outline-none focus:border-slate-400" autoFocus />
+                <label className="text-[11px] font-semibold text-body">{t("inbox.closeReason")}</label>
+                <input list="close-reasons" value={closeReason} onChange={(event) => setCloseReason(event.target.value)} className="h-10 rounded-md border border-line px-3 text-[12px] outline-none focus:border-brand-solid/40" autoFocus />
                 <datalist id="close-reasons">{(closeReasons ?? []).map((reason) => <option key={reason._id} value={reason.name} />)}</datalist>
               </>
             ) : (
               <>
-                <textarea value={note} onChange={(event) => setNote(event.target.value)} rows={7} maxLength={tool === "note" ? 4000 : 500} placeholder={tool === "note" ? t("inbox.teamOnlyNote") : t("inbox.nextAction")} className="resize-none rounded-md border border-slate-200 p-3 text-[12px] leading-5 outline-none focus:border-slate-400" autoFocus />
+                <textarea value={note} onChange={(event) => setNote(event.target.value)} rows={7} maxLength={tool === "note" ? 4000 : 500} placeholder={tool === "note" ? t("inbox.teamOnlyNote") : t("inbox.nextAction")} className="resize-none rounded-md border border-line p-3 text-[12px] leading-5 outline-none focus:border-brand-solid/40" autoFocus />
                 {tool === "reminder" && (
                   <>
                     <div className="flex flex-wrap gap-1">
@@ -856,18 +856,18 @@ export function PatientContextPanel({
                           key={label}
                           type="button"
                           onClick={() => setReminderAt(toLocalInputValue(timestamp))}
-                          className="rounded-md border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold text-slate-600 hover:border-slate-300"
+                          className="rounded-md border border-line bg-surface px-2 py-1 text-[10px] font-semibold text-body hover:border-line"
                         >
                           {label}
                         </button>
                       ))}
                     </div>
-                    <input type="datetime-local" value={reminderAt} onChange={(event) => setReminderAt(event.target.value)} className="h-10 rounded-md border border-slate-200 px-3 text-[12px] outline-none" />
+                    <input type="datetime-local" value={reminderAt} onChange={(event) => setReminderAt(event.target.value)} className="h-10 rounded-md border border-line px-3 text-[12px] outline-none" />
                   </>
                 )}
                 {tool === "note" && (
                   <div>
-                    <div className="mb-1 text-[10px] font-semibold text-slate-500">{t("inbox.mentions")}</div>
+                    <div className="mb-1 text-[10px] font-semibold text-muted">{t("inbox.mentions")}</div>
                     <div className="flex flex-wrap gap-1" data-mention-picker>
                       {(members ?? [])
                         .filter((member) => member.status === "active")
@@ -884,7 +884,7 @@ export function PatientContextPanel({
                               }
                               className={cn(
                                 "rounded-md border px-2 py-1 text-[10px] font-semibold transition-colors",
-                                selected ? "border-[#0a1b33] bg-[#0a1b33] text-white" : "border-slate-200 bg-white text-slate-600 hover:border-slate-300",
+                                selected ? "border-brand-solid bg-brand-solid text-white" : "border-line bg-surface text-body hover:border-line",
                               )}
                             >
                               @{memberDisplay(member)}
@@ -897,7 +897,7 @@ export function PatientContextPanel({
               </>
             )}
             {error && <p className="text-[11px] text-rose-600">{error}</p>}
-            <button type="submit" disabled={busy} className="mt-auto flex h-10 items-center justify-center gap-2 rounded-md bg-[#0a1b33] text-[12px] font-bold text-white disabled:opacity-50">
+            <button type="submit" disabled={busy} className="mt-auto flex h-10 items-center justify-center gap-2 rounded-md bg-brand-solid text-[12px] font-bold text-white disabled:opacity-50">
               {busy && <Loader2 size={13} className="animate-spin" />}{t("inbox.save")}
             </button>
           </form>

@@ -74,14 +74,14 @@ export function AiSuggestionCard({ threadId, onUseDraft, windowOpen }: { threadI
     <div className="mb-2 rounded-lg border border-[#2b4f8a]/30 bg-[#eef3fb] p-3" data-ai-suggestion>
       <div className="mb-1.5 flex flex-wrap items-center gap-2 text-[11px]">
         <span className="inline-flex items-center gap-1 rounded-md bg-[#2b4f8a] px-1.5 py-0.5 font-bold text-white"><Sparkles size={11} /> {tr("Sugestão da IA", "AI suggestion")}</span>
-        <span className="text-slate-500">{pending.agentName} · {relativeTime(pending.createdAt, Date.now(), locale)}{pending.routerIntent ? ` · ${pending.routerIntent}` : ""}</span>
+        <span className="text-muted">{pending.agentName} · {relativeTime(pending.createdAt, Date.now(), locale)}{pending.routerIntent ? ` · ${pending.routerIntent}` : ""}</span>
         {pending.stage === "handoff" && <span className="rounded-md bg-amber-100 px-1.5 py-0.5 font-semibold text-amber-800">{tr("sugere passar à equipa", "suggests a handoff")}</span>}
-        <span className="ml-auto text-[10px] text-slate-400">{tr("Nada foi enviado ainda.", "Nothing has been sent yet.")}</span>
+        <span className="ml-auto text-[10px] text-faint">{tr("Nada foi enviado ainda.", "Nothing has been sent yet.")}</span>
       </div>
       {editing ? (
-        <textarea value={text} onChange={(e) => setText(e.target.value)} rows={4} className="w-full rounded-md border border-[#2b4f8a]/40 bg-white p-2 text-[12px] leading-5 text-[#0a1b33] outline-none" autoFocus />
+        <textarea value={text} onChange={(e) => setText(e.target.value)} rows={4} className="w-full rounded-md border border-[#2b4f8a]/40 bg-surface p-2 text-[12px] leading-5 text-ink outline-none" autoFocus />
       ) : (
-        <button type="button" onClick={() => setEditing(true)} className="w-full whitespace-pre-wrap rounded-md border border-transparent bg-white/70 p-2 text-left text-[12px] leading-5 text-[#0a1b33] hover:border-[#2b4f8a]/40" title={tr("Clique para editar", "Click to edit")}>{text}</button>
+        <button type="button" onClick={() => setEditing(true)} className="w-full whitespace-pre-wrap rounded-md border border-transparent bg-white/70 p-2 text-left text-[12px] leading-5 text-ink hover:border-[#2b4f8a]/40" title={tr("Clique para editar", "Click to edit")}>{text}</button>
       )}
       {pending.violations.length > 0 && <p className="mt-1 text-[10px] font-semibold text-[#b3261e]">{tr("Guards", "Guards")}: {pending.violations.map((v) => v.split(":")[0]).join(", ")}</p>}
       {pending.promiseWarning && (
@@ -98,9 +98,9 @@ export function AiSuggestionCard({ threadId, onUseDraft, windowOpen }: { threadI
             const on = selected.includes(action.index);
             return (
               <li key={action.index}>
-                <label className="flex items-start gap-2 text-[12px] text-[#0a1b33]">
+                <label className="flex items-start gap-2 text-[12px] text-ink">
                   <input type="checkbox" checked={on} onChange={(e) => setSelected(e.target.checked ? [...selected, action.index] : selected.filter((i) => i !== action.index))} className="mt-0.5 h-4 w-4 accent-[#2b4f8a]" />
-                  <span><span className="font-semibold">{toolLabel(action.name, locale)}</span> <span className="text-slate-500">{actionSummary(action.name, action.input, action.output, locale)}</span></span>
+                  <span><span className="font-semibold">{toolLabel(action.name, locale)}</span> <span className="text-muted">{actionSummary(action.name, action.input, action.output, locale)}</span></span>
                 </label>
               </li>
             );
@@ -113,9 +113,9 @@ export function AiSuggestionCard({ threadId, onUseDraft, windowOpen }: { threadI
         <button type="button" disabled={busy !== null || !text.trim()} onClick={() => void run("approve", () => approve({ turnId: pending.turnId, text, approvedActionIndexes: selected }))} className={cn("inline-flex h-8 items-center gap-1 rounded-md px-3 text-[11px] font-bold text-white disabled:opacity-50", edited ? "bg-[#2b4f8a]" : "bg-[#0d6b61]")}>
           {busy === "approve" ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />} {edited ? tr("Aprovar editada e enviar", "Approve edited and send") : tr("Aprovar e enviar", "Approve and send")}
         </button>
-        <button type="button" disabled={busy !== null} onClick={() => { onUseDraft(text); void run("discard", () => discard({ turnId: pending.turnId, reason: "moved_to_composer" })); }} className="h-8 rounded-md border border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-600">{tr("Editar no composer", "Edit in composer")}</button>
-        <button type="button" disabled={busy !== null} onClick={() => void run("regen", () => regenerate({ turnId: pending.turnId }))} className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-600"><RefreshCw size={11} /> {tr("Gerar de novo", "Regenerate")}</button>
-        <button type="button" disabled={busy !== null} onClick={() => void run("discard", () => discard({ turnId: pending.turnId }))} className="inline-flex h-8 items-center gap-1 rounded-md px-2 text-[11px] font-semibold text-slate-500 hover:text-[#b3261e]"><X size={11} /> {tr("Descartar", "Discard")}</button>
+        <button type="button" disabled={busy !== null} onClick={() => { onUseDraft(text); void run("discard", () => discard({ turnId: pending.turnId, reason: "moved_to_composer" })); }} className="h-8 rounded-md border border-line bg-surface px-2 text-[11px] font-semibold text-body">{tr("Editar no composer", "Edit in composer")}</button>
+        <button type="button" disabled={busy !== null} onClick={() => void run("regen", () => regenerate({ turnId: pending.turnId }))} className="inline-flex h-8 items-center gap-1 rounded-md border border-line bg-surface px-2 text-[11px] font-semibold text-body"><RefreshCw size={11} /> {tr("Gerar de novo", "Regenerate")}</button>
+        <button type="button" disabled={busy !== null} onClick={() => void run("discard", () => discard({ turnId: pending.turnId }))} className="inline-flex h-8 items-center gap-1 rounded-md px-2 text-[11px] font-semibold text-muted hover:text-[#b3261e]"><X size={11} /> {tr("Descartar", "Discard")}</button>
       </div>
     </div>
   );

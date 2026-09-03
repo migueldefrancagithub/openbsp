@@ -26,8 +26,8 @@ export function MessageBubble({
         className={cn(
           "max-w-[70%] rounded-2xl px-3.5 py-2 shadow-sm",
           isOut
-            ? "bg-[#0a152d] text-white rounded-br-md"
-            : "bg-white border border-slate-200 text-[#0a1b33] rounded-bl-md",
+            ? "bg-nav-active text-white rounded-br-md"
+            : "bg-surface border border-line text-ink rounded-bl-md",
         )}
       >
         {text ? (
@@ -38,7 +38,7 @@ export function MessageBubble({
           <p
             className={cn(
               "text-[12px] italic",
-              isOut ? "text-white/60" : "text-slate-400",
+              isOut ? "text-white/60" : "text-faint",
             )}
           >
             [{type}]
@@ -47,7 +47,7 @@ export function MessageBubble({
         <div
           className={cn(
             "flex items-center gap-1 justify-end mt-1 text-[10px]",
-            isOut ? "text-white/50" : "text-slate-400",
+            isOut ? "text-white/50" : "text-faint",
           )}
         >
           <span>{formatTime(createdAt)}</span>

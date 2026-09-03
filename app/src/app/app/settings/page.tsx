@@ -378,13 +378,13 @@ export default function SettingsPage() {
         {settingsTab === "integrations" && <IntegrationsSection />}
         {settingsTab === "workspace" && <CustomFieldsSettingsSection />}
         {settingsTab === "workspace" && (
-        <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-          <div className="px-6 py-4 border-b border-slate-100">
-            <h2 className="font-semibold text-[#0a1b33] text-[15px]">
+        <section className="overflow-hidden rounded-lg border border-line bg-surface">
+          <div className="px-6 py-4 border-b border-line-soft">
+            <h2 className="font-semibold text-ink text-[15px]">
               {tr("Espaço de trabalho", "Workspace")}
             </h2>
           </div>
-          <dl className="divide-y divide-slate-100">
+          <dl className="divide-y divide-line-soft">
             <Row label={tr("Nome", "Name")} value={tenant.name} />
             <Row label={tr("Área", "Vertical")} value={verticalLabel(tenant.vertical, locale)} />
             <Row label={tr("ID da organização", "Tenant ID")} value={tenant.tenantId} mono />
@@ -395,39 +395,39 @@ export default function SettingsPage() {
 
         {/* WhatsApp connection */}
         {settingsTab === "meta" && (
-        <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-          <div className="px-6 py-4 border-b border-slate-100">
-            <h2 className="font-semibold text-[#0a1b33] text-[15px]">
+        <section className="overflow-hidden rounded-lg border border-line bg-surface">
+          <div className="px-6 py-4 border-b border-line-soft">
+            <h2 className="font-semibold text-ink text-[15px]">
               {tr("Preparação da ligação Meta", "Meta connection readiness")}
             </h2>
-            <p className="text-xs text-slate-500 mt-0.5">
+            <p className="text-xs text-muted mt-0.5">
               {tr("Verificações de cadastro, segurança, webhook e coexistência exigidas pela Meta.", "Provider-grade Meta admission, Embedded Signup, security, webhook, and coexistence checks.")}
             </p>
           </div>
           <div className="p-6">
             {!admission ? (
-              <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-5 text-sm text-slate-500">
+              <div className="flex items-center gap-2 rounded-xl border border-line bg-surface-2 px-4 py-5 text-sm text-muted">
                 <Loader2 size={15} className="animate-spin" />
                 {tr("A verificar requisitos da Meta...", "Loading provider readiness...")}
               </div>
             ) : (
               <>
                 <div className="mb-5 grid gap-3 md:grid-cols-[180px_1fr]">
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                    <div className="flex items-center gap-2 text-[12px] font-semibold uppercase text-slate-500">
+                  <div className="rounded-xl border border-line bg-surface-2 p-4">
+                    <div className="flex items-center gap-2 text-[12px] font-semibold uppercase text-muted">
                       <ShieldCheck size={14} />
                       {tr("Preparação Meta", "Meta readiness")}
                     </div>
-                    <div className="mt-3 text-4xl font-semibold text-[#0a1b33]">
+                    <div className="mt-3 text-4xl font-semibold text-ink">
                       {admission.score}%
                     </div>
                     <div className={`mt-2 inline-flex rounded-md border px-2 py-1 text-[11px] font-semibold ${readinessTone(admission.readinessLabel)}`}>
                       {admission.readinessLabel.replace(/_/g, " ")}
                     </div>
                   </div>
-                  <div className="rounded-xl border border-slate-200 bg-white p-4">
+                  <div className="rounded-xl border border-line bg-surface p-4">
                     <div className="flex items-start gap-3">
-                      <div className="mt-0.5 flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-[#0a1b33]">
+                      <div className="mt-0.5 flex h-8 w-8 items-center justify-center rounded-lg bg-surface-3 text-ink">
                         {admission.blockers.length > 0 ? (
                           <AlertTriangle size={15} />
                         ) : (
@@ -435,14 +435,14 @@ export default function SettingsPage() {
                         )}
                       </div>
                       <div>
-                        <div className="text-[13px] font-semibold text-[#0a1b33]">
+                        <div className="text-[13px] font-semibold text-ink">
                           {tr("Próximo passo", "Next move")}
                         </div>
-                        <p className="mt-1 text-sm leading-6 text-slate-500">
+                        <p className="mt-1 text-sm leading-6 text-muted">
                           {admission.suggestedPath}
                         </p>
                         {admission.blockers.length > 0 && (
-                          <div className="mt-2 text-[11px] font-mono text-slate-400">
+                          <div className="mt-2 text-[11px] font-mono text-faint">
                             {tr("Bloqueios", "Blocking")}: {admission.blockers.join(", ")}
                           </div>
                         )}
@@ -463,18 +463,18 @@ export default function SettingsPage() {
               </>
             )}
           </div>
-          <div className="border-t border-slate-100 px-6 py-4">
-            <div className="mb-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <div className="border-t border-line-soft px-6 py-4">
+            <div className="mb-5 rounded-xl border border-line bg-surface-2 p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="flex items-start gap-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-[#0a1b33]">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface text-ink">
                     <FileCheck2 size={16} />
                   </div>
                   <div>
-                    <div className="text-[13px] font-semibold text-[#0a1b33]">
+                    <div className="text-[13px] font-semibold text-ink">
                       {tr("Evidências para revisão da Meta", "Meta App Review evidence")}
                     </div>
-                    <p className="mt-1 max-w-2xl text-[12px] leading-5 text-slate-500">
+                    <p className="mt-1 max-w-2xl text-[12px] leading-5 text-muted">
                       {tr("Executa verificações apenas de leitura na WABA ligada e gera um relatório sem tokens, com estados HTTP e identificadores de diagnóstico.", "Runs read-only Graph checks against the connected WABA and returns a token-redacted pack with HTTP status and diagnostic IDs.")}
                     </p>
                   </div>
@@ -483,7 +483,7 @@ export default function SettingsPage() {
                   <button
                     type="button"
                     onClick={downloadEvidence}
-                    className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[12px] font-medium text-slate-600 transition-colors hover:border-slate-300 hover:text-[#0a1b33]"
+                    className="inline-flex items-center gap-2 rounded-lg border border-line bg-surface px-3 py-2 text-[12px] font-medium text-body transition-colors hover:border-line hover:text-ink"
                   >
                     <Download size={13} />
                     {tr("Descarregar .txt", "Download .txt")}
@@ -492,13 +492,13 @@ export default function SettingsPage() {
               </div>
 
               {evidenceNotice && (
-                <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
+                <div className="mt-3 rounded-lg border border-line bg-surface px-3 py-2 text-xs text-body">
                   {evidenceNotice}
                 </div>
               )}
 
               {(wabaAccounts ?? []).length === 0 ? (
-                <div className="mt-3 rounded-lg bg-white px-3 py-2 text-xs text-slate-500">
+                <div className="mt-3 rounded-lg bg-surface px-3 py-2 text-xs text-muted">
                   {tr("Ligue uma WABA antes de gerar evidências para a Meta.", "Connect a WABA before generating Meta evidence.")}
                 </div>
               ) : (
@@ -509,13 +509,13 @@ export default function SettingsPage() {
                     return (
                       <div
                         key={account._id}
-                        className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-white px-3 py-3"
+                        className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-surface px-3 py-3"
                       >
                         <div className="min-w-0">
-                          <div className="truncate text-[12px] font-semibold text-[#0a1b33]">
+                          <div className="truncate text-[12px] font-semibold text-ink">
                             WABA {account.wabaId}
                           </div>
-                          <div className="mt-0.5 truncate text-[11px] text-slate-500">
+                          <div className="mt-0.5 truncate text-[11px] text-muted">
                             {primaryPhone
                               ? `${primaryPhone.displayName} · ${primaryPhone.e164}`
                               : tr("Nenhum número encontrado", "No phone number found")}
@@ -527,7 +527,7 @@ export default function SettingsPage() {
                           onClick={() =>
                             handleRunEvidence(account._id, primaryPhone?._id)
                           }
-                          className="inline-flex items-center gap-2 rounded-lg bg-[#0a152d] px-3 py-2 text-[12px] font-medium text-white transition-all hover:bg-[#0a1b33] disabled:opacity-50"
+                          className="inline-flex items-center gap-2 rounded-lg bg-nav-active px-3 py-2 text-[12px] font-medium text-white transition-all hover:bg-brand-solid disabled:opacity-50"
                         >
                           {busy ? (
                             <Loader2 size={13} className="animate-spin" />
@@ -543,21 +543,21 @@ export default function SettingsPage() {
               )}
 
               {evidenceResult && (
-                <div className="mt-4 rounded-xl border border-slate-200 bg-white p-3">
+                <div className="mt-4 rounded-xl border border-line bg-surface p-3">
                   <div className="grid gap-2 text-xs sm:grid-cols-4">
                     <EvidenceMetric label="OK" value={evidenceResult.summary.ok} tone="text-emerald-700" />
                     <EvidenceMetric label={tr("Falharam", "Failed")} value={evidenceResult.summary.failed} tone="text-red-700" />
                     <EvidenceMetric label={tr("Ignoradas", "Skipped")} value={evidenceResult.summary.skipped} tone="text-amber-700" />
-                    <EvidenceMetric label={tr("Escritas", "Writes")} value={evidenceResult.summary.writesEnabled ? tr("ativas", "enabled") : tr("desligadas", "off")} tone="text-slate-700" />
+                    <EvidenceMetric label={tr("Escritas", "Writes")} value={evidenceResult.summary.writesEnabled ? tr("ativas", "enabled") : tr("desligadas", "off")} tone="text-ink" />
                   </div>
                   <div className="mt-3 max-h-64 space-y-1.5 overflow-auto pr-1">
                     {evidenceResult.records.map((record, index) => (
                       <div
                         key={`${record.label}-${index}`}
-                        className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-[11px]"
+                        className="rounded-lg border border-line-soft bg-surface-2 px-3 py-2 text-[11px]"
                       >
                         <div className="flex flex-wrap items-center justify-between gap-2">
-                          <span className="font-medium text-[#0a1b33]">
+                          <span className="font-medium text-ink">
                             {record.label}
                           </span>
                           <span className={`rounded-md border px-1.5 py-0.5 font-semibold ${evidenceRecordTone(record)}`}>
@@ -565,7 +565,7 @@ export default function SettingsPage() {
                           </span>
                         </div>
                         {!record.skipped && (
-                          <div className="mt-1 truncate font-mono text-[10px] text-slate-400">
+                          <div className="mt-1 truncate font-mono text-[10px] text-faint">
                             trace {record.traceId || "-"} · req {record.requestId || "-"}
                           </div>
                         )}
@@ -583,10 +583,10 @@ export default function SettingsPage() {
             )}
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <div className="text-[13px] font-medium text-[#0a1b33]">
+                <div className="text-[13px] font-medium text-ink">
                   {tr("Cadastro incorporado", "Embedded Signup")}
                 </div>
-                <div className="text-[11px] text-slate-500">
+                <div className="text-[11px] text-muted">
                   {tr("Inicie uma sessão segura de ligação à Meta quando a app estiver configurada.", "Start a state-tracked Meta onboarding session when app config is present.")}
                 </div>
               </div>
@@ -594,7 +594,7 @@ export default function SettingsPage() {
                 type="button"
                 onClick={handleEmbeddedSignup}
                 disabled={signupBusy}
-                className="inline-flex items-center gap-2 rounded-lg bg-[#0a152d] px-3 py-2 text-[12px] font-medium text-white transition-all hover:bg-[#0a1b33] disabled:opacity-50"
+                className="inline-flex items-center gap-2 rounded-lg bg-nav-active px-3 py-2 text-[12px] font-medium text-white transition-all hover:bg-brand-solid disabled:opacity-50"
               >
                 {signupBusy ? <Loader2 size={13} className="animate-spin" /> : <LogIn size={13} />}
                 {tr("Iniciar cadastro", "Start signup")}
@@ -605,20 +605,20 @@ export default function SettingsPage() {
                 {signupSessions!.slice(0, 3).map((session) => (
                   <div
                     key={session._id}
-                    className="rounded-lg bg-slate-50 px-3 py-2 text-[11px]"
+                    className="rounded-lg bg-surface-2 px-3 py-2 text-[11px]"
                   >
                     <div className="flex items-center justify-between gap-3">
-                      <span className="font-mono text-slate-400">
+                      <span className="font-mono text-faint">
                         {session.state.slice(0, 8)}
                       </span>
-                      <span className="font-medium text-slate-600">
+                      <span className="font-medium text-body">
                         {signupStateLabel(session.status, locale)}
                       </span>
                     </div>
                     {(session.businessId ||
                       session.wabaId ||
                       session.phoneNumberId) && (
-                      <div className="mt-2 grid gap-1 text-slate-500">
+                      <div className="mt-2 grid gap-1 text-muted">
                         {session.businessId && (
                           <span>BM {session.businessId}</span>
                         )}
@@ -636,14 +636,14 @@ export default function SettingsPage() {
                 ))}
               </div>
             )}
-            <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <div className="mt-4 rounded-xl border border-line bg-surface-2 p-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <div className="flex items-center gap-2 text-[13px] font-medium text-[#0a1b33]">
-                    <Link2 size={14} className="text-slate-500" />
+                  <div className="flex items-center gap-2 text-[13px] font-medium text-ink">
+                    <Link2 size={14} className="text-muted" />
                     {tr("Link de ligação do cliente", "Client connect link")}
                   </div>
-                  <div className="mt-1 text-[11px] leading-5 text-slate-500">
+                  <div className="mt-1 text-[11px] leading-5 text-muted">
                     {tr("Crie um link seguro de 72 horas para o cliente concluir a ligação sem aceder a este painel.", "Create a secure 72-hour link for a client to complete Embedded Signup without accessing this dashboard.")}
                   </div>
                 </div>
@@ -651,7 +651,7 @@ export default function SettingsPage() {
                   type="button"
                   onClick={handleCreateLaunchLink}
                   disabled={launchLinkBusy}
-                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[12px] font-medium text-[#0a1b33] transition-colors hover:border-slate-300 disabled:opacity-50"
+                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-line bg-surface px-3 py-2 text-[12px] font-medium text-ink transition-colors hover:border-line disabled:opacity-50"
                 >
                   {launchLinkBusy ? (
                     <Loader2 size={13} className="animate-spin" />
@@ -662,12 +662,12 @@ export default function SettingsPage() {
                 </button>
               </div>
               {launchLink && (
-                <div className="mt-3 break-all rounded-lg border border-slate-200 bg-white px-3 py-2 font-[var(--font-mono)] text-[11px] text-slate-600">
+                <div className="mt-3 break-all rounded-lg border border-line bg-surface px-3 py-2 font-[var(--font-mono)] text-[11px] text-body">
                   {launchLink}
                 </div>
               )}
               {launchLinkNotice && (
-                <div className="mt-2 text-[11px] font-medium text-slate-600">
+                <div className="mt-2 text-[11px] font-medium text-body">
                   {launchLinkNotice}
                 </div>
               )}
@@ -678,9 +678,9 @@ export default function SettingsPage() {
 
         {/* WhatsApp connection */}
         {settingsTab === "whatsapp" && (
-        <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-          <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h2 className="font-semibold text-[#0a1b33] text-[15px]">
+        <section className="overflow-hidden rounded-lg border border-line bg-surface">
+          <div className="px-6 py-4 border-b border-line-soft flex items-center justify-between">
+            <h2 className="font-semibold text-ink text-[15px]">
               WhatsApp Business Account
             </h2>
             {hasConnection ? (
@@ -700,7 +700,7 @@ export default function SettingsPage() {
                 {wabaAccounts!.map((acc) => (
                   <div
                     key={acc._id}
-                    className="border border-slate-200 rounded-xl p-4"
+                    className="border border-line rounded-xl p-4"
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
@@ -708,10 +708,10 @@ export default function SettingsPage() {
                           <Smartphone size={16} className="text-emerald-600" />
                         </div>
                         <div>
-                          <div className="font-medium text-[#0a1b33] text-sm">
+                          <div className="font-medium text-ink text-sm">
                             WABA {acc.wabaId}
                           </div>
-                          <div className="text-xs text-slate-500">
+                          <div className="text-xs text-muted">
                             {tr("Estado", "Status")}: {channelStateLabel(acc.status, locale)} · Token: {tokenStateLabel(acc.tokenStatus, locale)}
                             {` · ${tr("Armazenamento", "Storage")}: ${tokenStateLabel(acc.tokenStorage, locale)}`}
                             {acc.qualityRating && ` · ${tr("Qualidade", "Quality")}: ${acc.qualityRating}`}
@@ -724,15 +724,15 @@ export default function SettingsPage() {
                         {acc.phoneNumbers.map((p) => (
                           <li
                             key={p._id}
-                            className="flex items-center justify-between bg-slate-50 rounded-lg px-3 py-2 text-xs"
+                            className="flex items-center justify-between bg-surface-2 rounded-lg px-3 py-2 text-xs"
                           >
                             <div>
-                              <span className="font-medium text-[#0a1b33]">
+                              <span className="font-medium text-ink">
                                 {p.displayName}
                               </span>
-                              <span className="text-slate-500 ml-2">{p.e164}</span>
+                              <span className="text-muted ml-2">{p.e164}</span>
                               {p.qualityRating && (
-                                <span className="ml-2 rounded-md bg-white px-1.5 py-0.5 text-[10px] font-medium uppercase text-slate-500">
+                                <span className="ml-2 rounded-md bg-surface px-1.5 py-0.5 text-[10px] font-medium uppercase text-muted">
                                   {p.qualityRating}
                                 </span>
                               )}
@@ -748,7 +748,7 @@ export default function SettingsPage() {
                                 </div>
                               )}
                             </div>
-                            <span className="text-slate-400 font-mono text-[10px]">
+                            <span className="text-faint font-mono text-[10px]">
                               {p.phoneNumberId}
                             </span>
                           </li>
@@ -757,24 +757,24 @@ export default function SettingsPage() {
                     )}
                   </div>
                 ))}
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-muted">
                   {tr("Ligue outro número usando o formulário abaixo.", "Connect another number using the form below.")}
                 </p>
-                <div className="border-t border-slate-100 pt-6">
+                <div className="border-t border-line-soft pt-6">
                   <ConnectWabaForm />
                 </div>
               </div>
             ) : (
               <div>
                 <div className="flex items-start gap-4 mb-6">
-                  <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center flex-shrink-0">
-                    <Smartphone size={18} className="text-slate-400" />
+                  <div className="w-10 h-10 rounded-xl bg-surface-3 flex items-center justify-center flex-shrink-0">
+                    <Smartphone size={18} className="text-faint" />
                   </div>
                   <div className="flex-1">
-                    <p className="text-[14px] text-[#0a1b33] font-medium">
+                    <p className="text-[14px] text-ink font-medium">
                       {tr("Ligar token de utilizador de sistema WABA", "Connect a WABA system user token")}
                     </p>
-                    <p className="text-sm text-slate-500 mt-1">
+                    <p className="text-sm text-muted mt-1">
                       {tr("Usamos a Graph API para validar as permissões", "We use Graph API to validate scopes")} (
                       <code>whatsapp_business_messaging</code>,{" "}
                       <code>whatsapp_business_management</code>,{" "}
@@ -798,12 +798,12 @@ export default function SettingsPage() {
         )}
 
         {settingsTab === "automation" && (
-        <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-          <div className="px-6 py-4 border-b border-slate-100">
-            <h2 className="font-semibold text-[#0a1b33] text-[15px]">
+        <section className="overflow-hidden rounded-lg border border-line bg-surface">
+          <div className="px-6 py-4 border-b border-line-soft">
+            <h2 className="font-semibold text-ink text-[15px]">
               {tr("Automação de atendimento", "Communication automation")}
             </h2>
-            <p className="text-xs text-slate-500 mt-0.5">
+            <p className="text-xs text-muted mt-0.5">
               {tr("Regras gerais para opt-out, respostas automáticas, agentes e fluxos de atendimento.", "Workspace-wide rules for opt-out, delayed replies, agents and service flows.")}
             </p>
           </div>
@@ -819,7 +819,7 @@ export default function SettingsPage() {
                 onChange={setAutoReplyEnabled}
               />
               <label className="block">
-                <span className="mb-1 block text-[12px] font-medium text-slate-500">
+                <span className="mb-1 block text-[12px] font-medium text-muted">
                   {tr("Período em dias", "Period in days")}
                 </span>
                 <input
@@ -830,7 +830,7 @@ export default function SettingsPage() {
                   onChange={(event) =>
                     setAutoReplyPeriod(Number(event.target.value))
                   }
-                  className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm text-[#0a1b33] outline-none focus:border-slate-400"
+                  className="h-10 w-full rounded-lg border border-line px-3 text-sm text-ink outline-none focus:border-brand-solid/40"
                 />
               </label>
               <QuickReplySelect
@@ -925,9 +925,9 @@ function AdmissionCheckCard({
           : Circle;
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+    <div className="rounded-lg border border-line bg-surface-2 p-3">
       <div className="flex gap-3">
-        <div className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border bg-white ${statusIconTone(check.status)}`}>
+        <div className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border bg-surface ${statusIconTone(check.status)}`}>
           <StatusIcon
             size={14}
             className={check.status === "in_progress" ? "animate-spin" : ""}
@@ -935,7 +935,7 @@ function AdmissionCheckCard({
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <div className="text-[13px] font-medium text-[#0a1b33]">
+            <div className="text-[13px] font-medium text-ink">
               {check.title}
             </div>
             <span className={`rounded-md border px-1.5 py-0.5 text-[10px] font-semibold ${statusBadgeTone(check.status)}`}>
@@ -947,13 +947,13 @@ function AdmissionCheckCard({
               </span>
             )}
           </div>
-          <div className="mt-0.5 text-[11px] font-medium uppercase text-slate-400">
+          <div className="mt-0.5 text-[11px] font-medium uppercase text-faint">
             {groupLabel(check.group, locale)} · {check.source === "auto" ? tr("automático", "automatic") : check.source === "manual" ? tr("manual", "manual") : tr("híbrido", "hybrid")}
           </div>
-          <p className="mt-2 text-[12px] leading-5 text-slate-600">
+          <p className="mt-2 text-[12px] leading-5 text-body">
             {check.description}
           </p>
-          <p className="mt-1 text-[11px] leading-5 text-slate-500">
+          <p className="mt-1 text-[11px] leading-5 text-muted">
             {check.notes ?? check.action}
           </p>
           {manual && (
@@ -994,8 +994,8 @@ function EvidenceMetric({
   tone: string;
 }) {
   return (
-    <div className="rounded-lg bg-slate-50 px-3 py-2">
-      <div className="text-[10px] font-semibold uppercase text-slate-400">
+    <div className="rounded-lg bg-surface-2 px-3 py-2">
+      <div className="text-[10px] font-semibold uppercase text-faint">
         {label}
       </div>
       <div className={`mt-1 text-sm font-semibold ${tone}`}>{value}</div>
@@ -1023,7 +1023,7 @@ function AdmissionButton({
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className="rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-600 transition-colors hover:border-slate-300 hover:text-[#0a1b33] disabled:opacity-40"
+      className="rounded-md border border-line bg-surface px-2 py-1 text-[11px] font-medium text-body transition-colors hover:border-line hover:text-ink disabled:opacity-40"
     >
       {children}
     </button>
@@ -1046,7 +1046,7 @@ function statusIconTone(status: AdmissionStatus): string {
   }
   if (status === "blocked") return "border-red-200 text-red-600";
   if (status === "in_progress") return "border-sky-200 text-sky-600";
-  return "border-slate-200 text-slate-400";
+  return "border-line text-faint";
 }
 
 function statusBadgeTone(status: AdmissionStatus): string {
@@ -1057,7 +1057,7 @@ function statusBadgeTone(status: AdmissionStatus): string {
   if (status === "in_progress") {
     return "border-sky-200 bg-sky-50 text-sky-700";
   }
-  return "border-slate-200 bg-white text-slate-500";
+  return "border-line bg-surface text-muted";
 }
 
 function statusLabel(status: AdmissionStatus, locale: Locale): string {
@@ -1095,12 +1095,12 @@ function Row({
 }) {
   return (
     <div className="px-6 py-3.5 grid grid-cols-3 gap-4 text-sm">
-      <dt className="text-slate-500">{label}</dt>
+      <dt className="text-muted">{label}</dt>
       <dd
         className={
           mono
-            ? "col-span-2 text-slate-500 font-mono text-xs"
-            : "col-span-2 text-[#0a1b33] font-medium capitalize"
+            ? "col-span-2 text-muted font-mono text-xs"
+            : "col-span-2 text-ink font-medium capitalize"
         }
       >
         {value}
@@ -1121,16 +1121,16 @@ function SettingsCard({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-5">
+    <section className="rounded-lg border border-line bg-surface p-5">
       <div className="mb-4 flex items-start gap-3">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-[#0a1b33]">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-3 text-ink">
           <Icon size={16} />
         </span>
         <div>
-          <h3 className="font-[var(--font-outfit)] text-xl font-semibold text-[#0a1b33]">
+          <h3 className="font-[var(--font-outfit)] text-xl font-semibold text-ink">
             {title}
           </h3>
-          <p className="mt-1 text-sm leading-6 text-slate-500">{body}</p>
+          <p className="mt-1 text-sm leading-6 text-muted">{body}</p>
         </div>
       </div>
       <div className="space-y-3">{children}</div>
@@ -1148,7 +1148,7 @@ function ToggleRow({
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <label className="flex min-h-12 items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-[#0a1b33]">
+    <label className="flex min-h-12 items-center justify-between gap-3 rounded-lg border border-line bg-surface-2 px-4 py-2 text-sm font-semibold text-ink">
       {label}
       <input
         type="checkbox"
@@ -1174,13 +1174,13 @@ function QuickReplySelect({
   const { tr } = useI18n();
   return (
     <label className="block">
-      <span className="mb-1 block text-[12px] font-medium text-slate-500">
+      <span className="mb-1 block text-[12px] font-medium text-muted">
         {label}
       </span>
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-[#0a1b33] outline-none focus:border-slate-400"
+        className="h-10 w-full rounded-lg border border-line bg-surface px-3 text-sm text-ink outline-none focus:border-brand-solid/40"
       >
         <option value="">{tr("Selecionar resposta rápida", "Select quick reply")}</option>
         {options.map((reply) => (

@@ -50,8 +50,22 @@ export default function RootLayout({
       <html
         lang="pt-PT"
         className={`${inter.variable} ${outfit.variable} ${geistMono.variable} h-full antialiased`}
+        suppressHydrationWarning
       >
-        <body className="min-h-full flex flex-col bg-[#f9fafb]">
+        <head>
+          {/*
+            Applied before first paint. Reading the choice in an effect would
+            show every dark-mode user a white flash on each navigation, which is
+            the one thing a dark theme must never do.
+          */}
+          <script
+            dangerouslySetInnerHTML={{
+              __html:
+                "try{var t=localStorage.getItem('openbsp-theme');if(t==='dark'||t==='light'){document.documentElement.setAttribute('data-theme',t)}}catch(e){}",
+            }}
+          />
+        </head>
+        <body className="min-h-full flex flex-col bg-background">
           <ConvexClientProvider>
             <I18nProvider>{children}</I18nProvider>
           </ConvexClientProvider>

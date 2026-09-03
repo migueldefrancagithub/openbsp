@@ -36,17 +36,17 @@ export function CustomFieldsSection({
 
   if (definitions === undefined) return null;
   if (definitions.length === 0) {
-    return <p className="text-[10px] text-slate-400">{t("fields.empty")}</p>;
+    return <p className="text-[10px] text-faint">{t("fields.empty")}</p>;
   }
   const inputClass =
-    "mt-1 h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-[11px] text-[#0a1b33] outline-none focus:border-slate-400";
+    "mt-1 h-8 w-full rounded-md border border-line bg-surface px-2 text-[11px] text-ink outline-none focus:border-brand-solid/40";
 
   return (
     <div className="grid grid-cols-2 gap-2" data-custom-fields>
       {definitions.map((definition) => {
         const current = values?.[definition.key];
         return (
-          <label key={definition._id} className="min-w-0 text-[10px] font-semibold text-slate-400">
+          <label key={definition._id} className="min-w-0 text-[10px] font-semibold text-faint">
             <span className="block truncate">{definition.label}</span>
             {definition.type === "select" ? (
               <select

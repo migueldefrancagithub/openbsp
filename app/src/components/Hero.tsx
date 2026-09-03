@@ -37,7 +37,7 @@ function WhatsAppLogo({ size = 28 }: { size?: number }) {
 
 export function Hero() {
   return (
-    <div className="relative w-full max-w-[1400px] mx-auto rounded-[48px] bg-white border border-slate-200/50 shadow-[0_40px_100px_-20px_rgba(0,0,0,0.03)] overflow-hidden h-[600px] flex flex-col">
+    <div className="relative w-full max-w-[1400px] mx-auto rounded-[48px] bg-surface border border-slate-200/50 shadow-[0_40px_100px_-20px_rgba(0,0,0,0.03)] overflow-hidden h-[600px] flex flex-col">
       {/* Video background layer */}
       <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden select-none">
         {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
@@ -60,7 +60,7 @@ export function Hero() {
         transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
         className="relative z-20 flex-1 px-8 md:px-16 pt-12 md:pt-16 flex flex-col items-start"
       >
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-slate-200/70 bg-white/80 backdrop-blur text-[11px] text-slate-600 mb-7">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-slate-200/70 bg-white/80 backdrop-blur text-[11px] text-body mb-7">
           <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
           Built on Meta Cloud API v21
         </div>
@@ -85,9 +85,9 @@ export function Hero() {
           whileHover={{ scale: 1.03 }}
           whileTap={{ scale: 0.98 }}
           transition={{ type: "spring", stiffness: 400, damping: 18 }}
-          className="mt-8 inline-flex items-center gap-2 bg-[#0a152d] text-white text-[13px] font-medium pl-3 pr-6 py-3 rounded-full shadow-[0_8px_24px_-8px_rgba(10,21,45,0.5)]"
+          className="mt-8 inline-flex items-center gap-2 bg-nav-active text-white text-[13px] font-medium pl-3 pr-6 py-3 rounded-full shadow-[0_8px_24px_-8px_rgba(10,21,45,0.5)]"
         >
-          <span className="w-7 h-7 rounded-full bg-white flex items-center justify-center">
+          <span className="w-7 h-7 rounded-full bg-surface flex items-center justify-center">
             <WhatsAppLogo size={18} />
           </span>
           Talk to us on WhatsApp
@@ -105,7 +105,7 @@ export function Hero() {
           {/* WhatsApp brand button — native, with live green dot */}
           <button
             type="button"
-            className="relative w-9 h-9 bg-white border border-slate-100 shadow-sm rounded-full flex items-center justify-center hover:scale-105 transition-transform"
+            className="relative w-9 h-9 bg-surface border border-line-soft shadow-sm rounded-full flex items-center justify-center hover:scale-105 transition-transform"
             aria-label="WhatsApp"
           >
             <WhatsAppLogo size={22} />
@@ -113,13 +113,13 @@ export function Hero() {
           </button>
           <button
             type="button"
-            className="px-4 py-2 text-[12px] font-semibold text-slate-500 hover:text-[#0a1b33] transition-colors"
+            className="px-4 py-2 text-[12px] font-semibold text-muted hover:text-ink transition-colors"
           >
             Products
           </button>
           <button
             type="button"
-            className="px-4 py-2 text-[12px] font-semibold text-slate-500 hover:text-[#0a1b33] transition-colors"
+            className="px-4 py-2 text-[12px] font-semibold text-muted hover:text-ink transition-colors"
           >
             Docs
           </button>

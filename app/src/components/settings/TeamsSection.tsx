@@ -129,13 +129,13 @@ export function TeamsSection() {
   }
 
   return (
-    <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-      <div className="flex flex-col gap-3 border-b border-slate-100 px-6 py-4 md:flex-row md:items-center md:justify-between">
+    <section className="overflow-hidden rounded-lg border border-line bg-surface">
+      <div className="flex flex-col gap-3 border-b border-line-soft px-6 py-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h2 className="text-[15px] font-semibold text-[#0a1b33]">
+          <h2 className="text-[15px] font-semibold text-ink">
             {tr("Equipas e filas", "Teams & queues")}
           </h2>
-          <p className="mt-0.5 text-xs text-slate-500">
+          <p className="mt-0.5 text-xs text-muted">
             {tr(
               "Encaminhe conversas por equipa e mantenha responsáveis e SLAs visíveis.",
               "Route conversations by team while leads keep members and SLAs visible.",
@@ -145,30 +145,30 @@ export function TeamsSection() {
       </div>
 
       <div className="grid gap-5 p-6 xl:grid-cols-[1fr_1.15fr]">
-        <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-          <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-[#0a1b33]">
+        <div className="rounded-lg border border-line bg-surface-2 p-4">
+          <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink">
             <UserRoundCog size={16} />
             {tr("Criar equipa", "Create team")}
           </div>
           <label className="block">
-            <span className="text-[11px] font-medium text-slate-500">
+            <span className="text-[11px] font-medium text-muted">
               {tr("Nome da equipa", "Team name")}
             </span>
             <input
               value={name}
               onChange={(event) => setName(event.target.value)}
               placeholder={tr("Equipa comercial", "Sales team")}
-              className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-[#0a1b33] outline-none focus:border-slate-400"
+              className="mt-1 h-10 w-full rounded-lg border border-line bg-surface px-3 text-sm text-ink outline-none focus:border-brand-solid/40"
             />
           </label>
 
           <div className="mt-4">
-            <div className="mb-2 text-[11px] font-medium text-slate-500">
+            <div className="mb-2 text-[11px] font-medium text-muted">
               {tr("Membros", "Members")}
             </div>
             <div className="grid gap-1 sm:grid-cols-2">
               {activeMembers.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-slate-200 bg-white px-3 py-4 text-center text-xs text-slate-500">
+                <div className="rounded-lg border border-dashed border-line bg-surface px-3 py-4 text-center text-xs text-muted">
                   {tr("Convide membros antes de criar equipas.", "Invite members before creating teams.")}
                 </div>
               ) : (
@@ -178,25 +178,25 @@ export function TeamsSection() {
                   return (
                     <div
                       key={member._id}
-                      className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2"
+                      className="flex items-center gap-2 rounded-lg border border-line bg-surface px-3 py-2"
                     >
                       <button
                         type="button"
                         onClick={() => toggleMember(member._id)}
                         className={`flex h-5 w-5 items-center justify-center rounded border ${
                           checked
-                            ? "border-[#0a152d] bg-[#0a152d] text-white"
-                            : "border-slate-300 bg-white"
+                            ? "border-[#0a152d] bg-nav-active text-white"
+                            : "border-line bg-surface"
                         }`}
                         aria-label={`${tr("Selecionar", "Toggle")} ${member.email ?? roleLabel(member.role, locale)}`}
                       >
                         {checked && <Check size={12} />}
                       </button>
                       <div className="min-w-0 flex-1">
-                        <div className="truncate text-[13px] font-medium text-[#0a1b33]">
+                        <div className="truncate text-[13px] font-medium text-ink">
                           {member.email ?? roleLabel(member.role, locale)}
                         </div>
-                        <div className="text-[10px] uppercase tracking-wider text-slate-400">
+                        <div className="text-[10px] uppercase tracking-wider text-faint">
                           {roleLabel(member.role, locale)}
                         </div>
                       </div>
@@ -207,7 +207,7 @@ export function TeamsSection() {
                           className={`rounded-md border px-2 py-1 text-[10px] font-semibold ${
                             lead
                               ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                              : "border-slate-200 bg-slate-50 text-slate-500"
+                              : "border-line bg-surface-2 text-muted"
                           }`}
                         >
                           {tr("Líder", "Lead")}
@@ -236,7 +236,7 @@ export function TeamsSection() {
             type="button"
             onClick={handleCreateTeam}
             disabled={busy || name.trim().length < 2 || selectedMemberIds.length === 0}
-            className="mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-[#0a152d] px-3 text-[13px] font-medium text-white transition-colors hover:bg-[#0a1b33] disabled:opacity-50"
+            className="mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-nav-active px-3 text-[13px] font-medium text-white transition-colors hover:bg-brand-solid disabled:opacity-50"
           >
             {busy ? <Loader2 size={14} className="animate-spin" /> : <Users size={14} />}
             {tr("Criar equipa", "Create team")}
@@ -244,14 +244,14 @@ export function TeamsSection() {
         </div>
 
         <div>
-          <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-[#0a1b33]">
+          <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink">
             <Shield size={16} />
             {tr("Equipas ativas", "Active teams")}
           </div>
           {teams === undefined ? (
-            <div className="h-28 animate-pulse rounded-lg border border-slate-100 bg-slate-50" />
+            <div className="h-28 animate-pulse rounded-lg border border-line-soft bg-surface-2" />
           ) : teams.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500">
+            <div className="rounded-lg border border-dashed border-line px-4 py-8 text-center text-sm text-muted">
               {tr("Ainda não existem equipas.", "No teams yet.")}
             </div>
           ) : (
@@ -259,14 +259,14 @@ export function TeamsSection() {
               {teams.map((team) => (
                 <div
                   key={team._id}
-                  className="rounded-lg border border-slate-200 px-4 py-3"
+                  className="rounded-lg border border-line px-4 py-3"
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <div className="font-semibold text-[#0a1b33]">
+                    <div className="font-semibold text-ink">
                       {team.name}
                     </div>
                     <div className="flex items-center gap-1.5">
-                      <span className="rounded-md bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-500">
+                      <span className="rounded-md bg-surface-3 px-2 py-1 text-[11px] font-medium text-muted">
                         {team.members.length} {locale === "pt"
                           ? team.members.length === 1 ? "membro" : "membros"
                           : team.members.length === 1 ? "member" : "members"}
@@ -276,7 +276,7 @@ export function TeamsSection() {
                           <button
                             type="button"
                             onClick={() => (editing?.teamId === team._id ? setEditing(null) : startEditing(team))}
-                            className="rounded-md border border-slate-200 p-1.5 text-slate-500 hover:border-slate-300 hover:text-[#0a1b33]"
+                            className="rounded-md border border-line p-1.5 text-muted hover:border-line hover:text-ink"
                             aria-label={t("teams.edit")}
                             title={t("teams.edit")}
                           >
@@ -286,7 +286,7 @@ export function TeamsSection() {
                             type="button"
                             onClick={() => void handleDelete(team)}
                             disabled={busy}
-                            className="rounded-md border border-slate-200 p-1.5 text-slate-500 hover:border-rose-300 hover:text-rose-600 disabled:opacity-50"
+                            className="rounded-md border border-line p-1.5 text-muted hover:border-rose-300 hover:text-rose-600 disabled:opacity-50"
                             aria-label={t("teams.delete")}
                             title={t("teams.delete")}
                           >
@@ -297,23 +297,23 @@ export function TeamsSection() {
                     </div>
                   </div>
                   {editing?.teamId === team._id ? (
-                    <div className="mt-3 space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                    <div className="mt-3 space-y-3 rounded-lg border border-line bg-surface-2 p-3">
                       <label className="block">
-                        <span className="text-[11px] font-medium text-slate-500">{t("teams.rename")}</span>
+                        <span className="text-[11px] font-medium text-muted">{t("teams.rename")}</span>
                         <input
                           value={editing.name}
                           onChange={(event) => setEditing({ ...editing, name: event.target.value })}
-                          className="mt-1 h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-[#0a1b33] outline-none focus:border-slate-400"
+                          className="mt-1 h-9 w-full rounded-lg border border-line bg-surface px-3 text-sm text-ink outline-none focus:border-brand-solid/40"
                         />
                       </label>
                       <div>
-                        <div className="mb-1.5 text-[11px] font-medium text-slate-500">{t("teams.members")}</div>
+                        <div className="mb-1.5 text-[11px] font-medium text-muted">{t("teams.members")}</div>
                         <div className="grid gap-1 sm:grid-cols-2">
                           {activeMembers.map((member) => {
                             const checked = editing.memberIds.includes(member._id);
                             const lead = editing.leadMemberId === member._id;
                             return (
-                              <div key={member._id} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5">
+                              <div key={member._id} className="flex items-center gap-2 rounded-lg border border-line bg-surface px-2.5 py-1.5">
                                 <button
                                   type="button"
                                   onClick={() =>
@@ -326,13 +326,13 @@ export function TeamsSection() {
                                     })
                                   }
                                   className={`flex h-4.5 w-4.5 items-center justify-center rounded border ${
-                                    checked ? "border-[#0a1b33] bg-[#0a1b33] text-white" : "border-slate-300 bg-white"
+                                    checked ? "border-brand-solid bg-brand-solid text-white" : "border-line bg-surface"
                                   }`}
                                   aria-pressed={checked}
                                 >
                                   {checked && <Check size={11} />}
                                 </button>
-                                <span className="min-w-0 flex-1 truncate text-[12px] text-[#0a1b33]">
+                                <span className="min-w-0 flex-1 truncate text-[12px] text-ink">
                                   {member.email ?? member.name ?? roleLabel(member.role, locale)}
                                 </span>
                                 {checked && (
@@ -340,7 +340,7 @@ export function TeamsSection() {
                                     type="button"
                                     onClick={() => setEditing({ ...editing, leadMemberId: lead ? "" : member._id })}
                                     className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${
-                                      lead ? "bg-amber-100 text-amber-800" : "text-slate-400 hover:text-slate-600"
+                                      lead ? "bg-amber-100 text-amber-800" : "text-faint hover:text-body"
                                     }`}
                                   >
                                     {t("teams.lead")}
@@ -355,7 +355,7 @@ export function TeamsSection() {
                         <button
                           type="button"
                           onClick={() => setEditing(null)}
-                          className="h-8 rounded-md border border-slate-200 px-3 text-[12px] font-semibold text-slate-600"
+                          className="h-8 rounded-md border border-line px-3 text-[12px] font-semibold text-body"
                         >
                           {tr("Cancelar", "Cancel")}
                         </button>
@@ -363,7 +363,7 @@ export function TeamsSection() {
                           type="button"
                           onClick={() => void handleSaveEdit(team)}
                           disabled={busy || editing.name.trim().length < 2}
-                          className="inline-flex h-8 items-center gap-1.5 rounded-md bg-[#0a1b33] px-3 text-[12px] font-semibold text-white disabled:opacity-50"
+                          className="inline-flex h-8 items-center gap-1.5 rounded-md bg-brand-solid px-3 text-[12px] font-semibold text-white disabled:opacity-50"
                         >
                           {busy && <Loader2 size={12} className="animate-spin" />}
                           {t("teams.save")}
@@ -375,7 +375,7 @@ export function TeamsSection() {
                       {team.members.map((member) => (
                         <span
                           key={member.memberId}
-                          className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-600"
+                          className="rounded-full border border-line bg-surface-2 px-2.5 py-1 text-[11px] font-medium text-body"
                         >
                           {member.email ?? member.name ?? roleLabel(member.role, locale)}
                           {member.teamRole === "lead" ? ` · ${tr("líder", "lead")}` : ""}

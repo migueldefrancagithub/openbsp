@@ -78,16 +78,16 @@ export function MembersSection() {
   );
 
   return (
-    <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-      <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-        <h2 className="font-semibold text-[#0a1b33] text-[15px]">
+    <section className="overflow-hidden rounded-lg border border-line bg-surface">
+      <div className="px-6 py-4 border-b border-line-soft flex items-center justify-between">
+        <h2 className="font-semibold text-ink text-[15px]">
           {tr("Membros e convites", "Members & invites")}
         </h2>
         {!inviting && !justInvited && (
           <button
             type="button"
             onClick={() => setInviting(true)}
-            className="inline-flex items-center gap-1.5 bg-[#0a152d] text-white text-[12px] font-medium px-3 py-1.5 rounded-lg hover:bg-[#0a1b33] transition-all"
+            className="inline-flex items-center gap-1.5 bg-nav-active text-white text-[12px] font-medium px-3 py-1.5 rounded-lg hover:bg-brand-solid transition-all"
           >
             <UserPlus size={12} strokeWidth={2.5} />
             {tr("Convidar", "Invite")}
@@ -106,7 +106,7 @@ export function MembersSection() {
               {tr("Envie este link. Expira em 7 dias.", "Send this link. It expires in 7 days.")}
             </div>
             <div className="flex items-stretch gap-2">
-              <code className="flex-1 bg-white border border-emerald-200 rounded-md px-3 py-2 text-[11px] font-[var(--font-mono)] text-[#0a1b33] break-all">
+              <code className="flex-1 bg-surface border border-emerald-200 rounded-md px-3 py-2 text-[11px] font-[var(--font-mono)] text-ink break-all">
                 {justInvited.link}
               </code>
               <button
@@ -129,9 +129,9 @@ export function MembersSection() {
         )}
 
         {inviting && (
-          <div className="rounded-lg border border-slate-200 p-4 space-y-3">
+          <div className="rounded-lg border border-line p-4 space-y-3">
             <div>
-              <label className="text-[11px] text-slate-500 font-medium">
+              <label className="text-[11px] text-muted font-medium">
                 Email
               </label>
               <input
@@ -139,17 +139,17 @@ export function MembersSection() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="colega@example.pt"
-                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[#0a152d]/20"
+                className="mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[#0a152d]/20"
               />
             </div>
             <div>
-              <label className="text-[11px] text-slate-500 font-medium">
+              <label className="text-[11px] text-muted font-medium">
                 {tr("Papel", "Role")}
               </label>
               <select
                 value={role}
                 onChange={(e) => setRole(e.target.value as InviteRole)}
-                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[#0a152d]/20"
+                className="mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[#0a152d]/20"
               >
                 <option value="agent">{tr("atendimento — gerir inbox", "agent — handle inbox")}</option>
                 <option value="marketing">{tr("marketing — enviar campanhas", "marketing — send campaigns")}</option>
@@ -170,7 +170,7 @@ export function MembersSection() {
                   setEmail("");
                   setError(null);
                 }}
-                className="text-[12px] text-slate-500 hover:text-slate-700 px-2 py-1.5"
+                className="text-[12px] text-muted hover:text-ink px-2 py-1.5"
               >
                 {tr("Cancelar", "Cancel")}
               </button>
@@ -178,7 +178,7 @@ export function MembersSection() {
                 type="button"
                 onClick={handleInvite}
                 disabled={!email.trim() || busy}
-                className="inline-flex items-center gap-1.5 bg-[#0a152d] text-white text-[12px] font-medium px-3 py-1.5 rounded-lg disabled:opacity-40 hover:bg-[#0a1b33] transition-all"
+                className="inline-flex items-center gap-1.5 bg-nav-active text-white text-[12px] font-medium px-3 py-1.5 rounded-lg disabled:opacity-40 hover:bg-brand-solid transition-all"
               >
                 {busy && <Loader2 size={12} className="animate-spin" />}
                 {tr("Enviar convite", "Send invite")}
@@ -188,32 +188,32 @@ export function MembersSection() {
         )}
 
         <div>
-          <div className="text-[11px] uppercase tracking-wider text-slate-400 font-medium mb-2">
+          <div className="text-[11px] uppercase tracking-wider text-faint font-medium mb-2">
             {tr("Membros ativos", "Active members")}
           </div>
           {members === undefined ? (
-            <div className="text-slate-400 text-[12px]">{tr("A carregar…", "Loading…")}</div>
+            <div className="text-faint text-[12px]">{tr("A carregar…", "Loading…")}</div>
           ) : (
-            <ul className="divide-y divide-slate-100 border border-slate-200 rounded-lg overflow-hidden">
+            <ul className="divide-y divide-line-soft border border-line rounded-lg overflow-hidden">
               {(members ?? []).map((m) => (
                 <li
                   key={m._id}
-                  className="flex items-center gap-3 px-4 py-3 bg-white"
+                  className="flex items-center gap-3 px-4 py-3 bg-surface"
                 >
-                  <Users size={14} className="text-slate-500" />
+                  <Users size={14} className="text-muted" />
                   <div className="flex-1 min-w-0">
-                    <div className="text-[13px] font-medium text-[#0a1b33]">
+                    <div className="text-[13px] font-medium text-ink">
                       {m.email ?? tr("(sem email)", "(no email)")}
                       {me?.memberId === m._id && (
-                        <span className="ml-1 text-[10px] font-normal text-slate-400">({t("members.you")})</span>
+                        <span className="ml-1 text-[10px] font-normal text-faint">({t("members.you")})</span>
                       )}
                       {m.status === "suspended" && (
-                        <span className="ml-2 rounded border border-slate-200 bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-500">
+                        <span className="ml-2 rounded border border-line bg-surface-3 px-1.5 py-0.5 text-[10px] font-semibold text-muted">
                           {t("members.suspended")}
                         </span>
                       )}
                     </div>
-                    <div className="text-[11px] text-slate-500 mt-0.5">
+                    <div className="text-[11px] text-muted mt-0.5">
                       {roleLabel(m.role, locale)} · {tr("entrou", "joined")} {relativeTime(m.createdAt, Date.now(), locale)}
                     </div>
                   </div>
@@ -228,7 +228,7 @@ export function MembersSection() {
                           )
                         }
                         aria-label={t("members.role")}
-                        className="h-8 rounded-md border border-slate-200 bg-white px-2 text-[11px] font-semibold text-[#0a1b33] outline-none focus:border-slate-400"
+                        className="h-8 rounded-md border border-line bg-surface px-2 text-[11px] font-semibold text-ink outline-none focus:border-brand-solid/40"
                       >
                         {(["owner", "admin", "agent", "marketing"] as const).map((value) => (
                           <option key={value} value={value} disabled={value === "owner" && me?.role !== "owner"}>
@@ -244,7 +244,7 @@ export function MembersSection() {
                             m.status === "suspended" ? t("members.reactivate") : t("members.suspend"),
                           )
                         }
-                        className="h-8 rounded-md border border-slate-200 px-2 text-[11px] font-semibold text-slate-600 hover:border-slate-300"
+                        className="h-8 rounded-md border border-line px-2 text-[11px] font-semibold text-body hover:border-line"
                       >
                         {m.status === "suspended" ? t("members.reactivate") : t("members.suspend")}
                       </button>
@@ -254,26 +254,26 @@ export function MembersSection() {
               ))}
             </ul>
           )}
-          {memberNotice && <p className="mt-2 text-[12px] text-slate-600">{memberNotice}</p>}
+          {memberNotice && <p className="mt-2 text-[12px] text-body">{memberNotice}</p>}
         </div>
 
         {activeInvites.length > 0 && (
           <div>
-            <div className="text-[11px] uppercase tracking-wider text-slate-400 font-medium mb-2">
+            <div className="text-[11px] uppercase tracking-wider text-faint font-medium mb-2">
               {tr("Convites pendentes", "Pending invites")}
             </div>
-            <ul className="divide-y divide-slate-100 border border-slate-200 rounded-lg overflow-hidden">
+            <ul className="divide-y divide-line-soft border border-line rounded-lg overflow-hidden">
               {activeInvites.map((inv) => (
                 <li
                   key={inv._id}
-                  className="flex items-center gap-3 px-4 py-3 bg-white"
+                  className="flex items-center gap-3 px-4 py-3 bg-surface"
                 >
                   <UserPlus size={14} className="text-amber-500" />
                   <div className="flex-1 min-w-0">
-                    <div className="text-[13px] font-medium text-[#0a1b33]">
+                    <div className="text-[13px] font-medium text-ink">
                       {inv.email}
                     </div>
-                    <div className="text-[11px] text-slate-500 mt-0.5">
+                    <div className="text-[11px] text-muted mt-0.5">
                       {roleLabel(inv.role, locale)} · {tr("expira em", "expires")} {" "}
                       {new Date(inv.expiresAt).toLocaleDateString(locale === "pt" ? "pt-MZ" : "en-GB")}
                     </div>
@@ -285,7 +285,7 @@ export function MembersSection() {
                         revoke({ inviteId: inv._id });
                       }
                     }}
-                    className="text-slate-400 hover:text-red-600 p-1.5"
+                    className="text-faint hover:text-red-600 p-1.5"
                     title={tr("Revogar", "Revoke")}
                     aria-label={tr(`Revogar convite para ${inv.email}`, `Revoke invite to ${inv.email}`)}
                   >

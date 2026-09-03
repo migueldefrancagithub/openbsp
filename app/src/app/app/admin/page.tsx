@@ -45,26 +45,26 @@ export default function AdminHomePage() {
           {cards.map((card) => {
             const Icon = card.icon;
             return (
-              <Link key={card.href} href={card.href} className="group rounded-lg border border-slate-200 bg-white p-4 transition-colors hover:border-slate-300">
-                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-[#0a1b33]"><Icon size={16} /></span>
-                <div className="mt-3 flex items-center gap-1 text-[14px] font-semibold text-[#0a1b33]">{card.title} <ArrowRight size={13} className="text-slate-300 transition-transform group-hover:translate-x-0.5" /></div>
-                <p className="mt-0.5 text-[12px] text-slate-500">{card.desc}</p>
+              <Link key={card.href} href={card.href} className="group rounded-lg border border-line bg-surface p-4 transition-colors hover:border-line">
+                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-surface-3 text-ink"><Icon size={16} /></span>
+                <div className="mt-3 flex items-center gap-1 text-[14px] font-semibold text-ink">{card.title} <ArrowRight size={13} className="text-faint transition-transform group-hover:translate-x-0.5" /></div>
+                <p className="mt-0.5 text-[12px] text-muted">{card.desc}</p>
               </Link>
             );
           })}
-          <div className="rounded-lg border border-slate-200 bg-white p-4">
-            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-[#0a1b33]"><BellRing size={16} /></span>
-            <div className="mt-3 text-[14px] font-semibold text-[#0a1b33]">{tr("Alertas abertos", "Open alerts")}</div>
-            <p className="mt-0.5 text-[12px] text-slate-500">{summary ? tr(`${summary.open} abertos · ${summary.critical} críticos`, `${summary.open} open · ${summary.critical} critical`) : "…"}</p>
+          <div className="rounded-lg border border-line bg-surface p-4">
+            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-surface-3 text-ink"><BellRing size={16} /></span>
+            <div className="mt-3 text-[14px] font-semibold text-ink">{tr("Alertas abertos", "Open alerts")}</div>
+            <p className="mt-0.5 text-[12px] text-muted">{summary ? tr(`${summary.open} abertos · ${summary.critical} críticos`, `${summary.open} open · ${summary.critical} critical`) : "…"}</p>
           </div>
           {canAudit && (
-            <div className="rounded-lg border border-slate-200 bg-white p-4">
-              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-[#0a1b33]"><ShieldCheck size={16} /></span>
-              <div className="mt-3 text-[14px] font-semibold text-[#0a1b33]">{tr("Integridade da auditoria", "Audit integrity")}</div>
-              <p className="mt-0.5 text-[12px] text-slate-500">
+            <div className="rounded-lg border border-line bg-surface p-4">
+              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-surface-3 text-ink"><ShieldCheck size={16} /></span>
+              <div className="mt-3 text-[14px] font-semibold text-ink">{tr("Integridade da auditoria", "Audit integrity")}</div>
+              <p className="mt-0.5 text-[12px] text-muted">
                 {verify === null ? tr("Verifica a cadeia de hashes das últimas 200 entradas.", "Verifies the hash chain of the last 200 entries.") : verify === "busy" ? tr("A verificar…", "Verifying…") : "error" in verify ? verify.error : verify.ok ? tr(`Cadeia íntegra (${verify.checked} entradas).`, `Chain intact (${verify.checked} entries).`) : tr("Cadeia quebrada — contacte o suporte.", "Chain broken — contact support.")}
               </p>
-              <button type="button" onClick={() => void verifyChain()} disabled={verify === "busy"} className="mt-2 inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 px-2.5 text-[12px] font-semibold text-[#0a1b33] disabled:opacity-50">
+              <button type="button" onClick={() => void verifyChain()} disabled={verify === "busy"} className="mt-2 inline-flex h-8 items-center gap-1.5 rounded-md border border-line px-2.5 text-[12px] font-semibold text-ink disabled:opacity-50">
                 {verify === "busy" && <Loader2 size={12} className="animate-spin" />} {tr("Verificar", "Verify")}
               </button>
             </div>

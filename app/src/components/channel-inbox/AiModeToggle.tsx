@@ -32,12 +32,12 @@ export function AiModeToggle({ threadId, mode, overridden, canChange, onNotice }
 
   return (
     <span className="inline-flex items-center gap-1" data-ai-mode-toggle title={overridden ? tr("Modo definido nesta conversa (clique para voltar ao modo do agente)", "Mode set on this conversation (click to follow the agent)") : tr("Modo do agente", "Agent mode")}>
-      <span className="inline-flex rounded-md border border-slate-200 bg-slate-50 p-0.5 text-[10px] font-bold">
+      <span className="inline-flex rounded-md border border-line bg-surface-2 p-0.5 text-[10px] font-bold">
         {(["copilot", "autopilot"] as const).map((key) => {
           const active = mode === key;
           const Icon = key === "copilot" ? UserCheck : Rocket;
           return (
-            <button key={key} type="button" disabled={busy || !canChange} onClick={() => void change(key)} className={cn("inline-flex items-center gap-1 rounded px-1.5 py-0.5", active ? (key === "copilot" ? "bg-[#2b4f8a] text-white" : "bg-[#0d6b61] text-white") : "text-slate-500 hover:text-[#0a1b33]", !canChange && "cursor-default")}>
+            <button key={key} type="button" disabled={busy || !canChange} onClick={() => void change(key)} className={cn("inline-flex items-center gap-1 rounded px-1.5 py-0.5", active ? (key === "copilot" ? "bg-[#2b4f8a] text-white" : "bg-[#0d6b61] text-white") : "text-muted hover:text-ink", !canChange && "cursor-default")}>
               {busy && active ? <Loader2 size={10} className="animate-spin" /> : <Icon size={10} />}
               <span className="hidden sm:inline">{key === "copilot" ? tr("Co-Piloto", "Copilot") : tr("Automático", "Autopilot")}</span>
             </button>
@@ -45,7 +45,7 @@ export function AiModeToggle({ threadId, mode, overridden, canChange, onNotice }
         })}
       </span>
       {overridden && canChange && (
-        <button type="button" disabled={busy} onClick={() => void change(null)} className="text-[9px] font-semibold text-slate-400 hover:text-[#0a1b33]">{tr("agente", "agent")}</button>
+        <button type="button" disabled={busy} onClick={() => void change(null)} className="text-[9px] font-semibold text-faint hover:text-ink">{tr("agente", "agent")}</button>
       )}
     </span>
   );

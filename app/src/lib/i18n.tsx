@@ -959,13 +959,13 @@ export function LanguageSwitcher({
   return (
     <div
       className={cn(
-        "inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1",
+        "inline-flex items-center gap-1 rounded-lg border border-line bg-surface-2 p-1",
         compact && "flex-col",
         className,
       )}
       aria-label={t("locale.label")}
     >
-      {!compact && <Languages size={13} className="ml-1 text-slate-400" aria-hidden />}
+      {!compact && <Languages size={13} className="ml-1 text-faint" aria-hidden />}
       {(["pt", "en"] as const).map((option) => (
         <button
           key={option}
@@ -975,8 +975,8 @@ export function LanguageSwitcher({
             "h-7 rounded-md px-2 text-[11px] font-semibold transition-colors",
             compact && "w-9 px-0 text-[13px]",
             locale === option
-              ? "bg-white text-[#0a1b33] shadow-sm"
-              : "text-slate-500 hover:bg-white/70 hover:text-[#0a1b33]",
+              ? "bg-surface text-ink shadow-sm"
+              : "text-muted hover:bg-white/70 hover:text-ink",
           )}
         >
           {compact

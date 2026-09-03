@@ -127,11 +127,11 @@ export default function AppOverview() {
     return (
       <main className="min-h-screen bg-[#f6f8fb] p-6">
         <div className="mx-auto max-w-7xl space-y-4">
-          <div className="h-28 rounded-lg border border-slate-200 bg-white animate-pulse" />
+          <div className="h-28 rounded-lg border border-line bg-surface animate-pulse" />
           <div className="grid gap-3 md:grid-cols-3">
-            <div className="h-28 rounded-lg border border-slate-200 bg-white animate-pulse" />
-            <div className="h-28 rounded-lg border border-slate-200 bg-white animate-pulse" />
-            <div className="h-28 rounded-lg border border-slate-200 bg-white animate-pulse" />
+            <div className="h-28 rounded-lg border border-line bg-surface animate-pulse" />
+            <div className="h-28 rounded-lg border border-line bg-surface animate-pulse" />
+            <div className="h-28 rounded-lg border border-line bg-surface animate-pulse" />
           </div>
         </div>
       </main>
@@ -148,30 +148,30 @@ export default function AppOverview() {
 
   return (
     <main className="min-h-screen bg-[#f6f8fb]">
-      <header className="border-b border-slate-200 bg-white">
+      <header className="border-b border-line bg-surface">
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-6 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
           <div>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-faint">
               {t("op.eyebrow")}
             </div>
-            <h1 className="mt-1 font-[var(--font-outfit)] text-[30px] font-medium tracking-tight text-[#0a1b33]">
+            <h1 className="mt-1 font-[var(--font-outfit)] text-[30px] font-medium tracking-tight text-ink">
               {t("op.title")}
             </h1>
-            <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500">
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-muted">
               {t("op.subtitle")}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Link
               href="/app/channel-inbox"
-              className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-[13px] font-medium text-[#0a1b33] hover:border-slate-300"
+              className="inline-flex h-10 items-center gap-2 rounded-lg border border-line bg-surface px-3 text-[13px] font-medium text-ink hover:border-line"
             >
               <Inbox size={15} />
               {t("op.openInbox")}
             </Link>
             <Link
               href="/app/campaigns"
-              className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#0a152d] px-3 text-[13px] font-medium text-white hover:bg-[#0e1f41]"
+              className="inline-flex h-10 items-center gap-2 rounded-lg bg-nav-active px-3 text-[13px] font-medium text-white hover:bg-[#0e1f41]"
             >
               <Send size={15} />
               {t("op.createCampaign")}
@@ -265,23 +265,23 @@ export default function AppOverview() {
 
         <div className="grid gap-5 xl:grid-cols-2">
         <section className="contents">
-          <section className={operationTab === "pipeline" ? "rounded-lg border border-slate-200 bg-white" : "hidden"}>
-            <div className="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <section className={operationTab === "pipeline" ? "rounded-lg border border-line bg-surface" : "hidden"}>
+            <div className="flex flex-col gap-3 border-b border-line-soft px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h2 className="font-[var(--font-outfit)] text-lg font-medium text-[#0a1b33]">
+                <h2 className="font-[var(--font-outfit)] text-lg font-medium text-ink">
                   {t("op.pipeline")}
                 </h2>
-                <p className="mt-0.5 text-sm text-slate-500">
+                <p className="mt-0.5 text-sm text-muted">
                   {locale === "pt"
                     ? "Estado automático das conversas que já viraram pedido."
                     : "Automatic state for conversations that became requests."}
                 </p>
               </div>
-              <span className="rounded-lg bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-500">
+              <span className="rounded-lg bg-surface-2 px-3 py-1.5 text-xs font-semibold text-muted">
                 {dashboard.leads.total} {locale === "pt" ? "leads" : "leads"}
               </span>
             </div>
-            <div className="divide-y divide-slate-100">
+            <div className="divide-y divide-line-soft">
               {LEAD_STATUSES.map((status) => {
                 const count = statusCounts.get(status) ?? 0;
                 return (
@@ -289,13 +289,13 @@ export default function AppOverview() {
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex min-w-0 items-center gap-3">
                         <span className={statusDotClass(status)} />
-                        <span className="truncate text-sm font-medium text-[#0a1b33]">
+                        <span className="truncate text-sm font-medium text-ink">
                           {t(STATUS_KEYS[status])}
                         </span>
                       </div>
-                      <span className="font-mono text-sm text-slate-500">{count}</span>
+                      <span className="font-mono text-sm text-muted">{count}</span>
                     </div>
-                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100">
+                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-3">
                       <div
                         className={statusBarClass(status)}
                         style={{ width: `${Math.round((count / totalLeadStatuses) * 100)}%` }}
@@ -307,42 +307,42 @@ export default function AppOverview() {
             </div>
           </section>
 
-          <section className={operationTab === "today" ? "rounded-lg border border-slate-200 bg-white" : "hidden"}>
-            <div className="border-b border-slate-100 px-5 py-4">
-              <h2 className="font-[var(--font-outfit)] text-lg font-medium text-[#0a1b33]">
+          <section className={operationTab === "today" ? "rounded-lg border border-line bg-surface" : "hidden"}>
+            <div className="border-b border-line-soft px-5 py-4">
+              <h2 className="font-[var(--font-outfit)] text-lg font-medium text-ink">
                 {t("op.actionQueue")}
               </h2>
-              <p className="mt-0.5 text-sm text-slate-500">
+              <p className="mt-0.5 text-sm text-muted">
                 {locale === "pt"
                   ? "O próximo movimento seguro para a equipa."
                   : "The next safe move for the team."}
               </p>
             </div>
-            <div className="divide-y divide-slate-100">
+            <div className="divide-y divide-line-soft">
               {dashboard.actionItems.map((action) => (
                 <Link
                   key={`${action.key}-${action.href}`}
                   href={action.href}
-                  className="group flex gap-3 px-5 py-4 hover:bg-slate-50"
+                  className="group flex gap-3 px-5 py-4 hover:bg-surface-2"
                 >
                   <ActionIcon tone={action.tone as ActionTone} />
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-[#0a1b33]">
+                    <p className="text-sm font-semibold text-ink">
                       {t(`op.action.${action.key}` as TranslationKey)}
                     </p>
-                    <p className="mt-1 text-sm leading-5 text-slate-500">
+                    <p className="mt-1 text-sm leading-5 text-muted">
                       {t(`op.actionBody.${action.key}` as TranslationKey)}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
                     {action.count > 0 && (
-                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+                      <span className="rounded-full bg-surface-3 px-2 py-0.5 text-[11px] font-semibold text-body">
                         {action.count}
                       </span>
                     )}
                     <ArrowRight
                       size={15}
-                      className="text-slate-300 transition-transform group-hover:translate-x-0.5 group-hover:text-[#0f766e]"
+                      className="text-faint transition-transform group-hover:translate-x-0.5 group-hover:text-[#0f766e]"
                     />
                   </div>
                 </Link>
@@ -352,13 +352,13 @@ export default function AppOverview() {
         </section>
 
         <section className="contents">
-          <section className={operationTab === "today" ? "rounded-lg border border-slate-200 bg-white" : "hidden"}>
-            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+          <section className={operationTab === "today" ? "rounded-lg border border-line bg-surface" : "hidden"}>
+            <div className="flex items-center justify-between border-b border-line-soft px-5 py-4">
               <div>
-                <h2 className="font-[var(--font-outfit)] text-lg font-medium text-[#0a1b33]">
+                <h2 className="font-[var(--font-outfit)] text-lg font-medium text-ink">
                   {t("op.recent")}
                 </h2>
-                <p className="mt-0.5 text-sm text-slate-500">
+                <p className="mt-0.5 text-sm text-muted">
                   {locale === "pt"
                     ? "Cada conversa traz estado, próximo passo e janela."
                     : "Each conversation shows state, next step, and window."}
@@ -373,23 +373,23 @@ export default function AppOverview() {
             </div>
             {dashboard.recentThreads.length === 0 ? (
               <div className="px-5 py-12 text-center">
-                <MessageCircle size={24} className="mx-auto text-slate-300" />
-                <p className="mt-3 text-sm font-medium text-[#0a1b33]">
+                <MessageCircle size={24} className="mx-auto text-faint" />
+                <p className="mt-3 text-sm font-medium text-ink">
                   {t("op.noRecent")}
                 </p>
               </div>
             ) : (
-              <div className="divide-y divide-slate-100">
+              <div className="divide-y divide-line-soft">
                 {dashboard.recentThreads.map((thread) => (
                   <Link
                     key={thread.threadId}
                     href="/app/channel-inbox"
-                    className="block px-5 py-4 hover:bg-slate-50"
+                    className="block px-5 py-4 hover:bg-surface-2"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
-                          <p className="truncate text-sm font-semibold text-[#0a1b33]">
+                          <p className="truncate text-sm font-semibold text-ink">
                             {thread.label}
                           </p>
                           <StatusBadge status={thread.leadStatus as LeadStatus} />
@@ -399,16 +399,16 @@ export default function AppOverview() {
                             </span>
                           )}
                         </div>
-                        <p className="mt-1 truncate text-sm text-slate-500">
+                        <p className="mt-1 truncate text-sm text-muted">
                           {thread.preview ?? (locale === "pt" ? "Sem prévia" : "No preview")}
                         </p>
                         {thread.nextStep && (
-                          <p className="mt-2 text-xs font-medium text-slate-600">
+                          <p className="mt-2 text-xs font-medium text-body">
                             {t("op.nextStep")}: {thread.nextStep}
                           </p>
                         )}
                       </div>
-                      <span className="shrink-0 text-xs text-slate-400">
+                      <span className="shrink-0 text-xs text-faint">
                         {relativeTime(thread.lastEventAt, Date.now(), locale)}
                       </span>
                     </div>
@@ -418,18 +418,18 @@ export default function AppOverview() {
             )}
           </section>
 
-          <section className={operationTab === "pipeline" ? "rounded-lg border border-slate-200 bg-white" : "hidden"}>
-            <div className="border-b border-slate-100 px-5 py-4">
-              <h2 className="font-[var(--font-outfit)] text-lg font-medium text-[#0a1b33]">
+          <section className={operationTab === "pipeline" ? "rounded-lg border border-line bg-surface" : "hidden"}>
+            <div className="border-b border-line-soft px-5 py-4">
+              <h2 className="font-[var(--font-outfit)] text-lg font-medium text-ink">
                 {t("op.campaignHealth")}
               </h2>
-              <p className="mt-0.5 text-sm text-slate-500">
+              <p className="mt-0.5 text-sm text-muted">
                 {locale === "pt"
                   ? "Só contadores vindos de campanhas e eventos reais."
                   : "Only counters from real campaigns and events."}
               </p>
             </div>
-            <div className="grid grid-cols-2 gap-px bg-slate-100 sm:grid-cols-4">
+            <div className="grid grid-cols-2 gap-px bg-surface-3 sm:grid-cols-4">
               <CampaignMetric label={locale === "pt" ? "Enviados" : "Sent"} value={dashboard.campaigns.stats.sent} />
               <CampaignMetric label={locale === "pt" ? "Entregues" : "Delivered"} value={dashboard.campaigns.stats.delivered} />
               <CampaignMetric label={locale === "pt" ? "Lidos" : "Read"} value={dashboard.campaigns.stats.read} />
@@ -472,13 +472,13 @@ export default function AppOverview() {
         </div>
 
         {operationTab === "today" && (
-        <section className="rounded-lg border border-slate-200 bg-white p-5">
+        <section className="rounded-lg border border-line bg-surface p-5">
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>
-              <h2 className="font-[var(--font-outfit)] text-lg font-medium text-[#0a1b33]">
+              <h2 className="font-[var(--font-outfit)] text-lg font-medium text-ink">
                 {t("op.quickCreators")}
               </h2>
-              <p className="mt-0.5 text-sm text-slate-500">
+              <p className="mt-0.5 text-sm text-muted">
                 {locale === "pt"
                   ? "Configuração curta; operação automática depois que o lead entra."
                   : "Short setup; automatic operation after the lead enters."}
@@ -490,18 +490,18 @@ export default function AppOverview() {
               const Icon = creator.icon;
               const content = (
                 <>
-                  <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-white text-[#0f766e] shadow-sm">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-surface text-[#0f766e] shadow-sm">
                     <Icon size={17} />
                   </span>
-                  <p className="mt-4 text-sm font-semibold text-[#0a1b33]">
+                  <p className="mt-4 text-sm font-semibold text-ink">
                     {t(creator.labelKey)}
                   </p>
-                  <p className="mt-1 text-xs leading-5 text-slate-500">
+                  <p className="mt-1 text-xs leading-5 text-muted">
                     {creator.detail[locale]}
                   </p>
                 </>
               );
-              const className = "group rounded-lg border border-slate-100 bg-[#f8fafc] p-4 text-left transition-colors hover:border-slate-200 hover:bg-white";
+              const className = "group rounded-lg border border-line-soft bg-surface-2 p-4 text-left transition-colors hover:border-line hover:bg-surface";
               return creator.tab ? (
                 <button
                   key={creator.labelKey}
@@ -547,7 +547,7 @@ function AttentionCard({
   urgent?: boolean;
 }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-3 sm:p-4">
+    <div className="rounded-lg border border-line bg-surface p-3 sm:p-4">
       <span
         className={`inline-flex h-8 w-8 items-center justify-center rounded-lg sm:h-9 sm:w-9 ${
           urgent ? "bg-amber-50 text-amber-600" : "bg-emerald-50 text-[#0f766e]"
@@ -555,13 +555,13 @@ function AttentionCard({
       >
         <Icon size={17} />
       </span>
-      <p className="mt-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400 sm:mt-5 sm:text-[11px] sm:tracking-[0.14em]">
+      <p className="mt-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-faint sm:mt-5 sm:text-[11px] sm:tracking-[0.14em]">
         {label}
       </p>
-      <p className="mt-1 font-[var(--font-outfit)] text-2xl font-medium text-[#0a1b33] sm:text-3xl">
+      <p className="mt-1 font-[var(--font-outfit)] text-2xl font-medium text-ink sm:text-3xl">
         {value}
       </p>
-      <p className="mt-1 truncate text-xs text-slate-500 sm:text-sm">{note}</p>
+      <p className="mt-1 truncate text-xs text-muted sm:text-sm">{note}</p>
     </div>
   );
 }
@@ -591,7 +591,7 @@ function ActionIcon({ tone }: { tone: ActionTone }) {
 function StatusBadge({ status }: { status: LeadStatus }) {
   const { t } = useI18n();
   return (
-    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+    <span className="rounded-full bg-surface-3 px-2 py-0.5 text-[11px] font-semibold text-body">
       {t(STATUS_KEYS[status])}
     </span>
   );
@@ -599,11 +599,11 @@ function StatusBadge({ status }: { status: LeadStatus }) {
 
 function CampaignMetric({ label, value }: { label: string; value: number }) {
   return (
-    <div className="bg-white p-4">
-      <p className="font-[var(--font-outfit)] text-2xl font-medium text-[#0a1b33]">
+    <div className="bg-surface p-4">
+      <p className="font-[var(--font-outfit)] text-2xl font-medium text-ink">
         {value}
       </p>
-      <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+      <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-faint">
         {label}
       </p>
     </div>
@@ -624,15 +624,15 @@ function CompactHealth({
   urgent?: boolean;
 }) {
   return (
-    <div className="rounded-lg border border-slate-100 bg-[#f8fafc] p-4">
+    <div className="rounded-lg border border-line-soft bg-surface-2 p-4">
       <div className="flex items-start justify-between gap-3">
         <Icon size={17} className={urgent ? "text-amber-600" : "text-[#0f766e]"} />
-        <span className="font-[var(--font-outfit)] text-xl font-medium text-[#0a1b33]">
+        <span className="font-[var(--font-outfit)] text-xl font-medium text-ink">
           {value}
         </span>
       </div>
-      <p className="mt-4 text-sm font-semibold text-[#0a1b33]">{title}</p>
-      <p className="mt-1 text-xs leading-5 text-slate-500">{note}</p>
+      <p className="mt-4 text-sm font-semibold text-ink">{title}</p>
+      <p className="mt-1 text-xs leading-5 text-muted">{note}</p>
     </div>
   );
 }
