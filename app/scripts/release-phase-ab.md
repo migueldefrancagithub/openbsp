@@ -55,3 +55,12 @@ O Vercel constrói `main`. Confirmar em https://openbsp-ashy.vercel.app que a ap
 - Convex: `npx convex deploy` da `main` anterior (00744e6) **não** remove tabelas nem
   dados; as funções novas deixam de existir e a UI antiga volta a funcionar.
 - Vercel: "Promote" do deployment anterior.
+
+## Fase C incluída — comando único
+A branch `claude/openbsp-phase-c` (PR consolidado para `main`) contém A + B + C. Tudo num
+passo, pela ordem segura (Convex prod → backfills → merge):
+```bash
+bash app/scripts/release-phase-c.sh
+```
+Depois: `npx convex env set ANTHROPIC_API_KEY <chave>` (ou `OPENAI_API_KEY` /
+`GOOGLE_GENERATIVE_AI_API_KEY`), ou a clínica guarda a sua chave em Definições › IA.
