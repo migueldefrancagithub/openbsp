@@ -3,7 +3,19 @@ import type { Doc, Id } from "../../_generated/dataModel";
 import { writeAudit } from "../audit";
 import { recordThreadSystemEvent } from "../channels/systemEvents";
 
-/** A human takes over: pause the run and drop turns that have not been sent. */
+export type AiMode = "sandbox" | "copilot" | "autopilot";
+
+/** Conversation override wins; otherwise the agent's mode; copilot by default. */
+export function effectiveAiMode(thread: Pick<Doc<"channelThreads">, "aiMode">, agent: Pick<Doc<"aiAgents">, "mode"> | null): AiMode {
+  if (thread.aiMode) return thread.aiMode;
+  return agent?.mode ?? "copilot";
+}
+
+/**
+ * A human takes over. Autopilot: pause the run and drop unsent turns.
+ * Copilot: the human is expected to talk; only a pending suggestion for the
+ * message just answered is retired.
+ */
 export async function pauseAiRun(
   ctx: { db: any },
   thread: Doc<"channelThreads">,
@@ -15,14 +27,23 @@ export async function pauseAiRun(
     .withIndex("by_thread_status", (q: any) => q.eq("threadId", thread._id).eq("status", "active"))
     .first()) as Doc<"aiRuns"> | null;
   if (!aiRun) return null;
-  await ctx.db.patch(aiRun._id, { status: "paused", pausedReason: reason, updatedAt: now });
+  const agent = (await ctx.db.get(aiRun.agentId)) as Doc<"aiAgents"> | null;
   const recent = (await ctx.db
     .query("aiTurns")
     .withIndex("by_run", (q: any) => q.eq("runId", aiRun._id))
     .order("desc")
     .take(5)) as Doc<"aiTurns">[];
+  if (effectiveAiMode(thread, agent) === "copilot") {
+    for (const turn of recent) {
+      if (turn.status === "awaiting_approval") {
+        await ctx.db.patch(turn._id, { status: "skipped", failureCode: "HUMAN_REPLIED", updatedAt: now });
+      }
+    }
+    return null;
+  }
+  await ctx.db.patch(aiRun._id, { status: "paused", pausedReason: reason, updatedAt: now });
   for (const turn of recent) {
-    if (turn.status === "queued" || turn.status === "awaiting_send") {
+    if (turn.status === "queued" || turn.status === "awaiting_send" || turn.status === "awaiting_approval") {
       await ctx.db.patch(turn._id, { status: "skipped", failureCode: "HUMAN_TAKEOVER", updatedAt: now });
     }
   }

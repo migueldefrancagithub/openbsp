@@ -23,6 +23,7 @@ export type PipelineAgent = {
     greeting?: string;
   };
   knowledge: Array<{ kind: string; title: string; body: string }>;
+  examples?: Array<{ patient: string; reply: string }>;
 };
 
 export type PipelineInput = {
@@ -178,6 +179,7 @@ export async function runTurnPipeline(input: PipelineInput): Promise<PipelineRes
     language: decision?.language === "en" ? "en" : input.settings.replyLanguage,
     handoffKeywords: input.agent.config.handoff.keywords,
     fallbackMessage: input.agent.config.fallbackMessage,
+    examples: input.agent.examples,
   });
   const tools = toolSpecsFor(input.agent.config.tools);
   const messages: AiMessage[] = [...input.history.slice(-HISTORY_LIMIT), { role: "user", content: wrapPatientText(inbound) }];

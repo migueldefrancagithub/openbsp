@@ -218,6 +218,11 @@ export const dispatchInbound = internalMutation({
         return { consumed: true, status: "completed" };
       }
     }
+    // No keyword flow matched: the AI runtime decides (mode, agent, caps, budget).
+    // Copilot suggestions are wanted even while a human is talking.
+    if (!bot && inbound.text && thread.automationMode !== "stopped") {
+      await ctx.scheduler.runAfter(0, internal.aiRuntime.claimTurn, { eventId: event._id });
+    }
     if (
       thread.automationMode === "stopped" ||
       (thread.automationMode === "human" && bot?.triggerKind !== "keyword")
@@ -225,10 +230,6 @@ export const dispatchInbound = internalMutation({
       return { consumed: false };
     }
     if (!bot?.entryNodeKey || !bot.flowNodes?.length) {
-      // No keyword flow matched: the AI runtime decides (agent, caps, budget).
-      if (!bot && inbound.text) {
-        await ctx.scheduler.runAfter(0, internal.aiRuntime.claimTurn, { eventId: event._id });
-      }
       return { consumed: false };
     }
     const runId = await ctx.db.insert("channelAutomationRuns", {

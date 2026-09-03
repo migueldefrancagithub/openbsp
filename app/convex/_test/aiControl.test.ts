@@ -34,6 +34,7 @@ async function seed(t: ReturnType<typeof convexTest>) {
   const detail = await asOwner.query(api.aiAgents.get, { agentId });
   await asOwner.mutation(api.aiAgents.updateDraft, { agentId, config: { ...detail.agent.config, knowledgeItemIds: [base.knowledgeId] } });
   const published = await asOwner.mutation(api.aiAgents.publish, { agentId });
+  await asOwner.mutation(api.aiAgents.setMode, { agentId, mode: "autopilot" });
   const runId = await t.run(async (ctx) => {
     const now = Date.now();
     const runId = await ctx.db.insert("aiRuns", { tenantId: base.tenantId, agentId, versionId: published.versionId, channelId: base.channelId, threadId: base.threadId, threadKey: "258840000099", status: "active", turnsCount: 2, costUsdMicros: 1200, lastTurnAt: now, createdAt: now, updatedAt: now });

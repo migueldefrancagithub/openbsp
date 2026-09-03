@@ -291,6 +291,8 @@ const aiProviderValidator = v.union(
   v.literal("mock"),
 );
 
+const aiModeValidator = v.union(v.literal("sandbox"), v.literal("copilot"), v.literal("autopilot"));
+
 const aiObjectiveValidator = v.union(
   v.literal("reception"),
   v.literal("sales"),
@@ -835,6 +837,8 @@ export default defineSchema({
     firstRespondedAt: v.optional(v.number()),
     assignedBy: v.optional(v.union(v.literal("manual"), v.literal("rule"))),
     assignmentRuleId: v.optional(v.id("assignmentRules")),
+    /** Per-conversation override of the agent's maturity mode. */
+    aiMode: v.optional(v.union(v.literal("copilot"), v.literal("autopilot"))),
     /** Cache of the open/assigned human case, for list rendering. */
     openHumanCaseId: v.optional(v.id("humanCases")),
     /** Tenant-defined fields (see customFieldDefinitions); values inline. */
@@ -1035,6 +1039,8 @@ export default defineSchema({
     objective: aiObjectiveValidator,
     channelId: v.optional(v.id("channels")),
     status: v.union(v.literal("draft"), v.literal("active"), v.literal("paused")),
+    /** Maturity mode: sandbox (never touches WhatsApp), copilot (suggests, human approves), autopilot. */
+    mode: v.optional(aiModeValidator),
     config: aiAgentConfigValidator,
     currentVersion: v.number(),
     publishedVersionId: v.optional(v.id("aiAgentVersions")),
@@ -1103,12 +1109,20 @@ export default defineSchema({
     status: v.union(
       v.literal("queued"),
       v.literal("processing"),
+      v.literal("awaiting_approval"),
       v.literal("awaiting_send"),
       v.literal("completed"),
       v.literal("failed"),
       v.literal("skipped"),
     ),
     stage: v.optional(v.string()),
+    mode: v.optional(aiModeValidator),
+    /** Copilot: write actions proposed by the model, executed only on approval. */
+    proposedActions: v.optional(v.any()),
+    suggestedText: v.optional(v.string()),
+    approvedBy: v.optional(v.id("members")),
+    approvedAt: v.optional(v.number()),
+    editedText: v.optional(v.string()),
     routerDecision: v.optional(v.any()),
     providerAttempts: v.array(
       v.object({
@@ -1140,6 +1154,7 @@ export default defineSchema({
     .index("by_run", ["runId", "createdAt"])
     .index("by_run_business_key", ["runId", "businessKey"])
     .index("by_status_created", ["status", "createdAt"])
+    .index("by_thread_status", ["threadId", "status"])
     .index("by_tenant_created", ["tenantId", "createdAt"]),
 
   /** Every tool call the AI makes, with input/output and its verdict. */
@@ -1159,6 +1174,28 @@ export default defineSchema({
   })
     .index("by_turn", ["turnId", "createdAt"])
     .index("by_tenant_business_key", ["tenantId", "businessKey"]),
+
+  /**
+   * Copilot feedback loop: what the model suggested vs what the team sent.
+   * Approved examples are fed back to the agent as few-shot guidance.
+   */
+  aiFeedback: defineTable({
+    tenantId: v.id("tenants"),
+    agentId: v.id("aiAgents"),
+    versionId: v.optional(v.id("aiAgentVersions")),
+    turnId: v.id("aiTurns"),
+    threadId: v.id("channelThreads"),
+    patientText: v.string(),
+    suggestedText: v.string(),
+    finalText: v.string(),
+    outcome: v.union(v.literal("approved"), v.literal("edited"), v.literal("discarded")),
+    approvedActions: v.array(v.string()),
+    rejectedActions: v.array(v.string()),
+    memberId: v.id("members"),
+    createdAt: v.number(),
+  })
+    .index("by_agent_created", ["agentId", "createdAt"])
+    .index("by_tenant_created", ["tenantId", "createdAt"]),
 
   /** Composer help (suggest/translate/rewrite). Never sent by itself. */
   aiSuggestions: defineTable({

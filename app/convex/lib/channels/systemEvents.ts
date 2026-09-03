@@ -45,6 +45,10 @@ export const THREAD_SYSTEM_EVENT_KINDS = [
   "ai.skipped",
   "ai.paused",
   "ai.resumed",
+  "ai.suggested",
+  "ai.approved",
+  "ai.discarded",
+  "ai.mode_changed",
 ] as const;
 
 export type ThreadSystemEventKind = (typeof THREAD_SYSTEM_EVENT_KINDS)[number];
