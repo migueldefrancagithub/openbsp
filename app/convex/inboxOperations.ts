@@ -604,18 +604,49 @@ export const getThreadOps = tenantQuery({
         mode: v.string(),
         overridden: v.boolean(),
         pendingSuggestion: v.boolean(),
+        /** What the AI has spent on THIS conversation, in micro-dollars. */
+        costUsdMicros: v.number(),
+        turnsCharged: v.number(),
       }),
       v.null(),
     ),
   }),
   handler: async (ctx, args) => {
     const thread = await loadByIdInTenant(ctx, "channelThreads", args.threadId);
-    let ai: { agentName: string; status: "responding" | "paused" | "handed_off" | "off"; turns: number; lastTurnAt?: number; pausedReason?: string; mode: string; overridden: boolean; pendingSuggestion: boolean } | null = null;
+    let ai: {
+      agentName: string;
+      status: "responding" | "paused" | "handed_off" | "off";
+      turns: number;
+      lastTurnAt?: number;
+      pausedReason?: string;
+      mode: string;
+      overridden: boolean;
+      pendingSuggestion: boolean;
+      costUsdMicros: number;
+      turnsCharged: number;
+    } | null = null;
     const pendingSuggestion =
       (await ctx.db
         .query("aiTurns")
         .withIndex("by_thread_status", (q) => q.eq("threadId", thread._id).eq("status", "awaiting_approval"))
         .first()) !== null;
+    // Cost belongs next to the conversation it was spent on: a clinic that
+    // cannot see what an answer cost cannot decide whether to keep paying for
+    // it. Bounded read — the newest turns are the ones that matter.
+    let costUsdMicros = 0;
+    let turnsCharged = 0;
+    for (const status of ["completed", "awaiting_approval", "failed", "awaiting_send", "skipped"] as const) {
+      const rows = (await ctx.db
+        .query("aiTurns")
+        .withIndex("by_thread_status", (q) => q.eq("threadId", thread._id).eq("status", status))
+        .take(50)) as Doc<"aiTurns">[];
+      for (const row of rows) {
+        if (row.costUsdMicros > 0) {
+          costUsdMicros += row.costUsdMicros;
+          turnsCharged += 1;
+        }
+      }
+    }
     let agentForMode: Doc<"aiAgents"> | null = null;
     for (const status of ["active", "paused", "handed_off"] as const) {
       const run = await ctx.db
@@ -634,6 +665,8 @@ export const getThreadOps = tenantQuery({
           mode: thread.aiMode ?? agent?.mode ?? "copilot",
           overridden: !!thread.aiMode,
           pendingSuggestion,
+          costUsdMicros,
+          turnsCharged,
         };
         break;
       }
@@ -646,7 +679,16 @@ export const getThreadOps = tenantQuery({
         .take(1);
       agentForMode = actives[0] ?? null;
       if (agentForMode) {
-        ai = { agentName: agentForMode.name, status: "off", turns: 0, mode: thread.aiMode ?? agentForMode.mode ?? "copilot", overridden: !!thread.aiMode, pendingSuggestion };
+        ai = {
+          agentName: agentForMode.name,
+          status: "off",
+          turns: 0,
+          mode: thread.aiMode ?? agentForMode.mode ?? "copilot",
+          overridden: !!thread.aiMode,
+          pendingSuggestion,
+          costUsdMicros,
+          turnsCharged,
+        };
       }
     }
     // The most recent thing that stopped a send. Read from the durable system

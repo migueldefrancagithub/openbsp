@@ -71,6 +71,48 @@ export const acknowledgeAlert = tenantMutation({
   },
 });
 
+/**
+ * Clear a whole class of alerts at once.
+ *
+ * The bell exists to say "something needs you", and a list nobody can drain is
+ * a list people stop reading. Severity is the filter because it maps to the
+ * decision: informational noise can go in one gesture, critical ones should
+ * still be looked at individually — so the default deliberately excludes them.
+ */
+export const acknowledgeAll = tenantMutation({
+  args: { severity: v.optional(v.union(v.literal("info"), v.literal("warn"), v.literal("critical"))) },
+  returns: v.object({ acknowledged: v.number(), remaining: v.number() }),
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    const rows = (await ctx.db
+      .query("opsAlerts")
+      .withIndex("by_tenant_status_created", (q) => q.eq("tenantId", ctx.tenantId).eq("status", "open"))
+      .take(200)) as Doc<"opsAlerts">[];
+    // Without an explicit severity, "clear the noise" means info and warn.
+    // Nobody should be able to make a critical alert disappear by accident.
+    const target = args.severity
+      ? rows.filter((row) => row.severity === args.severity)
+      : rows.filter((row) => row.severity !== "critical");
+    for (const row of target) {
+      await ctx.db.patch(row._id, {
+        status: "acknowledged",
+        acknowledgedBy: ctx.memberId,
+        acknowledgedAt: now,
+        updatedAt: now,
+      });
+    }
+    await writeAudit(ctx, {
+      action: "ops.alert.acknowledged_bulk",
+      targetType: "opsAlert",
+      // A bulk clear has no single target, so the tenant carries the entry and
+      // the payload says how many and of what severity.
+      targetId: ctx.tenantId,
+      payload: { count: target.length, severity: args.severity ?? "info+warn" },
+    });
+    return { acknowledged: target.length, remaining: rows.length - target.length };
+  },
+});
+
 export const summary = tenantQuery({
   args: {},
   returns: v.object({ open: v.number(), critical: v.number(), warn: v.number() }),

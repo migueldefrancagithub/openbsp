@@ -47,7 +47,20 @@ export default function AdminLogsPage() {
 
   const events = useQuery(api.channels.listRecentEvents, tab === "events" && channelId ? { channelId, limit: 100 } : "skip");
   const outbox = useQuery(api.channels.listRecentOutbox, tab === "outbox" && channelId ? { channelId, limit: 200 } : "skip");
-  const audit = usePaginatedQuery(api.audit.listPaginated, tab === "audit" ? {} : "skip", { initialNumItems: 40 });
+  const members = useQuery(api.memberInvites.listMembers, tab === "audit" ? {} : "skip");
+  const [auditActor, setAuditActor] = useState<string>("");
+  const [auditArea, setAuditArea] = useState<string>("");
+  const audit = usePaginatedQuery(
+    api.audit.listPaginated,
+    tab === "audit"
+      ? {
+          ...(auditActor.startsWith("member:") ? { actorId: auditActor.slice(7) as Id<"members"> } : {}),
+          ...(auditActor.startsWith("type:") ? { actorType: auditActor.slice(5) } : {}),
+          ...(auditArea ? { actionPrefix: auditArea } : {}),
+        }
+      : "skip",
+    { initialNumItems: 40 },
+  );
   const followUps = usePaginatedQuery(api.followUps.listRecent, tab === "followups" ? {} : "skip", { initialNumItems: 40 });
   const now = Date.now();
 
@@ -107,6 +120,57 @@ export default function AdminLogsPage() {
                 ])}
               />
             )
+          )}
+          {tab === "audit" && (
+            <div className="mb-3 flex flex-wrap items-center gap-2 px-4 pt-3">
+              <select
+                value={auditActor}
+                onChange={(event) => setAuditActor(event.target.value)}
+                aria-label={tr("Filtrar por autor", "Filter by author")}
+                className="h-9 rounded-lg border border-line bg-surface px-3 text-[12px] font-medium text-ink outline-none"
+              >
+                <option value="">{tr("Qualquer autor", "Any author")}</option>
+                <option value="type:system">{tr("Sistema", "System")}</option>
+                <option value="type:ai">{tr("Agente de IA", "AI agent")}</option>
+                {(members ?? []).map((member) => (
+                  <option key={member._id} value={`member:${member._id}`}>
+                    {member.name ?? member.email ?? member.role}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={auditArea}
+                onChange={(event) => setAuditArea(event.target.value)}
+                aria-label={tr("Filtrar por área", "Filter by area")}
+                className="h-9 rounded-lg border border-line bg-surface px-3 text-[12px] font-medium text-ink outline-none"
+              >
+                <option value="">{tr("Qualquer área", "Any area")}</option>
+                <option value="ai.">{tr("IA e agentes", "AI and agents")}</option>
+                <option value="inbox.">{tr("Atendimento", "Inbox")}</option>
+                <option value="clinic.">{tr("Clínica e agenda", "Clinic and agenda")}</option>
+                <option value="campaign">{tr("Campanhas", "Campaigns")}</option>
+                <option value="member">{tr("Equipa e acessos", "Team and access")}</option>
+                <option value="ops.">{tr("Operação", "Operations")}</option>
+              </select>
+              {(auditActor || auditArea) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuditActor("");
+                    setAuditArea("");
+                  }}
+                  className="text-[12px] font-semibold text-muted hover:text-ink"
+                >
+                  {tr("Limpar", "Clear")}
+                </button>
+              )}
+              <span className="text-[11px] text-faint">
+                {tr(
+                  "O filtro corre sobre as páginas mais recentes, sem quebrar a ordem da cadeia.",
+                  "The filter runs over the most recent pages, without breaking the chain order.",
+                )}
+              </span>
+            </div>
           )}
           {tab === "audit" && (
             audit.status === "LoadingFirstPage" ? <Loading /> : audit.results.length === 0 ? <Empty /> : (

@@ -26,10 +26,16 @@ export default function LeadsPage() {
     [channels],
   );
   const [channelId, setChannelId] = useState<Id<"channels"> | "">("");
+  const [campaignId, setCampaignId] = useState<Id<"campaigns"> | "">("");
+  // Only campaigns that actually produced leads are worth offering as a filter.
+  const campaigns = useQuery(api.channelCampaigns.list, { paginationOpts: { numItems: 50, cursor: null } });
   useEffect(() => {
     if (!channelId && productChannels.length === 1) setChannelId(productChannels[0]._id);
   }, [channelId, productChannels]);
-  const counts = useQuery(api.leads.counts, channels === undefined ? "skip" : { channelId: channelId || undefined });
+  const counts = useQuery(
+    api.leads.counts,
+    channels === undefined ? "skip" : { channelId: channelId || undefined, originCampaignId: campaignId || undefined },
+  );
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -38,7 +44,19 @@ export default function LeadsPage() {
         title={t("leads.title")}
         description={t("leads.subtitle")}
         action={
-          productChannels.length > 1 ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={campaignId}
+              onChange={(event) => setCampaignId(event.target.value as Id<"campaigns"> | "")}
+              aria-label={t("leads.filterCampaign")}
+              className="h-9 rounded-lg border border-line bg-surface px-3 text-[13px] font-medium text-ink outline-none"
+            >
+              <option value="">{t("leads.allCampaigns")}</option>
+              {(campaigns?.page ?? []).map((campaign) => (
+                <option key={campaign._id} value={campaign._id}>{campaign.name}</option>
+              ))}
+            </select>
+            {productChannels.length > 1 ? (
             <select
               value={channelId}
               onChange={(event) => setChannelId(event.target.value as Id<"channels"> | "")}
@@ -49,7 +67,8 @@ export default function LeadsPage() {
                 <option key={channel._id} value={channel._id}>{channel.displayName}</option>
               ))}
             </select>
-          ) : undefined
+            ) : null}
+          </div>
         }
       />
       {channels === undefined ? (
@@ -58,7 +77,7 @@ export default function LeadsPage() {
         <EmptyState icon={MousePointerClick} title={t("leads.title")} description={t("leads.noChannel")} />
       ) : (
         <div className="flex min-h-0 flex-1 flex-col pt-4">
-          <LeadsKanban channelId={channelId || undefined} counts={counts} />
+          <LeadsKanban channelId={channelId || undefined} originCampaignId={campaignId || undefined} counts={counts} />
         </div>
       )}
     </div>

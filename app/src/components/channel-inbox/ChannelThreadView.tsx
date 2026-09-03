@@ -471,7 +471,7 @@ export function ChannelThreadView({
   channelId: Id<"channels">;
   threadKey: string;
 }) {
-  const { locale, t } = useI18n();
+  const { locale, t, tr } = useI18n();
   const thread = useQuery(api.channels.getThread, { channelId, threadKey });
   const events = useQuery(api.channels.listThreadEvents, {
     channelId,
@@ -1141,6 +1141,33 @@ export function ChannelThreadView({
             className="hidden"
           />
 
+          {!blocked && workspace?.role !== "marketing" && (quickReplies?.length ?? 0) > 0 && (
+            <div className="mb-2 flex flex-wrap items-center gap-1" data-quick-reply-strip>
+              <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-faint">
+                {tr("Respostas rápidas", "Quick replies")}
+              </span>
+              {(quickReplies ?? []).slice(0, 4).map((reply) => (
+                <button
+                  key={reply._id}
+                  type="button"
+                  onClick={() => insertQuickReply(reply.content)}
+                  title={reply.content.slice(0, 160)}
+                  className="max-w-[190px] truncate rounded-full border border-line bg-surface px-2.5 py-1 text-[11px] font-semibold text-body transition-colors hover:border-brand-solid/40 hover:text-ink"
+                >
+                  {reply.name}
+                </button>
+              ))}
+              {(quickReplies?.length ?? 0) > 4 && (
+                <button
+                  type="button"
+                  onClick={() => setShowQuickReplies(true)}
+                  className="rounded-full px-2 py-1 text-[11px] font-semibold text-muted hover:text-ink"
+                >
+                  +{(quickReplies?.length ?? 0) - 4}
+                </button>
+              )}
+            </div>
+          )}
           <RetentionNotice retention={threadOps?.retention} />
           {workspace?.role !== "marketing" && (
             <div className="mb-2">

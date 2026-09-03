@@ -3,6 +3,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vites
 import { api, internal } from "../_generated/api";
 import type { Doc, Id } from "../_generated/dataModel";
 import schema from "../schema";
+import { localDateOf } from "../lib/clinicTime";
 import { encryptSecret } from "../lib/secrets";
 import { normalizeWebhook } from "../integrations/iaSolutionHub/webhook";
 import { localTimeToTimestamp } from "../lib/clinicTime";
@@ -175,7 +176,10 @@ describe("AI runtime", () => {
     const s = await seed(t);
     // Budget exhausted → skip + alert.
     await t.run(async (ctx) => {
-      await ctx.db.insert("aiCostLedger", { tenantId: s.tenantId, day: new Date().toISOString().slice(0, 10), provider: "mock", model: "m", inputTokens: 1, outputTokens: 1, costUsdMicros: 5_000_000, turns: 1, updatedAt: Date.now() });
+      // The day key must be the CLINIC's day, the same one `spentTodayMicros`
+      // computes. Building it in UTC makes this test fail between 22:00 and
+      // midnight UTC, and pass the rest of the time.
+      await ctx.db.insert("aiCostLedger", { tenantId: s.tenantId, day: localDateOf(Date.now(), "Africa/Maputo"), provider: "mock", model: "m", inputTokens: 1, outputTokens: 1, costUsdMicros: 5_000_000, turns: 1, updatedAt: Date.now() });
     });
     const e1 = await inbound(t, s.channelId, "Olá", "b1");
     expect((await t.mutation(internal.aiRuntime.claimTurn, { eventId: e1._id })).reason).toBe("BUDGET_EXCEEDED");

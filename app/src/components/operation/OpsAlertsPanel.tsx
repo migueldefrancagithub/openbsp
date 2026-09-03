@@ -17,6 +17,7 @@ export function OpsAlertsPanel({ compact = false }: { compact?: boolean }) {
   const { locale, tr } = useI18n();
   const alerts = useQuery(api.ops.listAlerts, {});
   const acknowledge = useMutation(api.ops.acknowledgeAlert);
+  const acknowledgeAll = useMutation(api.ops.acknowledgeAll);
   const [busy, setBusy] = useState<Id<"opsAlerts"> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const now = Date.now();
@@ -53,7 +54,23 @@ export function OpsAlertsPanel({ compact = false }: { compact?: boolean }) {
           <BellRing size={14} /> {tr("Alertas", "Alerts")}
           <span className="rounded-full bg-amber-200 px-1.5 text-[11px]">{alerts.length}</span>
         </div>
-        {error && <span className="text-[11px] text-chip-danger-fg">{error}</span>}
+        <span className="flex items-center gap-2">
+          {error && <span className="text-[11px] text-chip-danger-fg">{error}</span>}
+          {alerts.some((alert) => alert.severity !== "critical") && (
+            <button
+              type="button"
+              disabled={busy !== null}
+              onClick={() => void acknowledgeAll({})}
+              className="text-[11px] font-semibold text-chip-warn-fg underline-offset-2 hover:underline disabled:opacity-50"
+              title={tr(
+                "Marca como vistos os avisos informativos e de atenção. Os críticos ficam para serem lidos um a um.",
+                "Marks the informational and attention alerts as seen. Critical ones stay, to be read one by one.",
+              )}
+            >
+              {tr("Limpar não-críticos", "Clear non-critical")}
+            </button>
+          )}
+        </span>
       </div>
       <ul className="divide-y divide-line-soft">
         {visible.map((alert) => {

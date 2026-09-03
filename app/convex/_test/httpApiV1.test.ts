@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import schema from "../schema";
+import { localDateOf } from "../lib/clinicTime";
 import { routeApiV1, type ApiCaller } from "../httpApiV1";
 
 async function seed(t: ReturnType<typeof convexTest>) {
@@ -67,7 +68,9 @@ describe("REST v1 router", () => {
     const crossTenant = await book({ serviceId: s.b.serviceId, startAt, businessKey: "ext-44" });
     expect(crossTenant.status).toBe(404);
 
-    const day = new Date(startAt).toISOString().slice(0, 10);
+    // Same reason as the ledger above: the agenda query converts the day using
+    // the tenant timezone, so the test has to ask for the tenant's day.
+    const day = localDateOf(startAt, "Africa/Maputo");
     const agenda = await routeApiV1(new Request(`https://x.convex.site/api/v1/appointments?from=${day}&to=${day}`), deps(t, caller));
     expect((await agenda.json()).data).toHaveLength(1);
     const badRange = await routeApiV1(new Request("https://x.convex.site/api/v1/appointments?from=2026-01-01&to=2026-12-31"), deps(t, caller));
