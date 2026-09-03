@@ -89,3 +89,20 @@ evento "Agente IA respondeu"; falha de envio → conversa em modo humano + alert
    "Orçamento diário de IA esgotado" e a conversa fica para a equipa.
 6. Enviar 2 mensagens seguidas → uma resposta por mensagem, sem duplicados
    (`aiTurns`: uma `completed`, outra `skipped/COALESCED` + `coalesce:` `completed`).
+
+## C5 — Handoff bidireccional, presença da IA e telemetria
+
+### Verificações
+1. Inbox: com um agente ativo, o cabeçalho da conversa mostra o chip "IA a responder";
+   responder manualmente ou carregar em "Pausar IA" → chip "IA em pausa"
+   (`aiRuns.paused`, turnos em fila descartados, evento "Agente IA em pausa").
+2. Com caso humano aberto, "Retomar" no chip devolve "Resolva o caso humano…";
+   após resolver, "Retomar" → chip "IA a responder", nota interna "IA retomada…" na
+   conversa e evento "Agente IA retomado".
+3. Passagem pela IA (`abrir_caso_humano`) → chip "IA passou à equipa"; o próximo
+   inbound não é respondido pela IA até retomar.
+4. `/app/agents` › Execuções: cartões (turnos, respondidos, passados à equipa,
+   falhas, ferramentas, latência, custo) e lista de turnos com ferramentas e tentativas
+   por provedor; link para a conversa.
+5. `channelAutomation:flowAnalytics` (fluxos por palavra-chave): execuções, conclusão,
+   duração média, motivos de fim e nós de abandono.

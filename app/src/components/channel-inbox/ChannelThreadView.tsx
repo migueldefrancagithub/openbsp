@@ -40,6 +40,7 @@ import { PilotBanner } from "@/components/channel-inbox/PilotBanner";
 import { LeadHeaderBar } from "@/components/channel-inbox/LeadHeaderBar";
 import { HandoffDialog } from "@/components/channel-inbox/HandoffDialog";
 import { HumanCaseChip } from "@/components/channel-inbox/HumanCaseChip";
+import { AiPresenceChip } from "@/components/channel-inbox/AiPresenceChip";
 import { SnoozeMenu } from "@/components/channel-inbox/SnoozeMenu";
 import {
   SystemEventRow,
@@ -831,6 +832,7 @@ export function ChannelThreadView({
               >
                 <Star size={15} className={summary.starredAt ? "fill-current" : undefined} />
               </button>
+              <AiPresenceChip threadId={summary._id} ai={threadOps?.ai} canResume={!threadOps?.openCase} onNotice={setHeaderNotice} />
               {threadOps?.openCase ? (
                 <HumanCaseChip threadId={summary._id} currentMemberId={workspace?.memberId} />
               ) : (

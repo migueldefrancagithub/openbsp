@@ -1,3 +1,4 @@
+import { pauseAiRun, resumeAiRun } from "../ai/control";
 import { stopThreadFollowUps } from "../followUpControl";
 import { ConvexError, v } from "convex/values";
 import type { Doc, Id } from "../../_generated/dataModel";
@@ -246,6 +247,12 @@ export async function applyThreadUpdate(
   }
   if (args.automationMode !== undefined) {
     patch.automationMode = args.automationMode;
+    if (args.automationMode === "human" && thread.automationMode !== "human") {
+      await pauseAiRun(ctx, thread, "paused_by_operator", now);
+    }
+    if (args.automationMode === "bot" && thread.automationMode !== "bot") {
+      await resumeAiRun(ctx, { thread, now });
+    }
     patch.automationChangedAt = now;
     patch.automationChangeReason = "manual_inbox_control";
     if (args.automationMode === "human") {

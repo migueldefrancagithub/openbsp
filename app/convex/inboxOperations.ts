@@ -464,9 +464,37 @@ export const getThreadOps = tenantQuery({
       v.null(),
     ),
     pilotBlocked: v.boolean(),
+    ai: v.union(
+      v.object({
+        agentName: v.string(),
+        status: v.union(v.literal("responding"), v.literal("paused"), v.literal("handed_off"), v.literal("off")),
+        turns: v.number(),
+        lastTurnAt: v.optional(v.number()),
+        pausedReason: v.optional(v.string()),
+      }),
+      v.null(),
+    ),
   }),
   handler: async (ctx, args) => {
     const thread = await loadByIdInTenant(ctx, "channelThreads", args.threadId);
+    let ai: { agentName: string; status: "responding" | "paused" | "handed_off" | "off"; turns: number; lastTurnAt?: number; pausedReason?: string } | null = null;
+    for (const status of ["active", "paused", "handed_off"] as const) {
+      const run = await ctx.db
+        .query("aiRuns")
+        .withIndex("by_thread_status", (q) => q.eq("threadId", thread._id).eq("status", status))
+        .first();
+      if (run) {
+        const agent = await ctx.db.get(run.agentId);
+        ai = {
+          agentName: agent?.name ?? "IA",
+          status: status === "active" ? (agent?.status === "active" ? "responding" : "off") : status,
+          turns: run.turnsCount,
+          lastTurnAt: run.lastTurnAt,
+          pausedReason: run.pausedReason,
+        };
+        break;
+      }
+    }
     const recent = (await ctx.db
       .query("humanCases")
       .withIndex("by_thread", (q) =>
@@ -490,6 +518,7 @@ export const getThreadOps = tenantQuery({
           }
         : null,
       pilotBlocked: !!thread.pilotBlockedAt,
+      ai,
     };
   },
 });

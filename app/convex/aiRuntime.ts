@@ -528,3 +528,154 @@ export const sweepStaleTurns = internalMutation({
     return { failed: stale.length };
   },
 });
+
+// ---------------------------------------------------------------------------
+// Telemetry (C5)
+// ---------------------------------------------------------------------------
+
+import { paginationOptsValidator } from "convex/server";
+import { requireCapability, tenantMutation, tenantQuery, loadByIdInTenant } from "./lib/customFunctions";
+import { resumeAiRun } from "./lib/ai/control";
+
+const turnRowValidator = v.object({
+  _id: v.id("aiTurns"),
+  runId: v.id("aiRuns"),
+  threadId: v.id("channelThreads"),
+  threadKey: v.string(),
+  agentName: v.string(),
+  status: v.string(),
+  stage: v.optional(v.string()),
+  routerIntent: v.optional(v.string()),
+  replyText: v.optional(v.string()),
+  failureCode: v.optional(v.string()),
+  toolCallCount: v.number(),
+  inputTokens: v.number(),
+  outputTokens: v.number(),
+  costUsdMicros: v.number(),
+  latencyMs: v.number(),
+  attempts: v.array(v.object({ provider: v.string(), model: v.string(), stage: v.string(), ok: v.boolean(), kind: v.optional(v.string()), latencyMs: v.number() })),
+  createdAt: v.number(),
+  completedAt: v.optional(v.number()),
+});
+
+export const listTurns = tenantQuery({
+  args: { agentId: v.optional(v.id("aiAgents")), threadId: v.optional(v.id("channelThreads")), paginationOpts: paginationOptsValidator },
+  returns: v.object({ page: v.array(turnRowValidator), isDone: v.boolean(), continueCursor: v.string() }),
+  handler: async (ctx, args) => {
+    requireCapability(ctx.role, "ai.view_runs");
+    const result = await ctx.db
+      .query("aiTurns")
+      .withIndex("by_tenant_created", (q) => q.eq("tenantId", ctx.tenantId))
+      .order("desc")
+      .filter((q) => (args.threadId ? q.eq(q.field("threadId"), args.threadId) : q.eq(q.field("tenantId"), ctx.tenantId)))
+      .paginate({ cursor: args.paginationOpts.cursor, numItems: Math.min(Math.max(args.paginationOpts.numItems, 1), 50) });
+    const runs = new Map<string, Doc<"aiRuns"> | null>();
+    const agents = new Map<string, Doc<"aiAgents"> | null>();
+    const page = [];
+    for (const turn of result.page) {
+      let run = runs.get(turn.runId);
+      if (run === undefined) {
+        run = (await ctx.db.get(turn.runId)) as Doc<"aiRuns"> | null;
+        runs.set(turn.runId, run);
+      }
+      if (!run) continue;
+      if (args.agentId && run.agentId !== args.agentId) continue;
+      let agent = agents.get(run.agentId);
+      if (agent === undefined) {
+        agent = (await ctx.db.get(run.agentId)) as Doc<"aiAgents"> | null;
+        agents.set(run.agentId, agent);
+      }
+      const decision = turn.routerDecision as { intent?: string } | undefined;
+      page.push({
+        _id: turn._id,
+        runId: turn.runId,
+        threadId: turn.threadId,
+        threadKey: run.threadKey,
+        agentName: agent?.name ?? "—",
+        status: turn.status,
+        stage: turn.stage,
+        routerIntent: decision?.intent,
+        replyText: turn.replyText,
+        failureCode: turn.failureCode,
+        toolCallCount: turn.toolCallCount,
+        inputTokens: turn.inputTokens,
+        outputTokens: turn.outputTokens,
+        costUsdMicros: turn.costUsdMicros,
+        latencyMs: turn.providerAttempts.reduce((sum, a) => sum + a.latencyMs, 0),
+        attempts: turn.providerAttempts.map((a) => ({ provider: a.provider, model: a.model, stage: a.stage, ok: a.ok, kind: a.kind, latencyMs: a.latencyMs })),
+        createdAt: turn.createdAt,
+        completedAt: turn.completedAt,
+      });
+    }
+    return { page, isDone: result.isDone, continueCursor: result.continueCursor };
+  },
+});
+
+export const stats = tenantQuery({
+  args: { agentId: v.optional(v.id("aiAgents")), days: v.optional(v.number()) },
+  returns: v.object({
+    turns: v.number(),
+    completed: v.number(),
+    failed: v.number(),
+    skipped: v.number(),
+    handoffs: v.number(),
+    toolCalls: v.number(),
+    avgLatencyMs: v.number(),
+    inputTokens: v.number(),
+    outputTokens: v.number(),
+    costUsdMicros: v.number(),
+    activeRuns: v.number(),
+    sampled: v.boolean(),
+  }),
+  handler: async (ctx, args) => {
+    requireCapability(ctx.role, "ai.view_runs");
+    const since = Date.now() - Math.min(90, Math.max(1, args.days ?? 7)) * 24 * 60 * 60_000;
+    const rows = (await ctx.db
+      .query("aiTurns")
+      .withIndex("by_tenant_created", (q) => q.eq("tenantId", ctx.tenantId).gte("createdAt", since))
+      .order("desc")
+      .take(1_001)) as Doc<"aiTurns">[];
+    const runs = new Map<string, Doc<"aiRuns"> | null>();
+    let turns = 0, completed = 0, failed = 0, skipped = 0, handoffs = 0, toolCalls = 0, latency = 0, latencyCount = 0, inputTokens = 0, outputTokens = 0, cost = 0;
+    for (const turn of rows.slice(0, 1_000)) {
+      if (args.agentId) {
+        let run = runs.get(turn.runId);
+        if (run === undefined) {
+          run = (await ctx.db.get(turn.runId)) as Doc<"aiRuns"> | null;
+          runs.set(turn.runId, run);
+        }
+        if (run?.agentId !== args.agentId) continue;
+      }
+      turns += 1;
+      if (turn.status === "completed") completed += 1;
+      if (turn.status === "failed") failed += 1;
+      if (turn.status === "skipped") skipped += 1;
+      if (turn.stage === "handoff") handoffs += 1;
+      toolCalls += turn.toolCallCount;
+      const l = turn.providerAttempts.reduce((sum, a) => sum + a.latencyMs, 0);
+      if (l > 0) { latency += l; latencyCount += 1; }
+      inputTokens += turn.inputTokens;
+      outputTokens += turn.outputTokens;
+      cost += turn.costUsdMicros;
+    }
+    const activeRuns = (await ctx.db
+      .query("aiRuns")
+      .withIndex("by_tenant_status_last", (q) => q.eq("tenantId", ctx.tenantId).eq("status", "active"))
+      .take(201)).filter((run) => !args.agentId || run.agentId === args.agentId).length;
+    return { turns, completed, failed, skipped, handoffs, toolCalls, avgLatencyMs: latencyCount > 0 ? Math.round(latency / latencyCount) : 0, inputTokens, outputTokens, costUsdMicros: cost, activeRuns, sampled: rows.length > 1_000 };
+  },
+});
+
+/** Inbox "Retomar IA" when the run is paused/handed off (case must be resolved). */
+export const resumeThread = tenantMutation({
+  args: { threadId: v.id("channelThreads") },
+  returns: v.object({ resumed: v.boolean() }),
+  handler: async (ctx, args) => {
+    requireCapability(ctx.role, "inbox.handoff");
+    const thread = await loadByIdInTenant(ctx, "channelThreads", args.threadId);
+    const now = Date.now();
+    const result = await resumeAiRun(ctx, { thread, now });
+    if (result.resumed) await setThreadAutomationMode(ctx, thread, "bot", "ai_resumed_by_operator", now);
+    return { resumed: result.resumed };
+  },
+});

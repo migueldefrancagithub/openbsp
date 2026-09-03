@@ -1,3 +1,4 @@
+import { pauseAiRun } from "./lib/ai/control";
 import { ConvexError, v } from "convex/values";
 import {
   internalMutation,
@@ -5,7 +6,10 @@ import {
 } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
-import { tenantQuery } from "./lib/customFunctions";
+import {
+  loadByIdInTenant,
+  tenantQuery,
+} from "./lib/customFunctions";
 import {
   extractErrorCode,
   recordThreadSystemEvent,
@@ -321,7 +325,7 @@ export const pauseForHuman = internalMutation({
         dedupeKey: `run:${run._id}:paused`,
       });
     }
-    await pauseAiRunForHuman(ctx, thread, now);
+    await pauseAiRun(ctx, thread, "human_operator_reply", now);
     await setThreadMode(ctx, thread, "human", "human_operator_reply");
     return null;
   },
@@ -1205,35 +1209,6 @@ async function stopRun(
   });
 }
 
-/** A human reply pauses the AI run and drops its queued turns (C5). */
-async function pauseAiRunForHuman(ctx: any, thread: Doc<"channelThreads">, now: number) {
-  const aiRun = await ctx.db
-    .query("aiRuns")
-    .withIndex("by_thread_status", (q: any) => q.eq("threadId", thread._id).eq("status", "active"))
-    .first();
-  if (!aiRun) return;
-  await ctx.db.patch(aiRun._id, { status: "paused", pausedReason: "human_operator_reply", updatedAt: now });
-  const queued = await ctx.db
-    .query("aiTurns")
-    .withIndex("by_run", (q: any) => q.eq("runId", aiRun._id))
-    .order("desc")
-    .take(5);
-  for (const turn of queued) {
-    if (turn.status === "queued" || turn.status === "awaiting_send") {
-      await ctx.db.patch(turn._id, { status: "skipped", failureCode: "HUMAN_TAKEOVER", updatedAt: now });
-    }
-  }
-  await recordThreadSystemEvent(ctx, {
-    thread,
-    kind: "ai.paused",
-    severity: "info",
-    code: "human_operator_reply",
-    actorType: "system",
-    dedupeKey: `airun:${aiRun._id}:paused:${now}`,
-    now,
-  });
-}
-
 async function setThreadMode(
   ctx: any,
   thread: Doc<"channelThreads">,
@@ -1463,3 +1438,61 @@ function object(value: unknown): Record<string, any> | null {
 function string(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
+
+/** Keyword-flow telemetry: executions, completion, time, errors, drop-off. */
+export const flowAnalytics = tenantQuery({
+  args: { chatbotId: v.id("chatbots") },
+  returns: v.object({
+    runs: v.number(),
+    completed: v.number(),
+    handedOff: v.number(),
+    stopped: v.number(),
+    failed: v.number(),
+    active: v.number(),
+    avgDurationMs: v.number(),
+    endReasons: v.array(v.object({ reason: v.string(), count: v.number() })),
+    dropOffNodes: v.array(v.object({ nodeKey: v.string(), count: v.number() })),
+    sampled: v.boolean(),
+  }),
+  handler: async (ctx, args) => {
+    const bot = await loadByIdInTenant(ctx, "chatbots", args.chatbotId);
+    const rows = (await ctx.db
+      .query("channelAutomationRuns")
+      .withIndex("by_chatbot_started", (q) => q.eq("chatbotId", bot._id))
+      .order("desc")
+      .take(501)) as Doc<"channelAutomationRuns">[];
+    const runs = rows.slice(0, 500);
+    const reasons = new Map<string, number>();
+    const dropOff = new Map<string, number>();
+    let duration = 0;
+    let durationCount = 0;
+    let completed = 0, handedOff = 0, stopped = 0, failed = 0, active = 0;
+    for (const run of runs) {
+      if (run.status === "completed") completed += 1;
+      else if (run.status === "handed_off") handedOff += 1;
+      else if (run.status === "stopped" || run.status === "timed_out") stopped += 1;
+      else if (run.status === "failed") failed += 1;
+      else if (run.status === "active") active += 1;
+      if (run.endedAt) {
+        duration += run.endedAt - run.startedAt;
+        durationCount += 1;
+      }
+      if (run.endReason) reasons.set(run.endReason, (reasons.get(run.endReason) ?? 0) + 1);
+      if (run.status !== "completed" && run.currentNodeKey) dropOff.set(run.currentNodeKey, (dropOff.get(run.currentNodeKey) ?? 0) + 1);
+    }
+    const top = (map: Map<string, number>, key: "reason" | "nodeKey") =>
+      Array.from(map.entries()).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([k, count]) => (key === "reason" ? { reason: k, count } : { nodeKey: k, count }));
+    return {
+      runs: runs.length,
+      completed,
+      handedOff,
+      stopped,
+      failed,
+      active,
+      avgDurationMs: durationCount > 0 ? Math.round(duration / durationCount) : 0,
+      endReasons: top(reasons, "reason") as Array<{ reason: string; count: number }>,
+      dropOffNodes: top(dropOff, "nodeKey") as Array<{ nodeKey: string; count: number }>,
+      sampled: rows.length > 500,
+    };
+  },
+});

@@ -49,6 +49,7 @@ import type * as integrations_leoHub_webhook from "../integrations/leoHub/webhoo
 import type * as leads from "../leads.js";
 import type * as leoHubLab from "../leoHubLab.js";
 import type * as lib_ai_checklist from "../lib/ai/checklist.js";
+import type * as lib_ai_control from "../lib/ai/control.js";
 import type * as lib_ai_guards from "../lib/ai/guards.js";
 import type * as lib_ai_pipeline from "../lib/ai/pipeline.js";
 import type * as lib_ai_prerouter from "../lib/ai/prerouter.js";
@@ -167,6 +168,7 @@ declare const fullApi: ApiFromModules<{
   leads: typeof leads;
   leoHubLab: typeof leoHubLab;
   "lib/ai/checklist": typeof lib_ai_checklist;
+  "lib/ai/control": typeof lib_ai_control;
   "lib/ai/guards": typeof lib_ai_guards;
   "lib/ai/pipeline": typeof lib_ai_pipeline;
   "lib/ai/prerouter": typeof lib_ai_prerouter;
