@@ -32,6 +32,23 @@ export function AgentFeedbackPanel({ agentId }: { agentId: Id<"aiAgents"> }) {
           </div>
         ))}
       </div>
+      {stats?.graduation.ready && (
+        <div className="rounded-lg border border-[#0d6b61]/30 bg-[#edf8f6] px-3 py-2 text-[12px] text-[#0d6b61]">
+          <span className="font-semibold">{tr("Pronto para Automático.", "Ready for Autopilot.")}</span>{" "}
+          {tr(
+            `A equipa aprovou ${Math.round(stats.graduation.approvalRate * 100)}% das sugestões sem editar, em ${stats.graduation.decided} decisões, e quase não corrigiu movimentos de etapa. A decisão continua sua.`,
+            `The team approved ${Math.round(stats.graduation.approvalRate * 100)}% of suggestions without editing, across ${stats.graduation.decided} decisions, and barely corrected any stage moves. The call is still yours.`,
+          )}
+        </div>
+      )}
+      {stats && (stats.corrections.reverted > 0 || stats.corrections.redirected > 0) && (
+        <p className="text-[11px] text-slate-500">
+          {tr(
+            `A equipa desfez ${stats.corrections.reverted + stats.corrections.redirected} movimento(s) de etapa deste agente (${stats.corrections.reverted} devolvido(s), ${stats.corrections.redirected} redireccionado(s)). É onde ele ainda lê a conversa de forma diferente da equipa.`,
+            `The team undid ${stats.corrections.reverted + stats.corrections.redirected} stage move(s) by this agent (${stats.corrections.reverted} reverted, ${stats.corrections.redirected} redirected). That is where it still reads the conversation differently from the team.`,
+          )}
+        </p>
+      )}
       <p className="flex items-center gap-1.5 text-[11px] text-slate-500"><GraduationCap size={12} /> {total > 0 ? tr(`Taxa de aprovação sem edição: ${Math.round(((stats?.approved ?? 0) / total) * 100)}%. As últimas 8 respostas aprovadas/editadas entram no prompt como exemplos.`, `Approval-as-is rate: ${Math.round(((stats?.approved ?? 0) / total) * 100)}%. The last 8 approved/edited replies are fed to the prompt as examples.`) : tr("Ainda sem feedback. Em Co-Piloto, cada aprovação ou edição ensina o agente.", "No feedback yet. In Copilot, every approval or edit teaches the agent.")}</p>
       <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
         {feedback.status === "LoadingFirstPage" ? (

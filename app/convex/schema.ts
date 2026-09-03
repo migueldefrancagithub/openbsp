@@ -815,6 +815,10 @@ export default defineSchema({
     tags: v.optional(v.array(v.string())),
     leadSource: v.optional(leadSourceValidator),
     leadStatus: v.optional(channelLeadStatusValidator),
+    /** Who last moved the stage: a human undoing the AI only counts when the AI moved it last. */
+    leadStatusActor: v.optional(v.union(v.literal("ai"), v.literal("member"), v.literal("system"))),
+    /** Where the AI took the stage FROM, so a revert can be told from a redirect. */
+    leadStatusPrevious: v.optional(v.string()),
     /** What the patient asked for last (see lib/channels/intents.ts). */
     intent: v.optional(threadIntentValidator),
     intentSource: v.optional(intentSourceValidator),
@@ -1162,6 +1166,27 @@ export default defineSchema({
     .index("by_run_business_key", ["runId", "businessKey"])
     .index("by_status_created", ["status", "createdAt"])
     .index("by_thread_status", ["threadId", "status"])
+    .index("by_tenant_created", ["tenantId", "createdAt"]),
+
+  /**
+   * A human undoing what the AI did — the return signal that closes the loop.
+   *
+   * Only counts when the AI moved the card LAST: a colleague tidying the funnel
+   * says nothing about the assistant, and an indicator that rises without cause
+   * is one people learn to ignore.
+   */
+  aiCorrections: defineTable({
+    tenantId: v.id("tenants"),
+    agentId: v.optional(v.id("aiAgents")),
+    threadId: v.id("channelThreads"),
+    /** reverted = back to where the AI took it from; redirected = somewhere else. */
+    kind: v.union(v.literal("reverted"), v.literal("redirected")),
+    aiStatus: v.string(),
+    memberStatus: v.string(),
+    memberId: v.id("members"),
+    createdAt: v.number(),
+  })
+    .index("by_agent_created", ["agentId", "createdAt"])
     .index("by_tenant_created", ["tenantId", "createdAt"]),
 
   /**

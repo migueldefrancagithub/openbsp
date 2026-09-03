@@ -1,4 +1,5 @@
 import { pauseAiRun, resumeAiRun } from "../ai/control";
+import { classifyCorrection } from "../ai/corrections";
 import { emitWebhookEvent } from "../webhooks";
 import { stopThreadFollowUps } from "../followUpControl";
 import { ConvexError, v } from "convex/values";
@@ -217,7 +218,35 @@ export async function applyThreadUpdate(
     patch.assignedTeamId = assignment.assignedTeamId;
   }
 
-  if (args.leadStatus !== undefined) patch.leadStatus = args.leadStatus;
+  if (args.leadStatus !== undefined) {
+    patch.leadStatus = args.leadStatus;
+    if (args.leadStatus !== thread.leadStatus) {
+      const verdict = classifyCorrection({
+        lastActor: thread.leadStatusActor,
+        fromStatus: thread.leadStatus,
+        toStatus: args.leadStatus,
+        aiPreviousStatus: thread.leadStatusPrevious,
+      });
+      if (verdict.isCorrection) {
+        const run = await ctx.db
+          .query("aiRuns")
+          .withIndex("by_thread_status", (q: any) => q.eq("threadId", thread._id).eq("status", "active"))
+          .first();
+        await ctx.db.insert("aiCorrections", {
+          tenantId: ctx.tenantId,
+          agentId: run?.agentId,
+          threadId: thread._id,
+          kind: verdict.kind,
+          aiStatus: verdict.aiStatus,
+          memberStatus: verdict.memberStatus,
+          memberId: ctx.memberId,
+          createdAt: now,
+        });
+      }
+      patch.leadStatusActor = "member";
+      patch.leadStatusPrevious = thread.leadStatus;
+    }
+  }
   if (args.leadStatus !== undefined && args.leadStatus !== thread.leadStatus) {
     await emitWebhookEvent(ctx, { tenantId: ctx.tenantId, type: "thread.lead_status_changed", eventId: `thread:${thread._id}:lead:${args.leadStatus}:${now}`, payload: { threadId: thread._id, threadKey: thread.threadKey, from: thread.leadStatus, to: args.leadStatus, byMemberId: ctx.memberId }, now });
   }

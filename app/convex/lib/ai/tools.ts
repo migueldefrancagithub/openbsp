@@ -134,6 +134,10 @@ export async function executeAiTool(ctx: ToolContext, name: string, rawInput: un
         const leadStatus = input.leadStatus ? String(input.leadStatus) : undefined;
         if (leadStatus && shouldAdvanceLeadStatus(thread.leadStatus, leadStatus as never)) {
           patch.leadStatus = leadStatus;
+          // Stamp the author and where it came from: a human undoing this later
+          // is only a signal about the assistant if the assistant moved it last.
+          patch.leadStatusActor = "ai";
+          patch.leadStatusPrevious = thread.leadStatus;
           patch.nextStep = input.nextStep ? String(input.nextStep).slice(0, 200) : nextStepFor(leadStatus as never);
         } else if (input.nextStep) {
           patch.nextStep = String(input.nextStep).slice(0, 200);
