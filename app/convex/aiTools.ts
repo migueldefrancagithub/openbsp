@@ -22,6 +22,8 @@ export const invoke = internalMutation({
     turnId: v.id("aiTurns"),
     name: v.string(),
     input: v.any(),
+    /** Copilot: propose instead of executing writes (reads still run). */
+    dryRun: v.optional(v.boolean()),
   },
   returns: outcomeValidator,
   handler: async (ctx, args) => {
@@ -33,7 +35,7 @@ export const invoke = internalMutation({
       return { status: "denied" as const, output: { error: "RUN_NOT_ACTIVE" }, errorCode: "RUN_NOT_ACTIVE", replayed: false };
     }
     const inputHash = (await sha256Hex(JSON.stringify(args.input ?? {}))).slice(0, 24);
-    const businessKey = `tool:${turn._id}:${args.name}:${inputHash}`;
+    const businessKey = `${args.dryRun ? "dry" : "tool"}:${turn._id}:${args.name}:${inputHash}`;
     const existing = (await ctx.db
       .query("aiToolInvocations")
       .withIndex("by_tenant_business_key", (q) => q.eq("tenantId", turn.tenantId).eq("businessKey", businessKey))
@@ -59,7 +61,7 @@ export const invoke = internalMutation({
         memberId: version?.publishedBy ?? agent?.createdBy ?? run.tenantId as unknown as Id<"members">,
         thread,
         turnId: turn._id,
-        dryRun: false,
+        dryRun: args.dryRun === true,
         allowedTools: version?.config.tools ?? [],
         approvedTemplates: templates.filter((t) => ["approved", "active"].includes(t.status.toLowerCase())).map((t) => ({ name: t.name, languageCode: t.languageCode })),
         now: started,

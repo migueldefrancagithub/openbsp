@@ -42,6 +42,8 @@ import { HandoffDialog } from "@/components/channel-inbox/HandoffDialog";
 import { HumanCaseChip } from "@/components/channel-inbox/HumanCaseChip";
 import { AiPresenceChip } from "@/components/channel-inbox/AiPresenceChip";
 import { AiComposerTools } from "@/components/channel-inbox/AiComposerTools";
+import { AiSuggestionCard } from "@/components/channel-inbox/AiSuggestionCard";
+import { AiModeToggle } from "@/components/channel-inbox/AiModeToggle";
 import { SnoozeMenu } from "@/components/channel-inbox/SnoozeMenu";
 import {
   SystemEventRow,
@@ -834,6 +836,9 @@ export function ChannelThreadView({
                 <Star size={15} className={summary.starredAt ? "fill-current" : undefined} />
               </button>
               <AiPresenceChip threadId={summary._id} ai={threadOps?.ai} canResume={!threadOps?.openCase} onNotice={setHeaderNotice} />
+              {threadOps?.ai && (
+                <AiModeToggle threadId={summary._id} mode={threadOps.ai.mode} overridden={threadOps.ai.overridden} canChange={workspace?.role !== "marketing"} onNotice={setHeaderNotice} />
+              )}
               {threadOps?.openCase ? (
                 <HumanCaseChip threadId={summary._id} currentMemberId={workspace?.memberId} />
               ) : (
@@ -1115,6 +1120,16 @@ export function ChannelThreadView({
             className="hidden"
           />
 
+          {workspace?.role !== "marketing" && (
+            <AiSuggestionCard
+              threadId={summary._id}
+              windowOpen={!blocked}
+              onUseDraft={(text) => {
+                setDraft(text);
+                composerRef.current?.focus();
+              }}
+            />
+          )}
           {!blocked && workspace?.role !== "marketing" && (
             <div className="mb-1.5">
               <AiComposerTools

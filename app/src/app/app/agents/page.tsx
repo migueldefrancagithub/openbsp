@@ -10,6 +10,8 @@ import { EmptyState, PageHeader } from "@/components/app/EmptyState";
 import { OBJECTIVES, issueLabel, objectiveLabel, toneLabel, toolLabel } from "@/components/agents/agentLabels";
 import { AgentSandbox } from "@/components/agents/AgentSandbox";
 import { AgentRunsPanel } from "@/components/agents/AgentRunsPanel";
+import { AgentModeToggle } from "@/components/agents/AgentModeToggle";
+import { AgentFeedbackPanel } from "@/components/agents/AgentFeedbackPanel";
 import { cn } from "@/lib/cn";
 import { convexErrorMessage } from "@/lib/convexErrorMessage";
 import { useI18n } from "@/lib/i18n";
@@ -114,7 +116,7 @@ export default function AgentsPage() {
                     <span className={cn("h-2 w-2 shrink-0 rounded-full", agent.status === "active" ? "bg-[#0d6b61]" : agent.status === "paused" ? "bg-amber-400" : "bg-slate-300")} />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[13px] font-semibold">{agent.name}</span>
-                      <span className={cn("block truncate text-[11px]", selectedId === agent._id ? "text-white/70" : "text-slate-500")}>{objectiveLabel(agent.objective, locale)} · v{agent.currentVersion}{agent.blockers > 0 ? ` · ${agent.blockers} ${tr("bloqueios", "blockers")}` : ""}</span>
+                      <span className={cn("block truncate text-[11px]", selectedId === agent._id ? "text-white/70" : "text-slate-500")}>{objectiveLabel(agent.objective, locale)} · v{agent.currentVersion} · {agent.mode === "sandbox" ? "Sandbox" : agent.mode === "copilot" ? tr("Co-Piloto", "Copilot") : tr("Automático", "Autopilot")}{agent.blockers > 0 ? ` · ${agent.blockers} ${tr("bloqueios", "blockers")}` : ""}</span>
                     </span>
                     <ChevronRight size={14} className="shrink-0 opacity-50" />
                   </button>
@@ -140,7 +142,7 @@ function AgentEditor({ agentId, channels, knowledge, onDeleted }: { agentId: Id<
   const [name, setName] = useState("");
   const [channelId, setChannelId] = useState<Id<"channels"> | "">("");
   const [keywords, setKeywords] = useState("");
-  const [tab, setTab] = useState<"config" | "sandbox" | "runs">("config");
+  const [tab, setTab] = useState<"config" | "sandbox" | "runs" | "evolution">("config");
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
   const [loadedFor, setLoadedFor] = useState<string | null>(null);
@@ -215,14 +217,20 @@ function AgentEditor({ agentId, channels, knowledge, onDeleted }: { agentId: Id<
       </div>
       {notice && <div className={cn("rounded-lg border px-3 py-2 text-[12px]", notice.tone === "error" ? "border-[#e0533d]/30 bg-[#fdf1ef] text-[#b3261e]" : "border-[#0d6b61]/30 bg-[#edf8f6] text-[#0d6b61]")}>{notice.text}</div>}
 
-      <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1 text-[12px] font-semibold">
-        {(["config", "sandbox", "runs"] as const).map((key) => (
-          <button key={key} type="button" onClick={() => setTab(key)} className={cn("rounded-md px-3 py-1.5", tab === key ? "bg-white text-[#0a1b33] shadow-sm" : "text-slate-500")}>{key === "config" ? tr("Configuração", "Configuration") : key === "sandbox" ? "Sandbox" : tr("Execuções", "Runs")}</button>
+      <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+        <div className="mb-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-slate-400">{tr("Modo de maturação", "Maturity mode")}</div>
+        <AgentModeToggle agentId={agentId} mode={agent.mode} published={!!agent.publishedVersionId} onNotice={setNotice} />
+      </div>
+
+      <div className="inline-flex flex-wrap rounded-lg border border-slate-200 bg-slate-50 p-1 text-[12px] font-semibold">
+        {(["config", "sandbox", "runs", "evolution"] as const).map((key) => (
+          <button key={key} type="button" onClick={() => setTab(key)} className={cn("rounded-md px-3 py-1.5", tab === key ? "bg-white text-[#0a1b33] shadow-sm" : "text-slate-500")}>{key === "config" ? tr("Configuração", "Configuration") : key === "sandbox" ? "Sandbox" : key === "runs" ? tr("Execuções", "Runs") : tr("Evolução", "Evolution")}</button>
         ))}
       </div>
 
       {tab === "sandbox" && <AgentSandbox agentId={agentId} />}
       {tab === "runs" && <AgentRunsPanel agentId={agentId} />}
+      {tab === "evolution" && <AgentFeedbackPanel agentId={agentId} />}
       {tab === "config" && (
         <div className="grid gap-5 xl:grid-cols-[1.4fr_1fr]">
           <div className="space-y-4">

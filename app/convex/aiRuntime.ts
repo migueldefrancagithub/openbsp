@@ -12,6 +12,8 @@ import { recordThreadSystemEvent } from "./lib/channels/systemEvents";
 import { setThreadAutomationMode } from "./lib/channels/automationControl";
 import { formatLocalDateTime, localDateOf } from "./lib/clinicTime";
 import { openHumanCaseInternal } from "./lib/humanCases";
+import { effectiveAiMode, type AiMode } from "./lib/ai/control";
+import { isWriteTool } from "./lib/ai/toolRegistry";
 import { upsertOpsAlert } from "./lib/opsAlerts";
 import { emitWebhookEvent } from "./lib/webhooks";
 
@@ -59,7 +61,7 @@ export const claimTurn = internalMutation({
       .withIndex("by_channel_thread", (q) => q.eq("channelId", channel._id).eq("threadKey", event.threadKey!))
       .unique();
     if (!thread || thread.tenantId !== channel.tenantId) return { claimed: false, reason: "thread" };
-    if (thread.automationMode === "human" || thread.automationMode === "stopped") return { claimed: false, reason: "mode" };
+    if (thread.automationMode === "stopped") return { claimed: false, reason: "mode" };
     if (thread.openHumanCaseId) return { claimed: false, reason: "human_case_open" };
     if (thread.dnd) return { claimed: false, reason: "dnd" };
     const identity = thread.identityId ? await ctx.db.get(thread.identityId) : null;
@@ -70,6 +72,10 @@ export const claimTurn = internalMutation({
     if (!agent || !agent.publishedVersionId) return { claimed: false, reason: "no_agent" };
     const version = await ctx.db.get(agent.publishedVersionId);
     if (!version) return { claimed: false, reason: "no_version" };
+    const mode: AiMode = effectiveAiMode(thread, agent);
+    if (mode === "sandbox") return { claimed: false, reason: "AGENT_SANDBOX" };
+    // Autopilot never talks over a human; copilot exists precisely for that.
+    if (mode === "autopilot" && thread.automationMode === "human") return { claimed: false, reason: "mode" };
 
     const now = Date.now();
     let run = await ctx.db
@@ -137,6 +143,10 @@ export const claimTurn = internalMutation({
       .order("desc")
       .take(Math.max(settings.maxTurnsPerThreadPerDay, version.config.maxRepliesPerThread) + 1);
     const inFlight = recent.find((turn) => turn.status === "queued" || turn.status === "processing" || turn.status === "awaiting_send");
+    // A suggestion nobody approved yet is retired by the newer message.
+    for (const stale of recent.filter((turn) => turn.status === "awaiting_approval")) {
+      await ctx.db.patch(stale._id, { status: "skipped", failureCode: "COALESCED", updatedAt: now });
+    }
     const completedToday = recent.filter((turn) => turn.status === "completed" && turn.createdAt >= now - 24 * 60 * 60_000).length;
     const completedTotal = recent.filter((turn) => turn.status === "completed").length;
     if (completedToday >= settings.maxTurnsPerThreadPerDay || completedTotal >= version.config.maxRepliesPerThread) {
@@ -171,6 +181,7 @@ export const claimTurn = internalMutation({
       sourceEventId: event._id,
       businessKey,
       status: "queued",
+      mode,
       providerAttempts: [],
       inputTokens: 0,
       outputTokens: 0,
@@ -179,7 +190,7 @@ export const claimTurn = internalMutation({
       createdAt: now,
       updatedAt: now,
     });
-    if (thread.automationMode !== "bot") await setThreadAutomationMode(ctx, thread, "bot", "ai_agent_active", now);
+    if (mode === "autopilot" && thread.automationMode !== "bot") await setThreadAutomationMode(ctx, thread, "bot", "ai_agent_active", now);
     await ctx.scheduler.runAfter(0, internal.aiRuntime.processTurn, { turnId });
     return { claimed: true, turnId };
   },
@@ -248,11 +259,18 @@ export const _loadTurnContext = internalQuery({
     // Coalesced follow-ups answer the newest message, not the one that started the turn.
     const inboundText = sourceEvent ? eventText(sourceEvent) : newestInbound ? eventText(newestInbound) : "";
     const siteHost = (() => { try { return process.env.SITE_URL ? new URL(process.env.SITE_URL).host : undefined; } catch { return undefined; } })();
+    const feedback = (await ctx.db
+      .query("aiFeedback")
+      .withIndex("by_agent_created", (q) => q.eq("agentId", run.agentId))
+      .order("desc")
+      .take(8)) as Doc<"aiFeedback">[];
+    const examples = feedback.filter((row) => row.outcome !== "discarded" && row.finalText.trim()).map((row) => ({ patient: row.patientText, reply: row.finalText }));
     return {
       turn,
       run,
+      mode: turn.mode ?? "autopilot",
       thread: { firstName: identity?.displayName?.trim().split(/\s+/)[0], leadStatus: thread.leadStatus, serviceWindowOpen: !!thread.serviceWindowExpiresAt && thread.serviceWindowExpiresAt > now },
-      agent: { name: agent.name, objective: agent.objective, config: version.config, knowledge: version.knowledgeSnapshot.map((k) => ({ kind: k.kind, title: k.title, body: k.body })) },
+      agent: { name: agent.name, objective: agent.objective, config: version.config, knowledge: version.knowledgeSnapshot.map((k) => ({ kind: k.kind, title: k.title, body: k.body })), examples },
       settingsRow,
       clinic: {
         clinicName: tenant?.name ?? "Clínica",
@@ -296,6 +314,7 @@ const resultValidator = v.object({
   stages: v.array(v.string()),
   usedModel: v.optional(v.string()),
   usedProvider: v.optional(v.string()),
+  proposedActions: v.optional(v.array(v.object({ name: v.string(), input: v.any(), output: v.any() }))),
 });
 
 /**
@@ -343,6 +362,28 @@ export const _finishTurn = internalMutation({
       updatedAt: now,
     };
 
+    if ((turn.mode ?? "autopilot") === "copilot" && (r.outcome === "reply" || r.outcome === "template" || r.outcome === "handoff" || r.outcome === "fallback")) {
+      const actions = [...(r.proposedActions ?? [])];
+      if (r.outcome === "handoff" && !r.handedOffByTool && r.handoff) {
+        actions.push({ name: "abrir_caso_humano", input: { reason: r.handoff.reason.slice(0, 80), urgency: r.handoff.urgency, question: r.handoff.question }, output: { proposed: true } });
+      }
+      if (r.outcome === "template" && r.template) {
+        actions.push({ name: "enviar_template", input: r.template, output: { proposed: true } });
+      }
+      const suggestedText = r.text ?? "";
+      await ctx.db.patch(turn._id, {
+        ...common,
+        status: "awaiting_approval",
+        stage: r.outcome === "handoff" ? "handoff" : r.outcome === "fallback" ? "fallback" : "reply",
+        routerDecision: { intent: r.routerIntent, reason: r.reason, violations: r.violations, stages: r.stages },
+        suggestedText,
+        proposedActions: actions,
+      });
+      await recordThreadSystemEvent(ctx, { thread, kind: "ai.suggested", severity: "info", actorType: "automation", payload: { turnId: turn._id, actions: actions.length, outcome: r.outcome }, dedupeKey: `aiturn:${turn._id}:suggested`, now });
+      await ctx.db.patch(thread._id, { nextStep: "Sugestão da IA a aguardar aprovação no inbox.", nextStepDueAt: now, updatedAt: now });
+      return null;
+    }
+
     const queueReply = async (stage: string, reply: { kind: "text"; text: string } | { kind: "template"; templateName: string; languageCode: string; bodyVariables: string[] }) => {
       await ctx.db.patch(turn._id, {
         ...common,
@@ -386,7 +427,8 @@ export const _finishTurn = internalMutation({
       const code = r.reason ?? "AI_TURN_FAILED";
       await ctx.db.patch(turn._id, { ...common, status: "failed", stage: r.outcome, failureCode: code, routerDecision: { intent: r.routerIntent, reason: r.reason, stages: r.stages, violations: r.violations }, completedAt: now });
       await recordThreadSystemEvent(ctx, { thread, kind: "ai.failed", severity: "error", code, actorType: "automation", payload: { turnId: turn._id, stages: r.stages.join(",") }, dedupeKey: `aiturn:${turn._id}:failed`, now });
-      if (code.startsWith("provider:")) {
+      const copilot = (turn.mode ?? "autopilot") === "copilot";
+      if (code.startsWith("provider:") && !copilot) {
         await ctx.db.patch(run._id, { status: "paused", pausedReason: code, updatedAt: now });
         await upsertOpsAlert(ctx, {
           tenantId: turn.tenantId,
@@ -400,7 +442,7 @@ export const _finishTurn = internalMutation({
           now,
         });
       }
-      if (!thread.openHumanCaseId) {
+      if (!thread.openHumanCaseId && !copilot) {
         await openHumanCaseInternal(
           { db: ctx.db, tenantId: turn.tenantId, memberId: version?.publishedBy ?? run.tenantId as unknown as Id<"members">, role: "ai" },
           { thread, reason: code === "SERVICE_WINDOW_EXPIRED" ? "Janela fechada: IA não pôde responder" : "IA indisponível", urgency: "normal", question: `A IA não conseguiu responder (${code}). Última mensagem precisa de resposta humana.`, openedFrom: "automation", actorKind: "system", now },
@@ -464,7 +506,13 @@ export const processTurn = internalAction({
         history: context.history,
         inboundText: context.inboundText,
         hasMedia: context.hasMedia,
-        executeTool: async (call) => (await ctx.runMutation(internal.aiTools.invoke, { turnId: args.turnId, name: call.name, input: call.input ?? {} })) as ToolOutcome,
+        executeTool: async (call) =>
+          (await ctx.runMutation(internal.aiTools.invoke, {
+            turnId: args.turnId,
+            name: call.name,
+            input: call.input ?? {},
+            dryRun: context.mode === "copilot" && isWriteTool(call.name),
+          })) as ToolOutcome,
       });
       const used = result.attempts.find((a) => a.ok && a.stage !== "router") ?? result.attempts.find((a) => a.ok);
       await ctx.runMutation(internal.aiRuntime._finishTurn, {
@@ -485,6 +533,7 @@ export const processTurn = internalAction({
           stages: result.stages,
           usedModel: used?.model,
           usedProvider: used?.provider,
+          proposedActions: result.toolCalls.filter((c) => c.status === "dry_run").map((c) => ({ name: c.name, input: c.input, output: c.output })),
         },
       });
     } catch (error) {
@@ -500,7 +549,8 @@ async function loadContextType() {
     turn: Doc<"aiTurns">;
     run: Doc<"aiRuns">;
     thread: { firstName?: string; leadStatus?: string; serviceWindowOpen: boolean };
-    agent: { name: string; objective: Doc<"aiAgents">["objective"]; config: Doc<"aiAgentVersions">["config"]; knowledge: Array<{ kind: string; title: string; body: string }> };
+    mode: AiMode;
+    agent: { name: string; objective: Doc<"aiAgents">["objective"]; config: Doc<"aiAgentVersions">["config"]; knowledge: Array<{ kind: string; title: string; body: string }>; examples: Array<{ patient: string; reply: string }> };
     settingsRow: Doc<"aiSettings"> | null;
     clinic: { clinicName: string; timeZone: string; localNow: string; services: Array<{ id: string; name: string; durationMinutes: number; professionalNames?: string[] }>; templates: Array<{ name: string; languageCode: string }>; allowedHosts: string[] };
     history: AiMessage[];

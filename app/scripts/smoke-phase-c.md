@@ -137,3 +137,28 @@ evento "Agente IA respondeu"; falha de envio → conversa em modo humano + alert
    tentativa; após 20 falhas o webhook fica pausado e aparece o alerta; "Reativar".
 4. REST v1 neutra: só depois de o owner registar `registerApiV1Routes(http)` em
    `http.ts` (ficheiro guardado); até lá, as rotas não existem.
+
+## M — Modos de maturação do agente (Sandbox · Co-Piloto · Automático)
+
+Modo do agente em `/app/agents` (cabeçalho) e override por conversa no inbox
+(`channelThreads.aiMode`). Por omissão os agentes nascem em **Co-Piloto**.
+
+| Modo | O que a IA faz | O que a equipa faz |
+|---|---|---|
+| Sandbox | só responde no separador Sandbox (dry-run); ignora conversas reais | testa cenários |
+| Co-Piloto | processa cada mensagem, propõe texto + acções (`awaiting_approval`); nada é enviado nem escrito | aprova (com ou sem edição) ou descarta no cartão "Sugestão da IA"; as edições viram exemplos do agente |
+| Automático | responde e executa ferramentas sozinha (comportamento C4) | intervém quando quiser |
+
+### Verificações
+1. Agente publicado em Co-Piloto: mensagem do paciente → no inbox aparece o chip "Sugestão
+   IA" na lista e o cartão acima do composer com o texto e as acções propostas (ex.
+   "Reservar consulta"); nada é enviado; `aiToolInvocations` regista `dry_run`.
+2. Editar o texto e "Aprovar e enviar" → marcação criada (`source: ai`), mensagem enviada
+   pelo outbox, `aiFeedback.outcome = edited`; o separador "Evolução" do agente mostra o
+   exemplo e a próxima sugestão já o usa.
+3. "Descartar" → nada enviado, `aiFeedback.outcome = discarded`.
+4. Responder manualmente com sugestão pendente → sugestão retirada (`HUMAN_REPLIED`), o
+   agente continua a sugerir na mensagem seguinte.
+5. Toggle no cabeçalho da conversa: Automático → a IA responde sozinha; Co-Piloto → volta a
+   sugerir e a conversa passa a modo humano. Sandbox no agente → nenhuma conversa real é
+   tocada (`AGENT_SANDBOX`).

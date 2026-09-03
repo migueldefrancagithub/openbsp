@@ -10,6 +10,7 @@ import { AI_TOOL_NAMES, isAiToolName, type AiObjective } from "./lib/ai/toolRegi
 const objectiveValidator = v.union(v.literal("reception"), v.literal("sales"), v.literal("confirmation"), v.literal("support"), v.literal("audit"));
 const toneValidator = v.union(v.literal("formal"), v.literal("friendly"), v.literal("direct"));
 const statusValidator = v.union(v.literal("draft"), v.literal("active"), v.literal("paused"));
+const modeValidator = v.union(v.literal("sandbox"), v.literal("copilot"), v.literal("autopilot"));
 
 const configValidator = v.object({
   instructions: v.string(),
@@ -37,6 +38,7 @@ const agentRowValidator = v.object({
   channelId: v.optional(v.id("channels")),
   channelName: v.optional(v.string()),
   status: statusValidator,
+  mode: modeValidator,
   currentVersion: v.number(),
   publishedVersionId: v.optional(v.id("aiAgentVersions")),
   config: configValidator,
@@ -118,6 +120,7 @@ async function rowOf(ctx: { db: any; tenantId: Id<"tenants"> }, agent: Doc<"aiAg
     channelId: agent.channelId,
     channelName: channel?.displayName,
     status: agent.status,
+    mode: agent.mode ?? "copilot",
     currentVersion: agent.currentVersion,
     publishedVersionId: agent.publishedVersionId,
     config: agent.config,
@@ -337,6 +340,25 @@ export const markSandboxRun = tenantMutation({
     requireCapability(ctx.role, "ai.configure");
     const agent = await loadByIdInTenant(ctx, "aiAgents", args.agentId);
     await ctx.db.patch(agent._id, { lastSandboxAt: Date.now() });
+    return null;
+  },
+});
+
+/**
+ * Maturity mode. Sandbox never touches WhatsApp; copilot suggests and the
+ * team approves; autopilot answers and books on its own. Copilot/autopilot
+ * need a published version.
+ */
+export const setMode = tenantMutation({
+  args: { agentId: v.id("aiAgents"), mode: modeValidator },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    requireCapability(ctx.role, "ai.publish");
+    const agent = await loadByIdInTenant(ctx, "aiAgents", args.agentId);
+    if (args.mode !== "sandbox" && !agent.publishedVersionId) throw new ConvexError({ code: "AI_MODE_REQUIRES_PUBLISH" });
+    if ((agent.mode ?? "copilot") === args.mode) return null;
+    await ctx.db.patch(agent._id, { mode: args.mode, updatedAt: Date.now() });
+    await writeAudit(ctx, { action: "ai.agent.mode_changed", targetType: "aiAgent", targetId: agent._id, payload: { from: agent.mode ?? "copilot", to: args.mode } });
     return null;
   },
 });

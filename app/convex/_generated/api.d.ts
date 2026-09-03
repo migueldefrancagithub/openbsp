@@ -11,6 +11,7 @@
 import type * as ai from "../ai.js";
 import type * as aiAgents from "../aiAgents.js";
 import type * as aiComposer from "../aiComposer.js";
+import type * as aiCopilot from "../aiCopilot.js";
 import type * as aiProviders from "../aiProviders.js";
 import type * as aiRuntime from "../aiRuntime.js";
 import type * as aiSandbox from "../aiSandbox.js";
@@ -134,6 +135,7 @@ declare const fullApi: ApiFromModules<{
   ai: typeof ai;
   aiAgents: typeof aiAgents;
   aiComposer: typeof aiComposer;
+  aiCopilot: typeof aiCopilot;
   aiProviders: typeof aiProviders;
   aiRuntime: typeof aiRuntime;
   aiSandbox: typeof aiSandbox;

@@ -228,6 +228,8 @@ const threadSummaryValidator = v.object({
   dueReminderCount: v.number(),
   firstResponseDueAt: v.optional(v.number()),
   slaBreached: v.boolean(),
+  aiSuggestionPending: v.boolean(),
+  aiMode: v.optional(v.string()),
 });
 
 export const listThreads = tenantQuery({
@@ -310,6 +312,12 @@ export const listThreads = tenantQuery({
         openCaseSlaDueAt: openCase?.slaDueAt,
         openCaseUrgency: openCase?.urgency,
         dueReminderCount,
+        aiSuggestionPending:
+          (await ctx.db
+            .query("aiTurns")
+            .withIndex("by_thread_status", (q) => q.eq("threadId", thread._id).eq("status", "awaiting_approval"))
+            .first()) !== null,
+        aiMode: thread.aiMode,
         firstResponseDueAt: thread.firstResponseDueAt,
         slaBreached:
           (!!thread.firstResponseDueAt && thread.firstResponseDueAt < now && !thread.closedAt) ||
@@ -471,13 +479,22 @@ export const getThreadOps = tenantQuery({
         turns: v.number(),
         lastTurnAt: v.optional(v.number()),
         pausedReason: v.optional(v.string()),
+        mode: v.string(),
+        overridden: v.boolean(),
+        pendingSuggestion: v.boolean(),
       }),
       v.null(),
     ),
   }),
   handler: async (ctx, args) => {
     const thread = await loadByIdInTenant(ctx, "channelThreads", args.threadId);
-    let ai: { agentName: string; status: "responding" | "paused" | "handed_off" | "off"; turns: number; lastTurnAt?: number; pausedReason?: string } | null = null;
+    let ai: { agentName: string; status: "responding" | "paused" | "handed_off" | "off"; turns: number; lastTurnAt?: number; pausedReason?: string; mode: string; overridden: boolean; pendingSuggestion: boolean } | null = null;
+    const pendingSuggestion =
+      (await ctx.db
+        .query("aiTurns")
+        .withIndex("by_thread_status", (q) => q.eq("threadId", thread._id).eq("status", "awaiting_approval"))
+        .first()) !== null;
+    let agentForMode: Doc<"aiAgents"> | null = null;
     for (const status of ["active", "paused", "handed_off"] as const) {
       const run = await ctx.db
         .query("aiRuns")
@@ -485,14 +502,29 @@ export const getThreadOps = tenantQuery({
         .first();
       if (run) {
         const agent = await ctx.db.get(run.agentId);
+        agentForMode = agent;
         ai = {
           agentName: agent?.name ?? "IA",
           status: status === "active" ? (agent?.status === "active" ? "responding" : "off") : status,
           turns: run.turnsCount,
           lastTurnAt: run.lastTurnAt,
           pausedReason: run.pausedReason,
+          mode: thread.aiMode ?? agent?.mode ?? "copilot",
+          overridden: !!thread.aiMode,
+          pendingSuggestion,
         };
         break;
+      }
+    }
+    if (!ai) {
+      // No run yet: still show the toggle when a published agent covers this channel.
+      const actives = await ctx.db
+        .query("aiAgents")
+        .withIndex("by_tenant_channel_status", (q) => q.eq("tenantId", ctx.tenantId).eq("channelId", thread.channelId).eq("status", "active"))
+        .take(1);
+      agentForMode = actives[0] ?? null;
+      if (agentForMode) {
+        ai = { agentName: agentForMode.name, status: "off", turns: 0, mode: thread.aiMode ?? agentForMode.mode ?? "copilot", overridden: !!thread.aiMode, pendingSuggestion };
       }
     }
     const recent = (await ctx.db

@@ -85,6 +85,8 @@ export type SpecialistContext = {
   language: "pt" | "en";
   handoffKeywords: string[];
   fallbackMessage: string;
+  /** Replies the team approved/edited in copilot mode (few-shot calibration). */
+  examples?: Array<{ patient: string; reply: string }>;
 };
 
 const KNOWLEDGE_CHAR_BUDGET = 12_000;
@@ -134,6 +136,13 @@ export function buildSpecialistSystem(ctx: SpecialistContext): string {
     "",
     "CONHECIMENTO DA CLÍNICA:",
     knowledge.join("\n\n") || "(vazio)",
+    ...(ctx.examples && ctx.examples.length > 0
+      ? [
+          "",
+          "EXEMPLOS DE RESPOSTAS APROVADAS PELA EQUIPA (imita o tom e o nível de detalhe; nunca copies factos que não estejam no conhecimento):",
+          ...ctx.examples.slice(0, 8).map((ex, i) => `${i + 1}. Paciente: "${ex.patient.slice(0, 200)}"\n   Equipa: "${ex.reply.slice(0, 400)}"`),
+        ]
+      : []),
   ]
     .filter((line) => line !== undefined)
     .join("\n");

@@ -60,6 +60,8 @@ async function seed(t: ReturnType<typeof convexTest>) {
   const detail = await asOwner.query(api.aiAgents.get, { agentId });
   await asOwner.mutation(api.aiAgents.updateDraft, { agentId, config: { ...detail.agent.config, knowledgeItemIds: [base.knowledgeId], maxRepliesPerThread: 3 } });
   await asOwner.mutation(api.aiAgents.publish, { agentId });
+  // These scenarios exercise the autonomous path; copilot is covered in aiCopilot.test.ts.
+  await asOwner.mutation(api.aiAgents.setMode, { agentId, mode: "autopilot" });
   return { ...base, asOwner, channelId: pending.channelId, agentId };
 }
 
@@ -151,7 +153,7 @@ describe("AI runtime", () => {
     expect(after.thread.openHumanCaseId).toBe(after.cases[0]._id);
     expect(after.events).toEqual(expect.arrayContaining(["ai.handoff", "handoff.case_opened", "ai.replied"]));
     const next = await inbound(t, s.channelId, "Ok", "w4");
-    expect((await t.mutation(internal.aiRuntime.claimTurn, { eventId: next._id })).reason).toBe("mode");
+    expect((await t.mutation(internal.aiRuntime.claimTurn, { eventId: next._id })).reason).toBe("human_case_open");
 
     // Human takeover on a fresh active run pauses it and skips queued turns.
     const t2 = convexTest(schema);

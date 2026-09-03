@@ -147,3 +147,21 @@ export function isAiToolName(value: string): value is AiToolName {
 export function toolSpecsFor(names: string[]): AiToolSpec[] {
   return names.filter(isAiToolName).map((name) => TOOL_SPECS[name]);
 }
+
+/** Deskcomm-style risk labels shown to the clinic; writes are proposed in copilot. */
+export type AiToolRisk = "safe" | "attention" | "critical";
+export const TOOL_RISK: Record<AiToolName, AiToolRisk> = {
+  consultar_agenda: "safe",
+  aplicar_tag: "safe",
+  criar_lembrete_equipa: "safe",
+  atualizar_lead: "attention",
+  agendar_follow_up: "attention",
+  abrir_caso_humano: "attention",
+  reservar_slot: "critical",
+  confirmar_consulta: "critical",
+  enviar_template: "critical",
+};
+export const READ_ONLY_TOOLS: AiToolName[] = ["consultar_agenda"];
+export function isWriteTool(name: string): boolean {
+  return isAiToolName(name) && !READ_ONLY_TOOLS.includes(name);
+}

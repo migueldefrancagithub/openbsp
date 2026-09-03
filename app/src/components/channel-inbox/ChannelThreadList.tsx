@@ -62,6 +62,7 @@ type ThreadRow = {
   openCaseSlaDueAt?: number;
   firstResponseDueAt?: number;
   slaBreached?: boolean;
+  aiSuggestionPending?: boolean;
   openCaseUrgency?: string;
   dueReminderCount?: number;
 };
@@ -349,6 +350,11 @@ export function ChannelThreadList() {
                             >
                               <Bell size={9} />
                               {thread.dueReminderCount}
+                            </span>
+                          )}
+                          {thread.aiSuggestionPending && (
+                            <span className="inline-flex items-center gap-1 rounded bg-[#eef3fb] px-1.5 py-0.5 text-[10px] font-semibold text-[#2b4f8a]" title={t("inbox.aiSuggestion")}>
+                              ✦ {t("inbox.aiSuggestion")}
                             </span>
                           )}
                           {thread.firstResponseDueAt && !thread.openCaseSlaDueAt && (
