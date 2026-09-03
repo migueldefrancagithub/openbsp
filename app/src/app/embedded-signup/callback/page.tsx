@@ -68,7 +68,7 @@ export default function EmbeddedSignupCallbackPage() {
     status === "loading" ? Loader2 : status === "success" ? CheckCircle2 : XCircle;
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#f6f8fb] px-4">
+    <main className="flex min-h-screen items-center justify-center bg-background px-4">
       <section className="w-full max-w-md rounded-2xl border border-line bg-surface p-8 text-center shadow-sm">
         <Icon
           size={30}
@@ -77,7 +77,7 @@ export default function EmbeddedSignupCallbackPage() {
               ? "animate-spin text-faint"
               : status === "success"
                 ? "text-emerald-600"
-                : "text-red-600"
+                : "text-chip-danger-fg"
           }`}
         />
         <h1 className="mt-4 font-[var(--font-outfit)] text-2xl font-medium text-ink">

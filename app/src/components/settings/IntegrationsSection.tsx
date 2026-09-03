@@ -40,9 +40,9 @@ export function IntegrationsSection() {
 
   return (
     <div className="space-y-6">
-      {error && <div className="rounded-lg border border-[#e0533d]/30 bg-[#fdf1ef] px-4 py-3 text-sm text-[#b3261e]">{error}</div>}
+      {error && <div className="rounded-lg border border-[#e0533d]/30 bg-chip-danger px-4 py-3 text-sm text-chip-danger-fg">{error}</div>}
       {secret && (
-        <div className="rounded-lg border border-[#0d6b61]/30 bg-[#edf8f6] p-4 text-[13px] text-ink">
+        <div className="rounded-lg border border-[#0d6b61]/30 bg-chip-success p-4 text-[13px] text-ink">
           <div className="mb-1 flex items-center gap-2 font-semibold"><KeyRound size={14} /> {tr(`Segredo do webhook "${secret.name}" — copie agora, não volta a ser mostrado.`, `Secret for webhook "${secret.name}" — copy it now, it will not be shown again.`)}</div>
           <div className="flex items-center gap-2">
             <code className="flex-1 overflow-x-auto rounded-md bg-surface px-2 py-1 text-[12px]">{secret.value}</code>
@@ -95,11 +95,11 @@ export function IntegrationsSection() {
                       <div className="truncate text-[11px] text-muted">{hook.url} · {hook.events.length} {tr("eventos", "events")} · ••••{hook.secretLast4}{hook.pausedAt ? ` · ${tr("pausado", "paused")} (${hook.pausedReason})` : ""}{hook.lastDeliveredAt ? ` · ${tr("última entrega", "last delivery")} ${relativeTime(hook.lastDeliveredAt, Date.now(), locale)}` : ""}</div>
                     </button>
                     <div className="flex shrink-0 gap-1.5">
-                      {hook.pausedAt && hook.pausedReason !== "removed" && <button type="button" disabled={busy !== null} onClick={() => void run(`resume-${hook._id}`, () => update({ webhookId: hook._id, active: true }))} className="h-8 rounded-md border border-line px-2 text-[11px] font-semibold text-[#0d6b61]">{tr("Reativar", "Reactivate")}</button>}
+                      {hook.pausedAt && hook.pausedReason !== "removed" && <button type="button" disabled={busy !== null} onClick={() => void run(`resume-${hook._id}`, () => update({ webhookId: hook._id, active: true }))} className="h-8 rounded-md border border-line px-2 text-[11px] font-semibold text-chip-success-fg">{tr("Reativar", "Reactivate")}</button>}
                       {hook.active && !hook.pausedAt && (
                         <>
                           <button type="button" disabled={busy !== null} onClick={() => void run(`rotate-${hook._id}`, async () => { const r = await rotate({ webhookId: hook._id }); setSecret({ name: hook.name, value: r.secret }); })} className="inline-flex h-8 items-center gap-1 rounded-md border border-line px-2 text-[11px] font-semibold text-body" title={tr("Rodar segredo", "Rotate secret")}><RefreshCw size={12} /></button>
-                          <button type="button" disabled={busy !== null} onClick={() => { if (window.confirm(tr("Desativar este webhook?", "Deactivate this webhook?"))) void run(`remove-${hook._id}`, () => remove({ webhookId: hook._id })); }} className="inline-flex h-8 items-center rounded-md border border-line px-2 text-[11px] font-semibold text-muted hover:text-[#b3261e]"><Trash2 size={12} /></button>
+                          <button type="button" disabled={busy !== null} onClick={() => { if (window.confirm(tr("Desativar este webhook?", "Deactivate this webhook?"))) void run(`remove-${hook._id}`, () => remove({ webhookId: hook._id })); }} className="inline-flex h-8 items-center rounded-md border border-line px-2 text-[11px] font-semibold text-muted hover:text-chip-danger-fg"><Trash2 size={12} /></button>
                         </>
                       )}
                     </div>
@@ -133,14 +133,14 @@ function Deliveries({ webhookId }: { webhookId: Id<"outboundWebhooks"> }) {
             <li key={d._id} className="flex items-center justify-between gap-2 py-1">
               <span className="min-w-0 truncate text-ink">{d.eventType} <span className="text-faint">· {relativeTime(d.createdAt, now, locale)}</span></span>
               <span className="flex shrink-0 items-center gap-2">
-                <span className={cn("rounded px-1.5 py-0.5 text-[10px] font-semibold", d.status === "delivered" ? "bg-[#edf8f6] text-[#0d6b61]" : d.status === "dead" ? "bg-[#fdf1ef] text-[#b3261e]" : "bg-amber-50 text-amber-800")}>{d.status}{d.lastStatus ? ` ${d.lastStatus}` : ""} · {d.attempts}×</span>
-                {(d.status === "failed" || d.status === "dead") && <button type="button" onClick={() => void retry({ deliveryId: d._id })} className="font-semibold text-[#2b4f8a]">{tr("Repetir", "Retry")}</button>}
+                <span className={cn("rounded px-1.5 py-0.5 text-[10px] font-semibold", d.status === "delivered" ? "bg-chip-success text-chip-success-fg" : d.status === "dead" ? "bg-chip-danger text-chip-danger-fg" : "bg-chip-warn text-chip-warn-fg")}>{d.status}{d.lastStatus ? ` ${d.lastStatus}` : ""} · {d.attempts}×</span>
+                {(d.status === "failed" || d.status === "dead") && <button type="button" onClick={() => void retry({ deliveryId: d._id })} className="font-semibold text-chip-info-fg">{tr("Repetir", "Retry")}</button>}
               </span>
             </li>
           ))}
         </ul>
       )}
-      {deliveries.status === "CanLoadMore" && <button type="button" onClick={() => deliveries.loadMore(15)} className="mt-1 font-semibold text-[#2b4f8a]">{tr("Carregar mais", "Load more")}</button>}
+      {deliveries.status === "CanLoadMore" && <button type="button" onClick={() => deliveries.loadMore(15)} className="mt-1 font-semibold text-chip-info-fg">{tr("Carregar mais", "Load more")}</button>}
     </div>
   );
 }

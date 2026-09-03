@@ -24,10 +24,10 @@ const INTENT_PT: Record<string, string> = {
 };
 
 function statusTone(status: string): string {
-  if (status === "ok") return "bg-[#edf8f6] text-[#0d6b61]";
-  if (status === "dry_run") return "bg-[#eef3fb] text-[#2b4f8a]";
+  if (status === "ok") return "bg-chip-success text-chip-success-fg";
+  if (status === "dry_run") return "bg-chip-info text-chip-info-fg";
   if (status === "denied") return "bg-surface-3 text-muted";
-  return "bg-[#fdf1ef] text-[#b3261e]";
+  return "bg-chip-danger text-chip-danger-fg";
 }
 
 /**
@@ -77,12 +77,12 @@ export function AiActionTrail({ threadId }: { threadId: Id<"channelThreads"> }) 
                   </span>
                 )}
                 {turn.mode === "copilot" && (
-                  <span className="rounded bg-[#eef3fb] px-1.5 py-0.5 font-semibold text-[#2b4f8a]">
+                  <span className="rounded bg-chip-info px-1.5 py-0.5 font-semibold text-chip-info-fg">
                     {tr("sugerido", "suggested")}
                   </span>
                 )}
                 {turn.failureCode && (
-                  <span className="inline-flex items-center gap-1 rounded bg-[#fdf1ef] px-1.5 py-0.5 font-semibold text-[#b3261e]">
+                  <span className="inline-flex items-center gap-1 rounded bg-chip-danger px-1.5 py-0.5 font-semibold text-chip-danger-fg">
                     <ShieldAlert size={9} />
                     {turn.failureCode === "TOOL_BREAKER_BLOCKED"
                       ? tr("ferramenta travada em ciclo", "tool stopped looping")
@@ -90,7 +90,7 @@ export function AiActionTrail({ threadId }: { threadId: Id<"channelThreads"> }) 
                   </span>
                 )}
                 {turn.violations.length > 0 && (
-                  <span className="rounded bg-amber-50 px-1.5 py-0.5 font-semibold text-amber-800">
+                  <span className="rounded bg-chip-warn px-1.5 py-0.5 font-semibold text-chip-warn-fg">
                     {tr("corrigido antes de enviar", "corrected before sending")}
                   </span>
                 )}

@@ -115,7 +115,7 @@ export function ConnectWabaForm() {
       </div>
 
       {result.kind === "success" && (
-        <div className="flex items-start gap-2 text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2.5 text-sm">
+        <div className="flex items-start gap-2 text-chip-success-fg bg-chip-success border border-chip-success-fg/25 rounded-lg px-3 py-2.5 text-sm">
           <CheckCircle2 size={16} className="flex-shrink-0 mt-0.5" />
           <div>
             <div className="font-semibold">{tr("Ligado.", "Connected.")}</div>
@@ -126,7 +126,7 @@ export function ConnectWabaForm() {
         </div>
       )}
       {result.kind === "error" && (
-        <div className="flex items-start gap-2 text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2.5 text-sm">
+        <div className="flex items-start gap-2 text-chip-danger-fg bg-chip-danger border border-chip-danger-fg/25 rounded-lg px-3 py-2.5 text-sm">
           <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />
           <div>{result.message}</div>
         </div>

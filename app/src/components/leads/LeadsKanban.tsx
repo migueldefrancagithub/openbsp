@@ -40,7 +40,7 @@ export function LeadsKanban({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {error && (
-        <div className="mx-4 mb-2 rounded-lg border border-[#f5c2b8] bg-[#fff1ee] px-3 py-2 text-[12px] text-[#8a2a1b] sm:mx-6">
+        <div className="mx-4 mb-2 rounded-lg border border-[#f5c2b8] bg-chip-danger px-3 py-2 text-[12px] text-chip-danger-fg sm:mx-6">
           {error}
         </div>
       )}
@@ -87,7 +87,7 @@ function KanbanColumn({
     <section
       className={cn(
         "flex h-full w-[272px] shrink-0 snap-start flex-col overflow-hidden rounded-xl border bg-surface-2 transition-colors",
-        over ? "border-[#0d6b61] bg-[#edf8f6] dark:bg-[#123029]" : "border-line",
+        over ? "border-[#0d6b61] bg-chip-success dark:bg-[#123029]" : "border-line",
       )}
       onDragOver={(event) => {
         if (event.dataTransfer.types.includes("text/openbsp-lead")) {

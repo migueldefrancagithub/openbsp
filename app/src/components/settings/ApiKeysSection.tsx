@@ -83,16 +83,16 @@ export function ApiKeysSection() {
         </p>
 
         {justMinted && (
-          <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 space-y-2">
-            <div className="flex items-center gap-2 text-[12px] font-semibold text-emerald-800">
+          <div className="rounded-lg border border-chip-success-fg/25 bg-chip-success p-4 space-y-2">
+            <div className="flex items-center gap-2 text-[12px] font-semibold text-chip-success-fg">
               <Check size={14} />
               {tr("Chave", "Key")} &quot;{justMinted.name}&quot; {tr("criada", "created")}
             </div>
-            <div className="text-[11px] text-emerald-700">
+            <div className="text-[11px] text-chip-success-fg">
               {tr("Copie agora; não voltará a ser mostrada.", "Copy now; it will not be shown again.")}
             </div>
             <div className="flex items-stretch gap-2">
-              <code className="flex-1 bg-surface border border-emerald-200 rounded-md px-3 py-2 text-[11px] font-[var(--font-mono)] text-ink break-all">
+              <code className="flex-1 bg-surface border border-chip-success-fg/25 rounded-md px-3 py-2 text-[11px] font-[var(--font-mono)] text-ink break-all">
                 {justMinted.plaintext}
               </code>
               <button
@@ -107,7 +107,7 @@ export function ApiKeysSection() {
             <button
               type="button"
               onClick={() => setJustMinted(null)}
-              className="text-[12px] text-emerald-800 font-medium hover:underline"
+              className="text-[12px] text-chip-success-fg font-medium hover:underline"
             >
               {tr("Concluído", "Done")}
             </button>
@@ -144,7 +144,7 @@ export function ApiKeysSection() {
               </select>
             </div>
             {error && (
-              <div className="text-[12px] text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2 flex items-start gap-2">
+              <div className="text-[12px] text-chip-danger-fg bg-chip-danger border border-chip-danger-fg/25 rounded-lg px-3 py-2 flex items-start gap-2">
                 <AlertCircle size={14} className="flex-shrink-0 mt-0.5" />
                 {error}
               </div>
@@ -205,7 +205,7 @@ export function ApiKeysSection() {
                       {roleLabel(k.role, locale)}
                     </span>
                     {k.revokedAt && (
-                      <span className="text-[10px] uppercase tracking-wider text-red-600 font-medium">
+                      <span className="text-[10px] uppercase tracking-wider text-chip-danger-fg font-medium">
                         {tr("revogada", "revoked")}
                       </span>
                     )}
@@ -224,7 +224,7 @@ export function ApiKeysSection() {
                         revoke({ apiKeyId: k._id });
                       }
                     }}
-                    className="text-faint hover:text-red-600 p-1.5"
+                    className="text-faint hover:text-chip-danger-fg p-1.5"
                     title={tr("Revogar", "Revoke")}
                     aria-label={tr(`Revogar chave ${k.name}`, `Revoke key ${k.name}`)}
                   >

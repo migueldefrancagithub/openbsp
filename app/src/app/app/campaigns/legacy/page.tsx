@@ -52,11 +52,11 @@ import { channelStateLabel, sendModeLabel } from "@/lib/operationalLabels";
 
 const STATUS_STYLES: Record<string, string> = {
   draft: "bg-surface-3 text-ink border-line",
-  scheduled: "bg-sky-50 text-sky-700 border-sky-200",
-  running: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  paused: "bg-amber-50 text-amber-700 border-amber-200",
+  scheduled: "bg-chip-info text-chip-info-fg border-sky-200",
+  running: "bg-chip-success text-chip-success-fg border-chip-success-fg/25",
+  paused: "bg-chip-warn text-chip-warn-fg border-chip-warn-fg/25",
   completed: "bg-indigo-50 text-indigo-700 border-indigo-200",
-  failed: "bg-red-50 text-red-700 border-red-200",
+  failed: "bg-chip-danger text-chip-danger-fg border-chip-danger-fg/25",
   cancelled: "bg-surface-3 text-muted border-line",
 };
 
@@ -659,8 +659,8 @@ export default function CampaignsPage() {
           <div
             className={`rounded-lg border px-4 py-3 text-sm ${
               error
-                ? "bg-red-50 border-red-200 text-red-700"
-                : "bg-emerald-50 border-emerald-200 text-emerald-700"
+                ? "bg-chip-danger border-chip-danger-fg/25 text-chip-danger-fg"
+                : "bg-chip-success border-chip-success-fg/25 text-chip-success-fg"
             }`}
           >
             {error ?? notice}
@@ -818,7 +818,7 @@ export default function CampaignsPage() {
             {templates !== undefined &&
               approvedTemplates.length === 0 &&
               labChannels.length > 0 && (
-                <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-[12px] text-amber-900">
+                <div className="mb-3 rounded-lg border border-chip-warn-fg/25 bg-chip-warn px-3 py-2.5 text-[12px] text-chip-warn-fg">
                   <div className="font-semibold">
                     {locale === "pt"
                       ? "Campanhas por template ainda exigem uma ligação WhatsApp direta (Meta)."
@@ -973,8 +973,8 @@ export default function CampaignsPage() {
                             <span
                               className={`shrink-0 rounded-full px-2 py-1 text-[11px] font-semibold ${
                                 windowOpen
-                                  ? "bg-emerald-50 text-emerald-700"
-                                  : "bg-amber-50 text-amber-700"
+                                  ? "bg-chip-success text-chip-success-fg"
+                                  : "bg-chip-warn text-chip-warn-fg"
                               }`}
                             >
                               {windowOpen
@@ -1017,7 +1017,7 @@ export default function CampaignsPage() {
                 </div>
 
                 {selectedMicroChannel && (
-                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-800">
+                  <div className="rounded-xl border border-chip-success-fg/25 bg-chip-success px-3 py-2 text-xs font-medium text-chip-success-fg">
                     {selectedMicroChannel.displayName} ·{" "}
                     {channelStateLabel(selectedMicroChannel.connectionState, locale)} ·{" "}
                     Webhook {channelStateLabel(selectedMicroChannel.webhookStatus, locale)}
@@ -1297,7 +1297,7 @@ export default function CampaignsPage() {
                     <Users size={15} />
                     {audiencePreview?.count ?? 0} {locale === "pt" ? "encontrados" : "matched"}
                   </span>
-                  <span className="inline-flex items-center gap-2 font-medium text-emerald-700">
+                  <span className="inline-flex items-center gap-2 font-medium text-chip-success-fg">
                     <ShieldCheck size={15} />
                     {audiencePreview?.excludedMarketingRevoked ?? 0} {locale === "pt" ? "recusas excluídas" : "opt-outs excluded"}
                   </span>
@@ -1316,7 +1316,7 @@ export default function CampaignsPage() {
                       {contact.matchReasons.slice(0, 2).map((reason) => (
                         <span
                           key={reason}
-                          className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700"
+                          className="rounded-full bg-chip-success px-2 py-0.5 text-[11px] font-semibold text-chip-success-fg"
                         >
                           {reason}
                         </span>
@@ -1424,7 +1424,7 @@ export default function CampaignsPage() {
                   className="h-11 w-full rounded-lg border border-line bg-surface pl-10 pr-3 text-sm text-ink outline-none transition-colors placeholder:text-faint focus:border-brand-solid/40"
                 />
               </label>
-              <span className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50">
+              <span className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-chip-success-fg/25 bg-chip-success">
                 <span className="h-3 w-3 rounded-full bg-emerald-500" />
               </span>
               <select className="h-11 rounded-lg border border-line bg-surface px-3 text-sm font-medium text-ink outline-none focus:border-brand-solid/40">
@@ -1758,11 +1758,11 @@ function BroadcastCard({
           >
             {statusLabel}
           </span>
-          <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+          <span className="inline-flex items-center gap-1 rounded-full border border-chip-success-fg/25 bg-chip-success px-2.5 py-1 text-xs font-semibold text-chip-success-fg">
             <Radio size={12} />
             {locale === "pt" ? "Medição real" : "Real tracking"}
           </span>
-          <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
+          <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-chip-info px-2.5 py-1 text-xs font-semibold text-chip-info-fg">
             {campaign.kind === "micro_lab" ? (locale === "pt" ? "Teste WhatsApp" : "WhatsApp test") : "Template"}
           </span>
         </div>
@@ -1821,17 +1821,17 @@ function BroadcastCard({
             {campaign.failureBreakdown.slice(0, 2).map((failure) => (
               <div
                 key={failure.category}
-                className="rounded-xl border border-red-100 bg-red-50 px-3 py-2"
+                className="rounded-xl border border-chip-danger-fg/20 bg-chip-danger px-3 py-2"
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-xs font-semibold text-red-800">
                     {failure.title}
                   </span>
-                  <span className="rounded-full bg-surface px-2 py-0.5 text-[11px] font-semibold text-red-600">
+                  <span className="rounded-full bg-surface px-2 py-0.5 text-[11px] font-semibold text-chip-danger-fg">
                     {failure.count}
                   </span>
                 </div>
-                <p className="mt-1 text-[11px] leading-5 text-red-700">
+                <p className="mt-1 text-[11px] leading-5 text-chip-danger-fg">
                   {failure.action}
                 </p>
               </div>
@@ -1840,7 +1840,7 @@ function BroadcastCard({
         )}
 
         <div className="mt-auto pt-4">
-          <div className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-3 text-sm font-semibold text-blue-700">
+          <div className="rounded-xl border border-blue-100 bg-chip-info px-3 py-3 text-sm font-semibold text-chip-info-fg">
             {locale === "pt" ? "criada" : "created"} {relativeTime(campaign.createdAt, Date.now(), locale)}
           </div>
           <button
@@ -1899,7 +1899,7 @@ function CampaignLogDrawer({
   const sent = sentLikeCount(campaign.stats);
   const progress = rate(sent + campaign.stats.failed + campaign.stats.skipped, campaign.stats.total);
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/60">
+    <div className="fixed inset-0 z-50 flex justify-end bg-scrim">
       <aside className="h-full w-full max-w-xl border-l border-line bg-surface shadow-2xl">
         <div className="flex items-start justify-between gap-4 border-b border-line-soft p-6">
           <div className="flex items-start gap-3">
@@ -1974,7 +1974,7 @@ function CampaignLogDrawer({
                         type="button"
                         onClick={() => onRecordConversion(event.campaignRecipientId!)}
                         disabled={busy !== null}
-                        className="mt-3 inline-flex h-8 items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 text-xs font-semibold text-emerald-700 transition-colors hover:border-emerald-300 disabled:opacity-50"
+                        className="mt-3 inline-flex h-8 items-center gap-2 rounded-lg border border-chip-success-fg/25 bg-chip-success px-3 text-xs font-semibold text-chip-success-fg transition-colors hover:border-emerald-300 disabled:opacity-50"
                       >
                         {busy === `convert:${event.campaignRecipientId}` ? (
                           <Loader2 size={13} className="animate-spin" />
@@ -2055,7 +2055,7 @@ function BroadcastMetric({
       </div>
       <div
         className={`mt-1 text-sm font-semibold ${
-          danger ? "text-red-600" : "text-ink"
+          danger ? "text-chip-danger-fg" : "text-ink"
         }`}
       >
         {value}
@@ -2121,7 +2121,7 @@ function DrawerStat({
     tone === "emerald"
       ? "text-emerald-600"
       : tone === "red"
-        ? "text-red-600"
+        ? "text-chip-danger-fg"
         : tone === "blue"
           ? "text-blue-600"
           : "text-ink";
@@ -2150,11 +2150,11 @@ function LogEvent({
 }) {
   const toneClass =
     tone === "bad"
-      ? "bg-red-50 text-red-700"
+      ? "bg-chip-danger text-chip-danger-fg"
       : tone === "warn"
-        ? "bg-amber-50 text-amber-700"
+        ? "bg-chip-warn text-chip-warn-fg"
         : tone === "good"
-          ? "bg-emerald-50 text-emerald-700"
+          ? "bg-chip-success text-chip-success-fg"
           : "bg-surface-3 text-body";
   return (
     <div className="rounded-xl border border-line bg-surface p-4">
@@ -2633,7 +2633,7 @@ function Metric({
     <div className="rounded-lg border border-line-soft bg-surface-2 px-2.5 py-2">
       <div
         className={`text-[16px] font-semibold ${
-          danger ? "text-red-600" : muted ? "text-muted" : "text-ink"
+          danger ? "text-chip-danger-fg" : muted ? "text-muted" : "text-ink"
         }`}
       >
         {value}

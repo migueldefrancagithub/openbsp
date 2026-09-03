@@ -34,9 +34,9 @@ export type TemplateButtonPreview =
   | { type: "phone_number"; text: string; phoneNumber: string };
 
 const CATEGORY_TONES: Record<TemplateCategory, string> = {
-  utility: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  marketing: "border-amber-200 bg-amber-50 text-amber-700",
-  authentication: "border-sky-200 bg-sky-50 text-sky-700",
+  utility: "border-chip-success-fg/25 bg-chip-success text-chip-success-fg",
+  marketing: "border-chip-warn-fg/25 bg-chip-warn text-chip-warn-fg",
+  authentication: "border-sky-200 bg-chip-info text-chip-info-fg",
 };
 
 export function WhatsAppIosPreview({
@@ -168,14 +168,14 @@ export function WhatsAppIosPreview({
       </div>
 
       {analysis.risks.length > 0 && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
-          <div className="mb-2 flex items-center gap-2 text-[13px] font-semibold text-amber-900">
+        <div className="rounded-lg border border-chip-warn-fg/25 bg-chip-warn p-4">
+          <div className="mb-2 flex items-center gap-2 text-[13px] font-semibold text-chip-warn-fg">
             <AlertTriangle size={15} />
             {tr("Proteções", "Guardrails")}
           </div>
           <ul className="space-y-2">
             {analysis.risks.slice(0, 4).map((risk) => (
-              <li key={`${risk.code}-${risk.title}`} className="text-[12px] leading-relaxed text-amber-800">
+              <li key={`${risk.code}-${risk.title}`} className="text-[12px] leading-relaxed text-chip-warn-fg">
                 <span className="font-semibold">{riskContent(risk.code, locale).title}:</span>{" "}
                 {riskContent(risk.code, locale).detail}
               </li>
@@ -215,9 +215,9 @@ function Signal({
 }) {
   const toneClass =
     tone === "good"
-      ? "bg-emerald-50 text-emerald-700"
+      ? "bg-chip-success text-chip-success-fg"
       : tone === "warn"
-        ? "bg-amber-50 text-amber-700"
+        ? "bg-chip-warn text-chip-warn-fg"
         : "bg-surface-3 text-body";
   return (
     <div className="rounded-lg border border-line bg-surface-2 p-3">

@@ -345,7 +345,22 @@ export async function settleFollowUpDispatch(
   await failTask(ctx, task, thread, code ?? "SEND_FAILED", reason, now);
 }
 
-/** Claims whose job never settled go back to the queue (or fail after 3). */
+/**
+ * Claims whose job never settled go back to the queue.
+ *
+ * The attempt counter is rolled BACK on purpose. A stale claim means the
+ * dispatch died at an unknown point, and the provider may already have
+ * accepted the message; a retry with a fresh attempt number would mint a new
+ * business key, miss the outbox dedupe, and send the patient a second copy.
+ * Reusing the same key makes `_claimOutbox` answer "already handled" and the
+ * task settles from the row that exists — the same doctrine the campaign path
+ * follows with `unknown` deliveries.
+ *
+ * `staleReleases` bounds the loop, since rolling the counter back would
+ * otherwise let a permanently stuck task retry forever.
+ */
+export const MAX_STALE_RELEASES = 2;
+
 export async function releaseStaleClaims(ctx: { db: any }, now: number): Promise<number> {
   const stale = (await ctx.db
     .query("followUpTasks")
@@ -354,10 +369,17 @@ export async function releaseStaleClaims(ctx: { db: any }, now: number): Promise
   let released = 0;
   for (const task of stale) {
     if ((task.lastAttemptAt ?? 0) > now - STALE_CLAIM_MS) continue;
-    if (task.attempts >= MAX_ATTEMPTS) {
+    const releases = task.staleReleases ?? 0;
+    if (task.attempts >= MAX_ATTEMPTS || releases >= MAX_STALE_RELEASES) {
       await ctx.db.patch(task._id, { status: "failed", failureCode: "STALE_CLAIM", updatedAt: now });
     } else {
-      await ctx.db.patch(task._id, { status: "scheduled", nextAttemptAt: now, updatedAt: now });
+      await ctx.db.patch(task._id, {
+        status: "scheduled",
+        nextAttemptAt: now,
+        attempts: Math.max(0, task.attempts - 1),
+        staleReleases: releases + 1,
+        updatedAt: now,
+      });
     }
     released += 1;
   }

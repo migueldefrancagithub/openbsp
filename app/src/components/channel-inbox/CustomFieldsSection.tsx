@@ -90,7 +90,7 @@ export function CustomFieldsSection({
           </label>
         );
       })}
-      {error && <p className="col-span-2 text-[10px] text-[#b3261e]">{error}</p>}
+      {error && <p className="col-span-2 text-[10px] text-chip-danger-fg">{error}</p>}
     </div>
   );
 }

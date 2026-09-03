@@ -380,7 +380,7 @@ function ChannelMessageBubble({ event, locale }: { event: ThreadEvent; locale: "
           className={cn(
             "inline-flex max-w-[80%] items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.12em]",
             isFailed
-              ? "border-red-200 bg-red-50 text-red-700"
+              ? "border-chip-danger-fg/25 bg-chip-danger text-chip-danger-fg"
               : "border-line bg-surface text-faint",
           )}
           title={event.lastError}
@@ -444,7 +444,7 @@ function ChannelMessageBubble({ event, locale }: { event: ThreadEvent; locale: "
           <div
             className={cn(
               "mt-1 rounded-md px-2 py-1 text-[11px]",
-              incoming ? "bg-red-50 text-red-700" : "bg-red-400/20 text-red-100",
+              incoming ? "bg-chip-danger text-chip-danger-fg" : "bg-red-400/20 text-red-100",
             )}
           >
             {short(event.lastError)}
@@ -808,7 +808,7 @@ export function ChannelThreadView({
     summary.recipientAllowlisted;
 
   return (
-    <div className="flex min-h-0 flex-1 bg-[#f4f6f9]">
+    <div className="flex min-h-0 flex-1 bg-background">
       <section className="flex min-w-0 flex-1 flex-col">
         <header className="border-b border-line bg-surface">
           <div className="flex items-center justify-between gap-3 px-3 py-2.5 sm:px-4">
@@ -820,7 +820,7 @@ export function ChannelThreadView({
               >
                 <ArrowLeft size={17} />
               </Link>
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#dff3ef] text-[11px] font-bold text-[#0d6b61]">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#dff3ef] text-[11px] font-bold text-chip-success-fg">
                 {initials(label)}
               </div>
               <div className="min-w-0">
@@ -837,9 +837,9 @@ export function ChannelThreadView({
                 className={cn(
                   "hidden items-center gap-1 rounded-md border px-2 py-1 text-[10px] font-semibold md:inline-flex",
                   window.state === "open"
-                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                    ? "border-chip-success-fg/25 bg-chip-success text-chip-success-fg"
                     : window.state === "closed"
-                      ? "border-amber-200 bg-amber-50 text-amber-700"
+                      ? "border-chip-warn-fg/25 bg-chip-warn text-chip-warn-fg"
                       : "border-line bg-surface-2 text-muted",
                 )}
                 title={window.detail}
@@ -865,7 +865,7 @@ export function ChannelThreadView({
                 <button
                   type="button"
                   onClick={() => setHandoffOpen(true)}
-                  className="inline-flex items-center gap-1 rounded-md border border-line px-2 py-1 text-[10px] font-semibold text-body transition-colors hover:border-amber-300 hover:bg-amber-50 hover:text-amber-800"
+                  className="inline-flex items-center gap-1 rounded-md border border-line px-2 py-1 text-[10px] font-semibold text-body transition-colors hover:border-amber-300 hover:bg-chip-warn hover:text-chip-warn-fg"
                   title={t("handoff.title")}
                   data-handoff-button
                 >
@@ -922,7 +922,7 @@ export function ChannelThreadView({
             currentMemberId={workspace?.memberId}
           />
           {headerNotice && (
-            <div className="border-t border-amber-100 bg-amber-50 px-3 py-1.5 text-[11px] text-amber-900">
+            <div className="border-t border-amber-100 bg-chip-warn px-3 py-1.5 text-[11px] text-chip-warn-fg">
               {headerNotice}
             </div>
           )}
@@ -958,16 +958,16 @@ export function ChannelThreadView({
             />
           )}
           {blocked && blocked.kind !== "allowlist" && (
-            <div className="flex items-start gap-2.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
+            <div className="flex items-start gap-2.5 rounded-lg border border-chip-warn-fg/25 bg-chip-warn px-3 py-2.5">
               <ShieldAlert
                 size={15}
                 className="mt-0.5 shrink-0 text-amber-600"
               />
               <div>
-                <div className="text-[12px] font-semibold text-amber-900">
+                <div className="text-[12px] font-semibold text-chip-warn-fg">
                   {blocked.title}
                 </div>
-                <div className="mt-0.5 text-[11px] leading-relaxed text-amber-800">
+                <div className="mt-0.5 text-[11px] leading-relaxed text-chip-warn-fg">
                   {blocked.detail}
                 </div>
               </div>
@@ -1083,7 +1083,7 @@ export function ChannelThreadView({
                         className={cn(
                           "w-full rounded-md border px-2.5 py-2 text-left transition-colors",
                           selectedTemplate?._id === template._id
-                            ? "border-[#0d6b61] bg-[#edf8f6]"
+                            ? "border-[#0d6b61] bg-chip-success"
                             : "border-transparent hover:bg-surface-2",
                         )}
                       >
@@ -1251,7 +1251,7 @@ export function ChannelThreadView({
           </div>
 
           {error && (
-            <div className="mt-2 flex items-start gap-2 text-[11px] text-red-700">
+            <div className="mt-2 flex items-start gap-2 text-[11px] text-chip-danger-fg">
               <AlertTriangle size={13} className="mt-0.5 shrink-0" />
               {error}
             </div>
@@ -1275,7 +1275,7 @@ export function ChannelThreadView({
       )}
       {patientPanelOpen && (
         <div
-          className="fixed inset-0 z-50 flex justify-end bg-[#050912]/45 backdrop-blur-[2px]"
+          className="fixed inset-0 z-50 flex justify-end bg-scrim backdrop-blur-[2px]"
           role="dialog"
           aria-modal="true"
           onMouseDown={(event) => {

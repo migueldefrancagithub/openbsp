@@ -219,8 +219,8 @@ export function LeoHubLabSection() {
           <div
             className={`flex items-start gap-2 rounded-xl border px-3 py-2.5 text-sm ${
               notice.kind === "success"
-                ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                : "border-red-200 bg-red-50 text-red-800"
+                ? "border-chip-success-fg/25 bg-chip-success text-chip-success-fg"
+                : "border-chip-danger-fg/25 bg-chip-danger text-red-800"
             }`}
           >
             {notice.kind === "success" ? (

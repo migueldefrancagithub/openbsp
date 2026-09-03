@@ -61,9 +61,9 @@ export function OperationRollups({ days = 14 }: { days?: number }) {
               { label: tr("Campanhas + follow-ups", "Campaigns + follow-ups"), value: totals.campaign + totals.followUp },
               { label: tr("1.ª resposta (média)", "First response (avg)"), value: totals.avgFirstResponseMs !== undefined ? `${Math.round(totals.avgFirstResponseMs / 60_000)} min` : "—" },
               { label: tr("Marcações", "Bookings"), value: totals.booked },
-              { label: tr("Compareceram", "Attended"), value: totals.attended, tone: "text-[#0d6b61]" },
-              { label: tr("Faltas", "No-shows"), value: totals.noShow, tone: "text-[#b3261e]" },
-              { label: tr("Envios falhados", "Failed sends"), value: totals.failed, tone: totals.failed > 0 ? "text-[#b3261e]" : undefined },
+              { label: tr("Compareceram", "Attended"), value: totals.attended, tone: "text-chip-success-fg" },
+              { label: tr("Faltas", "No-shows"), value: totals.noShow, tone: "text-chip-danger-fg" },
+              { label: tr("Envios falhados", "Failed sends"), value: totals.failed, tone: totals.failed > 0 ? "text-chip-danger-fg" : undefined },
             ].map((item) => (
               <div key={item.label} className="rounded-lg border border-line-soft bg-surface-2 px-3 py-2">
                 <div className="text-[10px] font-medium uppercase tracking-[0.12em] text-faint">{item.label}</div>
@@ -98,7 +98,7 @@ export function OperationRollups({ days = 14 }: { days?: number }) {
                       <td className="py-1.5 pr-3 tabular-nums">{row.outboundCampaign + row.outboundFollowUp}</td>
                       <td className="py-1.5 pr-3 tabular-nums">{row.newThreads}</td>
                       <td className="py-1.5 pr-3 tabular-nums">{row.booked}</td>
-                      <td className={cn("py-1.5 pr-3 tabular-nums", row.noShow > 0 && "text-[#b3261e]")}>{row.noShow}</td>
+                      <td className={cn("py-1.5 pr-3 tabular-nums", row.noShow > 0 && "text-chip-danger-fg")}>{row.noShow}</td>
                     </tr>
                   ))}
                 </tbody>

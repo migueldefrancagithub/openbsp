@@ -25,8 +25,18 @@
   --brand-solid: #0a1b33;
   --nav-active: #0a152d;
   --glass: rgba(255, 255, 255, 0.72);
+  --scrim: rgba(2, 6, 23, 0.35);
   --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.05);
   --shadow-float: 0 12px 32px -12px rgba(10, 27, 51, 0.28);
+  /* Status chips. Light keeps the exact pairs the product already used. */
+  --chip-danger-bg: #fdf1ef;
+  --chip-danger-fg: #b3261e;
+  --chip-success-bg: #edf8f6;
+  --chip-success-fg: #0d6b61;
+  --chip-info-bg: #eef3fb;
+  --chip-info-fg: #2b4f8a;
+  --chip-warn-bg: #fffbeb;
+  --chip-warn-fg: #92400e;
 }
 
 :root[data-theme="dark"] {
@@ -43,8 +53,19 @@
   --brand-solid: #2b4f8a;
   --nav-active: rgba(255, 255, 255, 0.12);
   --glass: rgba(17, 23, 38, 0.72);
+  --scrim: rgba(2, 6, 23, 0.62);
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
   --shadow-float: 0 16px 40px -16px rgba(0, 0, 0, 0.7);
+  /* Dark: the ink becomes the fill and the fill becomes the ink, so a chip
+     keeps its meaning without turning into a light rectangle on a dark card. */
+  --chip-danger-bg: rgba(224, 83, 61, 0.16);
+  --chip-danger-fg: #ff9c8a;
+  --chip-success-bg: rgba(13, 107, 97, 0.20);
+  --chip-success-fg: #6fd8c6;
+  --chip-info-bg: rgba(43, 79, 138, 0.24);
+  --chip-info-fg: #9dc0f5;
+  --chip-warn-bg: rgba(180, 128, 9, 0.20);
+  --chip-warn-fg: #f0c674;
 }
 
 /* Default to the system preference until someone chooses. */
@@ -63,8 +84,17 @@
     --brand-solid: #2b4f8a;
     --nav-active: rgba(255, 255, 255, 0.12);
     --glass: rgba(17, 23, 38, 0.72);
+    --scrim: rgba(2, 6, 23, 0.62);
     --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
     --shadow-float: 0 16px 40px -16px rgba(0, 0, 0, 0.7);
+    --chip-danger-bg: rgba(224, 83, 61, 0.16);
+    --chip-danger-fg: #ff9c8a;
+    --chip-success-bg: rgba(13, 107, 97, 0.20);
+    --chip-success-fg: #6fd8c6;
+    --chip-info-bg: rgba(43, 79, 138, 0.24);
+    --chip-info-fg: #9dc0f5;
+    --chip-warn-bg: rgba(180, 128, 9, 0.20);
+    --chip-warn-fg: #f0c674;
   }
 }
 
@@ -82,6 +112,15 @@
   --color-faint: var(--faint);
   --color-brand-solid: var(--brand-solid);
   --color-nav-active: var(--nav-active);
+  --color-scrim: var(--scrim);
+  --color-chip-danger: var(--chip-danger-bg);
+  --color-chip-danger-fg: var(--chip-danger-fg);
+  --color-chip-success: var(--chip-success-bg);
+  --color-chip-success-fg: var(--chip-success-fg);
+  --color-chip-info: var(--chip-info-bg);
+  --color-chip-info-fg: var(--chip-info-fg);
+  --color-chip-warn: var(--chip-warn-bg);
+  --color-chip-warn-fg: var(--chip-warn-fg);
   --font-sans: var(--font-inter), Inter, system-ui, sans-serif;
   --font-display: var(--font-outfit), Outfit, system-ui, sans-serif;
 }
@@ -96,6 +135,29 @@ body {
 
 ::selection {
   background: rgba(43, 79, 138, 0.28);
+}
+
+/*
+ * Keyboard focus, once, for everything.
+ *
+ * The token swap changed every border colour in the app, and only four files
+ * styled focus themselves — which left keyboard users with a nearly invisible
+ * ring on the new surfaces. A ring in the brand blue reads on both themes.
+ */
+:focus-visible {
+  outline: 2px solid #2b4f8a;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+:root[data-theme="dark"] :focus-visible {
+  outline-color: #7fa8e8;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) :focus-visible {
+    outline-color: #7fa8e8;
+  }
 }
 
 /* Frosted panels: used by drawers, the command palette and floating cards. */

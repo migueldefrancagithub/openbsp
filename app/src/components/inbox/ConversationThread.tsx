@@ -57,7 +57,7 @@ export function ConversationThread({ conversationId }: Props) {
     conversation.serviceWindowExpiresAt > Date.now();
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-[#f4f6f9]">
+    <div className="flex-1 flex flex-col h-full bg-background">
       {/* Header */}
       <div className="px-6 py-3 border-b border-line bg-surface flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -81,7 +81,7 @@ export function ConversationThread({ conversationId }: Props) {
               {conversation.leadSource === "ctwa" && (
                 <>
                   <span className="text-faint">·</span>
-                  <span className="inline-flex items-center gap-1 text-emerald-700">
+                  <span className="inline-flex items-center gap-1 text-chip-success-fg">
                     <Megaphone size={10} />
                     CTWA lead
                   </span>
@@ -104,8 +104,8 @@ export function ConversationThread({ conversationId }: Props) {
           <div
             className={
               within24h
-                ? "inline-flex items-center gap-1.5 text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-md text-[11px] font-medium"
-                : "inline-flex items-center gap-1.5 text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1 rounded-md text-[11px] font-medium"
+                ? "inline-flex items-center gap-1.5 text-chip-success-fg bg-chip-success border border-chip-success-fg/25 px-2 py-1 rounded-md text-[11px] font-medium"
+                : "inline-flex items-center gap-1.5 text-chip-warn-fg bg-chip-warn border border-chip-warn-fg/25 px-2 py-1 rounded-md text-[11px] font-medium"
             }
           >
             <Clock size={11} />

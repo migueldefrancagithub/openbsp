@@ -112,7 +112,7 @@ export function ConversationList() {
                       </div>
                     </div>
                     {c.leadSource === "ctwa" && (
-                      <div className="mt-1.5 inline-flex items-center gap-1 rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700">
+                      <div className="mt-1.5 inline-flex items-center gap-1 rounded-md bg-chip-success px-1.5 py-0.5 text-[10px] font-medium text-chip-success-fg">
                         <Megaphone size={10} />
                         CTWA lead
                       </div>
@@ -126,7 +126,7 @@ export function ConversationList() {
                           </span>
                         )}
                         {c.assignedAgentName && (
-                          <span className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700">
+                          <span className="inline-flex items-center gap-1 rounded-md bg-chip-info px-1.5 py-0.5 text-[10px] font-medium text-chip-info-fg">
                             <UserRound size={10} />
                             {c.assignedAgentName}
                           </span>

@@ -93,8 +93,8 @@ export function HumanCaseChip({
           "inline-flex items-center gap-1 rounded-md border font-semibold",
           compact ? "px-1.5 py-0.5 text-[9px]" : "px-2 py-1 text-[10px]",
           overdue
-            ? "border-[#f5c2b8] bg-[#fff1ee] text-[#8a2a1b]"
-            : "border-amber-200 bg-amber-50 text-amber-800",
+            ? "border-[#f5c2b8] bg-chip-danger text-chip-danger-fg"
+            : "border-chip-warn-fg/25 bg-chip-warn text-chip-warn-fg",
         )}
         title={`${openCase.reason} · ${openCase.responsibleName ?? t("handoff.unassigned")}`}
         data-human-case-chip
@@ -104,7 +104,7 @@ export function HumanCaseChip({
       </button>
       {open && (
         <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 sm:items-center sm:p-4"
+          className="fixed inset-0 z-50 flex items-end justify-center bg-scrim sm:items-center sm:p-4"
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) setOpen(false);
           }}
@@ -126,7 +126,7 @@ export function HumanCaseChip({
             </div>
             <p className="mt-3 rounded-md bg-surface-2 px-3 py-2 text-[12px] leading-relaxed text-ink">{openCase.question}</p>
             {!openCase.responsibleMemberId && currentMemberId && (
-              <button type="button" onClick={() => void takeIt()} disabled={busy} className="mt-2 text-[11px] font-semibold text-[#0d6b61] hover:underline">
+              <button type="button" onClick={() => void takeIt()} disabled={busy} className="mt-2 text-[11px] font-semibold text-chip-success-fg hover:underline">
                 {t("handoff.assignMe")}
               </button>
             )}
@@ -163,7 +163,7 @@ export function HumanCaseChip({
                 </button>
               ))}
             </div>
-            {error && <div className="mt-2 text-[11px] text-[#b3261e]">{error}</div>}
+            {error && <div className="mt-2 text-[11px] text-chip-danger-fg">{error}</div>}
             <div className="mt-4 flex items-center justify-end gap-2">
               <button type="button" onClick={() => setOpen(false)} className="h-9 rounded-md px-3 text-[12px] font-semibold text-muted hover:bg-surface-3">
                 {t("inbox.cancel")}

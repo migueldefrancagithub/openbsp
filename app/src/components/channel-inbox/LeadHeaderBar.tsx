@@ -112,7 +112,7 @@ export function LeadHeaderBar({
     "mt-0.5 h-7 w-full min-w-0 rounded-md border border-transparent bg-transparent px-1 text-[11px] font-semibold text-ink outline-none hover:border-line hover:bg-surface focus:border-brand-solid/40 focus:bg-surface";
 
   return (
-    <div className="border-t border-line-soft bg-[#fbfcfd]" data-lead-header>
+    <div className="border-t border-line-soft bg-surface-2" data-lead-header>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
         <div className="min-w-0 px-3 py-2">
           <div className="text-[8px] font-bold uppercase tracking-[0.12em] text-faint">{t("inbox.source")}</div>
@@ -164,7 +164,7 @@ export function LeadHeaderBar({
               <button
                 type="button"
                 onClick={() => void save({ responsibleMemberId: currentMemberId })}
-                className="normal-case tracking-normal text-[#0d6b61] hover:underline"
+                className="normal-case tracking-normal text-chip-success-fg hover:underline"
               >
                 {t("inbox.me")}
               </button>
@@ -227,7 +227,7 @@ export function LeadHeaderBar({
             <span
               className={cn(
                 "inline-flex items-center gap-1 text-[11px] font-semibold",
-                overdue ? "text-[#b3261e]" : thread.nextStepDueAt ? "text-ink" : "text-faint",
+                overdue ? "text-chip-danger-fg" : thread.nextStepDueAt ? "text-ink" : "text-faint",
               )}
               title={overdue ? t("inbox.overdue") : undefined}
             >
@@ -272,7 +272,7 @@ export function LeadHeaderBar({
           </div>
         </div>
       </div>
-      {error && <div className="px-3 pb-2 text-[11px] text-[#b3261e]">{error}</div>}
+      {error && <div className="px-3 pb-2 text-[11px] text-chip-danger-fg">{error}</div>}
     </div>
   );
 }

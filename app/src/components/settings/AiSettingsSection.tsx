@@ -64,7 +64,7 @@ export function AiSettingsSection() {
 
   return (
     <div className="space-y-6">
-      {notice && <div className={cn("rounded-lg border px-4 py-3 text-sm", notice.tone === "error" ? "border-[#e0533d]/30 bg-[#fdf1ef] text-[#b3261e]" : "border-[#0d6b61]/30 bg-[#edf8f6] text-[#0d6b61]")}>{notice.text}</div>}
+      {notice && <div className={cn("rounded-lg border px-4 py-3 text-sm", notice.tone === "error" ? "border-[#e0533d]/30 bg-chip-danger text-chip-danger-fg" : "border-[#0d6b61]/30 bg-chip-success text-chip-success-fg")}>{notice.text}</div>}
 
       <section className="overflow-hidden rounded-lg border border-line bg-surface">
         <div className="flex items-center gap-2 border-b border-line-soft px-6 py-4">
@@ -74,7 +74,7 @@ export function AiSettingsSection() {
             <p className="text-xs text-muted">{tr("Provedor, modelos e limites usados pelos agentes desta clínica. A chave nunca é mostrada depois de guardada.", "Provider, models and limits used by this clinic's agents. The key is never shown again after saving.")}</p>
           </div>
           {settings && (
-            <span className={cn("ml-auto inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-semibold", settings.ready ? "border-[#0d6b61]/30 bg-[#edf8f6] text-[#0d6b61]" : "border-amber-200 bg-amber-50 text-amber-800")}>
+            <span className={cn("ml-auto inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-semibold", settings.ready ? "border-[#0d6b61]/30 bg-chip-success text-chip-success-fg" : "border-chip-warn-fg/25 bg-chip-warn text-chip-warn-fg")}>
               {settings.ready ? <CheckCircle2 size={12} /> : <XCircle size={12} />} {settings.ready ? tr("Pronto", "Ready") : tr("Por testar", "Untested")}
             </span>
           )}
@@ -146,7 +146,7 @@ export function AiSettingsSection() {
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="text-[11px] text-muted">
                 {primaryStatus ? (
-                  <span className={primaryStatus.ok ? "text-[#0d6b61]" : "text-[#b3261e]"}>
+                  <span className={primaryStatus.ok ? "text-chip-success-fg" : "text-chip-danger-fg"}>
                     {primaryStatus.ok ? tr("Último teste OK", "Last test OK") : tr("Último teste falhou", "Last test failed")} · {primaryStatus.model} · {relativeTime(primaryStatus.checkedAt, Date.now(), locale)}{primaryStatus.latencyMs ? ` · ${primaryStatus.latencyMs} ms` : ""}{primaryStatus.error ? ` · ${primaryStatus.error}` : ""} · {tr("chave", "key")}: {primaryStatus.keySource === "tenant" ? tr("da clínica", "clinic") : primaryStatus.keySource === "platform" ? tr("da plataforma", "platform") : tr("nenhuma", "none")}
                   </span>
                 ) : tr("Ainda não testado.", "Not tested yet.")}
@@ -207,7 +207,7 @@ export function AiSettingsSection() {
                     {own ? `${tr("chave da clínica", "clinic key")} ${own.masked}` : platform ? tr("chave da plataforma", "platform key") : tr("sem chave", "no key")}
                   </div>
                   {own && (
-                    <button type="button" disabled={busy !== null} onClick={() => void run(`clear-${p.id}`, () => clearKey({ provider: p.id }), tr("Chave removida.", "Key removed."))} className="mt-1 text-[11px] font-semibold text-[#b3261e]">{tr("Remover", "Remove")}</button>
+                    <button type="button" disabled={busy !== null} onClick={() => void run(`clear-${p.id}`, () => clearKey({ provider: p.id }), tr("Chave removida.", "Key removed."))} className="mt-1 text-[11px] font-semibold text-chip-danger-fg">{tr("Remover", "Remove")}</button>
                   )}
                 </li>
               );

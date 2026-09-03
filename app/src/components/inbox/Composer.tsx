@@ -151,7 +151,7 @@ export function Composer({ conversationId, serviceWindowExpiresAt }: ComposerPro
   return (
     <div className="border-t border-line bg-surface p-4">
       {!within24h && !showTemplates && (
-        <div className="flex items-start gap-2 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 px-3 py-2 rounded-lg mb-3">
+        <div className="flex items-start gap-2 text-[11px] text-chip-warn-fg bg-chip-warn border border-chip-warn-fg/25 px-3 py-2 rounded-lg mb-3">
           <Lock size={12} strokeWidth={2.5} className="flex-shrink-0 mt-0.5" />
           <div className="flex-1">
             24h service window expired — send an approved template instead.
@@ -159,7 +159,7 @@ export function Composer({ conversationId, serviceWindowExpiresAt }: ComposerPro
           <button
             type="button"
             onClick={() => setShowTemplates(true)}
-            className="text-amber-900 font-semibold hover:underline"
+            className="text-chip-warn-fg font-semibold hover:underline"
           >
             Pick template
           </button>
@@ -329,7 +329,7 @@ export function Composer({ conversationId, serviceWindowExpiresAt }: ComposerPro
         </div>
       )}
       {error && (
-        <div className="flex items-start gap-2 text-[12px] text-red-700 bg-red-50 border border-red-200 px-3 py-2 rounded-lg mb-3">
+        <div className="flex items-start gap-2 text-[12px] text-chip-danger-fg bg-chip-danger border border-chip-danger-fg/25 px-3 py-2 rounded-lg mb-3">
           <AlertCircle size={12} className="flex-shrink-0 mt-0.5" />
           <span>{error}</span>
         </div>

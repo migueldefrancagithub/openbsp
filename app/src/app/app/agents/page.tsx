@@ -75,11 +75,11 @@ export default function AgentsPage() {
       />
       <div className="mx-auto flex w-full min-h-0 max-w-7xl flex-1 flex-col gap-4 overflow-y-auto px-4 py-5 sm:px-6 xl:px-8">
         {settings && !settings.ready && (
-          <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] text-amber-800">
+          <div className="flex items-center gap-2 rounded-lg border border-chip-warn-fg/25 bg-chip-warn px-4 py-3 text-[13px] text-chip-warn-fg">
             <AlertTriangle size={14} /> {tr("A IA ainda não está pronta: configure e teste o provedor em", "AI is not ready yet: configure and test the provider in")} <Link href="/app/settings?tab=ai" className="font-semibold underline">{tr("Definições › IA", "Settings › AI")}</Link>.
           </div>
         )}
-        {error && <div className="rounded-lg border border-[#e0533d]/30 bg-[#fdf1ef] px-4 py-3 text-[13px] text-[#b3261e]">{error}</div>}
+        {error && <div className="rounded-lg border border-[#e0533d]/30 bg-chip-danger px-4 py-3 text-[13px] text-chip-danger-fg">{error}</div>}
 
         {creating && (
           <section className="rounded-lg border border-line bg-surface p-5">
@@ -204,16 +204,16 @@ function AgentEditor({ agentId, channels, knowledge, onDeleted }: { agentId: Id<
     <section className="flex min-h-0 flex-1 flex-col gap-4 rounded-xl border border-line bg-surface p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <span className={cn("rounded-md border px-2 py-0.5 text-[11px] font-semibold", agent.status === "active" ? "border-[#0d6b61]/30 bg-[#edf8f6] text-[#0d6b61]" : agent.status === "paused" ? "border-amber-200 bg-amber-50 text-amber-800" : "border-line bg-surface-2 text-body")}>
+          <span className={cn("rounded-md border px-2 py-0.5 text-[11px] font-semibold", agent.status === "active" ? "border-[#0d6b61]/30 bg-chip-success text-chip-success-fg" : agent.status === "paused" ? "border-chip-warn-fg/25 bg-chip-warn text-chip-warn-fg" : "border-line bg-surface-2 text-body")}>
             {agent.status === "active" ? tr("Ativo", "Active") : agent.status === "paused" ? tr("Pausado", "Paused") : tr("Rascunho", "Draft")}
           </span>
           <span
             className={cn(
               "rounded-md border px-2 py-0.5 text-[11px] font-bold",
               agent.mode === "autopilot"
-                ? "border-[#0d6b61]/30 bg-[#edf8f6] text-[#0d6b61]"
+                ? "border-[#0d6b61]/30 bg-chip-success text-chip-success-fg"
                 : agent.mode === "copilot"
-                  ? "border-[#2b4f8a]/30 bg-[#eef3fb] text-[#2b4f8a]"
+                  ? "border-[#2b4f8a]/30 bg-chip-info text-chip-info-fg"
                   : "border-line bg-surface-2 text-body",
             )}
             title={tr("Modo de maturação", "Maturity mode")}
@@ -226,10 +226,10 @@ function AgentEditor({ agentId, channels, knowledge, onDeleted }: { agentId: Id<
           {agent.status === "active" && <button type="button" disabled={busy !== null} onClick={() => void run("pause", () => setStatus({ agentId, status: "paused" }), tr("Agente pausado.", "Agent paused."))} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line px-3 text-[12px] font-semibold text-ink"><Pause size={13} /> {tr("Pausar", "Pause")}</button>}
           {agent.status === "paused" && <button type="button" disabled={busy !== null} onClick={() => void run("resume", () => setStatus({ agentId, status: "active" }), tr("Agente ativo.", "Agent active."))} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[#0d6b61] px-3 text-[12px] font-semibold text-white"><Play size={13} /> {tr("Retomar", "Resume")}</button>}
           <button type="button" disabled={busy !== null || blockers.length > 0} onClick={() => void run("publish", () => publish({ agentId }), tr("Nova versão publicada.", "New version published."))} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-brand-solid px-3 text-[12px] font-semibold text-white disabled:opacity-50"><Rocket size={13} /> {agent.publishedVersionId ? tr("Publicar nova versão", "Publish new version") : tr("Publicar", "Publish")}</button>
-          {agent.status === "draft" && !agent.publishedVersionId && <button type="button" disabled={busy !== null} onClick={() => { if (window.confirm(tr("Apagar este rascunho?", "Delete this draft?"))) void run("remove", async () => { await remove({ agentId }); onDeleted(); }); }} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line px-3 text-[12px] font-semibold text-muted hover:text-[#b3261e]"><Trash2 size={13} /></button>}
+          {agent.status === "draft" && !agent.publishedVersionId && <button type="button" disabled={busy !== null} onClick={() => { if (window.confirm(tr("Apagar este rascunho?", "Delete this draft?"))) void run("remove", async () => { await remove({ agentId }); onDeleted(); }); }} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line px-3 text-[12px] font-semibold text-muted hover:text-chip-danger-fg"><Trash2 size={13} /></button>}
         </div>
       </div>
-      {notice && <div className={cn("rounded-lg border px-3 py-2 text-[12px]", notice.tone === "error" ? "border-[#e0533d]/30 bg-[#fdf1ef] text-[#b3261e]" : "border-[#0d6b61]/30 bg-[#edf8f6] text-[#0d6b61]")}>{notice.text}</div>}
+      {notice && <div className={cn("rounded-lg border px-3 py-2 text-[12px]", notice.tone === "error" ? "border-[#e0533d]/30 bg-chip-danger text-chip-danger-fg" : "border-[#0d6b61]/30 bg-chip-success text-chip-success-fg")}>{notice.text}</div>}
 
       <div role="tablist" className="inline-flex flex-wrap gap-1 rounded-lg border border-line bg-surface-2 p-1 text-[12px] font-semibold">
         {(
@@ -387,7 +387,7 @@ function AgentEditor({ agentId, channels, knowledge, onDeleted }: { agentId: Id<
                         <span
                           className={cn(
                             "ml-1.5 rounded px-1 py-0.5 text-[9px] font-bold uppercase tracking-wide",
-                            risk === "critical" ? "bg-[#fdf1ef] text-[#b3261e]" : risk === "attention" ? "bg-amber-50 text-amber-800" : "bg-surface-3 text-muted",
+                            risk === "critical" ? "bg-chip-danger text-chip-danger-fg" : risk === "attention" ? "bg-chip-warn text-chip-warn-fg" : "bg-surface-3 text-muted",
                           )}
                         >
                           {riskLabel}
@@ -407,12 +407,12 @@ function AgentEditor({ agentId, channels, knowledge, onDeleted }: { agentId: Id<
             <div className="rounded-lg border border-line bg-surface p-4">
               <div className="mb-2 flex items-center justify-between text-[13px] font-semibold text-ink">
                 {tr("Lista de verificação", "Checklist")}
-                <span className={cn("rounded-md px-2 py-0.5 text-[11px]", blockers.length === 0 ? "bg-[#edf8f6] text-[#0d6b61]" : "bg-[#fdf1ef] text-[#b3261e]")}>{blockers.length === 0 ? tr("pronto a publicar", "ready to publish") : `${blockers.length} ${tr("bloqueios", "blockers")}`}</span>
+                <span className={cn("rounded-md px-2 py-0.5 text-[11px]", blockers.length === 0 ? "bg-chip-success text-chip-success-fg" : "bg-chip-danger text-chip-danger-fg")}>{blockers.length === 0 ? tr("pronto a publicar", "ready to publish") : `${blockers.length} ${tr("bloqueios", "blockers")}`}</span>
               </div>
               <ul className="space-y-1.5 text-[12px]">
-                {blockers.map((issue) => <li key={issue.code + (issue.detail ?? "")} className="flex items-start gap-1.5 text-[#b3261e]"><AlertTriangle size={12} className="mt-0.5 shrink-0" /> {issueLabel(issue.code, issue.detail, locale)}</li>)}
-                {warnings.map((issue) => <li key={issue.code + (issue.detail ?? "")} className="flex items-start gap-1.5 text-amber-700"><AlertTriangle size={12} className="mt-0.5 shrink-0" /> {issueLabel(issue.code, issue.detail, locale)}</li>)}
-                {issues.length === 0 && <li className="flex items-center gap-1.5 text-[#0d6b61]"><CheckCircle2 size={12} /> {tr("Tudo verificado.", "All checks passed.")}</li>}
+                {blockers.map((issue) => <li key={issue.code + (issue.detail ?? "")} className="flex items-start gap-1.5 text-chip-danger-fg"><AlertTriangle size={12} className="mt-0.5 shrink-0" /> {issueLabel(issue.code, issue.detail, locale)}</li>)}
+                {warnings.map((issue) => <li key={issue.code + (issue.detail ?? "")} className="flex items-start gap-1.5 text-chip-warn-fg"><AlertTriangle size={12} className="mt-0.5 shrink-0" /> {issueLabel(issue.code, issue.detail, locale)}</li>)}
+                {issues.length === 0 && <li className="flex items-center gap-1.5 text-chip-success-fg"><CheckCircle2 size={12} /> {tr("Tudo verificado.", "All checks passed.")}</li>}
               </ul>
               <p className="mt-2 text-[10px] text-faint">{tr("A lista recalcula ao guardar. Publicar congela configuração e conhecimento numa versão imutável.", "The list recomputes on save. Publishing freezes configuration and knowledge into an immutable version.")}</p>
             </div>

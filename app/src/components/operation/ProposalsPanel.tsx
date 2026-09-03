@@ -55,13 +55,13 @@ export function ProposalsPanel({ threadId, compact = false }: { threadId?: Id<"c
   }
 
   return (
-    <div className={cn("rounded-lg border border-line bg-surface", compact && "border-[#2b4f8a]/25 bg-[#f7f9fd]")}>
+    <div className={cn("rounded-lg border border-line bg-surface", compact && "border-[#2b4f8a]/25 bg-surface-2")}>
       <div className="flex items-center justify-between border-b border-line-soft px-3 py-2">
         <span className="text-[12px] font-semibold text-ink">
           {tr("A IA ouviu, você decide", "The AI heard it, you decide")} ({pending.length})
         </span>
       </div>
-      {error && <p className="px-3 pt-2 text-[11px] text-[#b3261e]">{error}</p>}
+      {error && <p className="px-3 pt-2 text-[11px] text-chip-danger-fg">{error}</p>}
       <ul className="divide-y divide-line-soft">
         {pending.map((proposal) => (
           <li key={proposal._id} className="px-3 py-2.5 text-[12px]">
@@ -69,7 +69,7 @@ export function ProposalsPanel({ threadId, compact = false }: { threadId?: Id<"c
               {!threadId && (
                 <Link
                   href={`/app/channel-inbox/${encodeURIComponent(proposal.threadKey)}?channel=${proposal.channelId}`}
-                  className="font-semibold text-[#2b4f8a] hover:underline"
+                  className="font-semibold text-chip-info-fg hover:underline"
                 >
                   {proposal.patientName ?? proposal.threadKey}
                 </Link>

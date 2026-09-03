@@ -99,7 +99,7 @@ export function ComplianceSection() {
     /^[^@\s]+@[^@\s.]+\.[^@\s]+$/.test(controllerEmail.trim());
 
   return (
-    <section className="rounded-lg border border-amber-200 bg-surface">
+    <section className="rounded-lg border border-chip-warn-fg/25 bg-surface">
       <header className="flex items-center gap-2.5 border-b border-line-soft px-4 py-3">
         <ShieldCheck size={16} className="text-amber-600" />
         <div>
@@ -145,11 +145,11 @@ export function ComplianceSection() {
         />
 
         {!status.canAccept && (
-          <p className="text-[12px] text-amber-700">
+          <p className="text-[12px] text-chip-warn-fg">
             {tr("Apenas o proprietário do espaço pode aceitar estes termos.", "Only the workspace owner can accept these terms.")}
           </p>
         )}
-        {error && <p className="text-[12px] text-red-700">{error}</p>}
+        {error && <p className="text-[12px] text-chip-danger-fg">{error}</p>}
 
         <button
           type="submit"

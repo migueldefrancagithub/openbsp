@@ -27,9 +27,9 @@ import { convexErrorMessage } from "@/lib/convexErrorMessage";
 
 const STATUS_STYLES: Record<string, string> = {
   draft: "bg-surface-3 text-body border-line",
-  pending: "bg-amber-50 text-amber-700 border-amber-200",
-  approved: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  rejected: "bg-red-50 text-red-700 border-red-200",
+  pending: "bg-chip-warn text-chip-warn-fg border-chip-warn-fg/25",
+  approved: "bg-chip-success text-chip-success-fg border-chip-success-fg/25",
+  rejected: "bg-chip-danger text-chip-danger-fg border-chip-danger-fg/25",
   paused: "bg-surface-3 text-muted border-line",
   disabled: "bg-surface-3 text-faint border-line",
 };
@@ -240,7 +240,7 @@ export default function TemplatesPage() {
                         <span className="text-[10px] text-faint font-[var(--font-mono)]">
                           {friendlyId("TPL", t._id)}
                         </span>
-                        <span className="inline-flex items-center rounded-full border border-sky-200 bg-sky-50 px-2.5 py-0.5 text-[11px] font-semibold uppercase text-sky-700">
+                        <span className="inline-flex items-center rounded-full border border-sky-200 bg-chip-info px-2.5 py-0.5 text-[11px] font-semibold uppercase text-chip-info-fg">
                           {categoryLabel(t.category, locale)}
                         </span>
                         <span
@@ -324,11 +324,11 @@ function TemplateStat({
 }) {
   const toneClass =
     tone === "good"
-      ? "border-emerald-100 bg-emerald-50 text-emerald-700"
+      ? "border-emerald-100 bg-chip-success text-chip-success-fg"
       : tone === "warn"
-        ? "border-amber-100 bg-amber-50 text-amber-700"
+        ? "border-amber-100 bg-chip-warn text-chip-warn-fg"
         : tone === "bad"
-          ? "border-red-100 bg-red-50 text-red-700"
+          ? "border-chip-danger-fg/20 bg-chip-danger text-chip-danger-fg"
           : "border-line bg-surface-2 text-body";
   return (
     <div className={`rounded-lg border p-3 ${toneClass}`}>
@@ -384,11 +384,11 @@ function categoryLabel(category: string, locale: Locale) {
 }
 
 function templateReadinessClass(status: string) {
-  if (status === "approved") return "border-emerald-100 bg-emerald-50 text-emerald-700";
+  if (status === "approved") return "border-emerald-100 bg-chip-success text-chip-success-fg";
   if (status === "pending" || status === "draft") {
-    return "border-amber-100 bg-amber-50 text-amber-800";
+    return "border-amber-100 bg-chip-warn text-chip-warn-fg";
   }
-  return "border-red-100 bg-red-50 text-red-700";
+  return "border-chip-danger-fg/20 bg-chip-danger text-chip-danger-fg";
 }
 
 function templateReadinessIcon(status: string) {
@@ -476,8 +476,8 @@ function HubTemplatesSection({ channelId }: { channelId: Id<"channels"> }) {
               <span
                 className={`rounded border px-1.5 py-0.5 text-[10px] font-semibold ${
                   ["approved", "active"].includes(row.status.toLowerCase())
-                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                    : "border-amber-200 bg-amber-50 text-amber-700"
+                    ? "border-chip-success-fg/25 bg-chip-success text-chip-success-fg"
+                    : "border-chip-warn-fg/25 bg-chip-warn text-chip-warn-fg"
                 }`}
               >
                 {row.status}

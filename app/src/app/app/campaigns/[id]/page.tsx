@@ -168,7 +168,7 @@ export default function CampaignDetailPage() {
                     void run("cancel", () => cancel({ campaignId }));
                   }
                 }}
-                className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#e0533d]/40 bg-surface px-3 text-[12px] font-semibold text-[#b3261e]"
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#e0533d]/40 bg-surface px-3 text-[12px] font-semibold text-chip-danger-fg"
               >
                 <XCircle size={13} /> {tr("Cancelar", "Cancel")}
               </button>
@@ -192,9 +192,9 @@ export default function CampaignDetailPage() {
       />
 
       <div className="mx-auto w-full max-w-7xl space-y-5 px-4 py-5 sm:px-6 xl:px-8">
-        {error && <div className="rounded-lg border border-[#e0533d]/30 bg-[#fdf1ef] px-4 py-3 text-[13px] text-[#b3261e]">{error}</div>}
+        {error && <div className="rounded-lg border border-[#e0533d]/30 bg-chip-danger px-4 py-3 text-[13px] text-chip-danger-fg">{error}</div>}
         {campaign.pauseReason && campaign.status === "paused" && (
-          <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] text-amber-800">
+          <div className="rounded-lg border border-chip-warn-fg/25 bg-chip-warn px-4 py-3 text-[13px] text-chip-warn-fg">
             {tr("Motivo da pausa: ", "Pause reason: ")}
             {campaign.pauseReason === "failure_rate"
               ? tr("taxa de falhas acima de 20%. Verifique os destinatários falhados antes de retomar.", "failure rate above 20%. Check the failed recipients before resuming.")
@@ -204,7 +204,7 @@ export default function CampaignDetailPage() {
           </div>
         )}
         {campaign.status === "scheduled" && campaign.scheduledAt && (
-          <div className="rounded-lg border border-[#2b4f8a]/30 bg-[#eef3fb] px-4 py-3 text-[13px] text-[#2b4f8a]">
+          <div className="rounded-lg border border-[#2b4f8a]/30 bg-chip-info px-4 py-3 text-[13px] text-chip-info-fg">
             {tr("Agendada para ", "Scheduled for ")}{new Date(campaign.scheduledAt).toLocaleString(locale === "pt" ? "pt-PT" : "en-GB")}
           </div>
         )}
@@ -232,8 +232,8 @@ export default function CampaignDetailPage() {
             <div className="grid grid-cols-3 gap-2 text-center">
               {[
                 { label: tr("Encontradas", "Matched"), value: detail.audienceSummary.matched },
-                { label: tr("Elegíveis", "Eligible"), value: detail.audienceSummary.eligible, tone: "text-[#0d6b61]" },
-                { label: tr("Bloqueadas", "Blocked"), value: detail.audienceSummary.matched - detail.audienceSummary.eligible, tone: "text-amber-700" },
+                { label: tr("Elegíveis", "Eligible"), value: detail.audienceSummary.eligible, tone: "text-chip-success-fg" },
+                { label: tr("Bloqueadas", "Blocked"), value: detail.audienceSummary.matched - detail.audienceSummary.eligible, tone: "text-chip-warn-fg" },
               ].map((item) => (
                 <div key={item.label} className="rounded-lg border border-line-soft bg-surface-2 px-2 py-2">
                   <div className={cn("font-[var(--font-outfit)] text-[20px] font-medium", item.tone ?? "text-ink")}>{item.value}</div>
@@ -315,7 +315,7 @@ export default function CampaignDetailPage() {
               )}
               {recipients.status === "CanLoadMore" && (
                 <div className="border-t border-line-soft px-4 py-2">
-                  <button type="button" onClick={() => recipients.loadMore(30)} className="text-[12px] font-semibold text-[#2b4f8a] hover:underline">{tr("Carregar mais", "Load more")}</button>
+                  <button type="button" onClick={() => recipients.loadMore(30)} className="text-[12px] font-semibold text-chip-info-fg hover:underline">{tr("Carregar mais", "Load more")}</button>
                 </div>
               )}
             </>
@@ -335,7 +335,7 @@ export default function CampaignDetailPage() {
               )}
               {events.status === "CanLoadMore" && (
                 <div className="border-t border-line-soft px-4 py-2">
-                  <button type="button" onClick={() => events.loadMore(30)} className="text-[12px] font-semibold text-[#2b4f8a] hover:underline">{tr("Carregar mais", "Load more")}</button>
+                  <button type="button" onClick={() => events.loadMore(30)} className="text-[12px] font-semibold text-chip-info-fg hover:underline">{tr("Carregar mais", "Load more")}</button>
                 </div>
               )}
             </>

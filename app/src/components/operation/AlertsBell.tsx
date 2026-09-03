@@ -49,7 +49,7 @@ export function AlertsBell() {
         <div className="absolute bottom-0 left-full z-40 ml-2 w-[360px] rounded-xl border border-line bg-surface shadow-xl">
           <div className="flex items-center justify-between border-b border-line-soft px-3 py-2">
             <span className="text-[12px] font-semibold text-ink">{tr("Avisos abertos", "Open alerts")}</span>
-            <Link href="/app?tab=alerts" onClick={() => setOpen(false)} className="text-[11px] font-semibold text-[#2b4f8a] hover:underline">
+            <Link href="/app?tab=alerts" onClick={() => setOpen(false)} className="text-[11px] font-semibold text-chip-info-fg hover:underline">
               {tr("Ver todos", "See all")}
             </Link>
           </div>
@@ -71,7 +71,7 @@ export function AlertsBell() {
                     <p className="text-[11px] text-muted">{alert.title}</p>
                     <p className="text-[10px] text-faint">{relativeTime(alert.createdAt, now, locale)}</p>
                     {alert.href && (
-                      <Link href={alert.href} onClick={() => setOpen(false)} className="text-[11px] font-semibold text-[#2b4f8a] hover:underline">
+                      <Link href={alert.href} onClick={() => setOpen(false)} className="text-[11px] font-semibold text-chip-info-fg hover:underline">
                         {tr("Abrir", "Open")}
                       </Link>
                     )}
@@ -80,7 +80,7 @@ export function AlertsBell() {
                     type="button"
                     onClick={() => void acknowledge({ alertId: alert._id })}
                     title={tr("Marcar como visto", "Mark as seen")}
-                    className="mt-0.5 text-faint hover:text-[#0d6b61]"
+                    className="mt-0.5 text-faint hover:text-chip-success-fg"
                   >
                     <Check size={14} />
                   </button>

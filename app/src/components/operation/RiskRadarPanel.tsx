@@ -8,9 +8,9 @@ import { cn } from "@/lib/cn";
 import { useI18n } from "@/lib/i18n";
 
 const BUCKET = {
-  critical: { pt: "crítico", en: "critical", box: "bg-[#fdf1ef] text-[#b3261e]", Icon: TriangleAlert },
-  at_risk: { pt: "em risco", en: "at risk", box: "bg-amber-50 text-amber-800", Icon: Clock3 },
-  in_flight: { pt: "em voo", en: "in flight", box: "bg-[#eef3fb] text-[#2b4f8a]", Icon: PlaneTakeoff },
+  critical: { pt: "crítico", en: "critical", box: "bg-chip-danger text-chip-danger-fg", Icon: TriangleAlert },
+  at_risk: { pt: "em risco", en: "at risk", box: "bg-chip-warn text-chip-warn-fg", Icon: Clock3 },
+  in_flight: { pt: "em voo", en: "in flight", box: "bg-chip-info text-chip-info-fg", Icon: PlaneTakeoff },
 } as const;
 
 /**
@@ -29,7 +29,7 @@ export function RiskRadarPanel() {
   if (nothingToShow) {
     return (
       <div className="rounded-lg border border-line bg-surface px-4 py-6 text-center">
-        <CheckCircle2 size={22} className="mx-auto text-[#0d6b61]" />
+        <CheckCircle2 size={22} className="mx-auto text-chip-success-fg" />
         <p className="mt-1 text-[13px] font-medium text-ink">{tr("Nada em risco", "Nothing at risk")}</p>
         <p className="text-[12px] text-muted">
           {tr(
@@ -44,14 +44,14 @@ export function RiskRadarPanel() {
   return (
     <div className="space-y-2">
       {radar.withoutNextStep.length > 0 && (
-        <section className="rounded-lg border border-amber-200 bg-amber-50/60 p-3">
-          <p className="text-[13px] font-medium text-amber-900">
+        <section className="rounded-lg border border-chip-warn-fg/25 bg-chip-warn p-3">
+          <p className="text-[13px] font-medium text-chip-warn-fg">
             {radar.withoutNextStep.length}{" "}
             {radar.withoutNextStep.length === 1
               ? tr("conversa aberta sem próximo passo", "open conversation without a next step")
               : tr("conversas abertas sem próximo passo", "open conversations without a next step")}
           </p>
-          <p className="mb-1.5 text-[11px] text-amber-800">
+          <p className="mb-1.5 text-[11px] text-chip-warn-fg">
             {tr(
               "Ninguém marcou o que acontece a seguir. Cada uma é alguém à espera sem nada combinado.",
               "Nobody set what happens next. Each one is someone waiting with nothing agreed.",
@@ -62,11 +62,11 @@ export function RiskRadarPanel() {
               <li key={row.threadId} className="flex items-baseline justify-between gap-3 text-[11px]">
                 <Link
                   href={`/app/channel-inbox/${encodeURIComponent(row.threadKey)}?channel=${row.channelId}`}
-                  className="truncate text-[#2b4f8a] hover:underline"
+                  className="truncate text-chip-info-fg hover:underline"
                 >
                   {row.displayName ?? row.threadKey}
                 </Link>
-                <span className="shrink-0 tabular-nums text-amber-800">
+                <span className="shrink-0 tabular-nums text-chip-warn-fg">
                   {tr("aberta há", "open for")} {row.hoursOpen}h
                 </span>
               </li>

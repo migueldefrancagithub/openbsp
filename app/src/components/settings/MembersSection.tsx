@@ -97,16 +97,16 @@ export function MembersSection() {
 
       <div className="px-6 py-5 space-y-4">
         {justInvited && (
-          <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 space-y-2">
-            <div className="flex items-center gap-2 text-[12px] font-semibold text-emerald-800">
+          <div className="rounded-lg border border-chip-success-fg/25 bg-chip-success p-4 space-y-2">
+            <div className="flex items-center gap-2 text-[12px] font-semibold text-chip-success-fg">
               <Check size={14} />
               {tr("Convite enviado para", "Invite sent to")} {justInvited.email}
             </div>
-            <div className="text-[11px] text-emerald-700">
+            <div className="text-[11px] text-chip-success-fg">
               {tr("Envie este link. Expira em 7 dias.", "Send this link. It expires in 7 days.")}
             </div>
             <div className="flex items-stretch gap-2">
-              <code className="flex-1 bg-surface border border-emerald-200 rounded-md px-3 py-2 text-[11px] font-[var(--font-mono)] text-ink break-all">
+              <code className="flex-1 bg-surface border border-chip-success-fg/25 rounded-md px-3 py-2 text-[11px] font-[var(--font-mono)] text-ink break-all">
                 {justInvited.link}
               </code>
               <button
@@ -121,7 +121,7 @@ export function MembersSection() {
             <button
               type="button"
               onClick={() => setJustInvited(null)}
-              className="text-[12px] text-emerald-800 font-medium hover:underline"
+              className="text-[12px] text-chip-success-fg font-medium hover:underline"
             >
               {tr("Concluído", "Done")}
             </button>
@@ -157,7 +157,7 @@ export function MembersSection() {
               </select>
             </div>
             {error && (
-              <div className="text-[12px] text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2 flex items-start gap-2">
+              <div className="text-[12px] text-chip-danger-fg bg-chip-danger border border-chip-danger-fg/25 rounded-lg px-3 py-2 flex items-start gap-2">
                 <AlertCircle size={14} className="flex-shrink-0 mt-0.5" />
                 {error}
               </div>
@@ -285,7 +285,7 @@ export function MembersSection() {
                         revoke({ inviteId: inv._id });
                       }
                     }}
-                    className="text-faint hover:text-red-600 p-1.5"
+                    className="text-faint hover:text-chip-danger-fg p-1.5"
                     title={tr("Revogar", "Revoke")}
                     aria-label={tr(`Revogar convite para ${inv.email}`, `Revoke invite to ${inv.email}`)}
                   >

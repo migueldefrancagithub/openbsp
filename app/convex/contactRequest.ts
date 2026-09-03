@@ -1,5 +1,7 @@
 import { v, ConvexError } from "convex/values";
 import { action } from "./_generated/server";
+import { tenantAction } from "./lib/customFunctions";
+import { hasCapability, type Role } from "./lib/roles";
 import { internal } from "./_generated/api";
 import {
   sendContactRequest,
@@ -17,7 +19,7 @@ import type { Id } from "./_generated/dataModel";
  * directly via Graph API, and rely on the standard inbound webhook to
  * persist any reply (which will then carry the user's `wa_id`).
  */
-export const send = action({
+export const send = tenantAction({
   args: {
     contactId: v.id("contacts"),
     bodyText: v.string(),
@@ -31,6 +33,13 @@ export const send = action({
     ctx,
     args,
   ): Promise<{ ok: boolean; wamid?: string; reason?: string }> => {
+    // This path talks to Graph directly, outside the outbox. Before the fix it
+    // was a plain `action`: no session, and the tenant came from the caller's
+    // own contactId, so anyone who could reach the deployment could send a
+    // WhatsApp message on any workspace's number.
+    if (!hasCapability(ctx.role as Role, "messages.send")) {
+      throw new ConvexError({ code: "FORBIDDEN_CAPABILITY", capability: "messages.send" });
+    }
     const text = args.bodyText.trim();
     if (text.length === 0 || text.length > 1024) {
       throw new ConvexError({
@@ -47,6 +56,7 @@ export const send = action({
       e164?: string;
     } | null = await ctx.runQuery(internal.contactRequest._loadContext, {
       contactId: args.contactId,
+      tenantId: ctx.tenantId,
     });
     if (!ctxData) throw new ConvexError({ code: "CONTACT_NOT_FOUND" });
 
@@ -86,7 +96,7 @@ import { internalQuery } from "./_generated/server";
 
 /** Resolve contact identifiers + tenant's sending phone for the prompt. */
 export const _loadContext = internalQuery({
-  args: { contactId: v.id("contacts") },
+  args: { contactId: v.id("contacts"), tenantId: v.id("tenants") },
   returns: v.union(
     v.object({
       tenantId: v.id("tenants"),
@@ -99,7 +109,8 @@ export const _loadContext = internalQuery({
   ),
   handler: async (ctx, args) => {
     const c = await ctx.db.get(args.contactId);
-    if (!c) return null;
+    // The tenant comes from the SESSION, never from the row the caller named.
+    if (!c || c.tenantId !== args.tenantId) return null;
     const phone = await ctx.db
       .query("phoneNumbers")
       .withIndex("by_tenant", (q) => q.eq("tenantId", c.tenantId))

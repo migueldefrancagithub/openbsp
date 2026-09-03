@@ -1025,23 +1025,23 @@ function statusIcon(tone: Tone) {
 }
 
 function toneAvatarClass(tone: Tone) {
-  if (tone === "good") return "border-emerald-200 bg-emerald-50 text-emerald-700";
-  if (tone === "bad") return "border-red-200 bg-red-50 text-red-700";
-  if (tone === "warn") return "border-amber-200 bg-amber-50 text-amber-700";
+  if (tone === "good") return "border-chip-success-fg/25 bg-chip-success text-chip-success-fg";
+  if (tone === "bad") return "border-chip-danger-fg/25 bg-chip-danger text-chip-danger-fg";
+  if (tone === "warn") return "border-chip-warn-fg/25 bg-chip-warn text-chip-warn-fg";
   return "border-line bg-surface-2 text-ink";
 }
 
 function toneIconClass(tone: Tone) {
-  if (tone === "good") return "bg-emerald-50 text-emerald-600";
-  if (tone === "bad") return "bg-red-50 text-red-600";
-  if (tone === "warn") return "bg-amber-50 text-amber-600";
+  if (tone === "good") return "bg-chip-success text-emerald-600";
+  if (tone === "bad") return "bg-chip-danger text-chip-danger-fg";
+  if (tone === "warn") return "bg-chip-warn text-amber-600";
   return "bg-surface-2 text-muted";
 }
 
 function badgeClass(tone: Tone) {
-  if (tone === "good") return "border-emerald-200 bg-emerald-50 text-emerald-700";
-  if (tone === "bad") return "border-red-200 bg-red-50 text-red-700";
-  if (tone === "warn") return "border-amber-200 bg-amber-50 text-amber-700";
+  if (tone === "good") return "border-chip-success-fg/25 bg-chip-success text-chip-success-fg";
+  if (tone === "bad") return "border-chip-danger-fg/25 bg-chip-danger text-chip-danger-fg";
+  if (tone === "warn") return "border-chip-warn-fg/25 bg-chip-warn text-chip-warn-fg";
   return "border-line bg-surface-2 text-body";
 }
 
@@ -1053,16 +1053,16 @@ function dotClass(tone: Tone) {
 }
 
 function metricClass(tone: Tone) {
-  if (tone === "good") return "border-emerald-100 bg-emerald-50 text-emerald-700";
-  if (tone === "bad") return "border-red-100 bg-red-50 text-red-700";
-  if (tone === "warn") return "border-amber-100 bg-amber-50 text-amber-700";
+  if (tone === "good") return "border-emerald-100 bg-chip-success text-chip-success-fg";
+  if (tone === "bad") return "border-chip-danger-fg/20 bg-chip-danger text-chip-danger-fg";
+  if (tone === "warn") return "border-amber-100 bg-chip-warn text-chip-warn-fg";
   return "border-line bg-surface-2 text-body";
 }
 
 function tonePanelClass(tone: Tone) {
-  if (tone === "good") return "border-emerald-100 bg-emerald-50 text-emerald-800";
-  if (tone === "bad") return "border-red-100 bg-red-50 text-red-800";
-  if (tone === "warn") return "border-amber-100 bg-amber-50 text-amber-800";
+  if (tone === "good") return "border-emerald-100 bg-chip-success text-chip-success-fg";
+  if (tone === "bad") return "border-chip-danger-fg/20 bg-chip-danger text-red-800";
+  if (tone === "warn") return "border-amber-100 bg-chip-warn text-chip-warn-fg";
   return "border-line bg-surface-2 text-ink";
 }
 

@@ -86,7 +86,7 @@ export default function WhatsAppConnectLauncherPage() {
           : ShieldCheck;
 
   return (
-    <main className="min-h-screen bg-[#f6f8fb] px-4 py-10 text-ink">
+    <main className="min-h-screen bg-background px-4 py-10 text-ink">
       <section className="mx-auto flex min-h-[calc(100vh-5rem)] w-full max-w-lg flex-col justify-center">
         <div className="rounded-3xl border border-line bg-surface p-8 shadow-sm">
           <div className="flex items-center gap-3">
@@ -108,7 +108,7 @@ export default function WhatsAppConnectLauncherPage() {
               size={24}
               className={`${
                 state.status === "error"
-                  ? "text-red-600"
+                  ? "text-chip-danger-fg"
                   : state.status === "ready"
                     ? "text-emerald-600"
                     : state.status === "loading"

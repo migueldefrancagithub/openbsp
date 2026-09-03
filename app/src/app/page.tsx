@@ -161,7 +161,7 @@ export default function Home() {
         <div className="mx-auto max-w-6xl px-6 py-24">
           <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr] items-start">
             <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-medium text-emerald-700">
+              <div className="inline-flex items-center gap-2 rounded-full border border-chip-success-fg/25 bg-chip-success px-3 py-1 text-[11px] font-medium text-chip-success-fg">
                 <ShieldCheck size={13} />
                 Official Cloud API, not browser automation
               </div>

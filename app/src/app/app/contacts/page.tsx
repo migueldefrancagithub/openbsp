@@ -29,8 +29,8 @@ import { relativeTime } from "@/lib/relativeTime";
 import { useI18n, type Locale } from "@/lib/i18n";
 
 const CONSENT_PILL: Record<string, string> = {
-  granted: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  revoked: "bg-red-50 text-red-700 border-red-200",
+  granted: "bg-chip-success text-chip-success-fg border-chip-success-fg/25",
+  revoked: "bg-chip-danger text-chip-danger-fg border-chip-danger-fg/25",
   unknown: "bg-surface-3 text-muted border-line",
 };
 
@@ -192,8 +192,8 @@ export default function ContactsPage() {
           <div
             className={`mb-4 rounded-lg border px-4 py-3 text-sm ${
               error
-                ? "border-red-200 bg-red-50 text-red-700"
-                : "border-emerald-200 bg-emerald-50 text-emerald-700"
+                ? "border-chip-danger-fg/25 bg-chip-danger text-chip-danger-fg"
+                : "border-chip-success-fg/25 bg-chip-success text-chip-success-fg"
             }`}
           >
             {error ?? notice}
@@ -326,7 +326,7 @@ export default function ContactsPage() {
                     className="rounded-lg border border-line bg-surface p-4"
                   >
                     <div className="flex items-start gap-3">
-                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-sky-50 text-sm font-semibold text-sky-700">
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-chip-info text-sm font-semibold text-chip-info-fg">
                         {initial}
                       </span>
                       <div className="min-w-0 flex-1">
@@ -346,7 +346,7 @@ export default function ContactsPage() {
                             onClick={() =>
                               setRequestContact({ id: contact._id, name: primary })
                             }
-                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-emerald-700 hover:bg-emerald-50"
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-chip-success-fg hover:bg-chip-success"
                             aria-label={tr("Pedir telefone", "Request phone")}
                           >
                             <PhoneCall size={16} />
@@ -354,7 +354,7 @@ export default function ContactsPage() {
                         )}
                         <button
                           type="button"
-                          className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-sky-700 hover:bg-sky-50"
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-chip-info-fg hover:bg-chip-info"
                           aria-label={tr("Abrir conversa", "Open chat")}
                         >
                           <MessageCircle size={16} />
@@ -436,7 +436,7 @@ export default function ContactsPage() {
                 >
                   <input type="checkbox" className="h-4 w-4 accent-sky-600" />
                   <div className="flex min-w-0 items-center gap-3">
-                    <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-sky-50 text-[12px] font-semibold text-sky-700">
+                    <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-chip-info text-[12px] font-semibold text-chip-info-fg">
                       {initial}
                     </div>
                     <div className="min-w-0">
@@ -510,7 +510,7 @@ export default function ContactsPage() {
                         onClick={() =>
                           setRequestContact({ id: c._id, name: primary })
                         }
-                        className="rounded-lg p-1.5 text-emerald-600 hover:bg-emerald-50"
+                        className="rounded-lg p-1.5 text-emerald-600 hover:bg-chip-success"
                         aria-label={tr("Pedir telefone", "Request phone")}
                       >
                         <PhoneCall size={16} />
@@ -518,7 +518,7 @@ export default function ContactsPage() {
                     )}
                     <button
                       type="button"
-                      className="rounded-lg p-1.5 text-sky-700 hover:bg-sky-50"
+                      className="rounded-lg p-1.5 text-chip-info-fg hover:bg-chip-info"
                       aria-label={tr("Abrir conversa", "Open chat")}
                     >
                       <MessageCircle size={16} />
@@ -568,7 +568,7 @@ export default function ContactsPage() {
         />
       )}
       {requestContact && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim p-4">
           <div className="w-full max-w-md rounded-lg border border-line bg-surface shadow-xl">
             <div className="flex items-center justify-between border-b border-line-soft px-5 py-4">
               <div>
@@ -634,9 +634,9 @@ function ContactStat({
 }) {
   const toneClass =
     tone === "good"
-      ? "border-emerald-100 bg-emerald-50 text-emerald-700"
+      ? "border-emerald-100 bg-chip-success text-chip-success-fg"
       : tone === "warn"
-        ? "border-amber-100 bg-amber-50 text-amber-700"
+        ? "border-amber-100 bg-chip-warn text-chip-warn-fg"
         : "border-line bg-surface-2 text-body";
   return (
     <div className={`rounded-xl border p-3 ${toneClass}`}>
@@ -667,9 +667,9 @@ function IdentityLine({
   const { tr } = useI18n();
   const toneClass =
     tone === "good"
-      ? "text-emerald-700"
+      ? "text-chip-success-fg"
       : tone === "warn"
-        ? "text-amber-700"
+        ? "text-chip-warn-fg"
         : "text-body";
   return (
     <div className="flex min-w-0 items-center gap-2 text-xs">

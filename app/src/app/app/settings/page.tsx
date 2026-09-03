@@ -545,9 +545,9 @@ export default function SettingsPage() {
               {evidenceResult && (
                 <div className="mt-4 rounded-xl border border-line bg-surface p-3">
                   <div className="grid gap-2 text-xs sm:grid-cols-4">
-                    <EvidenceMetric label="OK" value={evidenceResult.summary.ok} tone="text-emerald-700" />
-                    <EvidenceMetric label={tr("Falharam", "Failed")} value={evidenceResult.summary.failed} tone="text-red-700" />
-                    <EvidenceMetric label={tr("Ignoradas", "Skipped")} value={evidenceResult.summary.skipped} tone="text-amber-700" />
+                    <EvidenceMetric label="OK" value={evidenceResult.summary.ok} tone="text-chip-success-fg" />
+                    <EvidenceMetric label={tr("Falharam", "Failed")} value={evidenceResult.summary.failed} tone="text-chip-danger-fg" />
+                    <EvidenceMetric label={tr("Ignoradas", "Skipped")} value={evidenceResult.summary.skipped} tone="text-chip-warn-fg" />
                     <EvidenceMetric label={tr("Escritas", "Writes")} value={evidenceResult.summary.writesEnabled ? tr("ativas", "enabled") : tr("desligadas", "off")} tone="text-ink" />
                   </div>
                   <div className="mt-3 max-h-64 space-y-1.5 overflow-auto pr-1">
@@ -577,7 +577,7 @@ export default function SettingsPage() {
             </div>
 
             {signupNotice && (
-              <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              <div className="mb-3 rounded-lg border border-chip-warn-fg/25 bg-chip-warn px-3 py-2 text-xs text-chip-warn-fg">
                 {signupNotice}
               </div>
             )}
@@ -684,11 +684,11 @@ export default function SettingsPage() {
               WhatsApp Business Account
             </h2>
             {hasConnection ? (
-              <span className="inline-flex items-center gap-1.5 text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md text-xs font-medium">
+              <span className="inline-flex items-center gap-1.5 text-chip-success-fg bg-chip-success border border-chip-success-fg/25 px-2 py-0.5 rounded-md text-xs font-medium">
                 <CheckCircle2 size={12} /> {tr("Ligado", "Connected")}
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1.5 text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md text-xs font-medium">
+              <span className="inline-flex items-center gap-1.5 text-chip-warn-fg bg-chip-warn border border-chip-warn-fg/25 px-2 py-0.5 rounded-md text-xs font-medium">
                 {tr("Não ligado", "Not connected")}
               </span>
             )}
@@ -704,7 +704,7 @@ export default function SettingsPage() {
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center">
+                        <div className="w-9 h-9 rounded-xl bg-chip-success flex items-center justify-center">
                           <Smartphone size={16} className="text-emerald-600" />
                         </div>
                         <div>
@@ -738,12 +738,12 @@ export default function SettingsPage() {
                               )}
                               {p.circuitBreakerUntil &&
                                 p.circuitBreakerUntil > Date.now() && (
-                                  <span className="ml-2 rounded-md border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+                                  <span className="ml-2 rounded-md border border-chip-warn-fg/25 bg-chip-warn px-1.5 py-0.5 text-[10px] font-medium text-chip-warn-fg">
                                     {tr("Proteção temporária ativa", "Circuit breaker active")}
                                   </span>
                                 )}
                               {p.circuitBreakerReason && (
-                                <div className="mt-1 text-[11px] text-amber-700">
+                                <div className="mt-1 text-[11px] text-chip-warn-fg">
                                   {p.circuitBreakerReason}
                                 </div>
                               )}
@@ -942,7 +942,7 @@ function AdmissionCheckCard({
               {statusLabel(check.status, locale)}
             </span>
             {check.blocking && check.status !== "done" && check.status !== "waived" && (
-              <span className="rounded-md border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">
+              <span className="rounded-md border border-chip-warn-fg/25 bg-chip-warn px-1.5 py-0.5 text-[10px] font-semibold text-chip-warn-fg">
                 {tr("Obrigatório", "Required")}
               </span>
             )}
@@ -1004,9 +1004,9 @@ function EvidenceMetric({
 }
 
 function evidenceRecordTone(record: { ok: boolean; skipped?: boolean }): string {
-  if (record.skipped) return "border-amber-200 bg-amber-50 text-amber-700";
-  if (record.ok) return "border-emerald-200 bg-emerald-50 text-emerald-700";
-  return "border-red-200 bg-red-50 text-red-700";
+  if (record.skipped) return "border-chip-warn-fg/25 bg-chip-warn text-chip-warn-fg";
+  if (record.ok) return "border-chip-success-fg/25 bg-chip-success text-chip-success-fg";
+  return "border-chip-danger-fg/25 bg-chip-danger text-chip-danger-fg";
 }
 
 function AdmissionButton({
@@ -1032,30 +1032,30 @@ function AdmissionButton({
 
 function readinessTone(label: string): string {
   if (label === "live_ready" || label === "review_ready") {
-    return "border-emerald-200 bg-emerald-50 text-emerald-700";
+    return "border-chip-success-fg/25 bg-chip-success text-chip-success-fg";
   }
   if (label === "blocked") {
-    return "border-red-200 bg-red-50 text-red-700";
+    return "border-chip-danger-fg/25 bg-chip-danger text-chip-danger-fg";
   }
-  return "border-amber-200 bg-amber-50 text-amber-700";
+  return "border-chip-warn-fg/25 bg-chip-warn text-chip-warn-fg";
 }
 
 function statusIconTone(status: AdmissionStatus): string {
   if (status === "done" || status === "waived") {
-    return "border-emerald-200 text-emerald-600";
+    return "border-chip-success-fg/25 text-emerald-600";
   }
-  if (status === "blocked") return "border-red-200 text-red-600";
+  if (status === "blocked") return "border-chip-danger-fg/25 text-chip-danger-fg";
   if (status === "in_progress") return "border-sky-200 text-sky-600";
   return "border-line text-faint";
 }
 
 function statusBadgeTone(status: AdmissionStatus): string {
   if (status === "done" || status === "waived") {
-    return "border-emerald-200 bg-emerald-50 text-emerald-700";
+    return "border-chip-success-fg/25 bg-chip-success text-chip-success-fg";
   }
-  if (status === "blocked") return "border-red-200 bg-red-50 text-red-700";
+  if (status === "blocked") return "border-chip-danger-fg/25 bg-chip-danger text-chip-danger-fg";
   if (status === "in_progress") {
-    return "border-sky-200 bg-sky-50 text-sky-700";
+    return "border-sky-200 bg-chip-info text-chip-info-fg";
   }
   return "border-line bg-surface text-muted";
 }

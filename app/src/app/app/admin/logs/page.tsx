@@ -21,9 +21,9 @@ function maskKey(value: string | undefined): string {
 }
 
 function statusTone(status: string): string {
-  if (["accepted", "processed", "sent", "delivered", "read"].includes(status)) return "bg-[#edf8f6] text-[#0d6b61]";
-  if (["failed", "rejected"].includes(status)) return "bg-[#fdf1ef] text-[#b3261e]";
-  if (["unknown", "claimed", "dispatching", "scheduled"].includes(status)) return "bg-amber-50 text-amber-800";
+  if (["accepted", "processed", "sent", "delivered", "read"].includes(status)) return "bg-chip-success text-chip-success-fg";
+  if (["failed", "rejected"].includes(status)) return "bg-chip-danger text-chip-danger-fg";
+  if (["unknown", "claimed", "dispatching", "scheduled"].includes(status)) return "bg-chip-warn text-chip-warn-fg";
   return "bg-surface-3 text-body";
 }
 
@@ -146,7 +146,7 @@ function Empty() {
 }
 function LoadMore({ onClick }: { onClick: () => void }) {
   const { tr } = useI18n();
-  return <div className="border-t border-line-soft px-4 py-2"><button type="button" onClick={onClick} className="text-[12px] font-semibold text-[#2b4f8a] hover:underline">{tr("Carregar mais", "Load more")}</button></div>;
+  return <div className="border-t border-line-soft px-4 py-2"><button type="button" onClick={onClick} className="text-[12px] font-semibold text-chip-info-fg hover:underline">{tr("Carregar mais", "Load more")}</button></div>;
 }
 function Badge({ status }: { status: string }) {
   return <span className={cn("rounded-md px-2 py-0.5 text-[11px] font-semibold", statusTone(status))}>{status}</span>;

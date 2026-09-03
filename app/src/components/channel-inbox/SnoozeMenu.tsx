@@ -51,7 +51,7 @@ export function SnoozeMenu({
       <span className="inline-flex items-center gap-1 rounded-md border border-line bg-surface-2 px-2 py-1 text-[10px] font-semibold text-body" data-snoozed>
         <Clock size={11} />
         {t("inbox.snoozeUntil").replace("{time}", formatTime(snoozedUntil, locale))}
-        <button type="button" onClick={onUnsnooze} className="ml-1 rounded px-1 text-[#0d6b61] hover:underline">
+        <button type="button" onClick={onUnsnooze} className="ml-1 rounded px-1 text-chip-success-fg hover:underline">
           {t("inbox.unsnooze")}
         </button>
       </span>

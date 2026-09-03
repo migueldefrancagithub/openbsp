@@ -117,8 +117,8 @@ export default function CampaignsPage() {
                           <span><b className="text-ink">{percent(row.rates.deliveryRate)}</b> {tr("entregues", "delivered")}</span>
                         </div>
                         <div className="flex gap-3 text-[12px] text-body">
-                          <span><b className="text-[#0d6b61]">{percent(row.rates.replyRate)}</b> {tr("respostas", "replies")}</span>
-                          <span><b className="text-[#0d6b61]">{row.rates.converted}</b> {tr("conversões", "conversions")}</span>
+                          <span><b className="text-chip-success-fg">{percent(row.rates.replyRate)}</b> {tr("respostas", "replies")}</span>
+                          <span><b className="text-chip-success-fg">{row.rates.converted}</b> {tr("conversões", "conversions")}</span>
                         </div>
                         <div className="text-[11px] text-faint">
                           {relativeTime(row.startedAt ?? row.createdAt, now, locale)}
@@ -130,7 +130,7 @@ export default function CampaignsPage() {
               )}
               {status === "CanLoadMore" && (
                 <div className="border-t border-line-soft px-4 py-2">
-                  <button type="button" onClick={() => loadMore(20)} className="text-[12px] font-semibold text-[#2b4f8a] hover:underline">
+                  <button type="button" onClick={() => loadMore(20)} className="text-[12px] font-semibold text-chip-info-fg hover:underline">
                     {tr("Carregar mais", "Load more")}
                   </button>
                 </div>
