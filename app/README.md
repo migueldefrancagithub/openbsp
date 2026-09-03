@@ -1,36 +1,49 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# OpenBSP — app
 
-## Getting Started
+Sistema operacional de vendas e atendimento por WhatsApp para clínicas: Inbox, Leads, Campanhas, Agenda, Agentes de IA, Operação e Administração. Next.js 16 (App Router) + Convex. PT 🇲🇿 por defeito, EN opcional.
 
-First, run the development server:
+Regras de produto e arquitectura vivem em [`../PROJECT.md`](../PROJECT.md), [`../AGENTS.md`](../AGENTS.md) e nos ADRs em [`../docs/`](../docs/). Deploy e variáveis de ambiente: [`../DEPLOYMENT.md`](../DEPLOYMENT.md).
+
+## Desenvolvimento
 
 ```bash
+npm ci
+npx convex dev --once   # publica schema/funções no deployment de dev (não usar `codegen`)
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Verificação por slice (todas têm de ficar verdes antes de um PR):
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm run typecheck && npm run check:errors && npm test && npm run build
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+`check:errors` falha se algum código `ConvexError` lançado no backend não tiver mensagem PT/EN em `src/lib/convexErrorMessage.ts`.
 
-## Learn More
+## Agentes de IA — modos de maturação
 
-To learn more about Next.js, take a look at the following resources:
+Cada agente tem um modo, com override por conversa no Inbox:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+| Modo | Comportamento |
+|---|---|
+| **Sandbox** | Só responde no separador Sandbox do agente. Nunca toca em conversas reais. |
+| **Co-Piloto** (predefinição) | Corre o pipeline completo, mas as ferramentas de escrita ficam em dry-run. A resposta e as acções propostas aparecem no Inbox como "Sugestão da IA"; a equipa edita, aprova (envia + executa as acções escolhidas) ou descarta. |
+| **Automático** | Responde e marca consultas sozinho, dentro das regras, guards e orçamento diário. |
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Onde se muda: cabeçalho do agente em **Agentes** (`[Sandbox | Co-Piloto | Automático]`, exige versão publicada para sair do Sandbox) e cabeçalho da conversa no **Inbox** (`[Co-Piloto | Automático]`, com volta ao modo do agente).
 
-## Deploy on Vercel
+Feedback loop: cada aprovação, edição ou descarte fica em `aiFeedback`; as últimas 8 respostas aprovadas ou editadas entram no prompt do especialista como exemplos da equipa. O separador **Evolução** do agente mostra as contagens e permite remover exemplos.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Todo o envio automático (campanhas, follow-ups, respostas da IA aprovadas ou automáticas) passa pelo router `outboundJobs` e pelo único writer do canal. Chave de IA: `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GOOGLE_GENERATIVE_AI_API_KEY` no Convex, ou chave própria da clínica em **Definições › IA**.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Smoke tests e release
+
+| Documento | Cobre |
+|---|---|
+| [`scripts/smoke-phase-a.md`](scripts/smoke-phase-a.md) | Inbox, incidentes do piloto, leads, handoff humano |
+| [`scripts/smoke-phase-b.md`](scripts/smoke-phase-b.md) | Campanhas no canal, agenda, follow-ups, RBAC/presença/SLA, admin |
+| [`scripts/smoke-phase-c.md`](scripts/smoke-phase-c.md) | Agentes de IA C1–C7 e, na secção **M**, os modos de maturação (sugestão → aprovar/editar/descartar → exemplos) |
+| [`scripts/release-phase-ab.md`](scripts/release-phase-ab.md) | Comandos de deploy Convex + backfills das Fases A/B |
+| [`scripts/release-phase-c.sh`](scripts/release-phase-c.sh) | Release numa linha: deploy Convex de produção → backfills → merge |
+
+Ordem de release: `npx convex deploy` **antes** do deploy do frontend (`vercel deploy --prod` a partir de `app/`), para a UI nunca chamar funções que ainda não existem.
