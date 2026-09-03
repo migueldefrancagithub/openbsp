@@ -42,3 +42,21 @@ aiToolInvocations, aiCostLedger; campos opcionais em channelAutomationDispatches
    ativo". Pausar/retomar e apagar rascunho funcionam; auditoria regista tudo.
 5. Menu: "Agentes" abre `/app/agents`; "Fluxos por palavra-chave" (menu ⚙) abre o estúdio
    antigo `/app/chatbots`.
+
+## C3 — Ferramentas reais e sandbox
+
+Ferramentas do agente (allow-list por versão, idempotentes por turno+ferramenta+input,
+auditadas em `aiToolInvocations`): consultar_agenda (só leitura), reservar_slot
+(`reserveSlotInternal`, `source: ai`, businessKey `ai:{turno}:reservar:…`), confirmar_consulta
+(`confirmInternal` via `ai`), atualizar_lead (nunca regride), criar_lembrete_equipa,
+agendar_follow_up (regra ativa obrigatória), enviar_template (só aprovados, fora da janela),
+aplicar_tag, abrir_caso_humano (`openHumanCaseInternal`, pára a IA).
+
+### Verificações
+1. Agente › Sandbox › cenário "Marcação" → transcrito mostra `consultar_agenda` e
+   `reservar_slot` em `dry_run`; nenhuma marcação real é criada; a lista de verificação
+   deixa de avisar "sandbox".
+2. Cenário "Pergunta clínica" → `handoff` com motivo `clinical_question` e a mensagem de
+   passagem à equipa; "Pede pessoa" → `handoff/human_request`.
+3. Em produção (C4), o turno regista cada ferramenta com estado e duração em
+   `aiToolInvocations`; repetir o mesmo passo devolve `replayed: true`.

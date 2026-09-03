@@ -4,9 +4,12 @@ import { writeAudit } from "./audit";
 import { markCampaignConversion } from "./campaignAttribution";
 import { recordThreadSystemEvent } from "./channels/systemEvents";
 import {
+  addDays,
+  formatLocalTime,
   localDateOf,
   localTimeToTimestamp,
   minuteOfDayOf,
+  parseDate,
   parseTime,
   resolveTimeZone,
   weekdayOfDate,
@@ -626,3 +629,80 @@ export function slotBusinessKey(args: {
 }
 
 export { localTimeToTimestamp };
+
+export type SlotRow = {
+  startAt: number;
+  endAt: number;
+  label: string;
+  available: boolean;
+  professionalId?: Id<"clinicProfessionals">;
+};
+
+/**
+ * Free slots for a service on a local date (tenant timezone). Used by the
+ * Operação/agenda queries and by the AI tool `consultar_agenda`.
+ */
+export async function listSlotsInternal(
+  ctx: { db: any },
+  args: {
+    tenantId: Id<"tenants">;
+    serviceId: Id<"clinicServices">;
+    date: string;
+    professionalId?: Id<"clinicProfessionals">;
+    stepMinutes?: number;
+    now?: number;
+    limit?: number;
+  },
+): Promise<SlotRow[]> {
+  const service = (await ctx.db.get(args.serviceId)) as Doc<"clinicServices"> | null;
+  if (!service || service.tenantId !== args.tenantId) throw new ConvexError({ code: "NOT_FOUND" });
+  if (service.status !== "active") return [];
+  const timeZone = await tenantTimeZone(ctx, args.tenantId);
+  const settings = await loadClinicSettings(ctx, args.tenantId);
+  parseDate(args.date);
+  const weekday = weekdayOfDate(args.date, timeZone);
+  let professional: Doc<"clinicProfessionals"> | null = null;
+  if (args.professionalId) {
+    professional = (await ctx.db.get(args.professionalId)) as Doc<"clinicProfessionals"> | null;
+    if (!professional || professional.tenantId !== args.tenantId) throw new ConvexError({ code: "PROFESSIONAL_NOT_FOUND" });
+    if (professional.status !== "active") return [];
+  }
+  const availability =
+    professional?.availability && professional.availability.length > 0 ? professional.availability : service.availability;
+  const dayAvailability = availability.filter((slot) => slot.weekday === weekday);
+  if (dayAvailability.length === 0) return [];
+  const dayStart = localTimeToTimestamp(args.date, "00:00", timeZone);
+  const dayEnd = localTimeToTimestamp(addDays(args.date, 1), "00:00", timeZone);
+  const appointments = (professional
+    ? await ctx.db
+        .query("clinicAppointments")
+        .withIndex("by_professional_start", (q: any) =>
+          q.eq("professionalId", professional!._id).gte("startAt", dayStart - 6 * 60 * 60_000).lt("startAt", dayEnd),
+        )
+        .take(500)
+    : await ctx.db
+        .query("clinicAppointments")
+        .withIndex("by_service_start", (q: any) =>
+          q.eq("serviceId", service._id).gte("startAt", dayStart - 6 * 60 * 60_000).lt("startAt", dayEnd),
+        )
+        .take(500)) as Doc<"clinicAppointments">[];
+  const busy = appointments
+    .filter((row) => row.tenantId === args.tenantId && isBookableStatus(row.status))
+    .map((row) => ({ start: row.startAt - service.bufferBeforeMinutes * 60_000, end: row.endAt + service.bufferAfterMinutes * 60_000 }));
+  const step = Math.max(5, Math.min(120, Math.round(args.stepMinutes ?? settings?.slotStepMinutes ?? 30)));
+  const now = args.now ?? Date.now();
+  const minLead = (settings?.minLeadMinutes ?? DEFAULT_MIN_LEAD_MINUTES) * 60_000;
+  const slots: SlotRow[] = [];
+  const limit = args.limit ?? 96;
+  for (const window of dayAvailability) {
+    const start = localTimeToTimestamp(args.date, window.start, timeZone);
+    const end = localTimeToTimestamp(args.date, window.end, timeZone);
+    for (let startAt = start; startAt + service.durationMinutes * 60_000 <= end; startAt += step * 60_000) {
+      const range = appointmentRange(service, startAt);
+      const available = startAt >= now + minLead && !busy.some((b) => b.start < range.protectedEndAt && range.protectedStartAt < b.end);
+      slots.push({ startAt, endAt: range.endAt, label: formatLocalTime(startAt, timeZone), available, professionalId: professional?._id });
+      if (slots.length >= limit) return slots;
+    }
+  }
+  return slots;
+}

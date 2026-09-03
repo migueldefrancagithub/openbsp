@@ -30,6 +30,20 @@ export const mockAdapter: AiProviderAdapter = {
       if (result instanceof AiProviderError) throw result;
       return { ...result, latencyMs: Date.now() - started };
     }
+    const last = request.messages[request.messages.length - 1];
+    if (last && last.role === "tool") {
+      // After a tool round the mock answers in plain text (like a real model).
+      const summary = last.results.map((r) => `${r.name}: ${typeof r.output === "object" && r.output ? JSON.stringify(r.output).slice(0, 80) : String(r.output)}`).join("; ");
+      return {
+        provider: "mock",
+        model: request.model,
+        text: `Perfeito, tratei disso. (${summary})`,
+        toolCalls: [],
+        finishReason: "stop",
+        usage: { inputTokens: 80, outputTokens: 25 },
+        latencyMs: Date.now() - started,
+      };
+    }
     const text = lastUserText(request);
     const fail = text.match(/\[\[fail:(\w+)\]\]/);
     if (fail) {

@@ -1,5 +1,6 @@
 import { ConvexError, v } from "convex/values";
 import { writeAudit } from "./lib/audit";
+import { openHumanCaseInternal } from "./lib/humanCases";
 import {
   setThreadAutomationMode,
   stopActiveAutomationRun,
@@ -23,6 +24,7 @@ import {
   coversStart,
   findConflict,
   isBookableStatus,
+  listSlotsInternal,
   loadClinicSettings,
   outcomeInternal,
   rescheduleInternal,
@@ -614,64 +616,20 @@ export const createHumanCase = tenantMutation({
     const thread = args.threadId
       ? await loadByIdInTenant(ctx, "channelThreads", args.threadId)
       : null;
-    if (thread?.openHumanCaseId) {
-      const existing = await ctx.db.get(thread.openHumanCaseId);
-      if (existing && existing.status !== "resolved") return existing._id;
-    }
     if (args.responsibleMemberId) {
       await loadByIdInTenant(ctx, "members", args.responsibleMemberId);
     }
-    const now = Date.now();
-    const slaMinutes = slaMinutesFor(args.urgency, args.slaMinutes);
-    const slaDueAt = now + slaMinutes * 60_000;
-    const caseId = await ctx.db.insert("humanCases", {
-      tenantId: ctx.tenantId,
-      threadId: thread?._id,
-      reason: assertLength(args.reason, "reason", 2, 80),
+    const result = await openHumanCaseInternal(ctx, {
+      thread,
+      reason: args.reason,
       urgency: args.urgency,
-      question: assertLength(args.question, "question", 3, 2_000),
-      status: args.responsibleMemberId ? "assigned" : "open",
+      question: args.question,
       responsibleMemberId: args.responsibleMemberId,
-      assignedAt: args.responsibleMemberId ? now : undefined,
-      slaDueAt,
-      previousLeadStatus:
-        thread && thread.leadStatus !== "awaiting_human" ? thread.leadStatus : undefined,
+      slaMinutes: args.slaMinutes,
       openedFrom: args.openedFrom ?? "operation",
-      createdBy: ctx.memberId,
-      createdAt: now,
-      updatedAt: now,
+      actorKind: "member",
     });
-    if (thread) {
-      await stopActiveAutomationRun(ctx, thread, "human_case_created", now);
-      await ctx.db.patch(thread._id, {
-        leadStatus: "awaiting_human",
-        inboxStatus: "awaiting_team",
-        openHumanCaseId: caseId,
-        responsibleMemberId: args.responsibleMemberId ?? thread.responsibleMemberId,
-        nextStep: "Equipa humana precisa decidir este caso antes da IA continuar.",
-        nextStepDueAt: slaDueAt,
-        updatedAt: now,
-      });
-      await setThreadAutomationMode(ctx, thread, "human", "human_case_created", now);
-      await recordThreadSystemEvent(ctx, {
-        thread,
-        kind: "handoff.case_opened",
-        severity: "warning",
-        actorType: "member",
-        actorMemberId: ctx.memberId,
-        humanCaseId: caseId,
-        payload: { urgency: args.urgency, slaDueAt, reason: args.reason.slice(0, 80) },
-        dedupeKey: `case:${caseId}:opened`,
-        now,
-      });
-    }
-    await writeClinicAudit(ctx, {
-      action: "clinic.human_case.created",
-      targetType: "humanCase",
-      targetId: caseId,
-      payload: { urgency: args.urgency, threadId: thread?._id, openedFrom: args.openedFrom },
-    });
-    return caseId;
+    return result.caseId;
   },
 });
 
@@ -863,70 +821,15 @@ export const listAvailableSlots = tenantQuery({
   },
   returns: v.array(slotValidator),
   handler: async (ctx, args) => {
-    const service = await loadByIdInTenant(ctx, "clinicServices", args.serviceId);
-    if (service.status !== "active") return [];
-    const timeZone = await tenantTimeZone(ctx, ctx.tenantId);
-    const settings = await loadClinicSettings(ctx, ctx.tenantId);
-    parseDate(args.date);
-    const weekday = weekdayOfDate(args.date, timeZone);
-    const professional = args.professionalId
-      ? await loadByIdInTenant(ctx, "clinicProfessionals", args.professionalId)
-      : null;
-    if (professional && professional.status !== "active") return [];
-    const availability =
-      professional?.availability && professional.availability.length > 0
-        ? professional.availability
-        : service.availability;
-    const dayAvailability = availability.filter((slot) => slot.weekday === weekday);
-    if (dayAvailability.length === 0) return [];
-
-    const dayStart = localTimeToTimestamp(args.date, "00:00", timeZone);
-    const dayEnd = localTimeToTimestamp(addDays(args.date, 1), "00:00", timeZone);
-    const appointments = (professional
-      ? await ctx.db
-          .query("clinicAppointments")
-          .withIndex("by_professional_start", (q) =>
-            q.eq("professionalId", professional._id).gte("startAt", dayStart - 6 * 60 * 60_000).lt("startAt", dayEnd),
-          )
-          .take(AGENDA_TAKE)
-      : await ctx.db
-          .query("clinicAppointments")
-          .withIndex("by_service_start", (q) =>
-            q.eq("serviceId", service._id).gte("startAt", dayStart - 6 * 60 * 60_000).lt("startAt", dayEnd),
-          )
-          .take(AGENDA_TAKE)) as Doc<"clinicAppointments">[];
-    const busy = appointments
-      .filter((row) => row.tenantId === ctx.tenantId && isBookableStatus(row.status))
-      .map((row) => ({
-        start: row.startAt - service.bufferBeforeMinutes * 60_000,
-        end: row.endAt + service.bufferAfterMinutes * 60_000,
-      }));
-    const step = Math.max(
-      5,
-      Math.min(120, Math.round(args.stepMinutes ?? settings?.slotStepMinutes ?? DEFAULT_SLOT_STEP_MINUTES)),
-    );
-    const now = Date.now();
-    const minLead = (settings?.minLeadMinutes ?? 30) * 60_000;
-    const slots: Array<{ startAt: number; endAt: number; label: string; available: boolean; professionalId?: Id<"clinicProfessionals"> }> = [];
-    for (const window of dayAvailability) {
-      const start = localTimeToTimestamp(args.date, window.start, timeZone);
-      const end = localTimeToTimestamp(args.date, window.end, timeZone);
-      for (let startAt = start; startAt + service.durationMinutes * 60_000 <= end; startAt += step * 60_000) {
-        const range = appointmentRange(service, startAt);
-        const available =
-          startAt >= now + minLead &&
-          !busy.some((b) => b.start < range.protectedEndAt && range.protectedStartAt < b.end);
-        slots.push({
-          startAt,
-          endAt: range.endAt,
-          label: formatLocalTime(startAt, timeZone),
-          available,
-          professionalId: professional?._id,
-        });
-        if (slots.length >= 96) break;
-      }
-    }
-    return slots;
+    await loadByIdInTenant(ctx, "clinicServices", args.serviceId);
+    if (args.professionalId) await loadByIdInTenant(ctx, "clinicProfessionals", args.professionalId);
+    return await listSlotsInternal(ctx, {
+      tenantId: ctx.tenantId,
+      serviceId: args.serviceId,
+      date: args.date,
+      professionalId: args.professionalId,
+      stepMinutes: args.stepMinutes,
+    });
   },
 });
 
