@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
-import { AlertTriangle, Bot, CheckCircle2, ChevronRight, Loader2, Pause, Play, Plus, Rocket, Trash2, Workflow } from "lucide-react";
+import { AlertTriangle, Bot, CheckCircle2, ChevronRight, FlaskConical, GraduationCap, Loader2, Pause, Play, Plus, Rocket, ShieldCheck, SlidersHorizontal, Trash2, Workflow } from "lucide-react";
 import { api } from "../../../../convex/_generated/api";
 import { TOOL_BUNDLES, TOOL_RISK } from "../../../../convex/lib/ai/toolRegistry";
 import type { Id } from "../../../../convex/_generated/dataModel";
@@ -61,7 +61,7 @@ export default function AgentsPage() {
   }
 
   return (
-    <div className="flex min-h-full flex-col">
+    <div className="flex h-full min-h-0 flex-col">
       <PageHeader
         eyebrow={tr("Automação", "Automation")}
         title={tr("Agentes", "Agents")}
@@ -73,7 +73,7 @@ export default function AgentsPage() {
           </div>
         }
       />
-      <div className="mx-auto w-full max-w-7xl space-y-4 px-4 py-5 sm:px-6 xl:px-8">
+      <div className="mx-auto flex w-full min-h-0 max-w-7xl flex-1 flex-col gap-4 overflow-y-auto px-4 py-5 sm:px-6 xl:px-8">
         {settings && !settings.ready && (
           <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] text-amber-800">
             <AlertTriangle size={14} /> {tr("A IA ainda não está pronta: configure e teste o provedor em", "AI is not ready yet: configure and test the provider in")} <Link href="/app/settings?tab=ai" className="font-semibold underline">{tr("Definições › IA", "Settings › AI")}</Link>.
@@ -143,7 +143,7 @@ function AgentEditor({ agentId, channels, knowledge, onDeleted }: { agentId: Id<
   const [name, setName] = useState("");
   const [channelId, setChannelId] = useState<Id<"channels"> | "">("");
   const [keywords, setKeywords] = useState("");
-  const [tab, setTab] = useState<"config" | "sandbox" | "runs" | "evolution">("config");
+  const [tab, setTab] = useState<"config" | "sandbox" | "evolution" | "guardrails">("sandbox");
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
   const [loadedFor, setLoadedFor] = useState<string | null>(null);
@@ -201,11 +201,24 @@ function AgentEditor({ agentId, channels, knowledge, onDeleted }: { agentId: Id<
   const required = new Set(detail.tools.filter(() => false));
 
   return (
-    <section className="space-y-4 rounded-lg border border-line bg-surface p-5">
+    <section className="flex min-h-0 flex-1 flex-col gap-4 rounded-xl border border-line bg-surface p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <span className={cn("rounded-md border px-2 py-0.5 text-[11px] font-semibold", agent.status === "active" ? "border-[#0d6b61]/30 bg-[#edf8f6] text-[#0d6b61]" : agent.status === "paused" ? "border-amber-200 bg-amber-50 text-amber-800" : "border-line bg-surface-2 text-body")}>
             {agent.status === "active" ? tr("Ativo", "Active") : agent.status === "paused" ? tr("Pausado", "Paused") : tr("Rascunho", "Draft")}
+          </span>
+          <span
+            className={cn(
+              "rounded-md border px-2 py-0.5 text-[11px] font-bold",
+              agent.mode === "autopilot"
+                ? "border-[#0d6b61]/30 bg-[#edf8f6] text-[#0d6b61]"
+                : agent.mode === "copilot"
+                  ? "border-[#2b4f8a]/30 bg-[#eef3fb] text-[#2b4f8a]"
+                  : "border-line bg-surface-2 text-body",
+            )}
+            title={tr("Modo de maturação", "Maturity mode")}
+          >
+            {agent.mode === "autopilot" ? tr("Automático", "Autopilot") : agent.mode === "copilot" ? tr("Co-Piloto", "Copilot") : "Sandbox"}
           </span>
           <span className="text-[12px] text-muted">v{agent.currentVersion}{agent.publishedVersionId ? ` · ${tr("publicado", "published")}` : ""}</span>
         </div>
@@ -218,20 +231,78 @@ function AgentEditor({ agentId, channels, knowledge, onDeleted }: { agentId: Id<
       </div>
       {notice && <div className={cn("rounded-lg border px-3 py-2 text-[12px]", notice.tone === "error" ? "border-[#e0533d]/30 bg-[#fdf1ef] text-[#b3261e]" : "border-[#0d6b61]/30 bg-[#edf8f6] text-[#0d6b61]")}>{notice.text}</div>}
 
-      <div className="rounded-lg border border-line bg-surface-2 p-3">
-        <div className="mb-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-faint">{tr("Modo de maturação", "Maturity mode")}</div>
-        <AgentModeToggle agentId={agentId} mode={agent.mode} published={!!agent.publishedVersionId} onNotice={setNotice} />
-      </div>
-
-      <div className="inline-flex flex-wrap rounded-lg border border-line bg-surface-2 p-1 text-[12px] font-semibold">
-        {(["config", "sandbox", "runs", "evolution"] as const).map((key) => (
-          <button key={key} type="button" onClick={() => setTab(key)} className={cn("rounded-md px-3 py-1.5", tab === key ? "bg-surface text-ink shadow-sm" : "text-muted")}>{key === "config" ? tr("Configuração", "Configuration") : key === "sandbox" ? "Sandbox" : key === "runs" ? tr("Execuções", "Runs") : tr("Evolução", "Evolution")}</button>
+      <div role="tablist" className="inline-flex flex-wrap gap-1 rounded-lg border border-line bg-surface-2 p-1 text-[12px] font-semibold">
+        {(
+          [
+            ["sandbox", tr("Sandbox & testes", "Sandbox & tests"), FlaskConical],
+            ["config", tr("Configuração", "Configuration"), SlidersHorizontal],
+            ["evolution", tr("Evolução & feedback", "Evolution & feedback"), GraduationCap],
+            ["guardrails", tr("Guardrails & modos", "Guardrails & modes"), ShieldCheck],
+          ] as const
+        ).map(([key, label, Icon]) => (
+          <button
+            key={key}
+            type="button"
+            role="tab"
+            aria-selected={tab === key}
+            onClick={() => setTab(key)}
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 transition-all",
+              tab === key ? "bg-surface text-ink shadow-[var(--shadow-card)]" : "text-muted hover:text-ink",
+            )}
+          >
+            <Icon size={13} /> {label}
+          </button>
         ))}
       </div>
 
-      {tab === "sandbox" && <AgentSandbox agentId={agentId} />}
-      {tab === "runs" && <AgentRunsPanel agentId={agentId} />}
-      {tab === "evolution" && <AgentFeedbackPanel agentId={agentId} />}
+      {tab === "sandbox" && (
+        <div className="flex min-h-[420px] flex-1 flex-col">
+          <AgentSandbox agentId={agentId} />
+        </div>
+      )}
+      {tab === "evolution" && (
+        <div className="space-y-4">
+          <AgentFeedbackPanel agentId={agentId} />
+          <AgentRunsPanel agentId={agentId} />
+        </div>
+      )}
+      {tab === "guardrails" && (
+        <div className="grid gap-4 xl:grid-cols-[1.3fr_1fr]">
+          <div className="space-y-3">
+            <div className="rounded-xl border border-line bg-surface-2 p-4">
+              <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.12em] text-faint">
+                {tr("Modo de maturação", "Maturity mode")}
+              </div>
+              <AgentModeToggle agentId={agentId} mode={agent.mode} published={!!agent.publishedVersionId} onNotice={setNotice} />
+            </div>
+            <div className="rounded-lg border border-line bg-surface-2 p-3">
+              <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.12em] text-faint">{tr("Passagem à equipa", "Handoff to the team")}</div>
+              <label className="block text-[11px] font-medium text-muted">{tr("Palavras que obrigam a passar (separadas por vírgula)", "Words that force a handoff (comma separated)")}<input value={keywords} onChange={(e) => setKeywords(e.target.value)} className={inputClass} /></label>
+              <label className="mt-2 block text-[11px] font-medium text-muted">{tr("Mensagem ao paciente na passagem", "Message to the patient on handoff")}<input value={config.handoff.message} onChange={(e) => setConfig({ ...config, handoff: { ...config.handoff, message: e.target.value } })} className={inputClass} maxLength={500} /></label>
+              <div className="mt-2 flex flex-wrap gap-4 text-[12px] text-ink">
+                <label className="flex items-center gap-2"><input type="checkbox" checked={config.handoff.onLowConfidence} onChange={(e) => setConfig({ ...config, handoff: { ...config.handoff, onLowConfidence: e.target.checked } })} className="h-4 w-4 accent-[#0a1b33]" />{tr("Passar quando tiver dúvidas", "Hand off when unsure")}</label>
+                <label className="flex items-center gap-2"><input type="checkbox" checked={config.handoff.onClinicalQuestion} onChange={(e) => setConfig({ ...config, handoff: { ...config.handoff, onClinicalQuestion: e.target.checked } })} className="h-4 w-4 accent-[#0a1b33]" />{tr("Passar perguntas clínicas", "Hand off clinical questions")}</label>
+              </div>
+            </div>
+            <div className="rounded-xl border border-line bg-surface-2 p-4 text-[12px] text-body">
+              <div className="mb-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-faint">
+                {tr("Sempre ligados", "Always on")}
+              </div>
+              <ul className="space-y-1">
+                <li>{tr("Nunca dá orientação clínica.", "Never gives clinical advice.")}</li>
+                <li>{tr("Nunca afirma uma marcação que a agenda não confirmou.", "Never claims a booking the agenda did not confirm.")}</li>
+                <li>{tr("Apresenta-se como assistente na primeira mensagem.", "Introduces itself as an assistant on the first message.")}</li>
+                <li>{tr("Não usa vocabulário interno do sistema.", "Does not use internal system vocabulary.")}</li>
+                <li>{tr("Pára uma ferramenta que entra em ciclo.", "Stops a tool that starts looping.")}</li>
+              </ul>
+            </div>
+            <div className="flex justify-end">
+              <button type="button" disabled={busy !== null} onClick={() => void save()} className="inline-flex h-10 items-center gap-2 rounded-lg border border-brand-solid px-4 text-[13px] font-semibold text-ink disabled:opacity-50">{busy === "save" && <Loader2 size={14} className="animate-spin" />} {tr("Guardar rascunho", "Save draft")}</button>
+            </div>
+          </div>
+        </div>
+      )}
       {tab === "config" && (
         <div className="grid gap-5 xl:grid-cols-[1.4fr_1fr]">
           <div className="space-y-4">
@@ -325,15 +396,6 @@ function AgentEditor({ agentId, channels, knowledge, onDeleted }: { agentId: Id<
                     </label>
                   );
                 })}
-              </div>
-            </div>
-            <div className="rounded-lg border border-line bg-surface-2 p-3">
-              <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.12em] text-faint">{tr("Passagem à equipa", "Handoff to the team")}</div>
-              <label className="block text-[11px] font-medium text-muted">{tr("Palavras que obrigam a passar (separadas por vírgula)", "Words that force a handoff (comma separated)")}<input value={keywords} onChange={(e) => setKeywords(e.target.value)} className={inputClass} /></label>
-              <label className="mt-2 block text-[11px] font-medium text-muted">{tr("Mensagem ao paciente na passagem", "Message to the patient on handoff")}<input value={config.handoff.message} onChange={(e) => setConfig({ ...config, handoff: { ...config.handoff, message: e.target.value } })} className={inputClass} maxLength={500} /></label>
-              <div className="mt-2 flex flex-wrap gap-4 text-[12px] text-ink">
-                <label className="flex items-center gap-2"><input type="checkbox" checked={config.handoff.onLowConfidence} onChange={(e) => setConfig({ ...config, handoff: { ...config.handoff, onLowConfidence: e.target.checked } })} className="h-4 w-4 accent-[#0a1b33]" />{tr("Passar quando tiver dúvidas", "Hand off when unsure")}</label>
-                <label className="flex items-center gap-2"><input type="checkbox" checked={config.handoff.onClinicalQuestion} onChange={(e) => setConfig({ ...config, handoff: { ...config.handoff, onClinicalQuestion: e.target.checked } })} className="h-4 w-4 accent-[#0a1b33]" />{tr("Passar perguntas clínicas", "Hand off clinical questions")}</label>
               </div>
             </div>
             <div className="flex justify-end">
