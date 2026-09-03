@@ -52,7 +52,7 @@ type ThreadContext = {
 };
 
 type Tool = "note" | "reminder" | "close" | null;
-type PanelTab = "summary" | "tasks" | "history";
+type PanelTab = "lead" | "appointments" | "notes" | "followups";
 type LeadStatus =
   | "new"
   | "interested"
@@ -224,9 +224,9 @@ export function PatientContextPanel({
   const setReminderStatus = useMutation(inboxApi.setReminderStatus);
   const createCloseReason = useMutation(inboxApi.createCloseReason);
   const [tool, setTool] = useState<Tool>(null);
-  const [activeTab, setActiveTab] = useState<PanelTab>("summary");
-  const followUps = useQuery(api.followUps.listForThread, activeTab === "tasks" ? { threadId: thread._id } : "skip");
-  const threadAppointments = useQuery(api.clinic.listThreadAppointments, activeTab === "tasks" ? { threadId: thread._id } : "skip");
+  const [activeTab, setActiveTab] = useState<PanelTab>("lead");
+  const followUps = useQuery(api.followUps.listForThread, activeTab === "followups" ? { threadId: thread._id } : "skip");
+  const threadAppointments = useQuery(api.clinic.listThreadAppointments, activeTab === "appointments" ? { threadId: thread._id } : "skip");
   const confirmAppointment = useMutation(api.clinic.confirmAppointment);
   const cancelAppointment = useMutation(api.clinic.cancelAppointment);
   const sendAppointmentNotice = useMutation(api.clinic.sendAppointmentNotice);
@@ -244,7 +244,7 @@ export function PatientContextPanel({
   const stopFollowUpTask = useMutation(api.followUps.stopTask);
   const history = useQuery(
     inboxApi.listThreadHistory,
-    activeTab === "history" ? { threadId: thread._id, limit: 40 } : "skip",
+    activeTab === "lead" ? { threadId: thread._id, limit: 40 } : "skip",
   );
   const [note, setNote] = useState("");
   const [mentioned, setMentioned] = useState<Id<"members">[]>([]);
@@ -266,7 +266,9 @@ export function PatientContextPanel({
   useEffect(() => setNextStep(thread.nextStep ?? ""), [thread.nextStep]);
   useEffect(() => {
     if (!toolRequest) return;
-    setActiveTab("tasks");
+    // Land on the tab that owns the tool, so the form the operator asked for is
+    // the first thing on screen.
+    setActiveTab(toolRequest.tool === "close" ? "lead" : "notes");
     setTool(toolRequest.tool);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [toolRequest?.nonce]);
@@ -346,11 +348,12 @@ export function PatientContextPanel({
         )}
       </div>
 
-      <div className="grid grid-cols-3 border-b border-line bg-surface-2 p-1.5">
+      <div className="grid grid-cols-4 border-b border-line bg-surface-2 p-1.5">
         {([
-          ["summary", t("inbox.summary"), CircleUserRound],
-          ["tasks", t("inbox.tasks"), ListTodo],
-          ["history", t("inbox.history"), History],
+          ["lead", tr("Ficha", "Record"), CircleUserRound],
+          ["appointments", tr("Marcações", "Bookings"), CalendarDays],
+          ["notes", tr("Notas", "Notes"), MessageSquareText],
+          ["followups", tr("Follow-ups", "Follow-ups"), Clock3],
         ] as const).map(([value, label, Icon]) => (
           <button
             key={value}
@@ -370,7 +373,7 @@ export function PatientContextPanel({
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {activeTab === "summary" && <>
+        {activeTab === "lead" && <>
         <Section title={t("inbox.flow")} icon={ChevronRight}>
           <div className="grid grid-cols-2 gap-2">
             <label className="text-[10px] font-semibold text-faint">
@@ -612,7 +615,7 @@ export function PatientContextPanel({
         </Section>
         </>}
 
-        {activeTab === "tasks" && <>
+        {activeTab === "notes" && <>
         <Section
           title={t("inbox.notes")}
           icon={MessageSquareText}
@@ -671,6 +674,9 @@ export function PatientContextPanel({
           ) : <p className="text-[10px] text-faint">{t("inbox.noReminders")}</p>}
         </Section>
 
+        </>}
+
+        {activeTab === "followups" && <>
         <Section
           title={tr("Follow-ups automáticos", "Automatic follow-ups")}
           icon={Clock3}
@@ -725,6 +731,9 @@ export function PatientContextPanel({
           )}
         </Section>
 
+        </>}
+
+        {activeTab === "appointments" && <>
         <Section
           title={t("inbox.appointments")}
           icon={CalendarDays}
@@ -763,7 +772,7 @@ export function PatientContextPanel({
         </Section>
         </>}
 
-        {activeTab === "history" && <>
+        {activeTab === "lead" && <>
         <Section title={t("inbox.changes")} icon={History}>
           {history === undefined ? (
             <p className="text-[10px] text-faint">{t("shell.loading")}</p>

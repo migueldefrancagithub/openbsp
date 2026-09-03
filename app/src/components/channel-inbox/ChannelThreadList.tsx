@@ -15,6 +15,7 @@ import {
   MessageCircleMore,
   Search,
   ShieldAlert,
+  Sparkles,
   Star,
   UserRound,
   UsersRound,
@@ -28,6 +29,10 @@ import { relativeTime } from "@/lib/relativeTime";
 import { useI18n, type TranslationKey } from "@/lib/i18n";
 
 type InboxFilter =
+  | "handling"
+  | "waiting"
+  | "ai_suggestions"
+  | "at_risk"
   | "all"
   | "mine"
   | "unassigned"
@@ -120,6 +125,10 @@ function commandTitle(thread: { command?: string }, locale: "pt" | "en"): string
 }
 
 const FILTERS: FilterItem[] = [
+  { value: "handling", labelKey: "inbox.tabHandling", icon: MessageCircleMore },
+  { value: "waiting", labelKey: "inbox.tabWaiting", icon: UsersRound },
+  { value: "ai_suggestions", labelKey: "inbox.tabSuggestions", icon: Sparkles },
+  { value: "at_risk", labelKey: "inbox.tabRisk", icon: ShieldAlert },
   { value: "all", labelKey: "inbox.all", icon: Inbox },
   { value: "mine", labelKey: "inbox.mine", icon: UserRound },
   { value: "unassigned", labelKey: "inbox.unassigned", icon: UserRound },
@@ -132,14 +141,15 @@ const FILTERS: FilterItem[] = [
   { value: "closed", labelKey: "inbox.closed", icon: Archive },
 ];
 
+/** The four states the operator works from. Everything else is a refinement. */
 const PRIMARY_FILTERS = FILTERS.filter((item) =>
-  ["all", "mine", "unassigned", "awaiting_team", "awaiting_patient"].includes(
-    item.value,
-  ),
+  ["handling", "waiting", "ai_suggestions", "at_risk"].includes(item.value),
 );
 
 const MORE_FILTERS = FILTERS.filter((item) =>
-  ["open", "active", "starred", "snoozed", "closed"].includes(item.value),
+  ["all", "mine", "unassigned", "open", "active", "awaiting_team", "awaiting_patient", "starred", "snoozed", "closed"].includes(
+    item.value,
+  ),
 );
 
 function isFilter(value: string | null): value is InboxFilter {
@@ -174,7 +184,7 @@ function routeWithState(
   search: string,
 ) {
   const params = new URLSearchParams({ channel: channelId });
-  if (filter !== "all") params.set("filter", filter);
+  if (filter !== "handling") params.set("filter", filter);
   if (search.trim()) params.set("q", search.trim());
   return `${base}?${params.toString()}`;
 }
@@ -194,7 +204,7 @@ export function ChannelThreadList() {
     | Id<"channels">
     | undefined;
   const requestedFilter = searchParams.get("filter");
-  const filter: InboxFilter = isFilter(requestedFilter) ? requestedFilter : "all";
+  const filter: InboxFilter = isFilter(requestedFilter) ? requestedFilter : "handling";
   const [search, setSearch] = useState(searchParams.get("q") ?? "");
   const deferredSearch = useDeferredValue(search.trim());
 
@@ -209,6 +219,7 @@ export function ChannelThreadList() {
         : "skip",
     [activeChannelId, filter, deferredSearch],
   );
+  const counts = useQuery(inboxApi.tabCounts, activeChannelId ? { channelId: activeChannelId } : "skip");
   const { results, status, loadMore } = usePaginatedQuery(
     inboxApi.listThreads,
     queryArgs as any,
@@ -264,26 +275,55 @@ export function ChannelThreadList() {
             />
           </label>
           <nav
-            className="mt-2 grid grid-cols-5 gap-1 rounded-md bg-surface-3 p-1"
+            role="tablist"
+            className="mt-2 grid grid-cols-4 gap-1 rounded-lg bg-surface-3 p-1"
             aria-label={t("inbox.title")}
           >
             {PRIMARY_FILTERS.map((item) => {
               const Icon = item.icon;
+              const active = filter === item.value;
+              const count = counts
+                ? item.value === "handling"
+                  ? counts.handling
+                  : item.value === "waiting"
+                    ? counts.waiting
+                    : item.value === "ai_suggestions"
+                      ? counts.aiSuggestions
+                      : counts.atRisk
+                : undefined;
               return (
-              <Link
-                key={item.value}
-                href={routeWithState("/app/channel-inbox", activeChannelId ?? "", item.value, search)}
-                className={cn(
-                  "flex h-11 min-w-0 flex-col items-center justify-center gap-0.5 rounded px-1 text-[9px] font-semibold transition-colors",
-                  filter === item.value
-                    ? "bg-surface text-ink shadow-sm"
-                    : "text-muted hover:bg-white/70 hover:text-ink",
-                )}
-                title={t(item.labelKey)}
-              >
-                <Icon size={13} />
-                <span className="w-full truncate text-center">{t(item.labelKey)}</span>
-              </Link>
+                <Link
+                  key={item.value}
+                  role="tab"
+                  aria-selected={active}
+                  href={routeWithState("/app/channel-inbox", activeChannelId ?? "", item.value, search)}
+                  className={cn(
+                    "group flex h-[52px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-md px-1 text-[10px] font-semibold transition-all",
+                    active
+                      ? "bg-surface text-ink shadow-[var(--shadow-card)]"
+                      : "text-muted hover:bg-surface/60 hover:text-ink",
+                  )}
+                  title={t(item.labelKey)}
+                >
+                  <span className="flex items-center gap-1">
+                    <Icon size={13} className={cn(item.value === "at_risk" && (count ?? 0) > 0 && "text-[#b3261e]")} />
+                    {count !== undefined && count > 0 && (
+                      <span
+                        className={cn(
+                          "rounded px-1 text-[9px] font-bold tabular-nums",
+                          item.value === "at_risk"
+                            ? "bg-[#fdf1ef] text-[#b3261e]"
+                            : item.value === "ai_suggestions"
+                              ? "bg-[#eef3fb] text-[#2b4f8a]"
+                              : "bg-surface-3 text-muted",
+                        )}
+                      >
+                        {counts?.capped && count >= 150 ? "99+" : count}
+                      </span>
+                    )}
+                  </span>
+                  <span className="w-full truncate text-center">{t(item.labelKey)}</span>
+                </Link>
               );
             })}
           </nav>

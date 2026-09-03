@@ -12,6 +12,7 @@ import {
 import { writeAudit } from "./lib/audit";
 import { threadHasMessageEvent } from "./lib/channels/threadVisibility";
 import { threadCommand, waitingSince } from "./lib/channels/threadCommand";
+import { classifyRisk, resolveStageWindow } from "./lib/leads/riskRadar";
 import { applyThreadUpdate, threadUpdateArgs } from "./lib/channels/threadUpdate";
 import { findOrCreateContactForThread } from "./lib/channels/contactBridge";
 import { recordConsentTransition } from "./lib/consent";
@@ -33,6 +34,11 @@ const filterValidator = v.union(
   v.literal("starred"),
   v.literal("snoozed"),
   v.literal("closed"),
+  // The tab set the operator actually works from.
+  v.literal("handling"),
+  v.literal("waiting"),
+  v.literal("ai_suggestions"),
+  v.literal("at_risk"),
 );
 
 const inboxStatusValidator = v.union(
@@ -110,6 +116,7 @@ function matchesFilter(
   filter: string,
   status: OperationalStatus,
   memberId?: Id<"members">,
+  extras?: { suggestionPending: boolean; command: string; atRisk: boolean },
 ): boolean {
   if (filter === "all") return status !== "closed";
   if (filter === "mine") {
@@ -119,6 +126,16 @@ function matchesFilter(
     return status !== "closed" && !thread.responsibleMemberId;
   }
   if (filter === "starred") return status !== "closed" && !!thread.starredAt;
+  // Being handled = a person owns it, or the AI is answering it. Waiting = the
+  // AI is not answering and nobody picked it up, which is the queue.
+  if (filter === "handling") {
+    return status !== "closed" && (!!thread.responsibleMemberId || extras?.command === "ai");
+  }
+  if (filter === "waiting") {
+    return status !== "closed" && !thread.responsibleMemberId && extras?.command !== "ai";
+  }
+  if (filter === "ai_suggestions") return status !== "closed" && !!extras?.suggestionPending;
+  if (filter === "at_risk") return status !== "closed" && !!extras?.atRisk;
   return status === filter;
 }
 
@@ -230,6 +247,9 @@ const threadSummaryValidator = v.object({
   firstResponseDueAt: v.optional(v.number()),
   slaBreached: v.boolean(),
   aiSuggestionPending: v.boolean(),
+  /** Burning: SLA past due, critically cold, or cold with no next step. */
+  atRisk: v.boolean(),
+  riskBucket: v.optional(v.string()),
   aiMode: v.optional(v.string()),
   /** Who is in command, by the single resolver in lib/channels/threadCommand. */
   command: v.string(),
@@ -252,6 +272,9 @@ async function channelHasLiveAgent(
     .take(10)) as Doc<"aiAgents">[];
   return agents.some((agent) => !!agent.publishedVersionId && agent.mode !== "sandbox");
 }
+
+/** How many recent conversations the tab counters read. */
+const TAB_COUNT_SCAN = 150;
 
 export const listThreads = tenantQuery({
   args: {
@@ -305,8 +328,24 @@ export const listThreads = tenantQuery({
       const haystack = `${displayName ?? ""} ${phone ?? ""} ${thread.threadKey} ${thread.lastPreview ?? ""}`.toLowerCase();
       if (search && !haystack.includes(search)) continue;
       const inboxStatus = deriveStatus(thread, now);
-      if (!matchesFilter(thread, args.filter, inboxStatus, ctx.memberId)) continue;
       const command = threadCommand({ ...thread, aiAvailable }, now);
+      const suggestionPending =
+        (await ctx.db
+          .query("aiTurns")
+          .withIndex("by_thread_status", (q) => q.eq("threadId", thread._id).eq("status", "awaiting_approval"))
+          .first()) !== null;
+      const risk = classifyRisk({
+        lastActivityAt: Math.max(thread.lastInboundAt ?? 0, thread.lastOutboundAt ?? 0, thread.createdAt),
+        now,
+        // The list does not read follow-ups per row; the radar screen does that.
+        inFlight: false,
+        window: resolveStageWindow(thread.leadStatus),
+      });
+      const slaBreached =
+        (!!thread.firstResponseDueAt && thread.firstResponseDueAt < now && !thread.closedAt) ||
+        (!!openCase && openCase.slaDueAt < now);
+      const atRisk = slaBreached || risk.bucket === "critical" || (!thread.nextStep && risk.onRadar);
+      if (!matchesFilter(thread, args.filter, inboxStatus, ctx.memberId, { suggestionPending, command: command.who, atRisk })) continue;
       page.push({
         _id: thread._id,
         channelId: thread.channelId,
@@ -337,19 +376,15 @@ export const listThreads = tenantQuery({
         openCaseSlaDueAt: openCase?.slaDueAt,
         openCaseUrgency: openCase?.urgency,
         dueReminderCount,
-        aiSuggestionPending:
-          (await ctx.db
-            .query("aiTurns")
-            .withIndex("by_thread_status", (q) => q.eq("threadId", thread._id).eq("status", "awaiting_approval"))
-            .first()) !== null,
+        aiSuggestionPending: suggestionPending,
+        atRisk,
+        riskBucket: risk.onRadar ? risk.bucket : undefined,
         aiMode: thread.aiMode,
         firstResponseDueAt: thread.firstResponseDueAt,
         command: command.who,
         commandReason: command.reason ?? undefined,
         waitingSince: waitingSince(thread),
-        slaBreached:
-          (!!thread.firstResponseDueAt && thread.firstResponseDueAt < now && !thread.closedAt) ||
-          (!!openCase && openCase.slaDueAt < now),
+        slaBreached,
       });
     }
     return {
@@ -357,6 +392,61 @@ export const listThreads = tenantQuery({
       isDone: result.isDone,
       continueCursor: result.continueCursor,
     };
+  },
+});
+
+/**
+ * Counts behind the inbox tabs.
+ *
+ * Bounded on purpose: it reads the most recent conversations, not the whole
+ * history, and says so with `capped`. A number that costs a full scan is a
+ * number the screen cannot afford to keep fresh.
+ */
+export const tabCounts = tenantQuery({
+  args: { channelId: v.id("channels") },
+  returns: v.object({
+    handling: v.number(),
+    waiting: v.number(),
+    aiSuggestions: v.number(),
+    atRisk: v.number(),
+    capped: v.boolean(),
+  }),
+  handler: async (ctx, args) => {
+    const channel = await ctx.db.get(args.channelId);
+    if (!channel || channel.tenantId !== ctx.tenantId) throw new ConvexError({ code: "CHANNEL_NOT_FOUND" });
+    const now = Date.now();
+    const aiAvailable = await channelHasLiveAgent(ctx, ctx.tenantId, args.channelId);
+    const threads = (await ctx.db
+      .query("channelThreads")
+      .withIndex("by_channel_last_event", (q) => q.eq("channelId", args.channelId))
+      .order("desc")
+      .take(TAB_COUNT_SCAN + 1)) as Doc<"channelThreads">[];
+    const counts = { handling: 0, waiting: 0, aiSuggestions: 0, atRisk: 0, capped: threads.length > TAB_COUNT_SCAN };
+    for (const thread of threads.slice(0, TAB_COUNT_SCAN)) {
+      const status = deriveStatus(thread, now);
+      if (status === "closed") continue;
+      if (!(await hasMessageEvent(ctx, thread))) continue;
+      const command = threadCommand({ ...thread, aiAvailable }, now);
+      const suggestionPending =
+        (await ctx.db
+          .query("aiTurns")
+          .withIndex("by_thread_status", (q) => q.eq("threadId", thread._id).eq("status", "awaiting_approval"))
+          .first()) !== null;
+      const risk = classifyRisk({
+        lastActivityAt: Math.max(thread.lastInboundAt ?? 0, thread.lastOutboundAt ?? 0, thread.createdAt),
+        now,
+        inFlight: false,
+        window: resolveStageWindow(thread.leadStatus),
+      });
+      const openCase = thread.openHumanCaseId ? ((await ctx.db.get(thread.openHumanCaseId)) as Doc<"humanCases"> | null) : null;
+      const slaBreached =
+        (!!thread.firstResponseDueAt && thread.firstResponseDueAt < now) || (!!openCase && openCase.slaDueAt < now);
+      if (suggestionPending) counts.aiSuggestions += 1;
+      if (slaBreached || risk.bucket === "critical" || (!thread.nextStep && risk.onRadar)) counts.atRisk += 1;
+      if (thread.responsibleMemberId || command.who === "ai") counts.handling += 1;
+      else counts.waiting += 1;
+    }
+    return counts;
   },
 });
 

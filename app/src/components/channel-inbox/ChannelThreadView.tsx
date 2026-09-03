@@ -44,6 +44,7 @@ import { AiPresenceChip } from "@/components/channel-inbox/AiPresenceChip";
 import { AiComposerTools } from "@/components/channel-inbox/AiComposerTools";
 import { AiSuggestionCard } from "@/components/channel-inbox/AiSuggestionCard";
 import { RetentionNotice } from "@/components/channel-inbox/RetentionNotice";
+import { AiActionTrail } from "@/components/channel-inbox/AiActionTrail";
 import { ProposalsPanel } from "@/components/operation/ProposalsPanel";
 import { AiModeToggle } from "@/components/channel-inbox/AiModeToggle";
 import { SnoozeMenu } from "@/components/channel-inbox/SnoozeMenu";
@@ -503,6 +504,23 @@ export function ChannelThreadView({
   const [templateVariables, setTemplateVariables] = useState<string[]>([]);
   const [quickReplySearch, setQuickReplySearch] = useState("");
   const [patientPanelOpen, setPatientPanelOpen] = useState(false);
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      const target = event.target as HTMLElement | null;
+      const typing = !!target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
+      if (event.key === "Escape" && patientPanelOpen) {
+        setPatientPanelOpen(false);
+        return;
+      }
+      if (event.key === "i" && !typing && !event.metaKey && !event.ctrlKey) {
+        event.preventDefault();
+        setPatientPanelOpen((open) => !open);
+      }
+    }
+    globalThis.addEventListener("keydown", onKey);
+    return () => globalThis.removeEventListener("keydown", onKey);
+  }, [patientPanelOpen]);
+
   const [handoffOpen, setHandoffOpen] = useState(false);
   const [panelToolRequest, setPanelToolRequest] = useState<
     { tool: "note" | "reminder" | "close"; nonce: number } | null
@@ -890,7 +908,7 @@ export function ChannelThreadView({
               <button
                 type="button"
                 onClick={() => setPatientPanelOpen(true)}
-                className="rounded-md p-2 text-faint transition-colors hover:bg-surface-3 hover:text-ink xl:hidden"
+                className="rounded-md p-2 text-faint transition-colors hover:bg-surface-3 hover:text-ink"
                 title={t("inbox.patient")}
               >
                 <PanelRightOpen size={15} />
@@ -927,6 +945,7 @@ export function ChannelThreadView({
               ),
             )
           )}
+          {workspace?.role !== "marketing" && <AiActionTrail threadId={summary._id} />}
         </div>
 
         <div className="border-t border-line bg-surface px-3 py-3 sm:px-4">
@@ -1254,18 +1273,22 @@ export function ChannelThreadView({
           }}
         />
       )}
-      <PatientContextPanel thread={summary} className="hidden xl:flex" toolRequest={panelToolRequest} />
       {patientPanelOpen && (
         <div
-          className="fixed inset-0 z-50 flex justify-end bg-slate-950/30 xl:hidden"
+          className="fixed inset-0 z-50 flex justify-end bg-[#050912]/45 backdrop-blur-[2px]"
+          role="dialog"
+          aria-modal="true"
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) setPatientPanelOpen(false);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") setPatientPanelOpen(false);
           }}
         >
           <PatientContextPanel
             thread={summary}
             onClose={() => setPatientPanelOpen(false)}
-            className="w-full max-w-[360px] shadow-2xl"
+            className="animate-slide-in-right w-full max-w-[400px] shadow-[var(--shadow-float)]"
             toolRequest={panelToolRequest}
           />
         </div>

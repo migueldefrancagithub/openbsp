@@ -788,6 +788,86 @@ export const listTurns = tenantQuery({
   },
 });
 
+/**
+ * What the AI did in this conversation, turn by turn — the audit the operator
+ * can read without leaving the chat.
+ *
+ * Tool calls are the interesting part: "consultou a agenda" and "reservou" are
+ * the difference between an assistant that talks and one that operates, and a
+ * blocked call is exactly what someone needs to see when the AI went quiet.
+ */
+export const listThreadActions = tenantQuery({
+  args: { threadId: v.id("channelThreads"), limit: v.optional(v.number()) },
+  returns: v.array(
+    v.object({
+      turnId: v.id("aiTurns"),
+      status: v.string(),
+      stage: v.optional(v.string()),
+      mode: v.optional(v.string()),
+      intent: v.optional(v.string()),
+      failureCode: v.optional(v.string()),
+      violations: v.array(v.string()),
+      costUsdMicros: v.number(),
+      createdAt: v.number(),
+      tools: v.array(
+        v.object({ name: v.string(), status: v.string(), errorCode: v.optional(v.string()), summary: v.optional(v.string()) }),
+      ),
+    }),
+  ),
+  handler: async (ctx, args) => {
+    const thread = await loadByIdInTenant(ctx, "channelThreads", args.threadId);
+    const limit = Math.min(Math.max(args.limit ?? 12, 1), 30);
+    const turns: Doc<"aiTurns">[] = [];
+    for (const status of ["completed", "awaiting_approval", "failed", "skipped", "awaiting_send"] as const) {
+      const rows = (await ctx.db
+        .query("aiTurns")
+        .withIndex("by_thread_status", (q) => q.eq("threadId", thread._id).eq("status", status))
+        .order("desc")
+        .take(limit)) as Doc<"aiTurns">[];
+      turns.push(...rows);
+    }
+    turns.sort((a, b) => b.createdAt - a.createdAt);
+    const out = [];
+    for (const turn of turns.slice(0, limit)) {
+      const invocations = (await ctx.db
+        .query("aiToolInvocations")
+        .withIndex("by_turn", (q) => q.eq("turnId", turn._id))
+        .take(10)) as Doc<"aiToolInvocations">[];
+      const decision = (turn.routerDecision ?? {}) as { intent?: string; violations?: string[] };
+      out.push({
+        turnId: turn._id,
+        status: turn.status,
+        stage: turn.stage,
+        mode: turn.mode,
+        intent: decision.intent,
+        failureCode: turn.failureCode,
+        violations: decision.violations ?? [],
+        costUsdMicros: turn.costUsdMicros,
+        createdAt: turn.createdAt,
+        tools: invocations.map((row) => ({
+          name: row.name,
+          status: row.status,
+          errorCode: row.errorCode,
+          summary: toolSummary(row),
+        })),
+      });
+    }
+    return out;
+  },
+});
+
+/** One short line per tool call — never the raw payload. */
+function toolSummary(row: Doc<"aiToolInvocations">): string | undefined {
+  const output = row.output as Record<string, unknown> | null | undefined;
+  if (!output || typeof output !== "object") return undefined;
+  if (typeof output.slots === "object" && Array.isArray(output.slots)) return `${output.slots.length} horários`;
+  if (typeof output.appointmentId === "string") return "marcação criada";
+  if (typeof output.caseId === "string") return "caso aberto";
+  if (typeof output.wouldPropose === "object") return "proposta (por aprovar)";
+  if (typeof output.proposalId === "string") return "proposta criada";
+  return undefined;
+}
+
 export const stats = tenantQuery({
   args: { agentId: v.optional(v.id("aiAgents")), days: v.optional(v.number()) },
   returns: v.object({
