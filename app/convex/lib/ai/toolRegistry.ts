@@ -16,6 +16,8 @@ export const AI_TOOL_NAMES = [
   "enviar_template",
   "aplicar_tag",
   "abrir_caso_humano",
+  "propor_dado_paciente",
+  "propor_proxima_acao",
 ] as const;
 
 export type AiToolName = (typeof AI_TOOL_NAMES)[number];
@@ -106,6 +108,32 @@ export const TOOL_SPECS: Record<AiToolName, AiToolSpec> = {
     description: "Aplica uma etiqueta à conversa (ex.: ortodontia, urgente).",
     inputSchema: { type: "object", properties: { tag: { type: "string" } }, required: ["tag"], additionalProperties: false },
   },
+  propor_dado_paciente: {
+    name: "propor_dado_paciente",
+    description:
+      "Propõe corrigir um dado do paciente (nome, email ou telefone) com base no que ELE escreveu. Não grava nada: uma pessoa da equipa confirma. Inclui sempre o trecho da mensagem.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        field: { type: "string", enum: ["name", "email", "phone"] },
+        value: { type: "string" },
+        excerpt: { type: "string", description: "O que o paciente escreveu, palavra por palavra." },
+      },
+      required: ["field", "value", "excerpt"],
+      additionalProperties: false,
+    },
+  },
+  propor_proxima_acao: {
+    name: "propor_proxima_acao",
+    description:
+      "Propõe à equipa a próxima acção nesta conversa (ex.: ligar ao paciente, enviar orçamento). Não executa nada: alguém aprova ou ignora.",
+    inputSchema: {
+      type: "object",
+      properties: { action: { type: "string", description: "Uma frase curta e concreta." } },
+      required: ["action"],
+      additionalProperties: false,
+    },
+  },
   abrir_caso_humano: {
     name: "abrir_caso_humano",
     description: "Passa a conversa à equipa humana com motivo e urgência. Pára a IA nesta conversa.",
@@ -137,7 +165,7 @@ export const FORBIDDEN_TOOLS_BY_OBJECTIVE: Record<AiObjective, AiToolName[]> = {
   sales: [],
   confirmation: [],
   support: [],
-  audit: ["reservar_slot", "confirmar_consulta", "enviar_template", "agendar_follow_up", "abrir_caso_humano", "atualizar_lead", "criar_lembrete_equipa", "aplicar_tag"],
+  audit: ["reservar_slot", "confirmar_consulta", "enviar_template", "agendar_follow_up", "abrir_caso_humano", "atualizar_lead", "criar_lembrete_equipa", "aplicar_tag", "propor_dado_paciente"],
 };
 
 export function isAiToolName(value: string): value is AiToolName {
@@ -160,8 +188,38 @@ export const TOOL_RISK: Record<AiToolName, AiToolRisk> = {
   reservar_slot: "critical",
   confirmar_consulta: "critical",
   enviar_template: "critical",
+  // These two only ever create a request for a person to decide, so the risk
+  // they carry is the attention they cost, not the change they make.
+  propor_dado_paciente: "safe",
+  propor_proxima_acao: "safe",
 };
 export const READ_ONLY_TOOLS: AiToolName[] = ["consultar_agenda"];
+
+/**
+ * Tools whose whole effect IS asking a human to decide.
+ *
+ * They run for real even in copilot: dry-running a proposal would mean the
+ * operator has to approve the request to be asked, which is the same gate twice
+ * and loses the point — the AI hears something and a person confirms it.
+ */
+export const HUMAN_GATED_TOOLS: AiToolName[] = ["propor_dado_paciente", "propor_proxima_acao"];
+
 export function isWriteTool(name: string): boolean {
-  return isAiToolName(name) && !READ_ONLY_TOOLS.includes(name);
+  return isAiToolName(name) && !READ_ONLY_TOOLS.includes(name) && !HUMAN_GATED_TOOLS.includes(name as AiToolName);
 }
+
+/**
+ * Capabilities grouped by the job they do, because the person configuring an
+ * agent owns a clinic and is not an engineer: `atualizar_lead` configures
+ * nothing for them. The per-tool checkbox still exists inside each group; the
+ * group is the default path.
+ */
+export type ToolBundle = "atender" | "marcar" | "vender" | "reter" | "escalar";
+
+export const TOOL_BUNDLES: Array<{ id: ToolBundle; tools: AiToolName[] }> = [
+  { id: "atender", tools: ["consultar_agenda", "aplicar_tag", "criar_lembrete_equipa"] },
+  { id: "marcar", tools: ["consultar_agenda", "reservar_slot", "confirmar_consulta"] },
+  { id: "vender", tools: ["atualizar_lead", "propor_proxima_acao", "propor_dado_paciente"] },
+  { id: "reter", tools: ["agendar_follow_up", "enviar_template"] },
+  { id: "escalar", tools: ["abrir_caso_humano", "criar_lembrete_equipa"] },
+];

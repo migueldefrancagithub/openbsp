@@ -33,7 +33,12 @@ export const mockAdapter: AiProviderAdapter = {
     const last = request.messages[request.messages.length - 1];
     if (last && last.role === "tool") {
       // After a tool round the mock answers in plain text (like a real model).
-      const summary = last.results.map((r) => `${r.name}: ${typeof r.output === "object" && r.output ? JSON.stringify(r.output).slice(0, 80) : String(r.output)}`).join("; ");
+      // Deliberately without tool names: a reply that names the tools would
+      // (correctly) trip the internal-vocabulary guard, and the harness must
+      // not fabricate a defect the model did not commit.
+      const summary = last.results
+        .map((r) => (typeof r.output === "object" && r.output ? JSON.stringify(r.output).slice(0, 80) : String(r.output)))
+        .join("; ");
       return {
         provider: "mock",
         model: request.model,
@@ -75,7 +80,10 @@ export const mockAdapter: AiProviderAdapter = {
     return {
       provider: "mock",
       model: request.model,
-      text: `Resposta simulada: ${text.slice(0, 80)}`,
+      // The `[[tool:…]]` / `[[fail:…]]` markers are harness syntax, not words a
+      // patient wrote: echoing them would trip the internal-vocabulary guard on
+      // the test's own scaffolding.
+      text: `Resposta simulada: ${text.replace(/\[\[[a-z]+:[^\]]*\]\]/g, "").trim().slice(0, 80)}`,
       toolCalls: [],
       finishReason: "stop",
       usage: { inputTokens: 60, outputTokens: 30 },

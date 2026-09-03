@@ -86,3 +86,57 @@ export function issueLabel(code: string, detail: string | undefined, locale: Loc
   };
   return (locale === "pt" ? pt : en)[code] ?? code;
 }
+
+/**
+ * How much damage a capability can do, in the clinic's words. It drives the
+ * ceremony on screen: "só consulta" needs none, "não dá para desfazer" is
+ * enabled one at a time.
+ */
+export const TOOL_RISK_COPY: Record<string, { pt: [string, string]; en: [string, string] }> = {
+  safe: {
+    pt: ["Só consulta", "O agente apenas lê. Nada muda no sistema."],
+    en: ["Read only", "The agent only reads. Nothing changes in the system."],
+  },
+  attention: {
+    pt: ["Altera dados", "O agente muda algo no sistema. Você vê o que mudou e pode desfazer."],
+    en: ["Changes data", "The agent changes something. You can see it and undo it."],
+  },
+  critical: {
+    pt: ["Efeito que não dá para desfazer", "Sai do sistema ou não volta atrás — como falar mesmo com o paciente. Ligue uma a uma."],
+    en: ["Effect that cannot be undone", "It leaves the system or does not come back — like really talking to the patient. Enable one at a time."],
+  },
+};
+
+export const BUNDLE_COPY: Record<string, { pt: [string, string]; en: [string, string] }> = {
+  atender: {
+    pt: ["Atender e responder", "Lê a conversa, consulta horários e organiza a ficha, sem marcar nada."],
+    en: ["Answer and organise", "Reads the conversation, checks slots and tidies the record, without booking."],
+  },
+  marcar: {
+    pt: ["Marcar consultas", "Consulta a agenda real, reserva e confirma presença."],
+    en: ["Book appointments", "Checks the real agenda, books and confirms attendance."],
+  },
+  vender: {
+    pt: ["Acompanhar o funil", "Move a etapa do lead e propõe à equipa o próximo passo e os dados que ouviu."],
+    en: ["Follow the funnel", "Moves the lead stage and proposes next steps and details it heard."],
+  },
+  reter: {
+    pt: ["Não perder o paciente", "Agenda retornos e usa templates aprovados fora da janela de 24h."],
+    en: ["Do not lose the patient", "Schedules returns and uses approved templates outside the 24h window."],
+  },
+  escalar: {
+    pt: ["Passar à equipa", "Reconhece quando não é caso dele e entrega o resumo a uma pessoa."],
+    en: ["Hand to the team", "Recognises when it is not its call and hands a summary to a person."],
+  },
+};
+
+export function riskCopy(risk: string, locale: Locale): [string, string] {
+  const entry = TOOL_RISK_COPY[risk] ?? TOOL_RISK_COPY.attention;
+  return locale === "en" ? entry.en : entry.pt;
+}
+
+export function bundleCopy(bundle: string, locale: Locale): [string, string] {
+  const entry = BUNDLE_COPY[bundle] ?? ["", ""] as unknown as { pt: [string, string]; en: [string, string] };
+  const value = (entry as { pt: [string, string]; en: [string, string] })[locale === "en" ? "en" : "pt"];
+  return value ?? [bundle, ""];
+}

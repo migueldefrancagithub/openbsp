@@ -17,6 +17,8 @@ const HEALTHCARE_DENYLIST: RegExp[] = [
 
 export type GuardViolation =
   | { code: "HEALTHCARE_ADVICE"; detail: string }
+  | { code: "DISCLOSURE_REQUIRED"; detail: string }
+  | { code: "INTERNAL_VOCABULARY"; detail: string }
   | { code: "UNVERIFIED_BOOKING"; detail: string }
   | { code: "TOO_LONG"; detail: string }
   | { code: "UNTRUSTED_LINK"; detail: string }
@@ -61,12 +63,72 @@ export function findUntrustedLink(text: string, allowedHosts: string[]): string 
   return null;
 }
 
+/**
+ * Words that belong to the inside of the system and never to a patient.
+ *
+ * Measured in the reference product at 30% leak when the same model is asked to
+ * both talk and operate: it says "vou atualizar o teu lead_status" because the
+ * tool vocabulary is in its context. The guard is the only version of this rule
+ * that does not depend on the model behaving.
+ */
+const INTERNAL_VOCABULARY: RegExp[] = [
+  /\b(lead[_ ]?status|thread|outbox|tenant|payload|webhook|endpoint)\b/i,
+  /\b(reservar_slot|consultar_agenda|abrir_caso_humano|atualizar_lead|aplicar_tag|agendar_follow_up|enviar_template|criar_lembrete_equipa|confirmar_consulta)\b/i,
+  /\b(handoff|hand-?off|caso humano|human case)\b/i,
+  /\b(prompt|system prompt|modelo de linguagem|LLM|token[s]? de contexto)\b/i,
+  /\b(businessKey|business key|idempot[êe]ncia|convex)\b/i,
+];
+
+export function findInternalVocabulary(text: string): string | null {
+  for (const pattern of INTERNAL_VOCABULARY) {
+    const match = pattern.exec(text);
+    if (match) return match[0];
+  }
+  return null;
+}
+
+/**
+ * Does this reply introduce itself as an assistant?
+ *
+ * Only asked of the FIRST message the clinic ever sends to someone. Saying it
+ * every time would be noise; never saying it lets a patient believe they are
+ * talking to a person, which is the one thing an assistant must not allow.
+ */
+export function missesDisclosure(text: string): boolean {
+  return !/\b(assistente|assistant|virtual|autom[áa]tic[oa]|automated)\b/i.test(text);
+}
+
 export type GuardInput = {
   text: string;
   verified: { booked: boolean; confirmed: boolean };
   allowedHosts: string[];
   maxChars?: number;
+  /** No accepted outbound to this patient yet: the reply must identify itself. */
+  firstOutbound?: boolean;
+  /**
+   * What to do when that first reply does not introduce itself. Default is to
+   * inject the sentence (see `applyDisclosure`) — blocking a reply over a
+   * missing greeting would cost the patient an answer for a fixable defect.
+   */
+  disclosureMode?: "inject" | "veto";
 };
+
+/**
+ * Prepends the assistant disclosure when the clinic's first reply to someone
+ * lacks it. Deterministic, so it does not depend on the model complying.
+ */
+export function applyDisclosure(
+  text: string,
+  args: { firstOutbound?: boolean; clinicName: string; locale: "pt" | "en" },
+): string {
+  const trimmed = text.trim();
+  if (!trimmed || !args.firstOutbound || !missesDisclosure(trimmed)) return trimmed;
+  const intro =
+    args.locale === "en"
+      ? `I'm the virtual assistant at ${args.clinicName}.`
+      : `Sou o assistente virtual da ${args.clinicName}.`;
+  return `${intro} ${trimmed}`;
+}
 
 export function runGuards(input: GuardInput): GuardViolation[] {
   const violations: GuardViolation[] = [];
@@ -79,6 +141,11 @@ export function runGuards(input: GuardInput): GuardViolation[] {
   if (text.length > (input.maxChars ?? MAX_REPLY_CHARS)) violations.push({ code: "TOO_LONG", detail: `${text.length} chars` });
   const link = findUntrustedLink(text, input.allowedHosts);
   if (link) violations.push({ code: "UNTRUSTED_LINK", detail: link });
+  const internal = findInternalVocabulary(text);
+  if (internal) violations.push({ code: "INTERNAL_VOCABULARY", detail: internal });
+  if (input.disclosureMode === "veto" && input.firstOutbound && text && missesDisclosure(text)) {
+    violations.push({ code: "DISCLOSURE_REQUIRED", detail: "first reply without assistant disclosure" });
+  }
   return violations;
 }
 

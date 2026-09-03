@@ -4,6 +4,7 @@ import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { writeAudit } from "./lib/audit";
 import { effectiveAiMode } from "./lib/ai/control";
+import { detectPromises, promiseSummary } from "./lib/ai/promises";
 import { executeAiTool } from "./lib/ai/tools";
 import { recordThreadSystemEvent } from "./lib/channels/systemEvents";
 import { derivePreview } from "./lib/channels/projection";
@@ -20,6 +21,8 @@ const pendingValidator = v.union(
     routerIntent: v.optional(v.string()),
     actions: v.array(actionValidator),
     violations: v.array(v.string()),
+    /** What the reply commits the clinic to, when nothing covers it yet. */
+    promiseWarning: v.optional(v.string()),
     createdAt: v.number(),
   }),
   v.null(),
@@ -54,7 +57,21 @@ export const pendingForThread = tenantQuery({
     const agent = run ? await ctx.db.get(run.agentId) : null;
     const decision = (turn.routerDecision ?? {}) as { intent?: string; violations?: string[] };
     const actions = ((turn.proposedActions as Array<{ name: string; input: unknown; output: unknown }> | undefined) ?? []).map((a, index) => ({ index, name: a.name, input: a.input ?? {}, output: a.output ?? null }));
-    return { turnId: turn._id, agentName: agent?.name ?? "IA", stage: turn.stage ?? "reply", text: turn.suggestedText ?? "", routerIntent: decision.intent, actions, violations: decision.violations ?? [], createdAt: turn.createdAt };
+    // What this reply commits the clinic to, and whether an action covers it.
+    // Shown BEFORE approval: after it is sent, the promise is already made.
+    const promises = detectPromises(turn.suggestedText ?? "");
+    const covered = actions.length > 0 || !!thread.responsibleMemberId || !!thread.openHumanCaseId;
+    return {
+      turnId: turn._id,
+      agentName: agent?.name ?? "IA",
+      stage: turn.stage ?? "reply",
+      text: turn.suggestedText ?? "",
+      routerIntent: decision.intent,
+      actions,
+      violations: decision.violations ?? [],
+      promiseWarning: promises.length > 0 && !covered ? promiseSummary(promises, "pt") : undefined,
+      createdAt: turn.createdAt,
+    };
   },
 });
 
@@ -281,20 +298,59 @@ export const listFeedback = tenantQuery({
   },
 });
 
+/** How many decided suggestions before readiness means anything. */
+export const GRADUATION_MIN_DECISIONS = 20;
+/** Share approved without an edit. */
+export const GRADUATION_MIN_RATE = 0.8;
+/** Stage moves a person undid; more than this and the agent is not ready. */
+export const GRADUATION_MAX_CORRECTIONS = 2;
+
 export const feedbackStats = tenantQuery({
   args: { agentId: v.id("aiAgents") },
-  returns: v.object({ approved: v.number(), edited: v.number(), discarded: v.number(), examples: v.number(), sampled: v.boolean() }),
+  returns: v.object({
+    approved: v.number(),
+    edited: v.number(),
+    discarded: v.number(),
+    examples: v.number(),
+    sampled: v.boolean(),
+    /** Stage moves by this agent that a person undid: the other half of the loop. */
+    corrections: v.object({ reverted: v.number(), redirected: v.number() }),
+    /** Ready to graduate: enough approvals, and few enough edits and corrections. */
+    graduation: v.object({ ready: v.boolean(), decided: v.number(), approvalRate: v.number() }),
+  }),
   handler: async (ctx, args) => {
     requireCapability(ctx.role, "ai.view_runs");
     const agent = await loadByIdInTenant(ctx, "aiAgents", args.agentId);
     const rows = (await ctx.db.query("aiFeedback").withIndex("by_agent_created", (q) => q.eq("agentId", agent._id)).order("desc").take(501)) as Doc<"aiFeedback">[];
     const sample = rows.slice(0, 500);
+    const corrections = (await ctx.db
+      .query("aiCorrections")
+      .withIndex("by_agent_created", (q) => q.eq("agentId", agent._id))
+      .order("desc")
+      .take(200)) as Doc<"aiCorrections">[];
+    const approved = sample.filter((r) => r.outcome === "approved").length;
+    const edited = sample.filter((r) => r.outcome === "edited").length;
+    const discarded = sample.filter((r) => r.outcome === "discarded").length;
+    const decided = approved + edited + discarded;
+    const approvalRate = decided === 0 ? 0 : approved / decided;
     return {
-      approved: sample.filter((r) => r.outcome === "approved").length,
-      edited: sample.filter((r) => r.outcome === "edited").length,
-      discarded: sample.filter((r) => r.outcome === "discarded").length,
+      approved,
+      edited,
+      discarded,
       examples: Math.min(8, sample.filter((r) => r.outcome !== "discarded" && r.finalText.trim()).length),
       sampled: rows.length > 500,
+      corrections: {
+        reverted: corrections.filter((row) => row.kind === "reverted").length,
+        redirected: corrections.filter((row) => row.kind === "redirected").length,
+      },
+      // Readiness is a SUGGESTION, never an automatic promotion: autonomy grows
+      // when a person decides it has, and the numbers are there to inform that
+      // decision, not to take it.
+      graduation: {
+        ready: decided >= GRADUATION_MIN_DECISIONS && approvalRate >= GRADUATION_MIN_RATE && corrections.length <= GRADUATION_MAX_CORRECTIONS,
+        decided,
+        approvalRate: Math.round(approvalRate * 100) / 100,
+      },
     };
   },
 });

@@ -84,6 +84,14 @@ export function AiSuggestionCard({ threadId, onUseDraft, windowOpen }: { threadI
         <button type="button" onClick={() => setEditing(true)} className="w-full whitespace-pre-wrap rounded-md border border-transparent bg-white/70 p-2 text-left text-[12px] leading-5 text-[#0a1b33] hover:border-[#2b4f8a]/40" title={tr("Clique para editar", "Click to edit")}>{text}</button>
       )}
       {pending.violations.length > 0 && <p className="mt-1 text-[10px] font-semibold text-[#b3261e]">{tr("Guards", "Guards")}: {pending.violations.map((v) => v.split(":")[0]).join(", ")}</p>}
+      {pending.promiseWarning && (
+        <p className="mt-1 rounded bg-amber-50 px-1.5 py-1 text-[11px] text-amber-900">
+          {tr(
+            `Esta resposta compromete a clínica a ${pending.promiseWarning}, e nada está agendado para isso. Aprove uma acção ou assuma a conversa.`,
+            `This reply commits the clinic to ${pending.promiseWarning}, and nothing is scheduled for it. Approve an action or take the conversation.`,
+          )}
+        </p>
+      )}
       {pending.actions.length > 0 && (
         <ul className="mt-2 space-y-1">
           {pending.actions.map((action) => {

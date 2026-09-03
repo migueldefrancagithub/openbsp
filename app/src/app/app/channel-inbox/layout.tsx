@@ -1,5 +1,6 @@
 import { ReactNode, Suspense } from "react";
 import { ChannelThreadList } from "@/components/channel-inbox/ChannelThreadList";
+import { InboxShortcuts } from "@/components/channel-inbox/InboxShortcuts";
 
 export default function ChannelInboxLayout({
   children,
@@ -13,6 +14,7 @@ export default function ChannelInboxLayout({
         <ChannelThreadList />
       </Suspense>
       <div className="flex-1 min-w-0 flex flex-col">{children}</div>
+      <InboxShortcuts />
     </div>
   );
 }

@@ -5,9 +5,10 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { AlertTriangle, Bot, CheckCircle2, ChevronRight, Loader2, Pause, Play, Plus, Rocket, Trash2, Workflow } from "lucide-react";
 import { api } from "../../../../convex/_generated/api";
+import { TOOL_BUNDLES, TOOL_RISK } from "../../../../convex/lib/ai/toolRegistry";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { EmptyState, PageHeader } from "@/components/app/EmptyState";
-import { OBJECTIVES, issueLabel, objectiveLabel, toneLabel, toolLabel } from "@/components/agents/agentLabels";
+import { OBJECTIVES, bundleCopy, issueLabel, objectiveLabel, riskCopy, toneLabel, toolLabel } from "@/components/agents/agentLabels";
 import { AgentSandbox } from "@/components/agents/AgentSandbox";
 import { AgentRunsPanel } from "@/components/agents/AgentRunsPanel";
 import { AgentModeToggle } from "@/components/agents/AgentModeToggle";
@@ -273,14 +274,54 @@ function AgentEditor({ agentId, channels, knowledge, onDeleted }: { agentId: Id<
               )}
             </div>
             <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-              <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.12em] text-slate-400">{tr("Ferramentas", "Tools")}</div>
+              <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.12em] text-slate-400">{tr("O que o agente pode fazer", "What the agent can do")}</div>
+              <div className="mb-3 flex flex-wrap gap-1.5">
+                {TOOL_BUNDLES.filter((bundle) => bundle.tools.some((tool) => detail.tools.includes(tool))).map((bundle) => {
+                  const available = bundle.tools.filter((tool) => detail.tools.includes(tool));
+                  const on = available.every((tool) => config.tools.includes(tool));
+                  const [label, explanation] = bundleCopy(bundle.id, locale);
+                  return (
+                    <button
+                      key={bundle.id}
+                      type="button"
+                      title={explanation}
+                      onClick={() =>
+                        setConfig({
+                          ...config,
+                          tools: on
+                            ? config.tools.filter((tool) => !available.includes(tool as never))
+                            : Array.from(new Set([...config.tools, ...available])),
+                        })
+                      }
+                      className={cn(
+                        "rounded-full border px-2.5 py-1 text-[11px] font-semibold",
+                        on ? "border-[#0a1b33] bg-[#0a1b33] text-white" : "border-slate-200 bg-white text-slate-600",
+                      )}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
               <div className="grid gap-1.5 sm:grid-cols-2">
                 {detail.tools.map((tool) => {
                   const on = config.tools.includes(tool);
+                  const risk = TOOL_RISK[tool as keyof typeof TOOL_RISK] ?? "attention";
+                  const [riskLabel, riskExplanation] = riskCopy(risk, locale);
                   return (
-                    <label key={tool} className="flex items-center gap-2 text-[12px] text-[#0a1b33]">
-                      <input type="checkbox" checked={on} onChange={(e) => setConfig({ ...config, tools: e.target.checked ? [...config.tools, tool] : config.tools.filter((t) => t !== tool) })} className="h-4 w-4 accent-[#0a1b33]" />
-                      {toolLabel(tool, locale)}{required.has(tool) ? " *" : ""}
+                    <label key={tool} className="flex items-start gap-2 text-[12px] text-[#0a1b33]" title={riskExplanation}>
+                      <input type="checkbox" checked={on} onChange={(e) => setConfig({ ...config, tools: e.target.checked ? [...config.tools, tool] : config.tools.filter((t) => t !== tool) })} className="mt-0.5 h-4 w-4 accent-[#0a1b33]" />
+                      <span>
+                        {toolLabel(tool, locale)}{required.has(tool) ? " *" : ""}
+                        <span
+                          className={cn(
+                            "ml-1.5 rounded px-1 py-0.5 text-[9px] font-bold uppercase tracking-wide",
+                            risk === "critical" ? "bg-[#fdf1ef] text-[#b3261e]" : risk === "attention" ? "bg-amber-50 text-amber-800" : "bg-slate-100 text-slate-500",
+                          )}
+                        >
+                          {riskLabel}
+                        </span>
+                      </span>
                     </label>
                   );
                 })}

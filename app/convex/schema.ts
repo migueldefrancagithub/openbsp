@@ -710,6 +710,8 @@ export default defineSchema({
     ])
     .index("by_channel_status_created", ["channelId", "status", "createdAt"])
     .index("by_status_unknown_since", ["status", "unknownSince"])
+    /** Rows the provider never took, oldest first. */
+    .index("by_status_created", ["status", "createdAt"])
     .index("by_tenant_created", ["tenantId", "createdAt"]),
 
   channelTemplates: defineTable({
@@ -813,6 +815,10 @@ export default defineSchema({
     tags: v.optional(v.array(v.string())),
     leadSource: v.optional(leadSourceValidator),
     leadStatus: v.optional(channelLeadStatusValidator),
+    /** Who last moved the stage: a human undoing the AI only counts when the AI moved it last. */
+    leadStatusActor: v.optional(v.union(v.literal("ai"), v.literal("member"), v.literal("system"))),
+    /** Where the AI took the stage FROM, so a revert can be told from a redirect. */
+    leadStatusPrevious: v.optional(v.string()),
     /** What the patient asked for last (see lib/channels/intents.ts). */
     intent: v.optional(threadIntentValidator),
     intentSource: v.optional(intentSourceValidator),
@@ -866,7 +872,9 @@ export default defineSchema({
     .index("by_tenant_inbox_status", ["tenantId", "inboxStatus", "lastEventAt"])
     .index("by_tenant_responsible", ["tenantId", "responsibleMemberId", "lastEventAt"])
     .index("by_tenant_team", ["tenantId", "assignedTeamId", "lastEventAt"])
-    .index("by_tenant_first_response_due", ["tenantId", "firstResponseDueAt"]),
+    .index("by_tenant_first_response_due", ["tenantId", "firstResponseDueAt"])
+    /** Snoozes whose time is up: a promise the team made to itself. */
+    .index("by_tenant_snoozed", ["tenantId", "snoozedUntil"]),
 
   threadInternalNotes: defineTable({
     tenantId: v.id("tenants"),
@@ -1120,6 +1128,9 @@ export default defineSchema({
     /** Copilot: write actions proposed by the model, executed only on approval. */
     proposedActions: v.optional(v.any()),
     suggestedText: v.optional(v.string()),
+    /** Promises detected in the reply, and whether anything owns them. */
+    promises: v.optional(v.array(v.object({ kind: v.string(), phrase: v.string() }))),
+    promiseOwned: v.optional(v.boolean()),
     approvedBy: v.optional(v.id("members")),
     approvedAt: v.optional(v.number()),
     editedText: v.optional(v.string()),
@@ -1156,6 +1167,66 @@ export default defineSchema({
     .index("by_status_created", ["status", "createdAt"])
     .index("by_thread_status", ["threadId", "status"])
     .index("by_tenant_created", ["tenantId", "createdAt"]),
+
+  /**
+   * A human undoing what the AI did — the return signal that closes the loop.
+   *
+   * Only counts when the AI moved the card LAST: a colleague tidying the funnel
+   * says nothing about the assistant, and an indicator that rises without cause
+   * is one people learn to ignore.
+   */
+  aiCorrections: defineTable({
+    tenantId: v.id("tenants"),
+    agentId: v.optional(v.id("aiAgents")),
+    threadId: v.id("channelThreads"),
+    /** reverted = back to where the AI took it from; redirected = somewhere else. */
+    kind: v.union(v.literal("reverted"), v.literal("redirected")),
+    aiStatus: v.string(),
+    memberStatus: v.string(),
+    memberId: v.id("members"),
+    createdAt: v.number(),
+  })
+    .index("by_agent_created", ["agentId", "createdAt"])
+    .index("by_tenant_created", ["tenantId", "createdAt"]),
+
+  /**
+   * What the AI heard and wants recorded, waiting for a person to decide.
+   *
+   * The AI proposes, a person confirms, and what nobody decides EXPIRES —
+   * a deadline nobody covers is worse than no deadline: it promises a limit
+   * that does not exist and the pending item becomes a permanent badge that
+   * simulates attention while postponing the decision.
+   */
+  aiProposals: defineTable({
+    tenantId: v.id("tenants"),
+    threadId: v.id("channelThreads"),
+    agentId: v.optional(v.id("aiAgents")),
+    turnId: v.optional(v.id("aiTurns")),
+    kind: v.union(v.literal("contact_field"), v.literal("next_action")),
+    /** One pending proposal per conversation + kind + field. */
+    businessKey: v.string(),
+    field: v.optional(v.union(v.literal("name"), v.literal("email"))),
+    value: v.optional(v.string()),
+    previousValue: v.optional(v.string()),
+    action: v.optional(v.string()),
+    /** What the patient wrote. Without it, confirming is an act of faith. */
+    excerpt: v.optional(v.string()),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("approved"),
+      v.literal("dismissed"),
+      v.literal("expired"),
+    ),
+    decidedBy: v.optional(v.id("members")),
+    decidedAt: v.optional(v.number()),
+    expiresAt: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_tenant_status", ["tenantId", "status", "createdAt"])
+    .index("by_thread_status", ["threadId", "status"])
+    .index("by_tenant_business_key", ["tenantId", "businessKey"])
+    .index("by_status_expires", ["status", "expiresAt"]),
 
   /** Every tool call the AI makes, with input/output and its verdict. */
   aiToolInvocations: defineTable({

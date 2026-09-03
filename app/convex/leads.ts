@@ -7,10 +7,14 @@ import { findOriginCampaign } from "./lib/channels/projection";
 import { threadHasMessageEvent } from "./lib/channels/threadVisibility";
 import { threadLeadStatusValidator } from "./lib/channels/threadUpdate";
 import { tenantQuery } from "./lib/customFunctions";
+import { classifyRisk, compareRisk, resolveStageWindow } from "./lib/leads/riskRadar";
 
 const PAGE_SIZE = 100;
 /** Column counts stop at 100+ — the kanban never needs the exact tail. */
 const COUNT_CAP = 100;
+
+/** How many recent conversations the radar reads per call. */
+const RADAR_SCAN = 120;
 
 export const LEAD_STATUSES = [
   "new",
@@ -270,3 +274,99 @@ export const _backfillOrigin = internalMutation({
     return { patched, isDone: page.isDone };
   },
 });
+
+/**
+ * The risk radar: open conversations that went cold, and the ones nobody has a
+ * next step for.
+ *
+ * The empty state is only empty when BOTH lists are: a clinic with eight
+ * demands without a next step and no cold lead would otherwise read "nothing at
+ * risk", hiding exactly the leak this screen exists to show.
+ */
+export const riskRadar = tenantQuery({
+  args: {},
+  returns: v.object({
+    counts: v.object({ critical: v.number(), at_risk: v.number(), in_flight: v.number() }),
+    items: v.array(
+      v.object({
+        threadId: v.id("channelThreads"),
+        threadKey: v.string(),
+        channelId: v.id("channels"),
+        displayName: v.optional(v.string()),
+        leadStatus: v.optional(v.string()),
+        bucket: v.string(),
+        hoursSinceActivity: v.number(),
+        nextStep: v.optional(v.string()),
+        responsibleName: v.optional(v.string()),
+      }),
+    ),
+    withoutNextStep: v.array(
+      v.object({ threadId: v.id("channelThreads"), threadKey: v.string(), channelId: v.id("channels"), displayName: v.optional(v.string()), hoursOpen: v.number() }),
+    ),
+    scanned: v.number(),
+  }),
+  handler: async (ctx) => {
+    const now = Date.now();
+    const threads = (await ctx.db
+      .query("channelThreads")
+      .withIndex("by_tenant_last_event", (q) => q.eq("tenantId", ctx.tenantId))
+      .order("desc")
+      .take(RADAR_SCAN)) as Doc<"channelThreads">[];
+    const counts = { critical: 0, at_risk: 0, in_flight: 0 };
+    const items = [];
+    const withoutNextStep = [];
+    for (const thread of threads) {
+      if (thread.closedAt || thread.dnd) continue;
+      // A conversation the patient never answered is not "cold": nothing was
+      // ever warm. The radar starts at the last real activity.
+      const lastActivityAt = Math.max(thread.lastInboundAt ?? 0, thread.lastOutboundAt ?? 0, thread.createdAt);
+      const followUps = (await ctx.db
+        .query("followUpTasks")
+        .withIndex("by_thread_status", (q) =>
+          q.eq("tenantId", ctx.tenantId).eq("threadId", thread._id).eq("status", "scheduled"),
+        )
+        .take(5)) as Doc<"followUpTasks">[];
+      const inFlight = followUps.some((task) => task.dueAt > now);
+      const risk = classifyRisk({ lastActivityAt, now, inFlight, window: resolveStageWindow(thread.leadStatus) });
+      if (!thread.nextStep && !thread.closedAt) {
+        withoutNextStep.push({
+          threadId: thread._id,
+          threadKey: thread.threadKey,
+          channelId: thread.channelId,
+          displayName: (await threadDisplayName(ctx, thread)) ?? undefined,
+          hoursOpen: Math.round((now - thread.createdAt) / 3_600_000),
+        });
+      }
+      if (!risk.onRadar) continue;
+      counts[risk.bucket as "critical" | "at_risk" | "in_flight"] += 1;
+      items.push({
+        threadId: thread._id,
+        threadKey: thread.threadKey,
+        channelId: thread.channelId,
+        displayName: (await threadDisplayName(ctx, thread)) ?? undefined,
+        leadStatus: thread.leadStatus,
+        bucket: risk.bucket,
+        hoursSinceActivity: Math.round(risk.hoursSinceActivity),
+        nextStep: thread.nextStep,
+        responsibleName: thread.responsibleMemberId
+          ? await memberDisplayName(ctx, thread.responsibleMemberId)
+          : undefined,
+      });
+    }
+    items.sort(compareRisk);
+    return { counts, items: items.slice(0, 40), withoutNextStep: withoutNextStep.slice(0, 20), scanned: threads.length };
+  },
+});
+
+async function threadDisplayName(ctx: { db: any }, thread: Doc<"channelThreads">): Promise<string | null> {
+  if (!thread.identityId) return null;
+  const identity = (await ctx.db.get(thread.identityId)) as Doc<"channelIdentities"> | null;
+  return identity?.displayName ?? null;
+}
+
+async function memberDisplayName(ctx: { db: any }, memberId: Id<"members">): Promise<string | undefined> {
+  const member = (await ctx.db.get(memberId)) as Doc<"members"> | null;
+  if (!member) return undefined;
+  const user = await ctx.db.get(member.userId);
+  return user?.name ?? user?.email;
+}

@@ -11,6 +11,7 @@ import {
 } from "./lib/customFunctions";
 import { writeAudit } from "./lib/audit";
 import { threadHasMessageEvent } from "./lib/channels/threadVisibility";
+import { threadCommand, waitingSince } from "./lib/channels/threadCommand";
 import { applyThreadUpdate, threadUpdateArgs } from "./lib/channels/threadUpdate";
 import { findOrCreateContactForThread } from "./lib/channels/contactBridge";
 import { recordConsentTransition } from "./lib/consent";
@@ -230,7 +231,27 @@ const threadSummaryValidator = v.object({
   slaBreached: v.boolean(),
   aiSuggestionPending: v.boolean(),
   aiMode: v.optional(v.string()),
+  /** Who is in command, by the single resolver in lib/channels/threadCommand. */
+  command: v.string(),
+  commandReason: v.optional(v.string()),
+  /** Since when the patient has been waiting — the queue's ordering label. */
+  waitingSince: v.number(),
 });
+
+/** Is there a published, active agent bound to this channel? */
+async function channelHasLiveAgent(
+  ctx: { db: any },
+  tenantId: Id<"tenants">,
+  channelId: Id<"channels">,
+): Promise<boolean> {
+  const agents = (await ctx.db
+    .query("aiAgents")
+    .withIndex("by_tenant_channel_status", (q: any) =>
+      q.eq("tenantId", tenantId).eq("channelId", channelId).eq("status", "active"),
+    )
+    .take(10)) as Doc<"aiAgents">[];
+  return agents.some((agent) => !!agent.publishedVersionId && agent.mode !== "sandbox");
+}
 
 export const listThreads = tenantQuery({
   args: {
@@ -259,6 +280,9 @@ export const listThreads = tenantQuery({
       });
     const now = Date.now();
     const search = args.search?.trim().toLowerCase() ?? "";
+    // One read per page, not per row: "does this channel have an agent live?"
+    // is a channel-wide fact, and it changes what the queue means.
+    const aiAvailable = await channelHasLiveAgent(ctx, ctx.tenantId, args.channelId);
     const page = [];
     for (const thread of result.page) {
       if (!(await hasMessageEvent(ctx, thread))) continue;
@@ -282,6 +306,7 @@ export const listThreads = tenantQuery({
       if (search && !haystack.includes(search)) continue;
       const inboxStatus = deriveStatus(thread, now);
       if (!matchesFilter(thread, args.filter, inboxStatus, ctx.memberId)) continue;
+      const command = threadCommand({ ...thread, aiAvailable }, now);
       page.push({
         _id: thread._id,
         channelId: thread.channelId,
@@ -319,6 +344,9 @@ export const listThreads = tenantQuery({
             .first()) !== null,
         aiMode: thread.aiMode,
         firstResponseDueAt: thread.firstResponseDueAt,
+        command: command.who,
+        commandReason: command.reason ?? undefined,
+        waitingSince: waitingSince(thread),
         slaBreached:
           (!!thread.firstResponseDueAt && thread.firstResponseDueAt < now && !thread.closedAt) ||
           (!!openCase && openCase.slaDueAt < now),
@@ -472,6 +500,10 @@ export const getThreadOps = tenantQuery({
       v.null(),
     ),
     pilotBlocked: v.boolean(),
+    /** Why the last automatic send did not go out, when it did not. */
+    retention: v.union(v.object({ code: v.string(), at: v.number() }), v.null()),
+    command: v.string(),
+    commandReason: v.optional(v.string()),
     ai: v.union(
       v.object({
         agentName: v.string(),
@@ -527,6 +559,20 @@ export const getThreadOps = tenantQuery({
         ai = { agentName: agentForMode.name, status: "off", turns: 0, mode: thread.aiMode ?? agentForMode.mode ?? "copilot", overridden: !!thread.aiMode, pendingSuggestion };
       }
     }
+    // The most recent thing that stopped a send. Read from the durable system
+    // events, so the screen and the engine cannot disagree about the reason.
+    const systemEvents = (await ctx.db
+      .query("threadSystemEvents")
+      .withIndex("by_thread", (q) => q.eq("threadId", thread._id))
+      .order("desc")
+      .take(12)) as Doc<"threadSystemEvents">[];
+    const blocking = systemEvents.find(
+      (event) => !!event.code && (event.severity === "warning" || event.severity === "error"),
+    );
+    const retention =
+      blocking && blocking.createdAt > (thread.lastOutboundAt ?? 0)
+        ? { code: blocking.code as string, at: blocking.createdAt }
+        : null;
     const recent = (await ctx.db
       .query("humanCases")
       .withIndex("by_thread", (q) =>
@@ -535,7 +581,14 @@ export const getThreadOps = tenantQuery({
       .order("desc")
       .take(5)) as Doc<"humanCases">[];
     const open = recent.find((row) => row.status !== "resolved") ?? null;
+    const command = threadCommand(
+      { ...thread, aiAvailable: !!agentForMode && !!agentForMode.publishedVersionId && agentForMode.mode !== "sandbox" },
+      Date.now(),
+    );
     return {
+      retention,
+      command: command.who,
+      commandReason: command.reason ?? undefined,
       openCase: open
         ? {
             _id: open._id,
