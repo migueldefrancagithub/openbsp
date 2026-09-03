@@ -1124,6 +1124,9 @@ export default defineSchema({
     /** Copilot: write actions proposed by the model, executed only on approval. */
     proposedActions: v.optional(v.any()),
     suggestedText: v.optional(v.string()),
+    /** Promises detected in the reply, and whether anything owns them. */
+    promises: v.optional(v.array(v.object({ kind: v.string(), phrase: v.string() }))),
+    promiseOwned: v.optional(v.boolean()),
     approvedBy: v.optional(v.id("members")),
     approvedAt: v.optional(v.number()),
     editedText: v.optional(v.string()),

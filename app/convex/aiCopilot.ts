@@ -4,6 +4,7 @@ import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { writeAudit } from "./lib/audit";
 import { effectiveAiMode } from "./lib/ai/control";
+import { detectPromises, promiseSummary } from "./lib/ai/promises";
 import { executeAiTool } from "./lib/ai/tools";
 import { recordThreadSystemEvent } from "./lib/channels/systemEvents";
 import { derivePreview } from "./lib/channels/projection";
@@ -20,6 +21,8 @@ const pendingValidator = v.union(
     routerIntent: v.optional(v.string()),
     actions: v.array(actionValidator),
     violations: v.array(v.string()),
+    /** What the reply commits the clinic to, when nothing covers it yet. */
+    promiseWarning: v.optional(v.string()),
     createdAt: v.number(),
   }),
   v.null(),
@@ -54,7 +57,21 @@ export const pendingForThread = tenantQuery({
     const agent = run ? await ctx.db.get(run.agentId) : null;
     const decision = (turn.routerDecision ?? {}) as { intent?: string; violations?: string[] };
     const actions = ((turn.proposedActions as Array<{ name: string; input: unknown; output: unknown }> | undefined) ?? []).map((a, index) => ({ index, name: a.name, input: a.input ?? {}, output: a.output ?? null }));
-    return { turnId: turn._id, agentName: agent?.name ?? "IA", stage: turn.stage ?? "reply", text: turn.suggestedText ?? "", routerIntent: decision.intent, actions, violations: decision.violations ?? [], createdAt: turn.createdAt };
+    // What this reply commits the clinic to, and whether an action covers it.
+    // Shown BEFORE approval: after it is sent, the promise is already made.
+    const promises = detectPromises(turn.suggestedText ?? "");
+    const covered = actions.length > 0 || !!thread.responsibleMemberId || !!thread.openHumanCaseId;
+    return {
+      turnId: turn._id,
+      agentName: agent?.name ?? "IA",
+      stage: turn.stage ?? "reply",
+      text: turn.suggestedText ?? "",
+      routerIntent: decision.intent,
+      actions,
+      violations: decision.violations ?? [],
+      promiseWarning: promises.length > 0 && !covered ? promiseSummary(promises, "pt") : undefined,
+      createdAt: turn.createdAt,
+    };
   },
 });
 

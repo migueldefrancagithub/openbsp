@@ -16,6 +16,7 @@ import { effectiveAiMode, type AiMode } from "./lib/ai/control";
 import { teamAvailability } from "./lib/escalation/availability";
 import { expectationInstruction, handoffNoticeText } from "./lib/escalation/handoffNotice";
 import { isWriteTool } from "./lib/ai/toolRegistry";
+import { detectPromises, promiseAlertTitle, promiseOwnership, promiseSummary, type DetectedPromise } from "./lib/ai/promises";
 import { upsertOpsAlert } from "./lib/opsAlerts";
 import { emitWebhookEvent } from "./lib/webhooks";
 
@@ -311,6 +312,76 @@ export const _startTurn = internalMutation({
   },
 });
 
+/**
+ * Does anything own the promises this reply makes?
+ *
+ * Reads the three places responsibility can live — a tool that really ran, a
+ * live follow-up, a person holding the conversation — and raises one alert when
+ * none of them do. It never claims the promise was broken: the system cannot
+ * know that, and saying it would be a verdict nobody measured.
+ */
+async function checkPromiseOwnership(
+  ctx: { db: any; scheduler?: unknown },
+  args: {
+    turn: Doc<"aiTurns">;
+    thread: Doc<"channelThreads">;
+    text: string;
+    appointmentTouched: boolean;
+    now: number;
+  },
+): Promise<{ promises: DetectedPromise[]; owned: boolean }> {
+  const promises = detectPromises(args.text);
+  if (promises.length === 0) return { promises, owned: true };
+  const invocations = (await ctx.db
+    .query("aiToolInvocations")
+    .withIndex("by_turn", (q: any) => q.eq("turnId", args.turn._id))
+    .take(20)) as Doc<"aiToolInvocations">[];
+  const followUps = (await ctx.db
+    .query("followUpTasks")
+    .withIndex("by_thread", (q: any) => q.eq("threadId", args.thread._id))
+    .take(10)) as Doc<"followUpTasks">[];
+  const verdict = promiseOwnership(promises, {
+    // A dry run committed nothing: in copilot the actions only exist after a
+    // person approves them.
+    toolsRan: invocations.some((row) => row.status === "ok"),
+    followUpAlive: followUps.some((row) => row.status === "scheduled" || row.status === "claimed"),
+    appointmentTouched: args.appointmentTouched,
+    humanCaseOpen: !!args.thread.openHumanCaseId,
+    memberOwns: !!args.thread.responsibleMemberId,
+  });
+  await ctx.db.patch(args.turn._id, { promises, promiseOwned: verdict.owned, updatedAt: args.now });
+  if (!verdict.owned) {
+    await upsertOpsAlert(ctx, {
+      tenantId: args.turn.tenantId,
+      kind: "ai.promise_unfulfilled",
+      businessKey: `ai:promise:${args.turn._id}`,
+      severity: "warn",
+      title: promiseAlertTitle(promises, "pt"),
+      payload: { turnId: args.turn._id, threadKey: args.thread.threadKey, promises: promises.map((item) => item.kind) },
+      href: `/app/channel-inbox/${args.thread.threadKey}?channel=${args.thread.channelId}`,
+      now: args.now,
+    });
+    await recordThreadSystemEvent(ctx, {
+      thread: args.thread,
+      kind: "ai.promise_unowned",
+      severity: "warning",
+      actorType: "automation",
+      payload: { turnId: args.turn._id, promises: promises.map((item) => item.kind).join(",") },
+      dedupeKey: `aiturn:${args.turn._id}:promise`,
+      now: args.now,
+    });
+    // Somebody has to be able to pick this up from the inbox.
+    if (!args.thread.nextStep) {
+      await ctx.db.patch(args.thread._id, {
+        nextStep: `Cumprir o que a IA prometeu: ${promiseSummary(promises, "pt")}.`,
+        nextStepDueAt: args.now,
+        updatedAt: args.now,
+      });
+    }
+  }
+  return { promises, owned: verdict.owned };
+}
+
 const resultValidator = v.object({
   outcome: v.string(),
   text: v.optional(v.string()),
@@ -328,6 +399,8 @@ const resultValidator = v.object({
   usedModel: v.optional(v.string()),
   usedProvider: v.optional(v.string()),
   proposedActions: v.optional(v.array(v.object({ name: v.string(), input: v.any(), output: v.any() }))),
+  /** Did the tools really touch the agenda in this turn? */
+  appointmentTouched: v.optional(v.boolean()),
 });
 
 /**
@@ -392,6 +465,10 @@ export const _finishTurn = internalMutation({
         suggestedText,
         proposedActions: actions,
       });
+      // The suggestion has not reached anyone yet, so nothing is owed. What the
+      // card needs is the WARNING, so the operator sees the commitment before
+      // approving it.
+      await ctx.db.patch(turn._id, { promises: detectPromises(suggestedText), updatedAt: now });
       await recordThreadSystemEvent(ctx, { thread, kind: "ai.suggested", severity: "info", actorType: "automation", payload: { turnId: turn._id, actions: actions.length, outcome: r.outcome }, dedupeKey: `aiturn:${turn._id}:suggested`, now });
       await ctx.db.patch(thread._id, { nextStep: "Sugestão da IA a aguardar aprovação no inbox.", nextStepDueAt: now, updatedAt: now });
       return null;
@@ -410,6 +487,7 @@ export const _finishTurn = internalMutation({
 
     if (r.outcome === "reply" && r.text) {
       await queueReply("reply", { kind: "text", text: r.text });
+      await checkPromiseOwnership(ctx, { turn, thread, text: r.text, appointmentTouched: !!r.appointmentTouched, now });
     } else if (r.outcome === "template" && r.template) {
       await queueReply("template", { kind: "template", ...r.template });
     } else if (r.outcome === "handoff") {
@@ -557,6 +635,7 @@ export const processTurn = internalAction({
           usedModel: used?.model,
           usedProvider: used?.provider,
           proposedActions: result.toolCalls.filter((c) => c.status === "dry_run").map((c) => ({ name: c.name, input: c.input, output: c.output })),
+          appointmentTouched: !!result.effects.booked || !!result.effects.confirmed,
         },
       });
     } catch (error) {
