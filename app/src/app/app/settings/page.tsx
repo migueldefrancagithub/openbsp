@@ -33,6 +33,7 @@ import { ComplianceSection } from "@/components/settings/ComplianceSection";
 import { IaSolutionHubSection } from "@/components/settings/IaSolutionHubSection";
 import { CustomFieldsSettingsSection } from "@/components/settings/CustomFieldsSettingsSection";
 import { ClinicSettingsSection } from "@/components/settings/ClinicSettingsSection";
+import { AiSettingsSection } from "@/components/settings/AiSettingsSection";
 import { AssignmentRulesSection } from "@/components/settings/AssignmentRulesSection";
 import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
@@ -180,6 +181,7 @@ export default function SettingsPage() {
     { key: "automation", label: tr("Automação", "Automation"), value: tr("Regras", "Rules"), icon: Bot },
     { key: "team", label: tr("Equipa", "Team"), value: tr("Membros/API", "Members/API"), icon: Users },
     { key: "clinic", label: tr("Clínica", "Clinic"), value: tr("Agenda/SLAs", "Calendar/SLAs"), icon: Stethoscope },
+    { key: "ai", label: tr("IA", "AI"), value: tr("Provedor/chaves", "Provider/keys"), icon: Bot },
     { key: "workspace", label: tr("Espaço", "Workspace"), value: roleLabel(tenant.role, locale), icon: Building2 },
   ];
 
@@ -369,6 +371,7 @@ export default function SettingsPage() {
 
         {/* Workspace card */}
         {settingsTab === "clinic" && <ClinicSettingsSection />}
+        {settingsTab === "ai" && <AiSettingsSection />}
         {settingsTab === "workspace" && <CustomFieldsSettingsSection />}
         {settingsTab === "workspace" && (
         <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">

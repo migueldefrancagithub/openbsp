@@ -9,6 +9,7 @@
  */
 
 import type * as ai from "../ai.js";
+import type * as aiAgents from "../aiAgents.js";
 import type * as aiProviders from "../aiProviders.js";
 import type * as aiSettings from "../aiSettings.js";
 import type * as analytics from "../analytics.js";
@@ -44,6 +45,7 @@ import type * as integrations_leoHub_client from "../integrations/leoHub/client.
 import type * as integrations_leoHub_webhook from "../integrations/leoHub/webhook.js";
 import type * as leads from "../leads.js";
 import type * as leoHubLab from "../leoHubLab.js";
+import type * as lib_ai_checklist from "../lib/ai/checklist.js";
 import type * as lib_ai_guards from "../lib/ai/guards.js";
 import type * as lib_ai_prerouter from "../lib/ai/prerouter.js";
 import type * as lib_ai_pricing from "../lib/ai/pricing.js";
@@ -118,6 +120,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   ai: typeof ai;
+  aiAgents: typeof aiAgents;
   aiProviders: typeof aiProviders;
   aiSettings: typeof aiSettings;
   analytics: typeof analytics;
@@ -153,6 +156,7 @@ declare const fullApi: ApiFromModules<{
   "integrations/leoHub/webhook": typeof integrations_leoHub_webhook;
   leads: typeof leads;
   leoHubLab: typeof leoHubLab;
+  "lib/ai/checklist": typeof lib_ai_checklist;
   "lib/ai/guards": typeof lib_ai_guards;
   "lib/ai/prerouter": typeof lib_ai_prerouter;
   "lib/ai/pricing": typeof lib_ai_pricing;

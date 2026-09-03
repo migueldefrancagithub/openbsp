@@ -1039,6 +1039,7 @@ export default defineSchema({
     currentVersion: v.number(),
     publishedVersionId: v.optional(v.id("aiAgentVersions")),
     lastValidation: v.optional(v.any()),
+    lastSandboxAt: v.optional(v.number()),
     createdBy: v.id("members"),
     createdAt: v.number(),
     updatedAt: v.number(),

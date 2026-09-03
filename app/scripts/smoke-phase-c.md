@@ -26,3 +26,19 @@ aiToolInvocations, aiCostLedger; campos opcionais em channelAutomationDispatches
    "Nenhuma chave configurada para este provedor".
 4. Fallback: com provedor de recurso configurado, um 503 no principal segue para o
    secundário (testes `aiProvider.test.ts`); chaves inválidas nunca são retentadas.
+
+## C2 — Configuração de agentes, gates de publicação, Definições › IA
+
+### Verificações
+1. Definições › IA: escolher provedor/modelos, guardar, "Testar ligação" → estado
+   "Pronto"; chave própria guardada aparece só como `••••XXXX`.
+2. `/app/agents` › "Novo agente" (Recepção, canal Hub) → rascunho com ferramentas por
+   omissão; a lista de verificação mostra bloqueios (conhecimento, provedor) e avisos
+   (sandbox, DPIA).
+3. Selecionar conhecimento ativo, guardar → bloqueios desaparecem; "Publicar" cria a
+   versão 1 (checksum) e o estado passa a Ativo. Editar o rascunho depois não altera
+   a versão publicada.
+4. Segundo agente com o mesmo objetivo no mesmo canal → bloqueio "já existe um agente
+   ativo". Pausar/retomar e apagar rascunho funcionam; auditoria regista tudo.
+5. Menu: "Agentes" abre `/app/agents`; "Fluxos por palavra-chave" (menu ⚙) abre o estúdio
+   antigo `/app/chatbots`.

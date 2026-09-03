@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import {
+  Bot,
   ScrollText,
   CalendarDays,
   BarChart3,
@@ -70,7 +71,7 @@ const PRIMARY_NAV: NavItem[] = [
   { href: "/app/leads", labelKey: "nav.leads", icon: MousePointerClick },
   { href: "/app/agenda", labelKey: "nav.agenda", icon: CalendarDays },
   { href: "/app/campaigns", labelKey: "nav.campaigns", icon: Send },
-  { href: "/app/chatbots", labelKey: "nav.agents", icon: Workflow },
+  { href: "/app/agents", labelKey: "nav.agents", icon: Bot },
   { href: "/app", labelKey: "nav.operation", icon: LayoutDashboard, exact: true },
 ];
 
@@ -78,6 +79,7 @@ const ADMIN_NAV: NavItem[] = [
   { href: "/app/admin", labelKey: "nav.adminHome", icon: SlidersHorizontal, exact: true },
   { href: "/app/admin/members", labelKey: "nav.members", icon: Users },
   { href: "/app/admin/logs", labelKey: "nav.logs", icon: ScrollText },
+  { href: "/app/chatbots", labelKey: "nav.flows", icon: Workflow },
   { href: "/app/contacts", labelKey: "nav.contacts", icon: Users },
   { href: "/app/analytics", labelKey: "nav.analytics", icon: BarChart3 },
   { href: "/app/channels", labelKey: "nav.channels", icon: Network },
