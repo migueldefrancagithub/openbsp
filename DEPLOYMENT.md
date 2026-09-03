@@ -17,8 +17,14 @@ Order for every production release:
 2. From `app/`: `npx convex deploy` (publishes schema + functions to the
    production deployment; run backfills afterwards if the release requires
    them).
-3. Let Vercel build `main` (or trigger a redeploy). Vercel picks up the
-   frontend only.
+3. Publish the frontend. The Git integration has not been rebuilding `main`
+   on its own (observed 2026-09-03), so run `vercel deploy --prod --yes` from
+   `app/` (needs `app/.vercel/project.json`). If the CLI times out while
+   polling, check `vercel ls openbsp --prod` before starting another build.
+4. Smoke the affected screens with `app/scripts/smoke-phase-{a,b,c}.md`.
+   `smoke-phase-c.md` § M covers the AI maturity modes (Sandbox · Co-Piloto ·
+   Automático). Phases A+B+C can be released in one go with
+   `bash app/scripts/release-phase-c.sh` (deploy → backfills → merge).
 
 Publishing the frontend before the backend leaves the UI calling functions that
 do not exist yet ("Could not find public function ..."). Publishing the backend
@@ -142,3 +148,17 @@ npm run typecheck
 npm run build
 npm run predeploy:check -- --target=production --strict
 ```
+
+Then the manual smoke tests in `app/scripts/smoke-phase-a.md`,
+`smoke-phase-b.md` and `smoke-phase-c.md` (§ M for the agent modes).
+
+### AI agents
+
+- Agents default to **Co-Piloto**: the AI only suggests in the Inbox and the
+  team approves, edits or discards. **Automático** (autonomous replies and
+  bookings) is switched per agent or per conversation, and needs a published
+  version. **Sandbox** never touches real conversations.
+- Suggestions only appear once a provider key exists: `ANTHROPIC_API_KEY`,
+  `OPENAI_API_KEY` or `GOOGLE_GENERATIVE_AI_API_KEY` on the Convex deployment,
+  or the clinic's own key in Definições › IA. Without a key, agents cannot be
+  published (fail closed).
