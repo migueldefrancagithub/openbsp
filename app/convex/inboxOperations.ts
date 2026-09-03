@@ -4,12 +4,26 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { internalMutation } from "./_generated/server";
 import {
   loadByIdInTenant,
+  requireCapability,
+  requireRoleAtLeast,
   tenantMutation,
   tenantQuery,
 } from "./lib/customFunctions";
+import { writeAudit } from "./lib/audit";
+import { threadHasMessageEvent } from "./lib/channels/threadVisibility";
+import { applyThreadUpdate, threadUpdateArgs } from "./lib/channels/threadUpdate";
+import { findOrCreateContactForThread } from "./lib/channels/contactBridge";
+import { recordConsentTransition } from "./lib/consent";
+import type { MutationCtx } from "./_generated/server";
+import {
+  extractErrorCode,
+  maskPhone,
+  recordThreadSystemEvent,
+} from "./lib/channels/systemEvents";
 
 const filterValidator = v.union(
   v.literal("all"),
+  v.literal("mine"),
   v.literal("unassigned"),
   v.literal("open"),
   v.literal("active"),
@@ -66,6 +80,7 @@ function deriveStatus(thread: Doc<"channelThreads">, now: number): OperationalSt
     return "snoozed";
   }
   if (
+    thread.openHumanCaseId ||
     thread.inboxStatus === "awaiting_team" ||
     thread.leadStatus === "awaiting_human" ||
     thread.automationMode === "human"
@@ -93,8 +108,12 @@ function matchesFilter(
   thread: Doc<"channelThreads">,
   filter: string,
   status: OperationalStatus,
+  memberId?: Id<"members">,
 ): boolean {
   if (filter === "all") return status !== "closed";
+  if (filter === "mine") {
+    return status !== "closed" && !!memberId && thread.responsibleMemberId === memberId;
+  }
   if (filter === "unassigned") {
     return status !== "closed" && !thread.responsibleMemberId;
   }
@@ -141,19 +160,7 @@ async function findContact(
 }
 
 async function hasMessageEvent(ctx: { db: any }, thread: Doc<"channelThreads">) {
-  if (thread.lastEventKind.startsWith("message.")) return true;
-  return (
-    (await ctx.db
-      .query("channelEvents")
-      .withIndex("by_channel_thread_kind", (q: any) =>
-        q
-          .eq("channelId", thread.channelId)
-          .eq("threadKey", thread.threadKey)
-          .gte("eventKind", "message.")
-          .lt("eventKind", "message/"),
-      )
-      .first()) !== null
-  );
+  return await threadHasMessageEvent(ctx, thread);
 }
 
 async function memberLabel(ctx: { db: any }, memberId?: Id<"members">) {
@@ -180,14 +187,11 @@ async function audit(
   threadId: Id<"channelThreads">,
   payload?: unknown,
 ) {
-  await ctx.db.insert("clinicAuditEvents", {
-    tenantId: ctx.tenantId,
-    actorMemberId: ctx.memberId,
+  await writeAudit(ctx, {
     action,
     targetType: "channel_thread",
     targetId: threadId,
     payload,
-    createdAt: Date.now(),
   });
 }
 
@@ -205,6 +209,7 @@ const threadSummaryValidator = v.object({
   tags: v.array(v.string()),
   leadSource: v.optional(v.string()),
   leadStatus: v.optional(v.string()),
+  intent: v.optional(v.string()),
   nextStep: v.optional(v.string()),
   nextStepDueAt: v.optional(v.number()),
   responsibleMemberId: v.optional(v.id("members")),
@@ -216,6 +221,13 @@ const threadSummaryValidator = v.object({
   snoozedUntil: v.optional(v.number()),
   automationMode: v.optional(v.string()),
   dnd: v.boolean(),
+  /** An automatic reply was blocked because the number is outside the pilot allowlist. */
+  pilotBlocked: v.boolean(),
+  openCaseSlaDueAt: v.optional(v.number()),
+  openCaseUrgency: v.optional(v.string()),
+  dueReminderCount: v.number(),
+  firstResponseDueAt: v.optional(v.number()),
+  slaBreached: v.boolean(),
 });
 
 export const listThreads = tenantQuery({
@@ -251,10 +263,23 @@ export const listThreads = tenantQuery({
       const identity = await getThreadIdentity(ctx, thread);
       const displayName = identity?.displayName;
       const phone = identity?.phone ?? normalizedPhone(thread.threadKey);
+      // Same recipient derivation as the outbound gate: the allowlist itself
+      // never leaves the server, only the verdict does.
+      const recipient = identity?.phone ?? thread.threadKey;
+      const pilotBlocked =
+        !!thread.pilotBlockedAt && !channel.outboundAllowlist.includes(recipient);
+      const openCase = thread.openHumanCaseId
+        ? ((await ctx.db.get(thread.openHumanCaseId)) as Doc<"humanCases"> | null)
+        : null;
+      const dueReminders = (await ctx.db
+        .query("threadReminders")
+        .withIndex("by_thread", (q) => q.eq("threadId", thread._id))
+        .take(10)) as Doc<"threadReminders">[];
+      const dueReminderCount = dueReminders.filter((row) => row.status === "due").length;
       const haystack = `${displayName ?? ""} ${phone ?? ""} ${thread.threadKey} ${thread.lastPreview ?? ""}`.toLowerCase();
       if (search && !haystack.includes(search)) continue;
       const inboxStatus = deriveStatus(thread, now);
-      if (!matchesFilter(thread, args.filter, inboxStatus)) continue;
+      if (!matchesFilter(thread, args.filter, inboxStatus, ctx.memberId)) continue;
       page.push({
         _id: thread._id,
         channelId: thread.channelId,
@@ -269,6 +294,7 @@ export const listThreads = tenantQuery({
         tags: thread.tags ?? [],
         leadSource: thread.leadSource,
         leadStatus: thread.leadStatus,
+        intent: thread.intent,
         nextStep: thread.nextStep,
         nextStepDueAt: thread.nextStepDueAt,
         responsibleMemberId: thread.responsibleMemberId,
@@ -280,6 +306,14 @@ export const listThreads = tenantQuery({
         snoozedUntil: thread.snoozedUntil,
         automationMode: thread.automationMode,
         dnd: thread.dnd ?? false,
+        pilotBlocked,
+        openCaseSlaDueAt: openCase?.slaDueAt,
+        openCaseUrgency: openCase?.urgency,
+        dueReminderCount,
+        firstResponseDueAt: thread.firstResponseDueAt,
+        slaBreached:
+          (!!thread.firstResponseDueAt && thread.firstResponseDueAt < now && !thread.closedAt) ||
+          (!!openCase && openCase.slaDueAt < now),
       });
     }
     return {
@@ -287,6 +321,308 @@ export const listThreads = tenantQuery({
       isDone: result.isDone,
       continueCursor: result.continueCursor,
     };
+  },
+});
+
+const timelineSystemEventValidator = v.object({
+  _id: v.id("threadSystemEvents"),
+  kind: v.string(),
+  severity: v.string(),
+  code: v.optional(v.string()),
+  actorType: v.string(),
+  actorName: v.optional(v.string()),
+  botName: v.optional(v.string()),
+  humanCaseId: v.optional(v.id("humanCases")),
+  payload: v.optional(v.any()),
+  createdAt: v.number(),
+});
+
+const timelineOutboxValidator = v.object({
+  _id: v.id("channelOutbox"),
+  status: v.string(),
+  messageKind: v.string(),
+  preview: v.optional(v.string()),
+  code: v.optional(v.string()),
+  failureReason: v.optional(v.string()),
+  createdAt: v.number(),
+  updatedAt: v.number(),
+});
+
+function outboxPreview(payload: unknown): string | undefined {
+  if (!payload || typeof payload !== "object") return undefined;
+  const record = payload as Record<string, unknown>;
+  if (typeof record.text === "string") return record.text.slice(0, 160);
+  if (typeof record.templateName === "string") return `Template: ${record.templateName}`;
+  if (typeof record.filename === "string") return record.filename.slice(0, 120);
+  return undefined;
+}
+
+/**
+ * Everything the thread timeline shows that is NOT a provider event: system
+ * events (automation outcomes, pilot blocks, handoffs) and outbox rows that
+ * never became a provider event because the send was rejected or never
+ * confirmed. Each list is take-limited; the client merges by timestamp.
+ */
+export const listThreadTimelineExtras = tenantQuery({
+  args: {
+    threadId: v.id("channelThreads"),
+    limit: v.optional(v.number()),
+  },
+  returns: v.object({
+    systemEvents: v.array(timelineSystemEventValidator),
+    failedOutbox: v.array(timelineOutboxValidator),
+  }),
+  handler: async (ctx, args) => {
+    const thread = await loadByIdInTenant(ctx, "channelThreads", args.threadId);
+    const limit = Math.min(Math.max(args.limit ?? 50, 1), 100);
+    const rows = (await ctx.db
+      .query("threadSystemEvents")
+      .withIndex("by_thread", (q) => q.eq("threadId", thread._id))
+      .order("desc")
+      .take(limit)) as Doc<"threadSystemEvents">[];
+    const botNames = new Map<string, string | undefined>();
+    const memberNames = new Map<string, string | undefined>();
+    const systemEvents = [];
+    for (const row of rows) {
+      let botName: string | undefined;
+      if (row.chatbotId) {
+        if (!botNames.has(row.chatbotId)) {
+          const bot = (await ctx.db.get(row.chatbotId)) as Doc<"chatbots"> | null;
+          botNames.set(row.chatbotId, bot?.name);
+        }
+        botName = botNames.get(row.chatbotId);
+      }
+      let actorName: string | undefined;
+      if (row.actorMemberId) {
+        if (!memberNames.has(row.actorMemberId)) {
+          memberNames.set(row.actorMemberId, await memberLabel(ctx, row.actorMemberId));
+        }
+        actorName = memberNames.get(row.actorMemberId);
+      }
+      systemEvents.push({
+        _id: row._id,
+        kind: row.kind,
+        severity: row.severity,
+        code: row.code,
+        actorType: row.actorType,
+        actorName,
+        botName,
+        humanCaseId: row.humanCaseId,
+        payload: row.payload,
+        createdAt: row.createdAt,
+      });
+    }
+    const failedOutbox = [];
+    for (const status of ["failed", "unknown"] as const) {
+      const outbox = (await ctx.db
+        .query("channelOutbox")
+        .withIndex("by_channel_thread_status", (q) =>
+          q
+            .eq("channelId", thread.channelId)
+            .eq("threadKey", thread.threadKey)
+            .eq("status", status),
+        )
+        .order("desc")
+        .take(20)) as Doc<"channelOutbox">[];
+      for (const row of outbox) {
+        failedOutbox.push({
+          _id: row._id,
+          status: row.status,
+          messageKind: row.messageKind,
+          preview: outboxPreview(row.payload),
+          code: extractErrorCode(row.failureReason),
+          failureReason: row.failureReason?.slice(0, 200),
+          createdAt: row.createdAt,
+          updatedAt: row.updatedAt,
+        });
+      }
+    }
+    return { systemEvents, failedOutbox };
+  },
+});
+
+/**
+ * Operational state of one thread for the header: the open human case (with
+ * SLA) and the pilot verdict. The case table is the source of truth; the
+ * `openHumanCaseId` cache on the thread only serves list rows.
+ */
+export const getThreadOps = tenantQuery({
+  args: { threadId: v.id("channelThreads") },
+  returns: v.object({
+    openCase: v.union(
+      v.object({
+        _id: v.id("humanCases"),
+        reason: v.string(),
+        urgency: v.string(),
+        question: v.string(),
+        status: v.string(),
+        responsibleMemberId: v.optional(v.id("members")),
+        responsibleName: v.optional(v.string()),
+        slaDueAt: v.number(),
+        createdAt: v.number(),
+      }),
+      v.null(),
+    ),
+    pilotBlocked: v.boolean(),
+    ai: v.union(
+      v.object({
+        agentName: v.string(),
+        status: v.union(v.literal("responding"), v.literal("paused"), v.literal("handed_off"), v.literal("off")),
+        turns: v.number(),
+        lastTurnAt: v.optional(v.number()),
+        pausedReason: v.optional(v.string()),
+      }),
+      v.null(),
+    ),
+  }),
+  handler: async (ctx, args) => {
+    const thread = await loadByIdInTenant(ctx, "channelThreads", args.threadId);
+    let ai: { agentName: string; status: "responding" | "paused" | "handed_off" | "off"; turns: number; lastTurnAt?: number; pausedReason?: string } | null = null;
+    for (const status of ["active", "paused", "handed_off"] as const) {
+      const run = await ctx.db
+        .query("aiRuns")
+        .withIndex("by_thread_status", (q) => q.eq("threadId", thread._id).eq("status", status))
+        .first();
+      if (run) {
+        const agent = await ctx.db.get(run.agentId);
+        ai = {
+          agentName: agent?.name ?? "IA",
+          status: status === "active" ? (agent?.status === "active" ? "responding" : "off") : status,
+          turns: run.turnsCount,
+          lastTurnAt: run.lastTurnAt,
+          pausedReason: run.pausedReason,
+        };
+        break;
+      }
+    }
+    const recent = (await ctx.db
+      .query("humanCases")
+      .withIndex("by_thread", (q) =>
+        q.eq("tenantId", ctx.tenantId).eq("threadId", thread._id),
+      )
+      .order("desc")
+      .take(5)) as Doc<"humanCases">[];
+    const open = recent.find((row) => row.status !== "resolved") ?? null;
+    return {
+      openCase: open
+        ? {
+            _id: open._id,
+            reason: open.reason,
+            urgency: open.urgency,
+            question: open.question,
+            status: open.status,
+            responsibleMemberId: open.responsibleMemberId,
+            responsibleName: await memberLabel(ctx, open.responsibleMemberId),
+            slaDueAt: open.slaDueAt,
+            createdAt: open.createdAt,
+          }
+        : null,
+      pilotBlocked: !!thread.pilotBlockedAt,
+      ai,
+    };
+  },
+});
+
+/**
+ * Record a consent decision from the conversation (e.g. the patient said yes
+ * to reminders on WhatsApp). The consent domain stays on `contacts`
+ * (currentConsents + consentEvents, the same rows campaign gates read); the
+ * thread is bridged to its contact by phone/BSUID, creating one if needed.
+ */
+export const recordConsent = tenantMutation({
+  args: {
+    threadId: v.id("channelThreads"),
+    purpose: v.union(v.literal("marketing"), v.literal("transactional")),
+    status: v.union(v.literal("granted"), v.literal("revoked")),
+    proofText: v.string(),
+  },
+  returns: v.object({ contactId: v.id("contacts") }),
+  handler: async (ctx, args) => {
+    requireCapability(ctx.role, "contacts.record_consent");
+    const thread = await loadByIdInTenant(ctx, "channelThreads", args.threadId);
+    const proofText = args.proofText.trim();
+    if (proofText.length < 5 || proofText.length > 500) {
+      throw new ConvexError({ code: "INVALID_CONSENT_PROOF" });
+    }
+    const identity = await getThreadIdentity(ctx, thread);
+    const contact = await findOrCreateContactForThread(ctx, thread, identity);
+    await recordConsentTransition(ctx as unknown as MutationCtx, {
+      tenantId: ctx.tenantId,
+      contactId: contact._id,
+      purpose: args.purpose,
+      newStatus: args.status,
+      source: "inbox_manual",
+      proofText,
+      capturedByMemberId: ctx.memberId,
+    });
+    await audit(ctx, "inbox.consent.recorded", thread._id, {
+      contactId: contact._id,
+      purpose: args.purpose,
+      status: args.status,
+    });
+    return { contactId: contact._id };
+  },
+});
+
+/**
+ * An agent cannot edit the pilot allowlist (that is an admin action in
+ * Settings with an explicit re-arm), but they can leave a traceable request:
+ * a system event on the thread plus a reminder for the first active admin.
+ * One request per thread per day.
+ */
+export const requestAllowlistInclusion = tenantMutation({
+  args: { threadId: v.id("channelThreads") },
+  returns: v.object({
+    requested: v.boolean(),
+    reminderId: v.optional(v.id("threadReminders")),
+  }),
+  handler: async (ctx, args) => {
+    requireCapability(ctx.role, "pilot.request_allowlist");
+    const thread = await loadByIdInTenant(ctx, "channelThreads", args.threadId);
+    const identity = await getThreadIdentity(ctx, thread);
+    const phone = identity?.phone ?? thread.threadKey;
+    const now = Date.now();
+    const day = new Date(now).toISOString().slice(0, 10);
+    const eventId = await recordThreadSystemEvent(ctx, {
+      thread,
+      kind: "pilot.allowlist_requested",
+      severity: "info",
+      actorType: "member",
+      actorMemberId: ctx.memberId,
+      payload: { phone: maskPhone(phone) },
+      dedupeKey: `pilot:${thread._id}:requested:${day}`,
+      now,
+    });
+    if (!eventId) return { requested: false };
+    const members = (await ctx.db
+      .query("members")
+      .withIndex("by_tenant_user", (q) => q.eq("tenantId", ctx.tenantId))
+      .take(100)) as Doc<"members">[];
+    const admin =
+      members.find(
+        (member) =>
+          member.status === "active" &&
+          (member.role === "owner" || member.role === "admin"),
+      ) ?? members.find((member) => member._id === ctx.memberId);
+    if (!admin) return { requested: true };
+    const dueAt = now + 60 * 60 * 1000;
+    const reminderId = await ctx.db.insert("threadReminders", {
+      tenantId: ctx.tenantId,
+      threadId: thread._id,
+      note: `Pedido de inclusão no piloto: ${phone}`,
+      dueAt,
+      status: "scheduled",
+      assignedMemberId: admin._id,
+      createdBy: ctx.memberId,
+      createdAt: now,
+      updatedAt: now,
+    });
+    await ctx.scheduler.runAt(dueAt, markReminderDue, { reminderId });
+    await audit(ctx, "inbox.pilot.allowlist_requested", thread._id, {
+      reminderId,
+      assignedMemberId: admin._id,
+    });
+    return { requested: true, reminderId };
   },
 });
 
@@ -519,6 +855,7 @@ export const createCloseReason = tenantMutation({
   args: { name: v.string() },
   returns: v.id("threadCloseReasons"),
   handler: async (ctx, args) => {
+    requireRoleAtLeast(ctx.role, "admin");
     const name = args.name.trim().replace(/\s+/g, " ").slice(0, 80);
     if (name.length < 2) throw new ConvexError({ code: "INVALID_CLOSE_REASON" });
     const existing = await ctx.db
@@ -543,118 +880,90 @@ export const createCloseReason = tenantMutation({
 export const updateThread = tenantMutation({
   args: {
     threadId: v.id("channelThreads"),
-    inboxStatus: v.optional(inboxStatusValidator),
-    starred: v.optional(v.boolean()),
-    snoozedUntil: v.optional(v.number()),
-    closeReasonId: v.optional(v.id("threadCloseReasons")),
-    responsibleMemberId: v.optional(v.id("members")),
-    clearResponsible: v.optional(v.boolean()),
-    assignedTeamId: v.optional(v.id("teams")),
-    clearTeam: v.optional(v.boolean()),
-    leadStatus: v.optional(leadStatusValidator),
-    nextStep: v.optional(v.string()),
-    nextStepDueAt: v.optional(v.number()),
-    tags: v.optional(v.array(v.string())),
-    dnd: v.optional(v.boolean()),
-    automationMode: v.optional(
-      v.union(
-        v.literal("idle"),
-        v.literal("bot"),
-        v.literal("human"),
-        v.literal("stopped"),
-      ),
-    ),
+    ...threadUpdateArgs,
   },
   returns: v.null(),
   handler: async (ctx, args) => {
+    const { threadId, ...update } = args;
     const thread = await loadByIdInTenant(
       ctx as Parameters<typeof loadByIdInTenant>[0],
       "channelThreads",
-      args.threadId,
+      threadId,
     );
-    if (args.responsibleMemberId) {
+    if (update.responsibleMemberId) {
       await loadByIdInTenant(
         ctx as Parameters<typeof loadByIdInTenant>[0],
         "members",
-        args.responsibleMemberId,
+        update.responsibleMemberId,
       );
     }
-    if (args.assignedTeamId) {
+    if (update.assignedTeamId) {
       await loadByIdInTenant(
         ctx as Parameters<typeof loadByIdInTenant>[0],
         "teams",
-        args.assignedTeamId,
+        update.assignedTeamId,
       );
     }
-    if (args.closeReasonId) {
+    if (update.closeReasonId) {
       await loadByIdInTenant(
         ctx as Parameters<typeof loadByIdInTenant>[0],
         "threadCloseReasons",
-        args.closeReasonId,
+        update.closeReasonId,
       );
     }
-    const now = Date.now();
-    const patch: Record<string, unknown> = { updatedAt: now };
-    if (args.inboxStatus !== undefined) {
-      patch.inboxStatus = args.inboxStatus;
-      if (args.inboxStatus === "closed") {
-        patch.closedAt = now;
-        patch.closedReasonId = args.closeReasonId;
-        patch.nextStep = undefined;
-        patch.nextStepDueAt = undefined;
-      } else {
-        patch.closedAt = undefined;
-        patch.closedReasonId = undefined;
-        if (args.inboxStatus === "snoozed") {
-          if (!args.snoozedUntil || args.snoozedUntil <= now) {
-            throw new ConvexError({ code: "INVALID_SNOOZE_TIME" });
-          }
-          patch.snoozedUntil = args.snoozedUntil;
-        } else {
-          patch.snoozedUntil = undefined;
-        }
-      }
-    }
-    if (args.starred !== undefined) patch.starredAt = args.starred ? now : undefined;
-    if (args.clearResponsible) {
-      patch.responsibleMemberId = undefined;
-    } else if (args.responsibleMemberId !== undefined) {
-      patch.responsibleMemberId = args.responsibleMemberId;
-    }
-    if (args.clearTeam) {
-      patch.assignedTeamId = undefined;
-    } else if (args.assignedTeamId !== undefined) {
-      patch.assignedTeamId = args.assignedTeamId;
-    }
-    if (args.leadStatus !== undefined) patch.leadStatus = args.leadStatus;
-    if (args.nextStep !== undefined) patch.nextStep = args.nextStep.trim().slice(0, 240);
-    if (args.nextStepDueAt !== undefined) patch.nextStepDueAt = args.nextStepDueAt;
-    if (args.tags !== undefined) {
-      patch.tags = Array.from(
-        new Set(args.tags.map((tag) => tag.trim()).filter(Boolean)),
-      ).slice(0, 30);
-    }
-    if (args.dnd !== undefined) patch.dnd = args.dnd;
-    if (args.automationMode !== undefined) {
-      patch.automationMode = args.automationMode;
-      patch.automationChangedAt = now;
-      patch.automationChangeReason = "manual_inbox_control";
-      if (args.automationMode === "human") {
-        patch.inboxStatus = "awaiting_team";
-        patch.leadStatus = "awaiting_human";
-      }
-    }
-    await ctx.db.patch(thread._id, patch);
-    await audit(ctx, "inbox.thread.updated", thread._id, {
-      inboxStatus: args.inboxStatus,
-      starred: args.starred,
-      responsibleMemberId: args.responsibleMemberId,
-      assignedTeamId: args.assignedTeamId,
-      leadStatus: args.leadStatus,
-      dnd: args.dnd,
-      automationMode: args.automationMode,
-    });
+    await applyThreadUpdate(ctx, thread, update);
     return null;
+  },
+});
+
+/**
+ * Audited changes on a thread (who changed what, when). Read from the
+ * operational audit sink by target; newest first, bounded.
+ */
+export const listThreadHistory = tenantQuery({
+  args: {
+    threadId: v.id("channelThreads"),
+    limit: v.optional(v.number()),
+  },
+  returns: v.array(
+    v.object({
+      _id: v.id("clinicAuditEvents"),
+      action: v.string(),
+      actorName: v.optional(v.string()),
+      actorKind: v.optional(v.string()),
+      payload: v.optional(v.any()),
+      createdAt: v.number(),
+    }),
+  ),
+  handler: async (ctx, args) => {
+    const thread = await loadByIdInTenant(ctx, "channelThreads", args.threadId);
+    const limit = Math.min(Math.max(args.limit ?? 50, 1), 100);
+    const rows = (await ctx.db
+      .query("clinicAuditEvents")
+      .withIndex("by_target", (q) =>
+        q
+          .eq("tenantId", ctx.tenantId)
+          .eq("targetType", "channel_thread")
+          .eq("targetId", thread._id),
+      )
+      .order("desc")
+      .take(limit)) as Doc<"clinicAuditEvents">[];
+    const names = new Map<string, string | undefined>();
+    const result = [];
+    for (const row of rows) {
+      if (!names.has(row.actorMemberId)) {
+        names.set(row.actorMemberId, await memberLabel(ctx, row.actorMemberId));
+      }
+      result.push({
+        _id: row._id,
+        action: row.action,
+        actorName: names.get(row.actorMemberId),
+        actorKind: row.actorKind,
+        payload: row.payload,
+        createdAt: row.createdAt,
+      });
+    }
+    return result;
   },
 });
 
@@ -666,6 +975,7 @@ export const addInternalNote = tenantMutation({
   },
   returns: v.id("threadInternalNotes"),
   handler: async (ctx, args) => {
+    requireCapability(ctx.role, "messages.send");
     const thread = await loadByIdInTenant(
       ctx as Parameters<typeof loadByIdInTenant>[0],
       "channelThreads",
@@ -711,6 +1021,7 @@ export const createReminder = tenantMutation({
   },
   returns: v.id("threadReminders"),
   handler: async (ctx, args) => {
+    requireCapability(ctx.role, "messages.send");
     const thread = await loadByIdInTenant(
       ctx as Parameters<typeof loadByIdInTenant>[0],
       "channelThreads",
@@ -762,6 +1073,26 @@ export const _markReminderDue = internalMutation({
   },
 });
 
+/**
+ * Safety net for reminders whose scheduled `_markReminderDue` was lost (e.g.
+ * a deploy that dropped a scheduled function). Global index, tiny pages.
+ */
+export const sweepOverdueReminders = internalMutation({
+  args: { limit: v.optional(v.number()) },
+  returns: v.object({ marked: v.number() }),
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    const rows = (await ctx.db
+      .query("threadReminders")
+      .withIndex("by_status_due", (q) => q.eq("status", "scheduled").lt("dueAt", now))
+      .take(Math.min(Math.max(args.limit ?? 200, 1), 500))) as Doc<"threadReminders">[];
+    for (const reminder of rows) {
+      await ctx.db.patch(reminder._id, { status: "due", updatedAt: now });
+    }
+    return { marked: rows.length };
+  },
+});
+
 export const setReminderStatus = tenantMutation({
   args: {
     reminderId: v.id("threadReminders"),
@@ -769,6 +1100,7 @@ export const setReminderStatus = tenantMutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
+    requireCapability(ctx.role, "messages.send");
     const reminder = await loadByIdInTenant(
       ctx as Parameters<typeof loadByIdInTenant>[0],
       "threadReminders",
@@ -786,7 +1118,10 @@ export const setReminderStatus = tenantMutation({
 export const generateAttachmentUploadUrl = tenantMutation({
   args: {},
   returns: v.string(),
-  handler: async (ctx) => await ctx.storage.generateUploadUrl(),
+  handler: async (ctx) => {
+    requireCapability(ctx.role, "messages.send");
+    return await ctx.storage.generateUploadUrl();
+  },
 });
 
 export const registerAttachment = tenantMutation({
@@ -803,6 +1138,7 @@ export const registerAttachment = tenantMutation({
     url: v.string(),
   }),
   handler: async (ctx, args) => {
+    requireCapability(ctx.role, "messages.send");
     const thread = await loadByIdInTenant(
       ctx as Parameters<typeof loadByIdInTenant>[0],
       "channelThreads",
@@ -853,6 +1189,7 @@ export const settleAttachment = tenantMutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
+    requireCapability(ctx.role, "messages.send");
     const attachment = await loadByIdInTenant(
       ctx as Parameters<typeof loadByIdInTenant>[0],
       "channelAttachments",

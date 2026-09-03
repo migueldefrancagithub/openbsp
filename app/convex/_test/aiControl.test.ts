@@ -1,267 +1,114 @@
 import { convexTest } from "convex-test";
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, internal } from "../_generated/api";
-import type { Id } from "../_generated/dataModel";
+import type { Doc } from "../_generated/dataModel";
 import schema from "../schema";
 
-beforeEach(() => {
-  vi.useFakeTimers();
+const previous = { key: process.env.WABA_TOKEN_ENCRYPTION_KEY_V1, mock: process.env.AI_MOCK_PROVIDER_ENABLED };
+process.env.WABA_TOKEN_ENCRYPTION_KEY_V1 = "e".repeat(64);
+process.env.AI_MOCK_PROVIDER_ENABLED = "1";
+beforeEach(() => vi.useFakeTimers());
+afterEach(() => vi.useRealTimers());
+afterAll(() => {
+  if (previous.key === undefined) delete process.env.WABA_TOKEN_ENCRYPTION_KEY_V1; else process.env.WABA_TOKEN_ENCRYPTION_KEY_V1 = previous.key;
+  if (previous.mock === undefined) delete process.env.AI_MOCK_PROVIDER_ENABLED; else process.env.AI_MOCK_PROVIDER_ENABLED = previous.mock;
 });
 
-afterEach(() => {
-  vi.useRealTimers();
-});
-
-async function seedAiControl(t: ReturnType<typeof convexTest>) {
-  return await t.run(async (ctx) => {
-    const userId = await ctx.db.insert("users", { name: "AI Operator" });
-    const tenantId = await ctx.db.insert("tenants", {
-      name: "OpenBSP Clinic",
-      vertical: "clinic",
-      plan: "growth",
-      settings: {
-        defaultLocale: "pt-PT",
-        timezone: "Africa/Maputo",
-        retentionDays: 730,
-      },
-      createdAt: Date.now(),
-    });
-    const memberId = await ctx.db.insert("members", {
-      tenantId,
-      userId,
-      role: "agent",
-      status: "active",
-      createdAt: Date.now(),
-    });
-    await ctx.db.insert("sessions", {
-      userId,
-      activeTenantId: tenantId,
-      updatedAt: Date.now(),
-    });
-    const whatsappAccountId = await ctx.db.insert("whatsappAccounts", {
-      tenantId,
-      metaAppId: "APP",
-      wabaId: "WABA",
-      accessToken: "token",
-      status: "active",
-      tokenStatus: "ok",
-      createdAt: Date.now(),
-    });
-    const phoneNumberId = await ctx.db.insert("phoneNumbers", {
-      tenantId,
-      whatsappAccountId,
-      phoneNumberId: "PHONE_AI",
-      e164: "+258840000000",
-      displayName: "OpenBSP Clinic",
-      createdAt: Date.now(),
-    });
-    const contactId = await ctx.db.insert("contacts", {
-      tenantId,
-      e164: "+258840000001",
-      name: "Ana",
-      tags: [],
-      createdAt: Date.now(),
-    });
-    const eventId = await ctx.db.insert("consentEvents", {
-      tenantId,
-      contactId,
-      purpose: "transactional",
-      channel: "whatsapp",
-      newStatus: "granted",
-      source: "inbound_24h",
-      capturedAt: Date.now(),
-    });
-    await ctx.db.insert("currentConsents", {
-      tenantId,
-      contactId,
-      purpose: "transactional",
-      channel: "whatsapp",
-      status: "granted",
-      effectiveAt: Date.now(),
-      lastEventId: eventId,
-    });
-    return { userId, tenantId, memberId, phoneNumberId, contactId };
-  });
-}
-
-async function makeConversation(
-  t: ReturnType<typeof convexTest>,
-  args: {
-    tenantId: Id<"tenants">;
-    phoneNumberId: Id<"phoneNumbers">;
-    contactId: Id<"contacts">;
-    leadSource?: "ctwa" | "organic" | "campaign_reply" | "unknown";
-    aiState?: "eligible" | "paused" | "disabled";
-    aiPausedReason?: string;
-    opportunityStatus?:
-      | "new"
-      | "contacted"
-      | "replied"
-      | "opportunity"
-      | "booked"
-      | "lost";
-  },
-) {
-  return await t.run(async (ctx) => {
+async function seed(t: ReturnType<typeof convexTest>) {
+  const base = await t.run(async (ctx) => {
+    const tenantId = await ctx.db.insert("tenants", { name: "Clínica", vertical: "clinic", plan: "starter", settings: { defaultLocale: "pt-MZ", timezone: "Africa/Maputo", retentionDays: 730 }, createdAt: Date.now() });
+    const userId = await ctx.db.insert("users", { name: "Owner" });
+    const memberId = await ctx.db.insert("members", { tenantId, userId, role: "owner", status: "active", createdAt: Date.now() });
+    await ctx.db.insert("sessions", { userId, activeTenantId: tenantId, updatedAt: Date.now() });
     const now = Date.now();
-    return await ctx.db.insert("conversations", {
-      tenantId: args.tenantId,
-      phoneNumberId: args.phoneNumberId,
-      contactId: args.contactId,
-      status: "open",
-      lastMessageAt: now,
-      lastIncomingAt: now,
-      serviceWindowExpiresAt: now + 60 * 60 * 1000,
-      unreadCount: 0,
-      tags: [],
-      leadSource: args.leadSource,
-      aiState: args.aiState,
-      aiPausedReason: args.aiPausedReason,
-      opportunityStatus: args.opportunityStatus,
-      lastCtwaClickAt: args.leadSource === "ctwa" ? now : undefined,
-    });
+    const channelId = await ctx.db.insert("channels", { tenantId, publicId: "hub_controlxxxxxxxxxxxxxxxxx".slice(0, 28), kind: "whatsapp", provider: "iasolution_hub", operationalTerritory: "openbsp", externalAccountId: "c-ctl", displayName: "Piloto", status: "active", sendMode: "allowlist", outboundAllowlist: ["258840000099"], connectionState: "allowlist_only", webhookStatus: "verified", createdBy: memberId, createdAt: now, updatedAt: now });
+    const threadId = await ctx.db.insert("channelThreads", { tenantId, channelId, threadKey: "258840000099", lastEventAt: now, lastEventKind: "message.text", unreadCount: 0, leadStatus: "interested", automationMode: "bot", serviceWindowExpiresAt: now + 3_600_000, createdAt: now, updatedAt: now });
+    await ctx.db.insert("channelEvents", { tenantId, channelId, eventKey: "in:1", eventKind: "message.text", direction: "incoming", threadKey: "258840000099", payload: { text: "Olá" }, rawPayload: "{}", rawBodySha256: "s", status: "processed", attempts: 1, receivedAt: now });
+    const knowledgeId = await ctx.db.insert("clinicKnowledgeItems", { tenantId, kind: "faq", title: "Horário", body: "Seg-Sex", status: "active", currentVersion: 1, createdBy: memberId, createdAt: now, updatedAt: now });
+    return { tenantId, userId, memberId, channelId, threadId, knowledgeId };
   });
+  const asOwner = t.withIdentity({ subject: base.userId });
+  await asOwner.mutation(api.aiSettings.update, { provider: "mock" });
+  await asOwner.action(api.aiProviders.probe, {});
+  const agentId = await asOwner.mutation(api.aiAgents.create, { name: "Recepção", objective: "reception", channelId: base.channelId });
+  const detail = await asOwner.query(api.aiAgents.get, { agentId });
+  await asOwner.mutation(api.aiAgents.updateDraft, { agentId, config: { ...detail.agent.config, knowledgeItemIds: [base.knowledgeId] } });
+  const published = await asOwner.mutation(api.aiAgents.publish, { agentId });
+  const runId = await t.run(async (ctx) => {
+    const now = Date.now();
+    const runId = await ctx.db.insert("aiRuns", { tenantId: base.tenantId, agentId, versionId: published.versionId, channelId: base.channelId, threadId: base.threadId, threadKey: "258840000099", status: "active", turnsCount: 2, costUsdMicros: 1200, lastTurnAt: now, createdAt: now, updatedAt: now });
+    await ctx.db.insert("aiTurns", { tenantId: base.tenantId, runId, threadId: base.threadId, businessKey: "event:a", status: "completed", stage: "reply", replyText: "Olá! Posso ajudar?", providerAttempts: [{ provider: "mock", model: "m", stage: "specialist", attempt: 1, ok: true, latencyMs: 300 }], inputTokens: 100, outputTokens: 30, costUsdMicros: 600, toolCallCount: 1, createdAt: now - 1000, updatedAt: now, completedAt: now });
+    await ctx.db.insert("aiTurns", { tenantId: base.tenantId, runId, threadId: base.threadId, businessKey: "event:b", status: "queued", providerAttempts: [], inputTokens: 0, outputTokens: 0, costUsdMicros: 0, toolCallCount: 0, createdAt: now, updatedAt: now });
+    return runId;
+  });
+  return { ...base, asOwner, agentId, runId };
 }
 
-describe("AI control plane", () => {
-  it("does not let an agent make AI eligible on organic conversations", async () => {
+describe("AI control, presence and telemetry", () => {
+  it("pauses on operator pause, refuses resume with an open case, resumes with a handback note", async () => {
     const t = convexTest(schema);
-    const seeded = await seedAiControl(t);
-    const conversationId = await makeConversation(t, {
-      ...seeded,
-      leadSource: "organic",
-      opportunityStatus: "replied",
-    });
-    const asUser = t.withIdentity({ subject: seeded.userId });
+    const s = await seed(t);
+    let ops = await s.asOwner.query(api.inboxOperations.getThreadOps, { threadId: s.threadId });
+    expect(ops.ai).toMatchObject({ agentName: "Recepção", status: "responding", turns: 2 });
 
-    await expect(
-      asUser.mutation(api.conversations.setAiState, {
-        conversationId,
-        state: "eligible",
-        reason: "manual_test",
-      }),
-    ).rejects.toThrow(/AI_NOT_CTWA_LEAD/);
+    await s.asOwner.mutation(api.inboxOperations.updateThread, { threadId: s.threadId, automationMode: "human" });
+    const paused = await t.run(async (ctx) => ({ run: (await ctx.db.get(s.runId)) as Doc<"aiRuns">, turns: await ctx.db.query("aiTurns").collect(), events: (await ctx.db.query("threadSystemEvents").collect()).map((e) => e.kind) }));
+    expect(paused.run.status).toBe("paused");
+    expect(paused.turns.find((x) => x.businessKey === "event:b")?.status).toBe("skipped");
+    expect(paused.events).toContain("ai.paused");
+    ops = await s.asOwner.query(api.inboxOperations.getThreadOps, { threadId: s.threadId });
+    expect(ops.ai?.status).toBe("paused");
+
+    // Open case blocks the handback.
+    const caseId = await s.asOwner.mutation(api.clinic.createHumanCase, { threadId: s.threadId, reason: "Dúvida", urgency: "normal", question: "Precisa de humano" });
+    await expect(s.asOwner.mutation(api.aiRuntime.resumeThread, { threadId: s.threadId })).rejects.toThrow(/HUMAN_CASE_OPEN/);
+    await s.asOwner.mutation(api.clinic.resolveHumanCase, { caseId, decision: "Resolvido", returnToAi: false });
+
+    const resumed = await s.asOwner.mutation(api.aiRuntime.resumeThread, { threadId: s.threadId });
+    expect(resumed.resumed).toBe(true);
+    const after = await t.run(async (ctx) => ({ run: (await ctx.db.get(s.runId)) as Doc<"aiRuns">, thread: (await ctx.db.get(s.threadId)) as Doc<"channelThreads">, notes: await ctx.db.query("threadInternalNotes").collect(), events: (await ctx.db.query("threadSystemEvents").collect()).map((e) => e.kind), audit: (await ctx.db.query("auditLog").collect()).map((r) => r.action) }));
+    expect(after.run.status).toBe("active");
+    expect(after.thread.automationMode).toBe("bot");
+    expect(after.notes[0].body).toContain("IA retomada");
+    expect(after.notes[0].body).toContain("Última resposta da IA");
+    expect(after.events).toContain("ai.resumed");
+    expect(after.audit).toContain("ai.run.resumed");
+    // Resuming via the generic thread update also works (idempotent when active).
+    await s.asOwner.mutation(api.inboxOperations.updateThread, { threadId: s.threadId, automationMode: "human" });
+    await s.asOwner.mutation(api.inboxOperations.updateThread, { threadId: s.threadId, automationMode: "bot" });
+    expect((await t.run(async (ctx) => (await ctx.db.get(s.runId)) as Doc<"aiRuns">)).status).toBe("active");
   });
 
-  it("pauses and audits AI when a CTWA lead becomes an opportunity", async () => {
+  it("lists turns and aggregates stats per agent", async () => {
     const t = convexTest(schema);
-    const seeded = await seedAiControl(t);
-    const conversationId = await makeConversation(t, {
-      ...seeded,
-      leadSource: "ctwa",
-      aiState: "eligible",
-      opportunityStatus: "replied",
-    });
-    const asUser = t.withIdentity({ subject: seeded.userId });
-
-    await asUser.mutation(api.conversations.setOpportunityStatus, {
-      conversationId,
-      status: "opportunity",
-    });
-
-    const { conversation, auditEvents } = await t.run(async (ctx) => ({
-      conversation: await ctx.db.get(conversationId),
-      auditEvents: await ctx.db
-        .query("aiAuditEvents")
-        .withIndex("by_conversation", (q) =>
-          q.eq("conversationId", conversationId),
-        )
-        .collect(),
-    }));
-
-    expect(conversation?.aiState).toBe("paused");
-    expect(conversation?.aiPausedReason).toBe("opportunity");
-    expect(auditEvents).toContainEqual(
-      expect.objectContaining({
-        kind: "paused",
-        reason: "opportunity",
-        createdBy: seeded.memberId,
-      }),
-    );
+    const s = await seed(t);
+    const turns = await s.asOwner.query(api.aiRuntime.listTurns, { agentId: s.agentId, paginationOpts: { cursor: null, numItems: 10 } });
+    expect(turns.page).toHaveLength(2);
+    expect(turns.page.find((x) => x.status === "completed")).toMatchObject({ agentName: "Recepção", replyText: "Olá! Posso ajudar?", toolCallCount: 1, latencyMs: 300 });
+    const stats = await s.asOwner.query(api.aiRuntime.stats, { agentId: s.agentId, days: 7 });
+    expect(stats).toMatchObject({ turns: 2, completed: 1, toolCalls: 1, avgLatencyMs: 300, costUsdMicros: 600, activeRuns: 1, sampled: false });
+    const agentRuns = await t.run(async (ctx) => (await ctx.db.query("aiRuns").collect()).length);
+    expect(agentRuns).toBe(1);
   });
 
-  it("audits human takeover when an agent replies in an AI-eligible CTWA chat", async () => {
+  it("summarises keyword-flow runs", async () => {
     const t = convexTest(schema);
-    const seeded = await seedAiControl(t);
-    const conversationId = await makeConversation(t, {
-      ...seeded,
-      leadSource: "ctwa",
-      aiState: "eligible",
-      opportunityStatus: "new",
+    const s = await seed(t);
+    const chatbotId = await t.run(async (ctx) => {
+      const now = Date.now();
+      const chatbotId = await ctx.db.insert("chatbots", { tenantId: s.tenantId, name: "Boas-vindas", status: "active", channel: "whatsapp", channelId: s.channelId, triggerKind: "keyword", createdBy: s.memberId, createdAt: now, updatedAt: now } as never);
+      const mk = async (status: "completed" | "handed_off" | "stopped", endReason: string | undefined, node: string) => {
+        await ctx.db.insert("channelAutomationRuns", { tenantId: s.tenantId, chatbotId, channelId: s.channelId, threadId: s.threadId, threadKey: "258840000099", status, currentNodeKey: node, vars: {}, repromptCount: 0, startedAt: now - 60_000, endedAt: now, endReason, lastAdvancedAt: now } as never);
+      };
+      await mk("completed", "flow_completed", "end");
+      await mk("handed_off", "handoff", "ask_time");
+      await mk("stopped", "contact_stop_keyword", "ask_time");
+      return chatbotId;
     });
-    const asUser = t.withIdentity({ subject: seeded.userId });
-
-    await asUser.mutation(api.messages.sendText, {
-      conversationId,
-      text: "Ola, sou o Miguel. Vou acompanhar por aqui.",
-      clientNonce: "human-handoff",
-    });
-
-    const { conversation, auditEvents } = await t.run(async (ctx) => ({
-      conversation: await ctx.db.get(conversationId),
-      auditEvents: await ctx.db
-        .query("aiAuditEvents")
-        .withIndex("by_conversation", (q) =>
-          q.eq("conversationId", conversationId),
-        )
-        .collect(),
-    }));
-
-    expect(conversation?.aiState).toBe("paused");
-    expect(conversation?.aiPausedReason).toBe("human_reply");
-    expect(auditEvents).toContainEqual(
-      expect.objectContaining({
-        kind: "paused",
-        reason: "human_reply",
-        createdBy: seeded.memberId,
-      }),
-    );
-  });
-
-  it("new CTWA click resets a paused lead and records the reset", async () => {
-    const t = convexTest(schema);
-    const seeded = await seedAiControl(t);
-    const conversationId = await makeConversation(t, {
-      ...seeded,
-      leadSource: "ctwa",
-      aiState: "paused",
-      aiPausedReason: "human_reply",
-      opportunityStatus: "booked",
-    });
-
-    await t.mutation(internal.webhooks.recordCtwaReferral, {
-      tenantId: seeded.tenantId,
-      conversationId,
-      contactId: seeded.contactId,
-      phoneNumberId: seeded.phoneNumberId,
-      metaMessageId: "wamid.NEW.CTWA",
-      clickedAt: 1700000000 * 1000,
-      referral: {
-        sourceType: "ad",
-        sourceId: "ad-fresh",
-        headline: "Nova campanha",
-      },
-    });
-
-    const { conversation, auditEvents } = await t.run(async (ctx) => ({
-      conversation: await ctx.db.get(conversationId),
-      auditEvents: await ctx.db
-        .query("aiAuditEvents")
-        .withIndex("by_conversation", (q) =>
-          q.eq("conversationId", conversationId),
-        )
-        .collect(),
-    }));
-
-    expect(conversation?.leadSource).toBe("ctwa");
-    expect(conversation?.opportunityStatus).toBe("new");
-    expect(conversation?.aiState).toBe("eligible");
-    expect(conversation?.aiPausedReason).toBeUndefined();
-    expect(auditEvents).toContainEqual(
-      expect.objectContaining({
-        kind: "eligible",
-        reason: "new_ctwa_click",
-      }),
-    );
+    const analytics = await s.asOwner.query(api.channelAutomation.flowAnalytics, { chatbotId });
+    expect(analytics).toMatchObject({ runs: 3, completed: 1, handedOff: 1, stopped: 1, avgDurationMs: 60_000 });
+    expect(analytics.dropOffNodes[0]).toEqual({ nodeKey: "ask_time", count: 2 });
+    expect(analytics.endReasons.map((r) => r.reason)).toContain("handoff");
+    void internal;
   });
 });

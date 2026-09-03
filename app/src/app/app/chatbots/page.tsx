@@ -64,6 +64,7 @@ import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { relativeTime } from "@/lib/relativeTime";
 import { useI18n, type Locale } from "@/lib/i18n";
+import { convexErrorMessage } from "@/lib/convexErrorMessage";
 import { channelStateLabel } from "@/lib/operationalLabels";
 
 type ChatbotStatus = "draft" | "active" | "paused";
@@ -387,7 +388,7 @@ export default function ChatbotsPage() {
       setFolderName("");
       setNotice(tr("Pasta criada.", "Folder created."));
     } catch (err) {
-      setError(readError(err));
+      setError(readError(err, locale));
     } finally {
       setBusy(null);
     }
@@ -419,7 +420,7 @@ export default function ChatbotsPage() {
         ),
       );
     } catch (err) {
-      setError(readError(err));
+      setError(readError(err, locale));
     } finally {
       setBusy(null);
     }
@@ -451,7 +452,7 @@ export default function ChatbotsPage() {
             ),
       );
     } catch (err) {
-      setError(readError(err));
+      setError(readError(err, locale));
     } finally {
       setBusy(null);
     }
@@ -483,7 +484,7 @@ export default function ChatbotsPage() {
       await updateStatus({ chatbotId: selectedBot._id, status: "active" });
       setNotice(tr("Fluxo validado e publicado.", "Flow validated and published."));
     } catch (err) {
-      setError(readError(err));
+      setError(readError(err, locale));
     } finally {
       setBusy(null);
     }
@@ -498,7 +499,7 @@ export default function ChatbotsPage() {
       await applyTemplate({ chatbotId: selectedBot._id, templateSlug: slug });
       setNotice(tr("Template aplicado ao fluxo.", "Template applied to flow."));
     } catch (err) {
-      setError(readError(err));
+      setError(readError(err, locale));
     } finally {
       setBusy(null);
     }
@@ -538,7 +539,7 @@ export default function ChatbotsPage() {
           : tr("Agente atualizado.", "Bot updated."),
       );
     } catch (err) {
-      setError(readError(err));
+      setError(readError(err, locale));
     } finally {
       setBusy(null);
     }
@@ -560,7 +561,7 @@ export default function ChatbotsPage() {
         ),
       );
     } catch (err) {
-      setError(readError(err));
+      setError(readError(err, locale));
     } finally {
       setBusy(null);
     }
@@ -909,7 +910,7 @@ export default function ChatbotsPage() {
                     placeholder={tr("Selecione um canal", "Select a channel")}
                   />
                   <SubmitButton
-                    disabled={busy !== null || botName.trim().length < 2}
+                    disabled={busy !== null || botName.trim().length < 2 || automationChannels.length === 0}
                     loading={busy === "bot"}
                     icon={Plus}
                   >
@@ -3827,9 +3828,8 @@ function BotMeta({
   );
 }
 
-function readError(err: unknown): string {
-  if (err instanceof Error) return err.message;
-  return "Something went wrong.";
+function readError(err: unknown, locale: Locale = "pt"): string {
+  return convexErrorMessage(err, locale, locale === "pt" ? "Algo correu mal." : "Something went wrong.");
 }
 
 function commaList(value: string): string[] | undefined {

@@ -1,6 +1,10 @@
 import { v, ConvexError } from "convex/values";
 import { internalMutation, internalQuery } from "./_generated/server";
-import { tenantMutation, tenantQuery } from "./lib/customFunctions";
+import {
+  requireCapability,
+  tenantMutation,
+  tenantQuery,
+} from "./lib/customFunctions";
 import { recordConsentTransition } from "./lib/consent";
 import type { Id } from "./_generated/dataModel";
 
@@ -313,6 +317,7 @@ export const bulkImport = tenantMutation({
     consentsRecorded: v.number(),
   }),
   handler: async (ctx, args) => {
+    requireCapability(ctx.role, "contacts.import");
     if (args.rows.length === 0) {
       throw new ConvexError({ code: "EMPTY_IMPORT" });
     }

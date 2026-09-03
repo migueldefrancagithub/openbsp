@@ -3,6 +3,7 @@
 import { useQuery } from "convex/react";
 import { useState } from "react";
 import {
+  BellRing,
   AlertTriangle,
   ArrowRight,
   Bot,
@@ -26,6 +27,8 @@ import { api } from "../../../convex/_generated/api";
 import { relativeTime } from "@/lib/relativeTime";
 import { useI18n, type TranslationKey } from "@/lib/i18n";
 import { ClinicOpsPanel } from "@/components/operation/ClinicOpsPanel";
+import { OpsAlertsPanel } from "@/components/operation/OpsAlertsPanel";
+import { TeamPresence } from "@/components/operation/TeamPresence";
 import { SegmentedTabs } from "@/components/app/SegmentedTabs";
 
 type LeadStatus =
@@ -36,10 +39,12 @@ type LeadStatus =
   | "awaiting_human"
   | "booked"
   | "confirmed"
+  | "attended"
+  | "no_show"
   | "lost";
 
 type ActionTone = "good" | "warn" | "action";
-type OperationTab = "today" | "pipeline" | "clinic";
+type OperationTab = "today" | "pipeline" | "clinic" | "alerts";
 
 const LEAD_STATUSES: LeadStatus[] = [
   "new",
@@ -49,6 +54,8 @@ const LEAD_STATUSES: LeadStatus[] = [
   "awaiting_human",
   "booked",
   "confirmed",
+  "attended",
+  "no_show",
   "lost",
 ];
 
@@ -60,6 +67,8 @@ const STATUS_KEYS: Record<LeadStatus, TranslationKey> = {
   awaiting_human: "status.awaiting_human",
   booked: "status.booked",
   confirmed: "status.confirmed",
+  attended: "status.attended",
+  no_show: "status.no_show",
   lost: "status.lost",
 };
 
@@ -108,6 +117,7 @@ const QUICK_CREATORS = [
 export default function AppOverview() {
   const tenant = useQuery(api.tenantsQueries.getActive);
   const dashboard = useQuery(api.operation.dashboard, {});
+  const alertSummary = useQuery(api.ops.summary, {});
   const { locale, t } = useI18n();
   const [operationTab, setOperationTab] = useState<OperationTab>("today");
 
@@ -214,6 +224,8 @@ export default function AppOverview() {
           />
         </section>
 
+        <OpsAlertsPanel compact />
+
         <SegmentedTabs
           items={[
             {
@@ -233,6 +245,12 @@ export default function AppOverview() {
               label: locale === "pt" ? "Clínica" : "Clinic",
               value: locale === "pt" ? "Agenda, IA e seguimento" : "Schedule, AI, and follow-up",
               icon: CalendarDays,
+            },
+            {
+              key: "alerts",
+              label: locale === "pt" ? "Alertas" : "Alerts",
+              value: alertSummary ? `${alertSummary.open} ${locale === "pt" ? "abertos" : "open"}` : "…",
+              icon: BellRing,
             },
           ]}
           selected={operationTab}
@@ -498,6 +516,12 @@ export default function AppOverview() {
         )}
 
         {operationTab === "clinic" && <ClinicOpsPanel />}
+        {operationTab === "alerts" && (
+          <div className="grid gap-5 xl:grid-cols-[1.4fr_1fr]">
+            <OpsAlertsPanel />
+            <TeamPresence />
+          </div>
+        )}
       </div>
     </main>
   );
@@ -607,22 +631,19 @@ function CompactHealth({
   );
 }
 
+function statusColorClass(status: LeadStatus) {
+  if (status === "awaiting_human") return "bg-amber-500";
+  if (status === "lost" || status === "no_show") return "bg-[#e0533d]";
+  if (status === "booked" || status === "confirmed" || status === "attended") return "bg-[#0d6b61]";
+  if (status === "wants_booking") return "bg-[#2b4f8a]";
+  if (status === "asked_price") return "bg-sky-500";
+  return "bg-teal-500";
+}
+
 function statusDotClass(status: LeadStatus) {
-  const base = "h-2.5 w-2.5 rounded-full shrink-0";
-  if (status === "awaiting_human") return `${base} bg-amber-500`;
-  if (status === "lost") return `${base} bg-slate-400`;
-  if (status === "booked" || status === "confirmed") return `${base} bg-emerald-500`;
-  if (status === "wants_booking") return `${base} bg-cyan-500`;
-  if (status === "asked_price") return `${base} bg-indigo-500`;
-  return `${base} bg-teal-500`;
+  return `h-2.5 w-2.5 rounded-full shrink-0 ${statusColorClass(status)}`;
 }
 
 function statusBarClass(status: LeadStatus) {
-  const base = "h-full rounded-full";
-  if (status === "awaiting_human") return `${base} bg-amber-500`;
-  if (status === "lost") return `${base} bg-slate-400`;
-  if (status === "booked" || status === "confirmed") return `${base} bg-emerald-500`;
-  if (status === "wants_booking") return `${base} bg-cyan-500`;
-  if (status === "asked_price") return `${base} bg-indigo-500`;
-  return `${base} bg-teal-500`;
+  return `h-full rounded-full ${statusColorClass(status)}`;
 }

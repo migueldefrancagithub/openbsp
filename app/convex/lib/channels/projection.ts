@@ -1,9 +1,20 @@
+import { autoAssignThread } from "../assignment";
+import { stopThreadFollowUps } from "../followUpControl";
+import { autoConfirmFromReply } from "../clinicAgenda";
+import { bumpCampaignStats, markCampaignReply } from "../campaignAttribution";
+import type { CampaignRecipientStatus as CampaignRowStatus } from "../campaignStats";
 import type { Doc, Id } from "../../_generated/dataModel";
 import type { MutationCtx } from "../../_generated/server";
 import {
   decideOutboxTransition,
   mapProviderStatusToOutboxStatus,
 } from "./outboxStatus";
+import {
+  classifyInbound,
+  normalizeIntentText,
+  type ChannelLeadStatus,
+  type InboundClassification,
+} from "./intents";
 
 /**
  * Channel-neutral reconciliation and thread projection.
@@ -22,19 +33,19 @@ const SERVICE_WINDOW_MS = 24 * 60 * 60 * 1000;
 const PREVIEW_MAX_CHARS = 160;
 const FAILURE_REASON_MAX_CHARS = 500;
 const DEFAULT_NEXT_STEP_MS = 2 * 60 * 60 * 1000;
+/** A reply within this window after a campaign send is attributed to it. */
+const CAMPAIGN_ORIGIN_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+/** A manual intent set by the team is not overwritten by inference for a day. */
+const MANUAL_INTENT_HOLD_MS = 24 * 60 * 60 * 1000;
+const ATTRIBUTABLE_RECIPIENT_STATUSES = new Set([
+  "sent",
+  "delivered",
+  "read",
+  "replied",
+  "clicked",
+]);
 
 type CampaignRecipientStatus = "sent" | "delivered" | "read" | "failed";
-type ChannelLeadStatus =
-  | "new"
-  | "interested"
-  | "asked_price"
-  | "wants_booking"
-  | "awaiting_human"
-  | "booked"
-  | "confirmed"
-  | "attended"
-  | "no_show"
-  | "lost";
 
 const CAMPAIGN_STATUS_RANK: Record<string, number> = {
   pending: 0,
@@ -90,51 +101,16 @@ export function derivePreview(payload: unknown): string | undefined {
   return undefined;
 }
 
-function normalizeIntentText(value: string): string {
-  return value
-    .trim()
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/\s+/g, " ");
-}
-
 function deriveInboundText(payload: unknown): string {
   return normalizeIntentText(derivePreview(payload) ?? "");
 }
 
-function inferLeadStatusFromInbound(
-  payload: unknown,
-): ChannelLeadStatus | undefined {
-  const text = deriveInboundText(payload);
-  if (!text) return "interested";
-  if (
-    /\b(confirmo|confirmado|confirmada|esta confirmado|vou comparecer|estarei la|ok confirmado)\b/.test(
-      text,
-    )
-  ) {
-    return "confirmed";
-  }
-  if (
-    /\b(marcar|agendar|consulta|slot|horario|horario disponivel|disponibilidade|remarcar)\b/.test(
-      text,
-    )
-  ) {
-    return "wants_booking";
-  }
-  if (/\b(preco|precos|valor|quanto custa|custa quanto|plano)\b/.test(text)) {
-    return "asked_price";
-  }
-  if (/\b(humano|atendente|pessoa|equipa|equipe|falar com alguem|assistente)\b/.test(text)) {
-    return "awaiting_human";
-  }
-  if (/\b(cancelar|nao quero|sem interesse|parar|sair|stop)\b/.test(text)) {
-    return "lost";
-  }
-  return "interested";
+/** Lead stage + intent for an inbound payload (zero-cost, deterministic). */
+export function classifyInboundPayload(payload: unknown): InboundClassification {
+  return classifyInbound(deriveInboundText(payload));
 }
 
-function nextStepFor(status: ChannelLeadStatus): string {
+export function nextStepFor(status: ChannelLeadStatus): string {
   if (status === "asked_price") return "Responder com servico, condicoes e proximo horario possivel.";
   if (status === "wants_booking") return "Consultar agenda real antes de propor ou confirmar horario.";
   if (status === "awaiting_human") return "Atribuir a equipa e responder com contexto da conversa.";
@@ -146,7 +122,7 @@ function nextStepFor(status: ChannelLeadStatus): string {
   return "Qualificar pedido e definir proxima acao.";
 }
 
-function shouldAdvanceLeadStatus(
+export function shouldAdvanceLeadStatus(
   current: ChannelLeadStatus | undefined,
   next: ChannelLeadStatus,
 ): boolean {
@@ -272,6 +248,21 @@ async function syncCampaignRecipientFromChannelOutbox(
   if (!advances && hadTimestamp) return;
 
   await ctx.db.patch(recipient._id, patch);
+  if (advances) {
+    const campaign = await ctx.db.get(recipient.campaignId);
+    if (campaign) {
+      await bumpCampaignStats(
+        ctx,
+        campaign,
+        {
+          from: recipient.status as CampaignRowStatus,
+          to: nextStatus as CampaignRowStatus,
+          unknown: recipient.failureCode === "OUTBOX_UNKNOWN" ? -1 : 0,
+        },
+        args.at,
+      );
+    }
+  }
   await ctx.db.insert("campaignEvents", {
     tenantId: recipient.tenantId,
     campaignId: recipient.campaignId,
@@ -291,24 +282,13 @@ async function syncCampaignRecipientFromChannelOutbox(
 
 async function stopScheduledFollowUpsForReply(
   ctx: MutationCtx,
-  args: { thread: Doc<"channelThreads">; now: number },
+  args: { thread: Doc<"channelThreads">; now: number; optOut?: boolean },
 ): Promise<void> {
-  const tasks = await ctx.db
-    .query("followUpTasks")
-    .withIndex("by_thread_status", (q) =>
-      q
-        .eq("tenantId", args.thread.tenantId)
-        .eq("threadId", args.thread._id)
-        .eq("status", "scheduled"),
-    )
-    .take(20);
-  for (const task of tasks) {
-    await ctx.db.patch(task._id, {
-      status: "stopped",
-      stoppedReason: "patient_replied",
-      updatedAt: args.now,
-    });
-  }
+  await stopThreadFollowUps(ctx, {
+    thread: args.thread,
+    reason: args.optOut ? "opt_out" : "patient_replied",
+    now: args.now,
+  });
 }
 
 function mapOutboxStatusToCampaignRecipientStatus(
@@ -340,6 +320,33 @@ function deriveFailureReason(payload: unknown): string | undefined {
 }
 
 /**
+ * Newest campaign send to this thread inside the attribution window. One
+ * indexed read per inbound message; only consulted while the thread has no
+ * origin yet.
+ */
+export async function findOriginCampaign(
+  ctx: MutationCtx,
+  args: { channel: Doc<"channels">; threadKey: string; now: number },
+): Promise<
+  { campaignId: Id<"campaigns">; recipientId: Id<"campaignRecipients">; sentAt: number } | undefined
+> {
+  const recipient = await ctx.db
+    .query("campaignRecipients")
+    .withIndex("by_tenant_channel_thread", (q) =>
+      q
+        .eq("tenantId", args.channel.tenantId)
+        .eq("channelId", args.channel._id)
+        .eq("threadKey", args.threadKey),
+    )
+    .order("desc")
+    .first();
+  if (!recipient?.sentAt) return undefined;
+  if (!ATTRIBUTABLE_RECIPIENT_STATUSES.has(recipient.status)) return undefined;
+  if (args.now - recipient.sentAt > CAMPAIGN_ORIGIN_WINDOW_MS) return undefined;
+  return { campaignId: recipient.campaignId, recipientId: recipient._id, sentAt: recipient.sentAt };
+}
+
+/**
  * Upsert the neutral thread a normalized event belongs to.
  *
  * `lastEventAt` only ever advances: a late-arriving older event must not
@@ -361,10 +368,17 @@ export async function projectThreadFromEvent(
   const eventAt = event.providerTimestamp ?? now;
   const incoming = event.direction === "incoming";
   const preview = derivePreview(event.payload);
-  const inferredLeadStatus =
-    incoming && event.eventKind.startsWith("message.")
-      ? inferLeadStatusFromInbound(event.payload)
-      : undefined;
+  const isInboundMessage = incoming && event.eventKind.startsWith("message.");
+  const classified: InboundClassification = isInboundMessage
+    ? classifyInboundPayload(event.payload)
+    : {};
+  const inferredLeadStatus = classified.leadStatus;
+  const origin = isInboundMessage
+    ? await findOriginCampaign(ctx, { channel, threadKey, now })
+    : undefined;
+  if (origin) {
+    await markCampaignReply(ctx, { recipientId: origin.recipientId, at: eventAt });
+  }
 
   const existing = await ctx.db
     .query("channelThreads")
@@ -374,7 +388,8 @@ export async function projectThreadFromEvent(
     .unique();
 
   if (!existing) {
-    await ctx.db.insert("channelThreads", {
+    const slaMs = isInboundMessage ? await firstResponseSlaMs(ctx, channel.tenantId) : 0;
+    const threadId = await ctx.db.insert("channelThreads", {
       tenantId: channel.tenantId,
       channelId: channel._id,
       threadKey,
@@ -388,15 +403,25 @@ export async function projectThreadFromEvent(
       serviceWindowExpiresAt: incoming
         ? eventAt + SERVICE_WINDOW_MS
         : undefined,
-      leadSource: incoming ? "organic" : undefined,
+      leadSource: origin ? "campaign_reply" : incoming ? "organic" : undefined,
       leadStatus: inferredLeadStatus ?? "new",
+      intent: classified.intent,
+      intentSource: classified.intent ? "inferred" : undefined,
+      intentUpdatedAt: classified.intent ? eventAt : undefined,
+      originCampaignId: origin?.campaignId,
+      originCampaignAt: origin?.sentAt,
       nextStep: inferredLeadStatus
         ? nextStepFor(inferredLeadStatus)
         : "Aguardar primeira resposta do paciente.",
       nextStepDueAt: incoming ? eventAt + DEFAULT_NEXT_STEP_MS : undefined,
+      firstResponseDueAt: isInboundMessage ? eventAt + slaMs : undefined,
       createdAt: now,
       updatedAt: now,
     });
+    if (isInboundMessage) {
+      const created = (await ctx.db.get(threadId)) as Doc<"channelThreads"> | null;
+      if (created) await autoAssignThread(ctx, { thread: created, now });
+    }
     return;
   }
 
@@ -432,12 +457,53 @@ export async function projectThreadFromEvent(
       patch.nextStep = nextStepFor(existing.leadStatus ?? "interested");
       patch.nextStepDueAt = existing.nextStepDueAt ?? eventAt + DEFAULT_NEXT_STEP_MS;
     }
+    const manualHold =
+      existing.intentSource === "manual" &&
+      eventAt - (existing.intentUpdatedAt ?? 0) < MANUAL_INTENT_HOLD_MS;
+    if (classified.intent && !manualHold) {
+      patch.intent = classified.intent;
+      patch.intentSource = "inferred";
+      patch.intentUpdatedAt = eventAt;
+    }
+    if (origin && !existing.originCampaignId) {
+      patch.originCampaignId = origin.campaignId;
+      patch.originCampaignAt = origin.sentAt;
+      if (!existing.leadSource || existing.leadSource === "organic") {
+        patch.leadSource = "campaign_reply";
+      }
+    }
+    if (isInboundMessage && !existing.firstResponseDueAt) {
+      patch.firstResponseDueAt = eventAt + (await firstResponseSlaMs(ctx, channel.tenantId));
+    }
   } else if (eventAt >= (existing.lastOutboundAt ?? 0)) {
     patch.lastOutboundAt = eventAt;
+    if (event.eventKind.startsWith("message.") && existing.firstResponseDueAt) {
+      patch.firstResponseDueAt = undefined;
+      patch.firstRespondedAt = eventAt;
+    }
   }
 
   await ctx.db.patch(existing._id, patch);
   if (incoming) {
     await stopScheduledFollowUpsForReply(ctx, { thread: existing, now });
   }
+
+  if (isInboundMessage && classified.intent === "confirm_attendance") {
+    const current = await ctx.db
+      .query("channelThreads")
+      .withIndex("by_channel_thread", (q) => q.eq("channelId", channel._id).eq("threadKey", threadKey))
+      .unique();
+    if (current) await autoConfirmFromReply(ctx, { thread: current, now });
+  }
+}
+
+const DEFAULT_FIRST_RESPONSE_SLA_MS = 15 * 60_000;
+
+async function firstResponseSlaMs(ctx: MutationCtx, tenantId: Id<"tenants">): Promise<number> {
+  const settings = await ctx.db
+    .query("clinicSettings")
+    .withIndex("by_tenant", (q) => q.eq("tenantId", tenantId))
+    .unique();
+  const minutes = settings?.firstResponseSlaMinutes;
+  return minutes && minutes > 0 ? minutes * 60_000 : DEFAULT_FIRST_RESPONSE_SLA_MS;
 }

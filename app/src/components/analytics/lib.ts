@@ -8,6 +8,7 @@ export const TABS = [
   { id: "delivery" },
   { id: "audience" },
   { id: "activity" },
+  { id: "operation" },
 ] as const;
 
 export type TabId = (typeof TABS)[number]["id"];
@@ -20,6 +21,7 @@ export function tabLabel(tab: TabId, locale: "pt" | "en") {
     delivery: ["Entrega", "Delivery"],
     audience: ["Público", "Audience"],
     activity: ["Atividade", "Activity"],
+    operation: ["Operação", "Operations"],
   };
   return labels[tab][locale === "pt" ? 0 : 1];
 }

@@ -7,9 +7,10 @@ import {
 } from "./_generated/server";
 import { internal } from "./_generated/api";
 import {
-  tenantQuery,
-  tenantMutation,
   loadByIdInTenant,
+  tenantAction,
+  tenantMutation,
+  tenantQuery,
 } from "./lib/customFunctions";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import type { Id } from "./_generated/dataModel";
@@ -88,6 +89,7 @@ export const listMembers = tenantQuery({
       status: v.string(),
       createdAt: v.number(),
       email: v.optional(v.string()),
+      name: v.optional(v.string()),
     }),
   ),
   handler: async (ctx) => {
@@ -105,6 +107,7 @@ export const listMembers = tenantQuery({
         status: m.status,
         createdAt: m.createdAt,
         email: u?.email,
+        name: u?.name,
       });
     }
     return out;
@@ -172,7 +175,7 @@ export const _insertInvite = internalMutation({
 
 // ---------- Public action: create invite ----------
 
-export const invite = action({
+export const invite = tenantAction({
   args: { email: v.string(), role: inviteRoleValidator },
   returns: v.object({
     inviteId: v.id("memberInvites"),
@@ -187,12 +190,7 @@ export const invite = action({
     plaintextToken: string;
     expiresAt: number;
   }> => {
-    const me: {
-      tenantId: Id<"tenants">;
-      memberId: Id<"members">;
-      role: string;
-    } | null = await ctx.runQuery(internal.memberInvites._meTenant, {});
-    if (!me) throw new ConvexError({ code: "UNAUTHENTICATED" });
+    const me = { tenantId: ctx.tenantId, memberId: ctx.memberId, role: ctx.role };
     if (me.role !== "owner" && me.role !== "admin") {
       throw new ConvexError({
         code: "FORBIDDEN",

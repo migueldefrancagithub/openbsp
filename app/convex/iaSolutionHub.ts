@@ -9,6 +9,7 @@ import {
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { tenantMutation, tenantQuery } from "./lib/customFunctions";
+import { outboundJobValidator } from "./lib/outboundJobs";
 import {
   projectThreadFromEvent,
   reconcileOutboxFromStatus,
@@ -2655,5 +2656,120 @@ export const ingestWebhookEvents = internalMutation({
       });
     }
     return { accepted, duplicates, failed };
+  },
+});
+
+/**
+ * Additive (Phase B2). Durable outbound jobs — campaign recipients and
+ * follow-up tasks — reach the provider through this action only. It reuses
+ * `dispatch` (rate limit → `_claimOutbox` gates → settle) exactly like the
+ * chatbot bridge above; the job router decides *what* to send and how the
+ * outcome is recorded. No gate, env or outbound behaviour changes here.
+ */
+export const dispatchOutboundJob = internalAction({
+  args: { job: outboundJobValidator },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const target = (await ctx.runQuery(internal.outboundJobs.loadJob, args)) as {
+      tenantId: Id<"tenants">;
+      memberId: Id<"members">;
+      channelId: Id<"channels">;
+      threadKey: string;
+      clientNonce: string;
+      messageKind: "text" | "template";
+      payload: unknown;
+    } | null;
+    if (!target) {
+      await ctx.runMutation(internal.outboundJobs.settleJob, {
+        job: args.job,
+        status: "failed",
+        failureReason: "Outbound job is no longer authorized.",
+      });
+      return null;
+    }
+    try {
+      const payload = asObject(target.payload);
+      if (!payload) throw new Error("Invalid outbound job payload.");
+      let result: DispatchResult;
+      if (target.messageKind === "text") {
+        const text = nonEmptyString(payload.text);
+        if (!text || text.length > 4_096) throw new Error("Invalid outbound job text.");
+        result = await dispatch(ctx, {
+          caller: {
+            tenantId: target.tenantId,
+            memberId: target.memberId,
+            role: "automation",
+          },
+          channelId: target.channelId,
+          threadKey: target.threadKey,
+          clientNonce: target.clientNonce,
+          messageKind: "text",
+          payload: { text, previewUrl: false },
+          origin: "automation",
+          sender: async (token, recipient) =>
+            await sendTextViaHub({
+              token,
+              to: recipient,
+              text,
+              previewUrl: false,
+            }),
+        });
+      } else {
+        const templateName = nonEmptyString(payload.templateName);
+        const languageCode = nonEmptyString(payload.languageCode);
+        const bodyVariables = Array.isArray(payload.bodyVariables)
+          ? payload.bodyVariables.filter((value): value is string => typeof value === "string")
+          : [];
+        if (!templateName || !languageCode) {
+          throw new Error("Invalid outbound job template.");
+        }
+        result = await dispatch(ctx, {
+          caller: {
+            tenantId: target.tenantId,
+            memberId: target.memberId,
+            role: "automation",
+          },
+          channelId: target.channelId,
+          threadKey: target.threadKey,
+          clientNonce: target.clientNonce,
+          messageKind: "template",
+          payload: { templateName, languageCode, bodyVariables },
+          origin: "automation",
+          sender: async (token, recipient) =>
+            await sendTemplateViaHub({
+              token,
+              to: recipient,
+              templateName,
+              languageCode,
+              bodyVariables,
+            }),
+        });
+      }
+      await ctx.runMutation(internal.outboundJobs.settleJob, {
+        job: args.job,
+        status:
+          result.status === "accepted"
+            ? "accepted"
+            : result.status === "failed"
+              ? "failed"
+              : "unknown",
+        outboxId: result.outboxId,
+        providerMessageId: result.providerMessageId,
+        failureReason:
+          result.status === "accepted" ? undefined : `Outbox status: ${result.status}`,
+      });
+    } catch (error) {
+      await ctx.runMutation(internal.outboundJobs.settleJob, {
+        job: args.job,
+        status: "failed",
+        failureReason:
+          error instanceof ConvexError
+            ? JSON.stringify(error.data)
+            : error instanceof Error
+              ? error.message
+              : "Outbound job dispatch failed.",
+      });
+    }
+    return null;
   },
 });

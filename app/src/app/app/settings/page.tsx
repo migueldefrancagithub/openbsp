@@ -1,8 +1,10 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
 import {
+  Webhook,
+  Stethoscope,
   AlertTriangle,
   Ban,
   Bot,
@@ -30,6 +32,11 @@ import { MembersSection } from "@/components/settings/MembersSection";
 import { TeamsSection } from "@/components/settings/TeamsSection";
 import { ComplianceSection } from "@/components/settings/ComplianceSection";
 import { IaSolutionHubSection } from "@/components/settings/IaSolutionHubSection";
+import { CustomFieldsSettingsSection } from "@/components/settings/CustomFieldsSettingsSection";
+import { ClinicSettingsSection } from "@/components/settings/ClinicSettingsSection";
+import { AiSettingsSection } from "@/components/settings/AiSettingsSection";
+import { IntegrationsSection } from "@/components/settings/IntegrationsSection";
+import { AssignmentRulesSection } from "@/components/settings/AssignmentRulesSection";
 import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { useI18n, type Locale } from "@/lib/i18n";
@@ -159,6 +166,14 @@ export default function SettingsPage() {
   const [dndOnCode, setDndOnCode] = useState("");
   const [dndOffCode, setDndOffCode] = useState("");
   const [settingsTab, setSettingsTab] = useState("meta");
+  // Deep links (e.g. the inbox pilot banner) open a specific tab. Read the
+  // query string after mount so this client page needs no Suspense boundary.
+  useEffect(() => {
+    const requested = new URLSearchParams(window.location.search).get("tab");
+    if (requested && ["meta", "whatsapp", "automation", "team", "workspace"].includes(requested)) {
+      setSettingsTab(requested);
+    }
+  }, []);
   if (!tenant) return null;
 
   const hasConnection = (wabaAccounts?.length ?? 0) > 0;
@@ -167,6 +182,9 @@ export default function SettingsPage() {
     { key: "whatsapp", label: "WhatsApp", value: hasConnection ? tr("Ligado", "Connected") : tr("Configurar", "Setup"), icon: Smartphone },
     { key: "automation", label: tr("Automação", "Automation"), value: tr("Regras", "Rules"), icon: Bot },
     { key: "team", label: tr("Equipa", "Team"), value: tr("Membros/API", "Members/API"), icon: Users },
+    { key: "clinic", label: tr("Clínica", "Clinic"), value: tr("Agenda/SLAs", "Calendar/SLAs"), icon: Stethoscope },
+    { key: "ai", label: tr("IA", "AI"), value: tr("Provedor/chaves", "Provider/keys"), icon: Bot },
+    { key: "integrations", label: tr("Integrações", "Integrations"), value: "Webhooks/API", icon: Webhook },
     { key: "workspace", label: tr("Espaço", "Workspace"), value: roleLabel(tenant.role, locale), icon: Building2 },
   ];
 
@@ -355,6 +373,10 @@ export default function SettingsPage() {
         />
 
         {/* Workspace card */}
+        {settingsTab === "clinic" && <ClinicSettingsSection />}
+        {settingsTab === "ai" && <AiSettingsSection />}
+        {settingsTab === "integrations" && <IntegrationsSection />}
+        {settingsTab === "workspace" && <CustomFieldsSettingsSection />}
         {settingsTab === "workspace" && (
         <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
           <div className="px-6 py-4 border-b border-slate-100">
@@ -870,6 +892,8 @@ export default function SettingsPage() {
             <MembersSection />
 
             <TeamsSection />
+
+            <AssignmentRulesSection />
 
             <ApiKeysSection />
           </div>

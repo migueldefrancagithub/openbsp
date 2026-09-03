@@ -2,9 +2,8 @@ import { ConvexError, v } from "convex/values";
 import type { Doc } from "./_generated/dataModel";
 import type { QueryCtx } from "./_generated/server";
 import { tenantMutation, tenantQuery } from "./lib/customFunctions";
+import { threadHasMessageEvent } from "./lib/channels/threadVisibility";
 
-const MESSAGE_EVENT_KIND_START = "message.";
-const MESSAGE_EVENT_KIND_END = "message/";
 // Bounded scan: skip legacy status-only projections without unbounded reads.
 const THREAD_LIST_PAGE_SIZE = 100;
 const THREAD_LIST_MAX_PAGES = 10;
@@ -14,26 +13,6 @@ const sendModeValidator = v.union(
   v.literal("allowlist"),
   v.literal("live"),
 );
-
-async function threadHasMessageEvent(
-  ctx: QueryCtx,
-  thread: Doc<"channelThreads">,
-): Promise<boolean> {
-  if (thread.lastEventKind.startsWith(MESSAGE_EVENT_KIND_START)) {
-    return true;
-  }
-  const messageEvent = await ctx.db
-    .query("channelEvents")
-    .withIndex("by_channel_thread_kind", (q) =>
-      q
-        .eq("channelId", thread.channelId)
-        .eq("threadKey", thread.threadKey)
-        .gte("eventKind", MESSAGE_EVENT_KIND_START)
-        .lt("eventKind", MESSAGE_EVENT_KIND_END),
-    )
-    .first();
-  return messageEvent !== null;
-}
 
 export const list = tenantQuery({
   args: {},
@@ -375,6 +354,14 @@ export const getThread = tenantQuery({
       dnd: v.optional(v.boolean()),
       automationMode: v.optional(v.string()),
       automationChangeReason: v.optional(v.string()),
+      pilotBlockedAt: v.optional(v.number()),
+      intent: v.optional(v.string()),
+      intentSource: v.optional(v.string()),
+      originCampaignId: v.optional(v.id("campaigns")),
+      originCampaignName: v.optional(v.string()),
+      customFields: v.optional(
+        v.record(v.string(), v.union(v.string(), v.number(), v.boolean())),
+      ),
       channelSendMode: v.string(),
       channelProvider: v.string(),
       channelDisplayName: v.string(),
@@ -400,6 +387,9 @@ export const getThread = tenantQuery({
     if (!(await threadHasMessageEvent(ctx, thread))) return null;
     const identity = thread.identityId
       ? await ctx.db.get(thread.identityId)
+      : null;
+    const originCampaign = thread.originCampaignId
+      ? await ctx.db.get(thread.originCampaignId)
       : null;
     // The allowlist itself stays server-side; the UI only needs the verdict.
     const recipient = identity?.phone ?? thread.threadKey;
@@ -429,6 +419,12 @@ export const getThread = tenantQuery({
       dnd: thread.dnd,
       automationMode: thread.automationMode,
       automationChangeReason: thread.automationChangeReason,
+      pilotBlockedAt: thread.pilotBlockedAt,
+      intent: thread.intent,
+      intentSource: thread.intentSource,
+      originCampaignId: thread.originCampaignId,
+      originCampaignName: originCampaign?.name,
+      customFields: thread.customFields,
       channelSendMode: channel.sendMode,
       channelProvider: channel.provider,
       channelDisplayName: channel.displayName,

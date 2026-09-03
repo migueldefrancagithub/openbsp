@@ -19,9 +19,11 @@ import {
 } from "lucide-react";
 import { PageHeader } from "@/components/app/EmptyState";
 import { api } from "../../../../convex/_generated/api";
+import type { Id } from "../../../../convex/_generated/dataModel";
 import { friendlyId } from "@/lib/friendlyId";
 import { relativeTime } from "@/lib/relativeTime";
 import { useI18n, type Locale } from "@/lib/i18n";
+import { convexErrorMessage } from "@/lib/convexErrorMessage";
 
 const STATUS_STYLES: Record<string, string> = {
   draft: "bg-slate-100 text-slate-600 border-slate-200",
@@ -36,6 +38,16 @@ export default function TemplatesPage() {
   const { locale, tr } = useI18n();
   const templates = useQuery(api.templates.list);
   const sync = useAction(api.templates.syncFromMeta);
+  const channels = useQuery(api.channels.list);
+  const hubChannel = useMemo(
+    () =>
+      (channels ?? []).find(
+        (channel) =>
+          channel.provider === "iasolution_hub" &&
+          channel.operationalTerritory === "openbsp",
+      ),
+    [channels],
+  );
   const [syncing, setSyncing] = useState(false);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("all");
@@ -293,6 +305,7 @@ export default function TemplatesPage() {
             </div>
           </>
         )}
+        {hubChannel && <HubTemplatesSection channelId={hubChannel._id} />}
       </div>
     </>
   );
@@ -384,4 +397,95 @@ function templateReadinessIcon(status: string) {
     return <AlertTriangle size={14} className="mt-0.5 shrink-0" />;
   }
   return <XCircle size={14} className="mt-0.5 shrink-0" />;
+}
+
+/**
+ * Templates on the isolated Hub channel are approved on the channel itself and
+ * mirrored into `channelTemplates`. Hub-only workspaces have no Meta-direct
+ * templates, so this is the list the inbox composer actually uses.
+ */
+function HubTemplatesSection({ channelId }: { channelId: Id<"channels"> }) {
+  const { locale, tr } = useI18n();
+  const rows = useQuery(api.channels.listTemplates, { channelId });
+  const syncHub = useAction(api.iaSolutionHub.syncTemplates);
+  const [syncing, setSyncing] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  async function onSyncHub() {
+    setSyncing(true);
+    setNotice(null);
+    try {
+      const result = await syncHub({ channelId });
+      setNotice(
+        locale === "pt"
+          ? `${result.upserted} templates sincronizados do canal.`
+          : `${result.upserted} templates synced from the channel.`,
+      );
+    } catch (error) {
+      setNotice(convexErrorMessage(error, locale));
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  return (
+    <section className="rounded-lg border border-slate-200 bg-white p-4">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-[14px] font-semibold text-[#0a1b33]">
+            {tr("Templates do canal do piloto", "Pilot channel templates")}
+          </h2>
+          <p className="mt-0.5 text-[12px] text-slate-500">
+            {tr(
+              "Aprovados no canal WhatsApp do piloto. São estes que o inbox usa fora da janela de 24h.",
+              "Approved on the pilot WhatsApp channel. These are the ones the inbox uses outside the 24h window.",
+            )}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => void onSyncHub()}
+          disabled={syncing}
+          className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] font-medium text-[#0a1b33] hover:border-slate-300 disabled:opacity-50"
+        >
+          {syncing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} strokeWidth={2} />}
+          {tr("Sincronizar do canal", "Sync from channel")}
+        </button>
+      </div>
+      {notice && <p className="mt-3 text-[12px] text-slate-600">{notice}</p>}
+      {rows === undefined ? (
+        <p className="mt-4 text-[12px] text-slate-400">{tr("A carregar...", "Loading...")}</p>
+      ) : rows.length === 0 ? (
+        <p className="mt-4 text-[12px] text-slate-500">
+          {tr(
+            "Ainda não há templates sincronizados. Aprove templates no Hub e sincronize.",
+            "No templates synced yet. Approve templates on the Hub, then sync.",
+          )}
+        </p>
+      ) : (
+        <ul className="mt-4 divide-y divide-slate-100 rounded-lg border border-slate-100">
+          {rows.map((row) => (
+            <li key={row._id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
+              <div className="min-w-0">
+                <div className="truncate text-[13px] font-semibold text-[#0a1b33]">{row.name}</div>
+                <div className="text-[10px] uppercase tracking-wide text-slate-400">
+                  {row.languageCode}
+                  {row.category ? ` · ${row.category}` : ""}
+                </div>
+              </div>
+              <span
+                className={`rounded border px-1.5 py-0.5 text-[10px] font-semibold ${
+                  ["approved", "active"].includes(row.status.toLowerCase())
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                    : "border-amber-200 bg-amber-50 text-amber-700"
+                }`}
+              >
+                {row.status}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
 }

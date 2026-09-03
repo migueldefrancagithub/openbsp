@@ -225,12 +225,27 @@ export default function NewTemplatePage() {
       <>
         <PageHeader eyebrow="Templates" title={tr("Novo template", "New template")} description="" />
         <div className="max-w-2xl px-4 py-5 sm:px-6">
-          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-            {tr("Ligue uma conta WhatsApp Business em", "Connect a WhatsApp Business Account in")}{" "}
-            <Link href="/app/settings" className="underline font-medium">
-              {tr("Configurações", "Settings")}
-            </Link>{" "}
-            {tr("antes de criar templates.", "before creating templates.")}
+          <div className="space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+            <p className="font-semibold text-amber-900">
+              {tr(
+                "Criar templates aqui exige uma ligação WhatsApp direta (Meta).",
+                "Creating templates here requires a direct WhatsApp (Meta) connection.",
+              )}
+            </p>
+            <p>
+              {tr(
+                "No canal do piloto (Hub), os templates são aprovados no próprio canal e aparecem em",
+                "On the pilot (Hub) channel, templates are approved on the channel itself and show up in",
+              )}{" "}
+              <Link href="/app/templates" className="font-medium underline">
+                Templates
+              </Link>{" "}
+              {tr("depois de sincronizar em", "after syncing in")}{" "}
+              <Link href="/app/settings?tab=whatsapp#hub" className="font-medium underline">
+                {tr("Definições › WhatsApp", "Settings › WhatsApp")}
+              </Link>
+              .
+            </p>
           </div>
         </div>
       </>

@@ -6,19 +6,47 @@
 
 ## Current Position
 
-Milestone: v0.1 Channel-neutral multichannel core
-Phase: 3 of 5 (Channel inbox UI) — Complete
-Plans: 02-01, 02-02, 03-01 complete (all loops closed)
-Status: Ready for operator round trip; next PLAN is the automation runtime
-Last activity: 2026-08-18 21:05 CAT — UNIFY complete for 03-01 (channel inbox UI)
+Milestone: v0.2 Clinic operating system (handoff 2026-09-02)
+Phase: A of 4 (Inbox end-to-end) — Code complete, awaiting review + production deploy
+Previous milestone v0.1 (channel-neutral core, Phases 1–4) is complete; see
+ROADMAP.md. Phases 5–6 of v0.1 (Instagram adapter, Meta direct completion)
+are deferred behind v0.2.
+Status: Plan approved by the owner on 2026-09-02. Executing Phase 0 + Phase A
+(inbox end-to-end, lead consolidation, human handoff, incident fixes); Phases
+B (campaigns/agenda/follow-ups/RBAC/analytics/admin), C (AI agents,
+multi-provider) and D (QA/polish/contraction/production) wait for review.
+Plan file: ~/.claude/plans/handoff-openbsp-fonte-de-structured-cocke.md
+Last activity: 2026-09-02 — Phase 0 + Phase A (A1–A6) committed on claude/openbsp-handoff-production-cb7326; 53 test files / 301 tests, typecheck and build green
 
-Working checkout: /Users/sidneychambal/openbsp
-Branch: feat/neutral-inbox-ui (off work/openbsp-direct-meta-cleanup)
+Working checkout: /Users/sidneychambal/openbsp/.claude/worktrees/hungry-lamarr-9b49ab
+Branch: claude/openbsp-handoff-production-cb7326 (off main @ 00744e6)
 
 Progress:
-- Milestone: [██████░░░░] 60%
-- Phase 2: [██████████] 100%
-- Phase 3: [██████████] 100%
+- Milestone v0.2: [███░░░░░░░] 30%
+- Phase 0: [██████████] 100%
+- Phase A: [█████████░] 90% (code done; prod deploy + smoke pending)
+
+## Phase A delivery (2026-09-02)
+
+Slices A1–A6 on branch `claude/openbsp-handoff-production-cb7326` (one commit
+each). Release protocol: merge → `cd app && npx convex deploy` → run the
+three backfills (`leads:_backfillLeadStatus`, `leads:_backfillOrigin`,
+`clinic:_backfillOpenHumanCases`) → Vercel builds main → run
+`app/scripts/smoke-phase-a.md`. Deferred to Phase B: hash-chained auditLog
+writer (seam `lib/audit.ts` is in place), presence, assignment rules.
+
+## Production facts (verified 2026-09-02)
+
+- Production runs only on the channel-neutral stack via `iasolution_hub`
+  (1 tenant, 1 channel in `allowlist` mode). Legacy Meta tables are empty.
+- Convex prod functions match `main` (function-spec diff = 0). Convex deploy is
+  manual (`npx convex deploy`); Vercel only builds Next (see DEPLOYMENT.md).
+- Incident "sent a message, nothing happened": inbound from a non-allowlisted
+  number → bot dispatch `RECIPIENT_NOT_ALLOWLISTED` → run `outbound_failed` →
+  thread `automationMode: human`; nothing surfaced in the inbox (Phase A1).
+- Incident "Convex error on create": Operação › Clínica panel shows raw
+  `error.message`; root cause not pinned (stale backend at test time, validation
+  error, or local anonymous deployment). Phase 0 + A2.
 
 ## Loop Position
 

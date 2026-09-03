@@ -1,6 +1,10 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 import { authTables } from "@convex-dev/auth/server";
+import {
+  intentSourceValidator,
+  threadIntentValidator,
+} from "./lib/channels/intents";
 
 // ---------- Validators reusable across tables ----------
 
@@ -251,6 +255,7 @@ const followUpRuleStatusValidator = v.union(
 
 const followUpTaskStatusValidator = v.union(
   v.literal("scheduled"),
+  v.literal("claimed"),
   v.literal("sent"),
   v.literal("stopped"),
   v.literal("failed"),
@@ -278,6 +283,39 @@ const campaignRecipientStatusValidator = v.union(
   v.literal("failed"),
   v.literal("skipped"),
 );
+
+const aiProviderValidator = v.union(
+  v.literal("anthropic"),
+  v.literal("openai"),
+  v.literal("google"),
+  v.literal("mock"),
+);
+
+const aiObjectiveValidator = v.union(
+  v.literal("reception"),
+  v.literal("sales"),
+  v.literal("confirmation"),
+  v.literal("support"),
+  v.literal("audit"),
+);
+
+/** Editable agent config; frozen into aiAgentVersions on publish. */
+const aiAgentConfigValidator = v.object({
+  instructions: v.string(),
+  tone: v.union(v.literal("formal"), v.literal("friendly"), v.literal("direct")),
+  knowledgeItemIds: v.array(v.id("clinicKnowledgeItems")),
+  tools: v.array(v.string()),
+  handoff: v.object({
+    keywords: v.array(v.string()),
+    onLowConfidence: v.boolean(),
+    onClinicalQuestion: v.boolean(),
+    message: v.string(),
+  }),
+  fallbackMessage: v.string(),
+  maxRepliesPerThread: v.number(),
+  greeting: v.optional(v.string()),
+  workingHoursOnly: v.optional(v.boolean()),
+});
 
 const chatbotStatusValidator = v.union(
   v.literal("draft"),
@@ -477,6 +515,8 @@ export default defineSchema({
     role: roleValidator,
     healthcareProfessional: v.optional(v.boolean()),
     status: v.union(v.literal("active"), v.literal("suspended")),
+    /** UI language, persisted server-side so it follows the user across devices. */
+    locale: v.optional(v.union(v.literal("pt"), v.literal("en"))),
     createdAt: v.number(),
   })
     .index("by_tenant_user", ["tenantId", "userId"])
@@ -660,6 +700,14 @@ export default defineSchema({
     .index("by_channel_business_key", ["channelId", "businessKey"])
     .index("by_channel_created", ["channelId", "createdAt"])
     .index("by_channel_provider_message", ["channelId", "providerMessageId"])
+    .index("by_channel_thread_status", [
+      "channelId",
+      "threadKey",
+      "status",
+      "createdAt",
+    ])
+    .index("by_channel_status_created", ["channelId", "status", "createdAt"])
+    .index("by_status_unknown_since", ["status", "unknownSince"])
     .index("by_tenant_created", ["tenantId", "createdAt"]),
 
   channelTemplates: defineTable({
@@ -763,6 +811,13 @@ export default defineSchema({
     tags: v.optional(v.array(v.string())),
     leadSource: v.optional(leadSourceValidator),
     leadStatus: v.optional(channelLeadStatusValidator),
+    /** What the patient asked for last (see lib/channels/intents.ts). */
+    intent: v.optional(threadIntentValidator),
+    intentSource: v.optional(intentSourceValidator),
+    intentUpdatedAt: v.optional(v.number()),
+    /** Campaign whose send this thread replied to (attribution window 7 days). */
+    originCampaignId: v.optional(v.id("campaigns")),
+    originCampaignAt: v.optional(v.number()),
     nextStep: v.optional(v.string()),
     nextStepDueAt: v.optional(v.number()),
     responsibleMemberId: v.optional(v.id("members")),
@@ -773,6 +828,19 @@ export default defineSchema({
     closedAt: v.optional(v.number()),
     closedReasonId: v.optional(v.id("threadCloseReasons")),
     dnd: v.optional(v.boolean()),
+    /** Set when an automatic reply was blocked by the pilot allowlist gate. */
+    pilotBlockedAt: v.optional(v.number()),
+    /** First-response SLA: set on an unanswered inbound, cleared on the first reply. */
+    firstResponseDueAt: v.optional(v.number()),
+    firstRespondedAt: v.optional(v.number()),
+    assignedBy: v.optional(v.union(v.literal("manual"), v.literal("rule"))),
+    assignmentRuleId: v.optional(v.id("assignmentRules")),
+    /** Cache of the open/assigned human case, for list rendering. */
+    openHumanCaseId: v.optional(v.id("humanCases")),
+    /** Tenant-defined fields (see customFieldDefinitions); values inline. */
+    customFields: v.optional(
+      v.record(v.string(), v.union(v.string(), v.number(), v.boolean())),
+    ),
     automationMode: v.optional(
       v.union(
         v.literal("idle"),
@@ -790,9 +858,11 @@ export default defineSchema({
     .index("by_channel_last_event", ["channelId", "lastEventAt"])
     .index("by_tenant_last_event", ["tenantId", "lastEventAt"])
     .index("by_tenant_lead_status", ["tenantId", "leadStatus", "lastEventAt"])
+    .index("by_channel_lead_status", ["channelId", "leadStatus", "lastEventAt"])
     .index("by_tenant_inbox_status", ["tenantId", "inboxStatus", "lastEventAt"])
     .index("by_tenant_responsible", ["tenantId", "responsibleMemberId", "lastEventAt"])
-    .index("by_tenant_team", ["tenantId", "assignedTeamId", "lastEventAt"]),
+    .index("by_tenant_team", ["tenantId", "assignedTeamId", "lastEventAt"])
+    .index("by_tenant_first_response_due", ["tenantId", "firstResponseDueAt"]),
 
   threadInternalNotes: defineTable({
     tenantId: v.id("tenants"),
@@ -818,7 +888,8 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_thread", ["threadId", "dueAt"])
-    .index("by_tenant_status_due", ["tenantId", "status", "dueAt"]),
+    .index("by_tenant_status_due", ["tenantId", "status", "dueAt"])
+    .index("by_status_due", ["status", "dueAt"]),
 
   channelAttachments: defineTable({
     tenantId: v.id("tenants"),
@@ -849,6 +920,391 @@ export default defineSchema({
     .index("by_tenant", ["tenantId", "active"])
     .index("by_tenant_name", ["tenantId", "name"]),
 
+  /**
+   * Operator-facing system timeline per thread: automation outcomes, pilot
+   * gate blocks, handoffs and lead changes. Deliberately separate from
+   * channelEvents (provider evidence + projection source: inserting synthetic
+   * rows there would move lastEventAt/serviceWindowExpiresAt) and from
+   * channelAutomationEvents (run-scoped, requires a chatbot).
+   */
+  threadSystemEvents: defineTable({
+    tenantId: v.id("tenants"),
+    channelId: v.id("channels"),
+    threadId: v.id("channelThreads"),
+    threadKey: v.string(),
+    kind: v.string(),
+    severity: v.union(
+      v.literal("info"),
+      v.literal("warning"),
+      v.literal("error"),
+    ),
+    /** ConvexError code or runtime reason when applicable. */
+    code: v.optional(v.string()),
+    actorType: v.union(
+      v.literal("member"),
+      v.literal("automation"),
+      v.literal("system"),
+    ),
+    actorMemberId: v.optional(v.id("members")),
+    chatbotId: v.optional(v.id("chatbots")),
+    runId: v.optional(v.id("channelAutomationRuns")),
+    humanCaseId: v.optional(v.id("humanCases")),
+    /** Normalized, safe fields only — never raw provider payloads. */
+    payload: v.optional(v.any()),
+    /** Idempotency key, e.g. `run:<id>:failed`. */
+    dedupeKey: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_thread", ["threadId", "createdAt"])
+    .index("by_thread_dedupe", ["threadId", "dedupeKey"])
+    .index("by_tenant_kind", ["tenantId", "kind", "createdAt"]),
+
+  /**
+   * One row per tenant per local day (optionally per channel). Written by the
+   * hourly rollup from index-bounded scans; `approximate` marks days whose
+   * scan hit the cap. Reads for reports never touch raw events.
+   */
+  analyticsDailyRollups: defineTable({
+    tenantId: v.id("tenants"),
+    day: v.string(),
+    channelId: v.optional(v.id("channels")),
+    timeZone: v.string(),
+    newThreads: v.number(),
+    inboundMessages: v.number(),
+    outboundHuman: v.number(),
+    outboundBot: v.number(),
+    outboundCampaign: v.number(),
+    outboundFollowUp: v.number(),
+    outboundFailed: v.number(),
+    booked: v.number(),
+    confirmed: v.number(),
+    attended: v.number(),
+    noShow: v.number(),
+    cancelled: v.number(),
+    firstResponseCount: v.number(),
+    firstResponseTotalMs: v.number(),
+    approximate: v.boolean(),
+    computedAt: v.number(),
+  })
+    .index("by_tenant_day", ["tenantId", "day"])
+    .index("by_tenant_channel_day", ["tenantId", "channelId", "day"]),
+
+  // ===== AI agents (Phase C) =====
+  /** Per-tenant AI configuration: provider, models, budget, own keys. */
+  aiSettings: defineTable({
+    tenantId: v.id("tenants"),
+    provider: aiProviderValidator,
+    routerModel: v.string(),
+    specialistModel: v.string(),
+    fallbackProvider: v.optional(aiProviderValidator),
+    fallbackModel: v.optional(v.string()),
+    effort: v.union(v.literal("low"), v.literal("medium"), v.literal("high")),
+    extendedThinking: v.optional(v.boolean()),
+    dailyBudgetUsdCents: v.number(),
+    maxTurnsPerThreadPerDay: v.number(),
+    maxToolCallsPerTurn: v.number(),
+    replyLanguage: v.union(v.literal("pt"), v.literal("en")),
+    /** Tenant-owned keys (encrypted). Absent → platform env key for that provider. */
+    keys: v.array(
+      v.object({
+        provider: aiProviderValidator,
+        ciphertext: v.string(),
+        keyVersion: v.number(),
+        last4: v.string(),
+        encryptedAt: v.number(),
+      }),
+    ),
+    providerStatus: v.array(
+      v.object({
+        provider: aiProviderValidator,
+        model: v.string(),
+        ok: v.boolean(),
+        checkedAt: v.number(),
+        latencyMs: v.optional(v.number()),
+        error: v.optional(v.string()),
+        keySource: v.union(v.literal("tenant"), v.literal("platform"), v.literal("none")),
+      }),
+    ),
+    updatedBy: v.id("members"),
+    updatedAt: v.number(),
+  }).index("by_tenant", ["tenantId"]),
+
+  aiAgents: defineTable({
+    tenantId: v.id("tenants"),
+    name: v.string(),
+    objective: aiObjectiveValidator,
+    channelId: v.optional(v.id("channels")),
+    status: v.union(v.literal("draft"), v.literal("active"), v.literal("paused")),
+    config: aiAgentConfigValidator,
+    currentVersion: v.number(),
+    publishedVersionId: v.optional(v.id("aiAgentVersions")),
+    lastValidation: v.optional(v.any()),
+    lastSandboxAt: v.optional(v.number()),
+    createdBy: v.id("members"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_tenant", ["tenantId", "updatedAt"])
+    .index("by_tenant_channel_status", ["tenantId", "channelId", "status"]),
+
+  /** Immutable snapshot of an agent + its knowledge at publish time. */
+  aiAgentVersions: defineTable({
+    tenantId: v.id("tenants"),
+    agentId: v.id("aiAgents"),
+    version: v.number(),
+    config: aiAgentConfigValidator,
+    knowledgeSnapshot: v.array(
+      v.object({
+        itemId: v.id("clinicKnowledgeItems"),
+        version: v.number(),
+        kind: v.string(),
+        title: v.string(),
+        body: v.string(),
+      }),
+    ),
+    checksum: v.string(),
+    publishedBy: v.id("members"),
+    publishedAt: v.number(),
+  }).index("by_agent_version", ["agentId", "version"]),
+
+  /** One AI run per thread per published agent; paused on human takeover. */
+  aiRuns: defineTable({
+    tenantId: v.id("tenants"),
+    agentId: v.id("aiAgents"),
+    versionId: v.id("aiAgentVersions"),
+    channelId: v.id("channels"),
+    threadId: v.id("channelThreads"),
+    threadKey: v.string(),
+    status: v.union(
+      v.literal("active"),
+      v.literal("paused"),
+      v.literal("handed_off"),
+      v.literal("completed"),
+      v.literal("failed"),
+    ),
+    turnsCount: v.number(),
+    costUsdMicros: v.number(),
+    lastTurnAt: v.optional(v.number()),
+    pausedReason: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_thread_status", ["threadId", "status"])
+    .index("by_tenant_status_last", ["tenantId", "status", "lastTurnAt"])
+    .index("by_agent_created", ["agentId", "createdAt"]),
+
+  /** One inbound → one turn: router → specialist → guards → dispatch. */
+  aiTurns: defineTable({
+    tenantId: v.id("tenants"),
+    runId: v.id("aiRuns"),
+    threadId: v.id("channelThreads"),
+    sourceEventId: v.optional(v.id("channelEvents")),
+    businessKey: v.string(),
+    status: v.union(
+      v.literal("queued"),
+      v.literal("processing"),
+      v.literal("awaiting_send"),
+      v.literal("completed"),
+      v.literal("failed"),
+      v.literal("skipped"),
+    ),
+    stage: v.optional(v.string()),
+    routerDecision: v.optional(v.any()),
+    providerAttempts: v.array(
+      v.object({
+        provider: v.string(),
+        model: v.string(),
+        stage: v.string(),
+        attempt: v.number(),
+        ok: v.boolean(),
+        kind: v.optional(v.string()),
+        status: v.optional(v.number()),
+        latencyMs: v.number(),
+      }),
+    ),
+    inputTokens: v.number(),
+    outputTokens: v.number(),
+    costUsdMicros: v.number(),
+    toolCallCount: v.number(),
+    replyText: v.optional(v.string()),
+    dispatchId: v.optional(v.id("channelAutomationDispatches")),
+    outboxId: v.optional(v.id("channelOutbox")),
+    providerMessageId: v.optional(v.string()),
+    failureCode: v.optional(v.string()),
+    failureReason: v.optional(v.string()),
+    startedAt: v.optional(v.number()),
+    completedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_run", ["runId", "createdAt"])
+    .index("by_run_business_key", ["runId", "businessKey"])
+    .index("by_status_created", ["status", "createdAt"])
+    .index("by_tenant_created", ["tenantId", "createdAt"]),
+
+  /** Every tool call the AI makes, with input/output and its verdict. */
+  aiToolInvocations: defineTable({
+    tenantId: v.id("tenants"),
+    turnId: v.id("aiTurns"),
+    runId: v.id("aiRuns"),
+    threadId: v.id("channelThreads"),
+    name: v.string(),
+    businessKey: v.string(),
+    input: v.any(),
+    output: v.optional(v.any()),
+    status: v.union(v.literal("ok"), v.literal("error"), v.literal("denied"), v.literal("dry_run")),
+    errorCode: v.optional(v.string()),
+    durationMs: v.number(),
+    createdAt: v.number(),
+  })
+    .index("by_turn", ["turnId", "createdAt"])
+    .index("by_tenant_business_key", ["tenantId", "businessKey"]),
+
+  /** Composer help (suggest/translate/rewrite). Never sent by itself. */
+  aiSuggestions: defineTable({
+    tenantId: v.id("tenants"),
+    threadId: v.optional(v.id("channelThreads")),
+    memberId: v.id("members"),
+    kind: v.union(v.literal("suggest_reply"), v.literal("translate"), v.literal("rewrite_tone")),
+    input: v.string(),
+    output: v.string(),
+    provider: v.string(),
+    model: v.string(),
+    costUsdMicros: v.number(),
+    flagged: v.array(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_thread", ["threadId", "createdAt"])
+    .index("by_tenant_created", ["tenantId", "createdAt"]),
+
+  /** Daily spend per provider/model (budget enforcement + reports). */
+  aiCostLedger: defineTable({
+    tenantId: v.id("tenants"),
+    day: v.string(),
+    provider: v.string(),
+    model: v.string(),
+    inputTokens: v.number(),
+    outputTokens: v.number(),
+    costUsdMicros: v.number(),
+    turns: v.number(),
+    updatedAt: v.number(),
+  }).index("by_tenant_day", ["tenantId", "day"]),
+
+  // ===== Integrations (Phase C7) =====
+  /** Customer endpoints that receive signed events (n8n, Sheets bridges, CRMs). */
+  outboundWebhooks: defineTable({
+    tenantId: v.id("tenants"),
+    name: v.string(),
+    url: v.string(),
+    secretCiphertext: v.string(),
+    secretKeyVersion: v.number(),
+    secretLast4: v.string(),
+    events: v.array(v.string()),
+    active: v.boolean(),
+    consecutiveFailures: v.number(),
+    pausedAt: v.optional(v.number()),
+    pausedReason: v.optional(v.string()),
+    lastDeliveredAt: v.optional(v.number()),
+    createdBy: v.id("members"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_tenant_active", ["tenantId", "active"]),
+
+  /** One row per (event, webhook). Retried with backoff; dead after the cap. */
+  webhookDeliveries: defineTable({
+    tenantId: v.id("tenants"),
+    webhookId: v.id("outboundWebhooks"),
+    eventType: v.string(),
+    eventId: v.string(),
+    businessKey: v.string(),
+    payload: v.any(),
+    status: v.union(v.literal("pending"), v.literal("claimed"), v.literal("delivered"), v.literal("failed"), v.literal("dead")),
+    attempts: v.number(),
+    nextAttemptAt: v.number(),
+    lastStatus: v.optional(v.number()),
+    lastError: v.optional(v.string()),
+    deliveredAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_status_next", ["status", "nextAttemptAt"])
+    .index("by_webhook_created", ["webhookId", "createdAt"])
+    .index("by_business_key", ["webhookId", "businessKey"])
+    .index("by_tenant_created", ["tenantId", "createdAt"]),
+
+  /** Heartbeat per member (every 30 s from the app shell). Online < 90 s. */
+  presence: defineTable({
+    tenantId: v.id("tenants"),
+    memberId: v.id("members"),
+    lastSeenAt: v.number(),
+    manualStatus: v.optional(v.union(v.literal("available"), v.literal("away"))),
+    updatedAt: v.number(),
+  })
+    .index("by_tenant_member", ["tenantId", "memberId"])
+    .index("by_tenant_seen", ["tenantId", "lastSeenAt"]),
+
+  /** Automatic owner for new inbound conversations. */
+  assignmentRules: defineTable({
+    tenantId: v.id("tenants"),
+    name: v.string(),
+    channelId: v.optional(v.id("channels")),
+    teamId: v.id("teams"),
+    strategy: v.union(v.literal("round_robin"), v.literal("least_open")),
+    onlyOnline: v.boolean(),
+    leadStatuses: v.optional(v.array(v.string())),
+    active: v.boolean(),
+    order: v.number(),
+    lastAssignedMemberId: v.optional(v.id("members")),
+    assignedCount: v.optional(v.number()),
+    createdBy: v.id("members"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_tenant_active", ["tenantId", "active", "order"]),
+
+  /**
+   * Operational alerts for the team (SLA breaches, unconfirmed sends,
+   * retention candidates). Upserted by sweeps with a businessKey so a
+   * condition never produces duplicate rows.
+   */
+  opsAlerts: defineTable({
+    tenantId: v.id("tenants"),
+    kind: v.string(),
+    businessKey: v.string(),
+    severity: v.union(v.literal("info"), v.literal("warn"), v.literal("critical")),
+    title: v.string(),
+    payload: v.optional(v.any()),
+    href: v.optional(v.string()),
+    status: v.union(v.literal("open"), v.literal("acknowledged")),
+    acknowledgedBy: v.optional(v.id("members")),
+    acknowledgedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_tenant_status_created", ["tenantId", "status", "createdAt"])
+    .index("by_business_key", ["tenantId", "businessKey"]),
+
+  /** Tenant-defined patient fields shown in the inbox panel (max 20 active). */
+  customFieldDefinitions: defineTable({
+    tenantId: v.id("tenants"),
+    key: v.string(),
+    label: v.string(),
+    type: v.union(
+      v.literal("text"),
+      v.literal("number"),
+      v.literal("date"),
+      v.literal("select"),
+      v.literal("boolean"),
+    ),
+    options: v.optional(v.array(v.string())),
+    order: v.number(),
+    active: v.boolean(),
+    createdBy: v.id("members"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_tenant", ["tenantId", "active", "order"])
+    .index("by_tenant_key", ["tenantId", "key"]),
+
   // ===== Clinic operating system =====
   clinicServices: defineTable({
     tenantId: v.id("tenants"),
@@ -865,6 +1321,8 @@ export default defineSchema({
       }),
     ),
     status: clinicServiceStatusValidator,
+    /** Professionals who perform this service (empty = any / not modelled). */
+    professionalIds: v.optional(v.array(v.id("clinicProfessionals"))),
     createdBy: v.id("members"),
     createdAt: v.number(),
     updatedAt: v.number(),
@@ -872,9 +1330,48 @@ export default defineSchema({
     .index("by_tenant", ["tenantId"])
     .index("by_tenant_status", ["tenantId", "status"]),
 
+  /** People whose calendar gets booked (doctor, hygienist, room). */
+  clinicProfessionals: defineTable({
+    tenantId: v.id("tenants"),
+    name: v.string(),
+    specialty: v.optional(v.string()),
+    color: v.optional(v.string()),
+    memberId: v.optional(v.id("members")),
+    availability: v.optional(
+      v.array(v.object({ weekday: v.number(), start: v.string(), end: v.string() })),
+    ),
+    status: v.union(v.literal("active"), v.literal("archived")),
+    order: v.number(),
+    createdBy: v.id("members"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_tenant_status", ["tenantId", "status", "order"]),
+
+  /** One row per tenant: agenda behaviour and message templates. */
+  clinicSettings: defineTable({
+    tenantId: v.id("tenants"),
+    timezone: v.optional(v.string()),
+    slotStepMinutes: v.optional(v.number()),
+    minLeadMinutes: v.optional(v.number()),
+    reminderHoursBefore: v.optional(v.array(v.number())),
+    confirmationTemplateName: v.optional(v.string()),
+    confirmationTemplateLanguage: v.optional(v.string()),
+    reminderTemplateName: v.optional(v.string()),
+    reminderTemplateLanguage: v.optional(v.string()),
+    confirmationText: v.optional(v.string()),
+    reminderText: v.optional(v.string()),
+    fallbackText: v.optional(v.string()),
+    humanSlaMinutes: v.optional(v.number()),
+    firstResponseSlaMinutes: v.optional(v.number()),
+    updatedBy: v.id("members"),
+    updatedAt: v.number(),
+  }).index("by_tenant", ["tenantId"]),
+
   clinicAppointments: defineTable({
     tenantId: v.id("tenants"),
     serviceId: v.id("clinicServices"),
+    professionalId: v.optional(v.id("clinicProfessionals")),
     threadId: v.optional(v.id("channelThreads")),
     patientName: v.optional(v.string()),
     patientHandle: v.optional(v.string()),
@@ -882,12 +1379,38 @@ export default defineSchema({
     endAt: v.number(),
     status: clinicAppointmentStatusValidator,
     confirmationReadAt: v.optional(v.number()),
+    /** Idempotency key: the same intent never books twice. */
+    businessKey: v.optional(v.string()),
+    source: v.optional(
+      v.union(
+        v.literal("operation"),
+        v.literal("inbox"),
+        v.literal("agenda"),
+        v.literal("ai"),
+        v.literal("patient"),
+      ),
+    ),
+    confirmedVia: v.optional(
+      v.union(v.literal("manual"), v.literal("reply"), v.literal("ai")),
+    ),
+    confirmedAt: v.optional(v.number()),
+    cancelledAt: v.optional(v.number()),
+    cancelledBy: v.optional(
+      v.union(v.literal("clinic"), v.literal("patient"), v.literal("system")),
+    ),
+    cancelReason: v.optional(v.string()),
+    rescheduledFromId: v.optional(v.id("clinicAppointments")),
+    rescheduledToId: v.optional(v.id("clinicAppointments")),
+    outcomeAt: v.optional(v.number()),
+    notes: v.optional(v.string()),
     createdBy: v.id("members"),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
     .index("by_tenant_start", ["tenantId", "startAt"])
     .index("by_service_start", ["serviceId", "startAt"])
+    .index("by_professional_start", ["professionalId", "startAt"])
+    .index("by_tenant_business_key", ["tenantId", "businessKey"])
     .index("by_thread", ["tenantId", "threadId", "startAt"]),
 
   clinicKnowledgeItems: defineTable({
@@ -927,6 +1450,13 @@ export default defineSchema({
     slaDueAt: v.number(),
     decision: v.optional(v.string()),
     resolvedAt: v.optional(v.number()),
+    /** Stage the thread was in before awaiting_human, restored on resolve. */
+    previousLeadStatus: v.optional(channelLeadStatusValidator),
+    openedFrom: v.optional(
+      v.union(v.literal("inbox"), v.literal("operation"), v.literal("automation")),
+    ),
+    assignedAt: v.optional(v.number()),
+    returnedToAiAt: v.optional(v.number()),
     createdBy: v.id("members"),
     createdAt: v.number(),
     updatedAt: v.number(),
@@ -952,26 +1482,50 @@ export default defineSchema({
 
   followUpTasks: defineTable({
     tenantId: v.id("tenants"),
-    ruleId: v.id("followUpRules"),
+    /** Absent for appointment notices (confirmation/reminder) — see `kind`. */
+    ruleId: v.optional(v.id("followUpRules")),
     threadId: v.optional(v.id("channelThreads")),
     humanCaseId: v.optional(v.id("humanCases")),
+    appointmentId: v.optional(v.id("clinicAppointments")),
+    kind: v.optional(
+      v.union(
+        v.literal("rule"),
+        v.literal("appointment_confirmation"),
+        v.literal("appointment_reminder"),
+      ),
+    ),
+    /** Resolved message (text) or template reference for the executor. */
+    message: v.optional(v.string()),
+    templateName: v.optional(v.string()),
+    templateLanguage: v.optional(v.string()),
     businessKey: v.string(),
     dueAt: v.number(),
     status: followUpTaskStatusValidator,
     attempts: v.number(),
     lastAttemptAt: v.optional(v.number()),
+    nextAttemptAt: v.optional(v.number()),
     stoppedReason: v.optional(v.string()),
+    failureCode: v.optional(v.string()),
+    failureReason: v.optional(v.string()),
+    outboxId: v.optional(v.id("channelOutbox")),
+    providerMessageId: v.optional(v.string()),
+    sentAt: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
     .index("by_business_key", ["tenantId", "businessKey"])
     .index("by_status_due", ["status", "dueAt"])
     .index("by_thread_status", ["tenantId", "threadId", "status"])
+    .index("by_appointment", ["appointmentId", "status"])
+    .index("by_tenant_due", ["tenantId", "dueAt"])
     .index("by_rule_thread", ["ruleId", "threadId", "status"]),
 
   clinicAuditEvents: defineTable({
     tenantId: v.id("tenants"),
     actorMemberId: v.id("members"),
+    actorKind: v.optional(
+      v.union(v.literal("member"), v.literal("ai"), v.literal("system")),
+    ),
     action: v.string(),
     targetType: v.string(),
     targetId: v.string(),
@@ -1305,13 +1859,53 @@ export default defineSchema({
   campaigns: defineTable({
     tenantId: v.id("tenants"),
     name: v.string(),
-    kind: v.optional(v.union(v.literal("template_broadcast"), v.literal("micro_lab"))),
+    kind: v.optional(
+      v.union(
+        v.literal("template_broadcast"),
+        v.literal("micro_lab"),
+        v.literal("channel_template"),
+        v.literal("channel_text"),
+      ),
+    ),
     businessKey: v.optional(v.string()),
     listId: v.optional(v.id("contactLists")),
     templateId: v.optional(v.id("templates")),
     templateVersion: v.optional(v.number()),
     channelId: v.optional(v.id("channels")),
     contentPreview: v.optional(v.string()),
+    // ---- Channel campaigns (Phase B2) ----
+    channelTemplateId: v.optional(v.id("channelTemplates")),
+    templateName: v.optional(v.string()),
+    templateLanguage: v.optional(v.string()),
+    messageText: v.optional(v.string()),
+    variableBindings: v.optional(
+      v.array(
+        v.object({
+          index: v.number(),
+          source: v.union(
+            v.literal("static"),
+            v.literal("first_name"),
+            v.literal("tracked_link"),
+          ),
+          value: v.optional(v.string()),
+        }),
+      ),
+    ),
+    audience: v.optional(v.any()),
+    audienceStatus: v.optional(
+      v.union(
+        v.literal("pending"),
+        v.literal("materializing"),
+        v.literal("ready"),
+        v.literal("empty"),
+      ),
+    ),
+    audienceCursor: v.optional(v.string()),
+    audienceSummary: v.optional(v.any()),
+    stats: v.optional(v.any()),
+    consentAttestedBy: v.optional(v.id("members")),
+    consentAttestedAt: v.optional(v.number()),
+    lastBatchAt: v.optional(v.number()),
     status: v.optional(campaignStatusValidator),
     createdBy: v.optional(v.id("members")),
     scheduledAt: v.optional(v.number()),
@@ -1354,11 +1948,17 @@ export default defineSchema({
     conversionLabel: v.optional(v.string()),
     conversionValueMinor: v.optional(v.number()),
     conversionCurrency: v.optional(v.string()),
+    // ---- Channel campaigns (Phase B2) ----
+    threadId: v.optional(v.id("channelThreads")),
+    dispatchAttempts: v.optional(v.number()),
+    nextAttemptAt: v.optional(v.number()),
+    trackedLinkToken: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
     .index("by_campaign", ["campaignId"])
     .index("by_campaign_status", ["campaignId", "status"])
+    .index("by_campaign_thread", ["campaignId", "threadKey"])
     .index("by_message", ["messageId"])
     .index("by_contact", ["tenantId", "contactId"])
     .index("by_channel_outbox", ["channelOutboxId"])
@@ -1368,6 +1968,22 @@ export default defineSchema({
       "threadKey",
       "updatedAt",
     ]),
+
+  /** Per-recipient short links: /r/{token} → targetUrl, click attribution. */
+  trackedLinks: defineTable({
+    tenantId: v.id("tenants"),
+    campaignId: v.id("campaigns"),
+    campaignRecipientId: v.optional(v.id("campaignRecipients")),
+    token: v.string(),
+    targetUrl: v.string(),
+    clickCount: v.number(),
+    firstClickedAt: v.optional(v.number()),
+    lastClickedAt: v.optional(v.number()),
+    createdAt: v.number(),
+  })
+    .index("by_token", ["token"])
+    .index("by_campaign", ["campaignId"])
+    .index("by_recipient", ["campaignRecipientId"]),
 
   campaignEvents: defineTable({
     tenantId: v.id("tenants"),
@@ -1530,6 +2146,9 @@ export default defineSchema({
       v.literal("wait_input"),
       v.literal("terminal"),
     ),
+    /** Phase C: replies produced by the AI runtime carry their turn. */
+    origin: v.optional(v.union(v.literal("automation"), v.literal("ai"))),
+    aiTurnId: v.optional(v.id("aiTurns")),
     autoDispatch: v.boolean(),
     nextNodeKey: v.optional(v.string()),
     waitNodeKey: v.optional(v.string()),

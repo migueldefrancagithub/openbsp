@@ -1,14 +1,14 @@
 import { v } from "convex/values";
+import { threadHasMessageEvent } from "./lib/channels/threadVisibility";
 import type { Doc, Id } from "./_generated/dataModel";
 import { tenantQuery } from "./lib/customFunctions";
 
-const MESSAGE_EVENT_KIND_START = "message.";
-const MESSAGE_EVENT_KIND_END = "message/";
 const THREAD_SCAN_LIMIT = 200;
 const CHANNEL_SCAN_LIMIT = 50;
 const CAMPAIGN_SCAN_LIMIT = 50;
 const CAMPAIGN_RECIPIENT_SCAN_LIMIT = 1_000;
 const RECENT_LIMIT = 6;
+const LEAD_COUNT_CAP = 5_000;
 
 const leadStatusValidator = v.union(
   v.literal("new"),
@@ -48,6 +48,7 @@ export const dashboard = tenantQuery({
     leads: v.object({
       total: v.number(),
       sourceThreads: v.number(),
+      capped: v.boolean(),
       statusCounts: v.array(
         v.object({
           status: leadStatusValidator,
@@ -102,7 +103,7 @@ export const dashboard = tenantQuery({
   }),
   handler: async (ctx) => {
     const now = Date.now();
-    const [channels, rawThreads, conversations, campaigns, chatbots, runs] =
+    const [channels, rawThreads, campaigns, chatbots, runs] =
       await Promise.all([
         ctx.db
           .query("channels")
@@ -111,13 +112,6 @@ export const dashboard = tenantQuery({
         ctx.db
           .query("channelThreads")
           .withIndex("by_tenant_last_event", (q) =>
-            q.eq("tenantId", ctx.tenantId),
-          )
-          .order("desc")
-          .take(THREAD_SCAN_LIMIT),
-        ctx.db
-          .query("conversations")
-          .withIndex("by_tenant_lastmsg", (q) =>
             q.eq("tenantId", ctx.tenantId),
           )
           .order("desc")
@@ -145,16 +139,20 @@ export const dashboard = tenantQuery({
       if (await threadHasMessageEvent(ctx, thread)) threads.push(thread);
     }
 
+    // Lead counts come from the lead-status index (capped per status), not
+    // from the 200-thread attention sample, so totals do not plateau.
     const statusCounts = new Map<LeadStatus, number>();
-    for (const status of LEAD_STATUS_ORDER) statusCounts.set(status, 0);
-    for (const thread of threads) {
-      const status = leadStatus(thread);
-      statusCounts.set(status, (statusCounts.get(status) ?? 0) + 1);
+    let leadsCapped = false;
+    for (const status of LEAD_STATUS_ORDER) {
+      const rows = await ctx.db
+        .query("channelThreads")
+        .withIndex("by_tenant_lead_status", (q) => q.eq("tenantId", ctx.tenantId).eq("leadStatus", status))
+        .filter((q) => q.eq(q.field("closedAt"), undefined))
+        .take(LEAD_COUNT_CAP + 1);
+      if (rows.length > LEAD_COUNT_CAP) leadsCapped = true;
+      statusCounts.set(status, Math.min(rows.length, LEAD_COUNT_CAP));
     }
-    for (const conversation of conversations) {
-      const status = mapConversationLeadStatus(conversation.opportunityStatus);
-      statusCounts.set(status, (statusCounts.get(status) ?? 0) + 1);
-    }
+    const leadsTotal = Array.from(statusCounts.values()).reduce((sum, n) => sum + n, 0);
 
     const campaignStats = emptyCampaignStats();
     for (const campaign of campaigns) {
@@ -219,8 +217,9 @@ export const dashboard = tenantQuery({
         activeBots,
       },
       leads: {
-        total: threads.length + conversations.length,
-        sourceThreads: threads.length,
+        total: leadsTotal,
+        sourceThreads: leadsTotal,
+        capped: leadsCapped,
         statusCounts: LEAD_STATUS_ORDER.map((status) => ({
           status,
           count: statusCounts.get(status) ?? 0,
@@ -318,32 +317,6 @@ function leadStatus(thread: Doc<"channelThreads">): LeadStatus {
   return thread.leadStatus ?? (thread.unreadCount > 0 ? "interested" : "new");
 }
 
-function mapConversationLeadStatus(status: string | undefined): LeadStatus {
-  if (status === "booked") return "booked";
-  if (status === "lost") return "lost";
-  if (status === "opportunity") return "wants_booking";
-  if (status === "replied") return "interested";
-  if (status === "contacted") return "asked_price";
-  return "new";
-}
-
-async function threadHasMessageEvent(
-  ctx: { db: any },
-  thread: Doc<"channelThreads">,
-): Promise<boolean> {
-  if (thread.lastEventKind.startsWith(MESSAGE_EVENT_KIND_START)) return true;
-  const messageEvent = await ctx.db
-    .query("channelEvents")
-    .withIndex("by_channel_thread_kind", (q: any) =>
-      q
-        .eq("channelId", thread.channelId)
-        .eq("threadKey", thread.threadKey)
-        .gte("eventKind", MESSAGE_EVENT_KIND_START)
-        .lt("eventKind", MESSAGE_EVENT_KIND_END),
-    )
-    .first();
-  return messageEvent !== null;
-}
 
 function emptyCampaignStats() {
   return {

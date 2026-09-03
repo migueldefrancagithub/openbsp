@@ -18,6 +18,8 @@ import type { ReactNode } from "react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { useI18n } from "@/lib/i18n";
+import { AppointmentScheduler } from "@/components/agenda/AppointmentScheduler";
+import { convexErrorMessage } from "@/lib/convexErrorMessage";
 import { relativeTime } from "@/lib/relativeTime";
 import { SegmentedTabs } from "@/components/app/SegmentedTabs";
 
@@ -48,7 +50,6 @@ export function ClinicOpsPanel() {
   const saveKnowledge = useMutation(api.clinic.saveKnowledgeItem);
   const createFollowUpRule = useMutation(api.clinic.createFollowUpRule);
   const createHumanCase = useMutation(api.clinic.createHumanCase);
-  const createAppointment = useMutation(api.clinic.createAppointment);
   const { locale } = useI18n();
   const isPt = locale === "pt";
   const [notice, setNotice] = useState<Notice>(null);
@@ -84,16 +85,6 @@ export function ClinicOpsPanel() {
       : "Patient needs a team decision before AI continues.",
   );
 
-  const firstServiceId = workspace?.services.find((service) => service.status === "active")
-    ?._id as Id<"clinicServices"> | undefined;
-  const [slotServiceId, setSlotServiceId] = useState<Id<"clinicServices"> | "">("");
-  const selectedSlotServiceId = slotServiceId || firstServiceId;
-  const [slotDate, setSlotDate] = useState(todayInputValue());
-  const [appointmentName, setAppointmentName] = useState("");
-  const slots = useQuery(
-    api.clinic.listAvailableSlots,
-    selectedSlotServiceId ? { serviceId: selectedSlotServiceId, date: slotDate } : "skip",
-  );
 
   const readiness = workspace?.readiness;
   const readyCount = useMemo(() => {
@@ -105,18 +96,44 @@ export function ClinicOpsPanel() {
     ].filter(Boolean).length;
   }, [readiness]);
 
-  async function runAction(key: string, action: () => Promise<unknown>, success: string) {
+  async function runAction(
+    key: string,
+    action: () => Promise<unknown>,
+    success: string,
+    precheck?: () => string | null,
+  ) {
+    // Mirror the server rules before the round trip so the operator sees a
+    // plain sentence instead of a validation error.
+    const problem = precheck?.();
+    if (problem) {
+      setNotice({ tone: "error", text: problem });
+      return;
+    }
     setBusy(key);
     setNotice(null);
     try {
       await action();
       setNotice({ tone: "success", text: success });
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      setNotice({ tone: "error", text: message });
+      setNotice({
+        tone: "error",
+        text: convexErrorMessage(
+          error,
+          locale,
+          isPt ? "Não foi possível concluir a ação." : "Could not complete the action.",
+        ),
+      });
     } finally {
       setBusy(null);
     }
+  }
+
+  function textLengthProblem(value: string, label: string, min: number, max: number) {
+    const length = value.trim().length;
+    if (length >= min && length <= max) return null;
+    return isPt
+      ? `${label}: use entre ${min} e ${max} caracteres.`
+      : `${label}: use between ${min} and ${max} characters.`;
   }
 
   if (workspace === undefined) {
@@ -250,6 +267,13 @@ export function ClinicOpsPanel() {
                     professionalName: serviceProfessional || undefined,
                   }),
                 isPt ? "Serviço criado." : "Service created.",
+                () =>
+                  textLengthProblem(serviceName, isPt ? "Nome do serviço" : "Service name", 2, 80) ??
+                  (!Number.isFinite(serviceDuration) || serviceDuration < 10 || serviceDuration > 480
+                    ? isPt
+                      ? "Duração: entre 10 e 480 minutos."
+                      : "Duration: between 10 and 480 minutes."
+                    : null),
               )
             }
             disabled={busy !== null}
@@ -260,69 +284,13 @@ export function ClinicOpsPanel() {
           </button>
 
           <div className="mt-3 rounded-lg bg-[#f8fafc] p-3">
-            <div className="grid gap-3 sm:grid-cols-[1fr_150px]">
-              <label className="text-xs font-semibold text-slate-500">
-                {isPt ? "Serviço" : "Service"}
-                <select
-                  value={selectedSlotServiceId ?? ""}
-                  onChange={(event) => setSlotServiceId(event.target.value as Id<"clinicServices">)}
-                  className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-[#0a1b33]"
-                >
-                  {workspace.services
-                    .filter((service) => service.status === "active")
-                    .map((service) => (
-                      <option key={service._id} value={service._id}>
-                        {service.name}
-                      </option>
-                    ))}
-                </select>
-              </label>
-              <label className="text-xs font-semibold text-slate-500">
-                {isPt ? "Dia" : "Day"}
-                <input
-                  type="date"
-                  value={slotDate}
-                  onChange={(event) => setSlotDate(event.target.value)}
-                  className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-[#0a1b33]"
-                />
-              </label>
-            </div>
-            <Input
-              label={isPt ? "Paciente para reservar" : "Patient to book"}
-              value={appointmentName}
-              onChange={setAppointmentName}
-              placeholder={isPt ? "Nome opcional" : "Optional name"}
+            <div className="mb-2 text-xs font-semibold text-slate-500">{isPt ? "Marcar consulta" : "Book appointment"}</div>
+            <AppointmentScheduler
+              mode={{ kind: "book", source: "operation" }}
+              onDone={() => {
+                setNotice({ tone: "success", text: isPt ? "Agendamento criado." : "Appointment created." });
+              }}
             />
-            <div className="mt-3 flex flex-wrap gap-2">
-              {(slots ?? []).filter((slot) => slot.available).slice(0, 6).map((slot) => (
-                <button
-                  key={slot.startAt}
-                  type="button"
-                  onClick={() =>
-                    selectedSlotServiceId &&
-                    runAction(
-                      `slot-${slot.startAt}`,
-                      () =>
-                        createAppointment({
-                          serviceId: selectedSlotServiceId,
-                          startAt: slot.startAt,
-                          patientName: appointmentName || undefined,
-                        }),
-                      isPt ? "Agendamento criado." : "Appointment created.",
-                    )
-                  }
-                  disabled={busy !== null}
-                  className="rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-60"
-                >
-                  {slot.label}
-                </button>
-              ))}
-              {selectedSlotServiceId && slots?.filter((slot) => slot.available).length === 0 && (
-                <span className="text-xs text-slate-500">
-                  {isPt ? "Sem horários livres neste dia." : "No free slots on this day."}
-                </span>
-              )}
-            </div>
           </div>
         </Panel>
         )}
@@ -456,6 +424,14 @@ export function ClinicOpsPanel() {
                     message: followMessage,
                   }),
                 isPt ? "Regra de follow-up criada." : "Follow-up rule created.",
+                () =>
+                  textLengthProblem(followName, isPt ? "Nome da regra" : "Rule name", 2, 80) ??
+                  textLengthProblem(followMessage, isPt ? "Mensagem" : "Message", 5, 1000) ??
+                  (!Number.isFinite(followDelay) || followDelay < 5 || followDelay > 60 * 24 * 30
+                    ? isPt
+                      ? "Atraso: entre 5 minutos e 30 dias."
+                      : "Delay: between 5 minutes and 30 days."
+                    : null),
               )
             }
             disabled={busy !== null}
@@ -468,8 +444,13 @@ export function ClinicOpsPanel() {
             empty={isPt ? "Sem follow-ups ainda." : "No follow-ups yet."}
             rows={workspace.followUpTasks.slice(0, 4).map((task) => ({
               key: task._id,
-              title: isPt ? "Próximo disparo" : "Next send",
-              detail: relativeTime(task.dueAt, Date.now(), locale),
+              title:
+                task.kind === "appointment_confirmation"
+                  ? (isPt ? "Pedido de confirmação" : "Confirmation request")
+                  : task.kind === "appointment_reminder"
+                    ? (isPt ? "Lembrete de consulta" : "Appointment reminder")
+                    : (isPt ? "Próximo disparo" : "Next send"),
+              detail: `${relativeTime(task.nextAttemptAt ?? task.dueAt, Date.now(), locale)}${task.attempts > 0 ? ` · ${task.attempts}× ${isPt ? "tentativas" : "attempts"}` : ""}`,
             }))}
           />
         </Panel>
@@ -523,6 +504,9 @@ export function ClinicOpsPanel() {
                     question: caseQuestion,
                   }),
                 isPt ? "Caso humano criado." : "Human case created.",
+                () =>
+                  textLengthProblem(caseReason, isPt ? "Motivo" : "Reason", 2, 80) ??
+                  textLengthProblem(caseQuestion, isPt ? "Pergunta" : "Question", 3, 2000),
               )
             }
             disabled={busy !== null}

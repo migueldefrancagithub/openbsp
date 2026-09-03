@@ -127,6 +127,10 @@ describe("clinic operating system", () => {
   it("offers real slots and blocks overlapping appointments", async () => {
     const t = convexTest(schema);
     const { owner } = await seedTenant(t);
+    // Slots in the past are never offered, so pick the next Tuesday.
+    const nextTuesday = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000);
+    while (nextTuesday.getUTCDay() !== 2) nextTuesday.setUTCDate(nextTuesday.getUTCDate() + 1);
+    const date = nextTuesday.toISOString().slice(0, 10);
 
     const serviceId = await owner.mutation(api.clinic.createService, {
       name: "Consulta",
@@ -135,7 +139,7 @@ describe("clinic operating system", () => {
     });
     const slots = await owner.query(api.clinic.listAvailableSlots, {
       serviceId,
-      date: "2026-09-01",
+      date,
       stepMinutes: 30,
     });
     const firstSlot = slots.find((slot) => slot.available)!;
@@ -146,7 +150,7 @@ describe("clinic operating system", () => {
     });
     const after = await owner.query(api.clinic.listAvailableSlots, {
       serviceId,
-      date: "2026-09-01",
+      date,
       stepMinutes: 30,
     });
 

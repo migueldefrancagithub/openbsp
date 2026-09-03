@@ -1,7 +1,7 @@
 import { convexTest } from "convex-test";
 import { describe, expect, it } from "vitest";
 import { api, internal } from "../_generated/api";
-import type { Id } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 import schema from "../schema";
 import { normalizeWebhook } from "../integrations/leoHub/webhook";
 
@@ -174,5 +174,162 @@ describe("operational inbox", () => {
         starred: true,
       }),
     ).rejects.toThrow();
+  });
+});
+
+async function addMember(
+  t: ReturnType<typeof convexTest>,
+  tenantId: Id<"tenants">,
+  role: "admin" | "agent" | "marketing",
+) {
+  return await t.run(async (ctx) => {
+    const userId = await ctx.db.insert("users", { name: `${role} user` });
+    const memberId = await ctx.db.insert("members", {
+      tenantId,
+      userId,
+      role,
+      status: "active",
+      createdAt: Date.now(),
+    });
+    await ctx.db.insert("sessions", { userId, activeTenantId: tenantId, updatedAt: Date.now() });
+    return { userId, memberId };
+  });
+}
+
+describe("inbox roles, intents and history", () => {
+  it("enforces the capability matrix on thread updates", async () => {
+    const t = convexTest(schema);
+    const owner = await seedTenant(t, "Clinic RBAC");
+    const { channelId } = await seedChannel(t, owner, "rbac");
+    const agent = await addMember(t, owner.tenantId, "agent");
+    const marketing = await addMember(t, owner.tenantId, "marketing");
+    await receiveMessage(t, { channelId, phone: TEST_PHONE, body: "Olá" });
+    const threadId = await t.run(async (ctx) => {
+      const [thread] = await ctx.db.query("channelThreads").collect();
+      return thread._id;
+    });
+    const asAgent = t.withIdentity({ subject: agent.userId });
+    const asMarketing = t.withIdentity({ subject: marketing.userId });
+
+    await asAgent.mutation(inboxApi.updateThread, { threadId, responsibleMemberId: agent.memberId });
+    await asAgent.mutation(inboxApi.updateThread, { threadId, leadStatus: "asked_price", intent: "price_request" });
+    await expect(
+      asAgent.mutation(inboxApi.updateThread, { threadId, responsibleMemberId: owner.memberId }),
+    ).rejects.toThrow(/FORBIDDEN_CAPABILITY/);
+    await expect(
+      asMarketing.mutation(inboxApi.updateThread, { threadId, starred: true }),
+    ).rejects.toThrow(/FORBIDDEN_CAPABILITY/);
+    await expect(
+      asMarketing.mutation(inboxApi.addInternalNote, { threadId, body: "x", mentionedMemberIds: [] }),
+    ).rejects.toThrow(/FORBIDDEN_CAPABILITY/);
+
+    const thread = (await t.run(async (ctx) => await ctx.db.get(threadId)))!;
+    expect(thread).toMatchObject({
+      responsibleMemberId: agent.memberId,
+      leadStatus: "asked_price",
+      intent: "price_request",
+      intentSource: "manual",
+    });
+
+    const mine = await asAgent.query(inboxApi.listThreads, {
+      channelId,
+      filter: "mine",
+      paginationOpts: { cursor: null, numItems: 10 },
+    });
+    expect(mine.page.map((row: any) => row._id)).toEqual([threadId]);
+    const notMine = await t.withIdentity({ subject: owner.userId }).query(inboxApi.listThreads, {
+      channelId,
+      filter: "mine",
+      paginationOpts: { cursor: null, numItems: 10 },
+    });
+    expect(notMine.page).toHaveLength(0);
+  });
+
+  it("records before/after in the history and emits lead system events", async () => {
+    const t = convexTest(schema);
+    const owner = await seedTenant(t, "Clinic History");
+    const { channelId } = await seedChannel(t, owner, "history");
+    await receiveMessage(t, { channelId, phone: TEST_PHONE, body: "Quero marcar" });
+    const threadId = await t.run(async (ctx) => {
+      const [thread] = await ctx.db.query("channelThreads").collect();
+      return thread._id;
+    });
+    const asOwner = t.withIdentity({ subject: owner.userId });
+    await asOwner.mutation(inboxApi.updateThread, {
+      threadId,
+      leadStatus: "booked",
+      nextStepDueAt: Date.now() + 3_600_000,
+    });
+    await asOwner.mutation(inboxApi.updateThread, { threadId, clearNextStepDueAt: true });
+    const history = await asOwner.query(inboxApi.listThreadHistory, { threadId });
+    expect(history.length).toBeGreaterThanOrEqual(2);
+    const first = history[history.length - 1];
+    expect(first.action).toBe("inbox.thread.updated");
+    expect(first.payload.changed.leadStatus).toEqual({ from: "wants_booking", to: "booked" });
+    const thread = (await t.run(async (ctx) => await ctx.db.get(threadId)))!;
+    expect(thread.nextStepDueAt).toBeUndefined();
+    const systemEvents = await t.run(async (ctx) =>
+      await ctx.db.query("threadSystemEvents").withIndex("by_thread", (q) => q.eq("threadId", threadId)).collect(),
+    );
+    expect(systemEvents.map((row) => row.kind)).toContain("lead.status_changed");
+  });
+});
+
+describe("consent from the inbox", () => {
+  it("bridges the thread to a contact and records the consent transition with proof", async () => {
+    const t = convexTest(schema);
+    const owner = await seedTenant(t, "Clinic Consent");
+    const { channelId } = await seedChannel(t, owner, "consent");
+    const agent = await addMember(t, owner.tenantId, "agent");
+    const marketing = await addMember(t, owner.tenantId, "marketing");
+    await receiveMessage(t, { channelId, phone: TEST_PHONE, body: "Sim, podem enviar lembretes" });
+    const threadId = await t.run(async (ctx) => {
+      const [thread] = await ctx.db.query("channelThreads").collect();
+      return thread._id;
+    });
+    const asAgent = t.withIdentity({ subject: agent.userId });
+    await expect(
+      asAgent.mutation(inboxApi.recordConsent, { threadId, purpose: "marketing", status: "granted", proofText: "ok" }),
+    ).rejects.toThrow(/INVALID_CONSENT_PROOF/);
+    const { contactId } = await asAgent.mutation(inboxApi.recordConsent, {
+      threadId,
+      purpose: "marketing",
+      status: "granted",
+      proofText: "Paciente respondeu sim no WhatsApp",
+    });
+    const rows = await t.run(async (ctx) => ({
+      contact: (await ctx.db.get(contactId)) as Doc<"contacts"> | null,
+      current: await ctx.db.query("currentConsents").collect(),
+      events: await ctx.db.query("consentEvents").collect(),
+      conversations: await ctx.db.query("conversations").collect(),
+    }));
+    expect(rows.contact?.e164).toBe(`+${TEST_PHONE}`);
+    expect(rows.current).toHaveLength(1);
+    expect(rows.current[0]).toMatchObject({ purpose: "marketing", status: "granted", contactId });
+    expect(rows.events[0]).toMatchObject({ source: "inbox_manual", proofText: "Paciente respondeu sim no WhatsApp" });
+    // Bridging a contact never mints legacy conversations.
+    expect(rows.conversations).toHaveLength(0);
+
+    const context = await asAgent.query(inboxApi.getPatientContext, { threadId });
+    expect(context.consents).toEqual([expect.objectContaining({ purpose: "marketing", status: "granted" })]);
+
+    await asAgent.mutation(inboxApi.recordConsent, {
+      threadId,
+      purpose: "marketing",
+      status: "revoked",
+      proofText: "Pediu para parar",
+    });
+    const after = await t.run(async (ctx) => await ctx.db.query("currentConsents").collect());
+    expect(after).toHaveLength(1);
+    expect(after[0].status).toBe("revoked");
+
+    await expect(
+      t.withIdentity({ subject: marketing.userId }).mutation(inboxApi.recordConsent, {
+        threadId,
+        purpose: "transactional",
+        status: "granted",
+        proofText: "tentativa sem permissão",
+      }),
+    ).rejects.toThrow(/FORBIDDEN_CAPABILITY/);
   });
 });

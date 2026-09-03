@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
 import {
   CheckCircle2,
@@ -15,21 +15,10 @@ import {
 } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import { useI18n, type Locale } from "@/lib/i18n";
+import { convexErrorMessage } from "@/lib/convexErrorMessage";
 
 function errorMessage(error: unknown, locale: Locale): string {
-  const data =
-    error && typeof error === "object" && "data" in error
-      ? (error as { data?: unknown }).data
-      : null;
-  if (data && typeof data === "object" && "message" in data) {
-    return String((data as { message: unknown }).message);
-  }
-  if (data && typeof data === "object" && "code" in data) {
-    return String((data as { code: unknown }).code);
-  }
-  return error instanceof Error
-    ? error.message
-    : locale === "pt" ? "A operação falhou." : "Operation failed.";
+  return convexErrorMessage(error, locale, locale === "pt" ? "A operação falhou." : "Operation failed.");
 }
 
 function generateSecret(): string {
@@ -71,6 +60,36 @@ export function IaSolutionHubSection() {
   const [allowlist, setAllowlist] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [prefillDigits, setPrefillDigits] = useState<string | null>(null);
+
+  // The inbox pilot banner deep-links here with ?allowlistAdd=<digits>. Prefill
+  // the replacement list with the current allowlist plus the new number; the
+  // operator still saves and re-arms the pilot explicitly (ADR-003 §8-9).
+  useEffect(() => {
+    const digits = new URLSearchParams(window.location.search)
+      .get("allowlistAdd")
+      ?.replace(/\D/g, "");
+    if (digits && digits.length >= 8) setPrefillDigits(digits);
+  }, []);
+  useEffect(() => {
+    if (!prefillDigits || !channel) return;
+    const current = channel.outboundAllowlist ?? [];
+    if (current.includes(prefillDigits)) {
+      setNotice(tr(
+        "Este número já está na lista autorizada do piloto.",
+        "This number is already on the pilot allowlist.",
+      ));
+      setPrefillDigits(null);
+      return;
+    }
+    setAllowlist([...current, prefillDigits].join("\n"));
+    setNotice(tr(
+      "Número adicionado ao rascunho da lista. Guarde a lista e volte a ativar o piloto.",
+      "Number added to the list draft. Save the list, then enable the pilot again.",
+    ));
+    setPrefillDigits(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefillDigits, channel?._id]);
 
   async function handleCreate() {
     setBusy("create");
@@ -177,7 +196,7 @@ export function IaSolutionHubSection() {
   }
 
   return (
-    <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+    <section id="hub" className="scroll-mt-4 overflow-hidden rounded-lg border border-slate-200 bg-white">
       <div className="flex flex-col gap-3 border-b border-slate-100 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex items-center gap-2">

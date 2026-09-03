@@ -22,11 +22,18 @@ import {
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { cn } from "@/lib/cn";
+import { convexErrorMessage } from "@/lib/convexErrorMessage";
 import { relativeTime } from "@/lib/relativeTime";
 import { useI18n, type TranslationKey } from "@/lib/i18n";
 import { roleLabel } from "@/lib/operationalLabels";
+import { CustomFieldsSection } from "@/components/channel-inbox/CustomFieldsSection";
+import { AppointmentScheduler } from "@/components/agenda/AppointmentScheduler";
+import { appointmentStatusLabel } from "@/components/agenda/agendaLabels";
 
 type ThreadContext = {
+  customFields?: Record<string, string | number | boolean>;
+  intent?: string;
+  intentSource?: string;
   _id: Id<"channelThreads">;
   threadKey: string;
   displayName?: string;
@@ -106,9 +113,66 @@ function formatMoment(timestamp: number, locale: "pt" | "en") {
   }).format(timestamp);
 }
 
+function memberDisplay(member: { email?: string; name?: string; role: string }): string {
+  return member.name ?? member.email?.split("@")[0] ?? member.role;
+}
+
+function toLocalInputValue(timestamp: number): string {
+  const date = new Date(timestamp);
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function reminderPresets(t: (key: TranslationKey) => string): Array<[string, number]> {
+  const now = Date.now();
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(9, 0, 0, 0);
+  const monday = new Date();
+  const day = monday.getDay();
+  monday.setDate(monday.getDate() + ((8 - day) % 7 || 7));
+  monday.setHours(9, 0, 0, 0);
+  return [
+    [t("inbox.reminderIn1h"), now + 60 * 60 * 1000],
+    [t("inbox.reminderIn4h"), now + 4 * 60 * 60 * 1000],
+    [t("inbox.reminderTomorrow"), tomorrow.getTime()],
+    [t("inbox.reminderNextMonday"), monday.getTime()],
+  ];
+}
+
+function auditActionLabel(action: string, t: (key: TranslationKey) => string): string {
+  const key = `audit.${action}` as TranslationKey;
+  const label = t(key);
+  return label === key ? action.replace(/[._]/g, " ") : label;
+}
+
+function describeChanges(payload: unknown, t: (key: TranslationKey) => string): string {
+  const changed =
+    payload && typeof payload === "object" && "changed" in payload
+      ? (payload as { changed?: Record<string, { from?: unknown; to?: unknown }> }).changed
+      : undefined;
+  if (!changed) return "";
+  const parts = Object.entries(changed).map(([field, diff]) => {
+    const key = `audit.field.${field}` as TranslationKey;
+    const label = t(key) === key ? field : t(key);
+    const to = diff?.to;
+    const rendered =
+      to === undefined || to === null || to === ""
+        ? "—"
+        : typeof to === "boolean"
+          ? to ? "✓" : "✗"
+          : Array.isArray(to)
+            ? to.join(", ")
+            : typeof to === "number" && to > 1_000_000_000_000
+              ? new Date(to).toLocaleString()
+              : String(to);
+    return `${label} → ${rendered}`;
+  });
+  return parts.length ? ` · ${parts.join(" · ")}` : "";
+}
+
 function errorText(error: unknown, locale: "pt" | "en") {
-  if (error instanceof Error) return error.message;
-  return locale === "pt" ? "Não foi possível guardar." : "Could not save.";
+  return convexErrorMessage(error, locale, locale === "pt" ? "Não foi possível guardar." : "Could not save.");
 }
 
 function Section({
@@ -140,10 +204,12 @@ export function PatientContextPanel({
   thread,
   className,
   onClose,
+  toolRequest,
 }: {
   thread: ThreadContext;
   className?: string;
   onClose?: () => void;
+  toolRequest?: { tool: "note" | "reminder" | "close"; nonce: number } | null;
 }) {
   const { locale, t, tr } = useI18n();
   const context = useQuery(inboxApi.getPatientContext, { threadId: thread._id }) as any;
@@ -159,7 +225,34 @@ export function PatientContextPanel({
   const createCloseReason = useMutation(inboxApi.createCloseReason);
   const [tool, setTool] = useState<Tool>(null);
   const [activeTab, setActiveTab] = useState<PanelTab>("summary");
+  const followUps = useQuery(api.followUps.listForThread, activeTab === "tasks" ? { threadId: thread._id } : "skip");
+  const threadAppointments = useQuery(api.clinic.listThreadAppointments, activeTab === "tasks" ? { threadId: thread._id } : "skip");
+  const confirmAppointment = useMutation(api.clinic.confirmAppointment);
+  const cancelAppointment = useMutation(api.clinic.cancelAppointment);
+  const sendAppointmentNotice = useMutation(api.clinic.sendAppointmentNotice);
+  const [showScheduler, setShowScheduler] = useState(false);
+  const [appointmentError, setAppointmentError] = useState<string | null>(null);
+  async function runAppointmentAction(action: () => Promise<unknown>) {
+    setAppointmentError(null);
+    try {
+      await action();
+    } catch (cause) {
+      setAppointmentError(convexErrorMessage(cause, locale));
+    }
+  }
+  const stopFollowUps = useMutation(api.followUps.stopForThread);
+  const stopFollowUpTask = useMutation(api.followUps.stopTask);
+  const history = useQuery(
+    inboxApi.listThreadHistory,
+    activeTab === "history" ? { threadId: thread._id, limit: 40 } : "skip",
+  );
   const [note, setNote] = useState("");
+  const [mentioned, setMentioned] = useState<Id<"members">[]>([]);
+  const [tagDraft, setTagDraft] = useState("");
+  const [consentDraft, setConsentDraft] = useState<
+    { purpose: "marketing" | "transactional"; status: "granted" | "revoked"; proof: string } | null
+  >(null);
+  const recordConsent = useMutation(inboxApi.recordConsent);
   const [nextStep, setNextStep] = useState(thread.nextStep ?? "");
   const [closeReason, setCloseReason] = useState("");
   const [reminderAt, setReminderAt] = useState(() => {
@@ -171,6 +264,12 @@ export function PatientContextPanel({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => setNextStep(thread.nextStep ?? ""), [thread.nextStep]);
+  useEffect(() => {
+    if (!toolRequest) return;
+    setActiveTab("tasks");
+    setTool(toolRequest.tool);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [toolRequest?.nonce]);
 
   async function run(operation: () => Promise<unknown>) {
     setBusy(true);
@@ -190,8 +289,9 @@ export function PatientContextPanel({
     const body = note.trim();
     if (!body) return;
     await run(async () => {
-      await addInternalNote({ threadId: thread._id, body, mentionedMemberIds: [] });
+      await addInternalNote({ threadId: thread._id, body, mentionedMemberIds: mentioned });
       setNote("");
+      setMentioned([]);
     });
   }
 
@@ -286,6 +386,21 @@ export function PatientContextPanel({
               </select>
             </label>
             <label className="text-[10px] font-semibold text-slate-400">
+              {t("inbox.intent")}
+              <select
+                value={thread.intent ?? ""}
+                onChange={(event) => void updateThread(event.target.value
+                  ? { threadId: thread._id, intent: event.target.value as never }
+                  : { threadId: thread._id, clearIntent: true })}
+                className="mt-1 h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-[11px] font-semibold text-[#0a1b33] outline-none"
+              >
+                <option value="">{t("inbox.noIntent")}</option>
+                {["greeting", "info_request", "price_request", "booking_request", "reschedule", "cancel", "confirm_attendance", "complaint", "support", "human_request", "opt_out", "clinical_question", "out_of_scope", "other"].map((intent) => (
+                  <option key={intent} value={intent}>{t(`intent.${intent}` as TranslationKey)}</option>
+                ))}
+              </select>
+            </label>
+            <label className="text-[10px] font-semibold text-slate-400">
               {t("inbox.owner")}
               <select
                 value={thread.responsibleMemberId ?? ""}
@@ -357,18 +472,60 @@ export function PatientContextPanel({
               IA · {thread.automationMode === "bot" ? tr("Ativa", "On") : tr("Pausada", "Paused")}
             </button>
           </div>
-          {tags.length > 0 ? (
-            <div className="mt-2 flex flex-wrap gap-1">
-              {tags.slice(0, 8).map((tag) => (
-                <span key={tag} className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[9px] font-semibold text-slate-500">{tag}</span>
-              ))}
-            </div>
-          ) : <p className="mt-2 text-[10px] text-slate-400">{t("inbox.noTags")}</p>}
+          <div className="mt-2 flex flex-wrap gap-1" data-tags>
+            {tags.map((tag) => (
+              <span
+                key={tag}
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[9px] font-semibold",
+                  tag.startsWith("grupo:") || tag.startsWith("group:")
+                    ? "border-[#cfe0f5] bg-[#eef4fc] text-[#2b4f8a]"
+                    : "border-slate-200 bg-slate-50 text-slate-500",
+                )}
+              >
+                {tag}
+                <button
+                  type="button"
+                  onClick={() => void updateThread({ threadId: thread._id, tags: tags.filter((item) => item !== tag) })}
+                  className="text-slate-400 hover:text-[#b3261e]"
+                  aria-label={`${t("inbox.cancel")} ${tag}`}
+                >
+                  <X size={9} />
+                </button>
+              </span>
+            ))}
+            {tags.length === 0 && <span className="text-[10px] text-slate-400">{t("inbox.noTags")}</span>}
+          </div>
+          <form
+            className="mt-1.5 flex gap-1"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const next = tagDraft.trim().toLowerCase();
+              if (!next || tags.includes(next)) return;
+              void updateThread({ threadId: thread._id, tags: [...tags, next] });
+              setTagDraft("");
+            }}
+          >
+            <input
+              value={tagDraft}
+              onChange={(event) => setTagDraft(event.target.value)}
+              placeholder={t("tags.placeholder")}
+              maxLength={40}
+              className="h-7 min-w-0 flex-1 rounded-md border border-slate-200 px-2 text-[10px] outline-none focus:border-slate-400"
+            />
+            <button type="submit" className="rounded-md border border-slate-200 px-2 text-[10px] font-semibold text-slate-600" title={t("tags.add")}>
+              +
+            </button>
+          </form>
           {context?.contact?.locale && (
             <div className="mt-2 text-[10px] text-slate-400">
               {tr("Idioma do paciente", "Patient language")}: <span className="font-semibold text-slate-600">{context.contact.locale}</span>
             </div>
           )}
+        </Section>
+
+        <Section title={t("fields.title")} icon={ListTodo}>
+          <CustomFieldsSection threadId={thread._id} values={thread.customFields} />
         </Section>
 
         <Section title={t("inbox.consent")} icon={ShieldCheck}>
@@ -389,6 +546,61 @@ export function PatientContextPanel({
             ))}
             {context?.consents?.length === 0 && <span className="text-[10px] text-slate-400">{t("inbox.noConsents")}</span>}
           </div>
+          <div className="mt-2 grid grid-cols-2 gap-1" data-consent-actions>
+            {(["marketing", "transactional"] as const).map((purpose) => {
+              const current = (context?.consents ?? []).find((item: any) => item.purpose === purpose)?.status;
+              const nextStatus = current === "granted" ? "revoked" : "granted";
+              return (
+                <button
+                  key={purpose}
+                  type="button"
+                  onClick={() => setConsentDraft({ purpose, status: nextStatus, proof: "" })}
+                  className={cn(
+                    "rounded-md border px-2 py-1.5 text-left text-[10px] font-semibold",
+                    nextStatus === "granted" ? "border-emerald-200 text-emerald-700" : "border-rose-200 text-rose-600",
+                  )}
+                >
+                  {nextStatus === "granted" ? t("consent.grant") : t("consent.revoke")} · {t(`consent.${purpose}` as TranslationKey)}
+                </button>
+              );
+            })}
+          </div>
+          {consentDraft && (
+            <form
+              className="mt-2 space-y-1.5 rounded-md bg-slate-50 p-2"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void run(async () => {
+                  await recordConsent({
+                    threadId: thread._id,
+                    purpose: consentDraft.purpose,
+                    status: consentDraft.status,
+                    proofText: consentDraft.proof,
+                  });
+                  setConsentDraft(null);
+                });
+              }}
+            >
+              <label className="block text-[10px] font-semibold text-slate-500">
+                {t("consent.proof")}
+                <input
+                  value={consentDraft.proof}
+                  onChange={(event) => setConsentDraft({ ...consentDraft, proof: event.target.value })}
+                  placeholder={t("consent.proofPlaceholder")}
+                  minLength={5}
+                  maxLength={500}
+                  required
+                  autoFocus
+                  className="mt-1 h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-[10px] outline-none focus:border-slate-400"
+                />
+              </label>
+              <div className="flex justify-end gap-1">
+                <button type="button" onClick={() => setConsentDraft(null)} className="rounded-md px-2 py-1 text-[10px] font-semibold text-slate-500">{t("inbox.cancel")}</button>
+                <button type="submit" disabled={busy || consentDraft.proof.trim().length < 5} className="rounded-md bg-[#0a1b33] px-2 py-1 text-[10px] font-bold text-white disabled:opacity-50">{t("consent.save")}</button>
+              </div>
+            </form>
+          )}
+          {error && !tool && <p className="mt-1 text-[10px] text-[#b3261e]">{error}</p>}
         </Section>
 
         <Section title={t("inbox.actions")} icon={Archive}>
@@ -413,6 +625,18 @@ export function PatientContextPanel({
               {context.notes.slice(0, 4).map((item: any) => (
                 <div key={item._id} className="border-l-2 border-amber-300 pl-2">
                   <p className="text-[11px] leading-4 text-slate-700">{item.body}</p>
+                  {item.mentionedMemberIds?.length > 0 && (
+                    <div className="mt-0.5 flex flex-wrap gap-1">
+                      {item.mentionedMemberIds.map((id: Id<"members">) => {
+                        const member = members?.find((row) => row._id === id);
+                        return (
+                          <span key={id} className="rounded bg-[#eef4fc] px-1 py-0.5 text-[9px] font-semibold text-[#2b4f8a]">
+                            @{member ? memberDisplay(member) : "…"}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
                   <span className="text-[9px] text-slate-400">{item.authorName ?? t("inbox.team")} · {relativeTime(item.createdAt, Date.now(), locale)}</span>
                 </div>
               ))}
@@ -447,17 +671,122 @@ export function PatientContextPanel({
           ) : <p className="text-[10px] text-slate-400">{t("inbox.noReminders")}</p>}
         </Section>
 
-        <Section title={t("inbox.appointments")} icon={CalendarDays}>
-          {context?.appointments?.length ? context.appointments.slice(0, 3).map((item: any) => (
-            <div key={item._id} className="mb-2 flex items-center gap-2 last:mb-0">
-              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-blue-50 text-blue-600"><CalendarDays size={13} /></div>
-              <div className="min-w-0"><p className="truncate text-[11px] font-semibold text-slate-700">{item.serviceName}</p><p className="text-[9px] text-slate-400">{formatMoment(item.startAt, locale)} · {stateLabel(item.status, t)}</p></div>
+        <Section
+          title={tr("Follow-ups automáticos", "Automatic follow-ups")}
+          icon={Clock3}
+          action={
+            followUps && followUps.some((task) => task.status === "scheduled" || task.status === "claimed") ? (
+              <button type="button" onClick={() => void stopFollowUps({ threadId: thread._id })} className="text-[10px] font-bold text-[#b3261e]">
+                {tr("Parar todos", "Stop all")}
+              </button>
+            ) : undefined
+          }
+        >
+          {followUps === undefined ? (
+            <Loader2 size={13} className="animate-spin text-slate-300" />
+          ) : followUps.length === 0 ? (
+            <p className="text-[10px] text-slate-400">{tr("Sem follow-ups nesta conversa.", "No follow-ups on this conversation.")}</p>
+          ) : (
+            <div className="space-y-1.5">
+              {followUps.slice(0, 5).map((task) => {
+                const pending = task.status === "scheduled" || task.status === "claimed";
+                const label =
+                  task.kind === "appointment_confirmation"
+                    ? tr("Pedido de confirmação", "Confirmation request")
+                    : task.kind === "appointment_reminder"
+                      ? tr("Lembrete de consulta", "Appointment reminder")
+                      : task.ruleName ?? tr("Regra de follow-up", "Follow-up rule");
+                const state =
+                  task.status === "scheduled"
+                    ? `${tr("Dispara", "Fires")} ${relativeTime(task.nextAttemptAt ?? task.dueAt, Date.now(), locale)}`
+                    : task.status === "claimed"
+                      ? tr("A enviar…", "Sending…")
+                      : task.status === "sent"
+                        ? `${tr("Enviado", "Sent")} ${relativeTime(task.sentAt ?? task.updatedAt, Date.now(), locale)}`
+                        : task.status === "failed"
+                          ? `${tr("Falhou", "Failed")}${task.failureCode ? ` · ${task.failureCode}` : ""}`
+                          : `${tr("Parado", "Stopped")}${task.stoppedReason ? ` · ${task.stoppedReason}` : ""}`;
+                return (
+                  <div key={task._id} className="flex items-start gap-2">
+                    <span className={cn("mt-1 h-1.5 w-1.5 shrink-0 rounded-full", pending ? "bg-[#2b4f8a]" : task.status === "sent" ? "bg-[#0d6b61]" : task.status === "failed" ? "bg-[#e0533d]" : "bg-slate-300")} />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[11px] text-slate-700">{label}{task.attempts > 1 ? ` · ${task.attempts}×` : ""}</p>
+                      <span className="text-[9px] text-slate-400">{state}</span>
+                    </div>
+                    {pending && (
+                      <button type="button" onClick={() => void stopFollowUpTask({ taskId: task._id })} className="text-[9px] font-semibold text-slate-400 hover:text-[#b3261e]">
+                        {tr("Parar", "Stop")}
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
             </div>
-          )) : <p className="text-[10px] text-slate-400">{t("inbox.noAppointments")}</p>}
+          )}
+        </Section>
+
+        <Section
+          title={t("inbox.appointments")}
+          icon={CalendarDays}
+          action={<button type="button" onClick={() => setShowScheduler(true)} className="text-[10px] font-bold text-[#2b4f8a]">+ {tr("Agendar", "Book")}</button>}
+        >
+          {threadAppointments === undefined ? (
+            <Loader2 size={13} className="animate-spin text-slate-300" />
+          ) : threadAppointments.length === 0 ? (
+            <p className="text-[10px] text-slate-400">{t("inbox.noAppointments")}</p>
+          ) : (
+            <div className="space-y-2">
+              {threadAppointments.slice(0, 3).map((item) => {
+                const active = item.status === "scheduled" || item.status === "confirmed";
+                return (
+                  <div key={item._id} className="flex items-start gap-2">
+                    <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-md", active ? "bg-[#eef3fb] text-[#2b4f8a]" : "bg-slate-100 text-slate-400")}><CalendarDays size={13} /></div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[11px] font-semibold text-slate-700">{item.serviceName}{item.professionalName ? ` · ${item.professionalName}` : ""}</p>
+                      <p className="text-[9px] text-slate-400">{formatMoment(item.startAt, locale)} · {appointmentStatusLabel(item.status, locale)}{item.pendingNotices > 0 ? ` · ${tr("aviso pendente", "notice pending")}` : ""}</p>
+                      {active && (
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {item.status === "scheduled" && (
+                            <button type="button" onClick={() => void runAppointmentAction(() => confirmAppointment({ appointmentId: item._id }))} className="rounded border border-[#0d6b61]/30 px-1.5 py-0.5 text-[9px] font-semibold text-[#0d6b61]">{tr("Confirmar", "Confirm")}</button>
+                          )}
+                          <button type="button" onClick={() => void runAppointmentAction(() => sendAppointmentNotice({ appointmentId: item._id, kind: item.status === "confirmed" ? "appointment_reminder" : "appointment_confirmation" }))} className="rounded border border-slate-200 px-1.5 py-0.5 text-[9px] font-semibold text-slate-600">{item.status === "confirmed" ? tr("Lembrete", "Reminder") : tr("Pedir confirmação", "Ask to confirm")}</button>
+                          <button type="button" onClick={() => { if (window.confirm(tr("Cancelar esta marcação?", "Cancel this appointment?"))) void runAppointmentAction(() => cancelAppointment({ appointmentId: item._id })); }} className="rounded border border-slate-200 px-1.5 py-0.5 text-[9px] font-semibold text-slate-500 hover:text-[#b3261e]">{tr("Cancelar", "Cancel")}</button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+              {appointmentError && <p className="text-[10px] text-[#b3261e]">{appointmentError}</p>}
+            </div>
+          )}
         </Section>
         </>}
 
         {activeTab === "history" && <>
+        <Section title={t("inbox.changes")} icon={History}>
+          {history === undefined ? (
+            <p className="text-[10px] text-slate-400">{t("shell.loading")}</p>
+          ) : history.length === 0 ? (
+            <p className="text-[10px] text-slate-400">{t("inbox.historyEmpty")}</p>
+          ) : (
+            history.map((row) => (
+              <div key={row._id} className="mb-2 text-[10px] last:mb-0">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="min-w-0 truncate font-semibold text-slate-600">
+                    {auditActionLabel(row.action, t)}
+                  </span>
+                  <span className="shrink-0 text-[9px] text-slate-400">{relativeTime(row.createdAt, Date.now(), locale)}</span>
+                </div>
+                <div className="text-[9px] text-slate-400">
+                  {row.actorName ?? (row.actorKind === "ai" ? "IA" : t("inbox.team"))}
+                  {describeChanges(row.payload, t)}
+                </div>
+              </div>
+            ))
+          )}
+        </Section>
+
         <Section title={t("inbox.campaigns")} icon={Megaphone}>
           {context?.campaigns?.length ? context.campaigns.slice(0, 4).map((item: any) => (
             <div key={`${item.campaignId}-${item.updatedAt}`} className="mb-1.5 flex items-center justify-between gap-2 text-[10px] last:mb-0">
@@ -485,6 +814,22 @@ export function PatientContextPanel({
         </>}
       </div>
 
+      {showScheduler && (
+        <div className="absolute inset-0 z-20 flex flex-col bg-white">
+          <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+            <div className="text-[13px] font-bold text-[#0a1b33]">{tr("Agendar consulta", "Book appointment")}</div>
+            <button type="button" onClick={() => setShowScheduler(false)} className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100"><X size={15} /></button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-4">
+            <AppointmentScheduler
+              compact
+              mode={{ kind: "book", threadId: thread._id, patientName: thread.displayName ?? undefined, source: "inbox" }}
+              onDone={() => setShowScheduler(false)}
+            />
+          </div>
+        </div>
+      )}
+
       {tool && (
         <div className="absolute inset-0 z-20 flex flex-col bg-white">
           <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
@@ -503,7 +848,52 @@ export function PatientContextPanel({
             ) : (
               <>
                 <textarea value={note} onChange={(event) => setNote(event.target.value)} rows={7} maxLength={tool === "note" ? 4000 : 500} placeholder={tool === "note" ? t("inbox.teamOnlyNote") : t("inbox.nextAction")} className="resize-none rounded-md border border-slate-200 p-3 text-[12px] leading-5 outline-none focus:border-slate-400" autoFocus />
-                {tool === "reminder" && <input type="datetime-local" value={reminderAt} onChange={(event) => setReminderAt(event.target.value)} className="h-10 rounded-md border border-slate-200 px-3 text-[12px] outline-none" />}
+                {tool === "reminder" && (
+                  <>
+                    <div className="flex flex-wrap gap-1">
+                      {reminderPresets(t).map(([label, timestamp]) => (
+                        <button
+                          key={label}
+                          type="button"
+                          onClick={() => setReminderAt(toLocalInputValue(timestamp))}
+                          className="rounded-md border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold text-slate-600 hover:border-slate-300"
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                    <input type="datetime-local" value={reminderAt} onChange={(event) => setReminderAt(event.target.value)} className="h-10 rounded-md border border-slate-200 px-3 text-[12px] outline-none" />
+                  </>
+                )}
+                {tool === "note" && (
+                  <div>
+                    <div className="mb-1 text-[10px] font-semibold text-slate-500">{t("inbox.mentions")}</div>
+                    <div className="flex flex-wrap gap-1" data-mention-picker>
+                      {(members ?? [])
+                        .filter((member) => member.status === "active")
+                        .map((member) => {
+                          const selected = mentioned.includes(member._id);
+                          return (
+                            <button
+                              key={member._id}
+                              type="button"
+                              onClick={() =>
+                                setMentioned((current) =>
+                                  selected ? current.filter((id) => id !== member._id) : [...current, member._id],
+                                )
+                              }
+                              className={cn(
+                                "rounded-md border px-2 py-1 text-[10px] font-semibold transition-colors",
+                                selected ? "border-[#0a1b33] bg-[#0a1b33] text-white" : "border-slate-200 bg-white text-slate-600 hover:border-slate-300",
+                              )}
+                            >
+                              @{memberDisplay(member)}
+                            </button>
+                          );
+                        })}
+                    </div>
+                  </div>
+                )}
               </>
             )}
             {error && <p className="text-[11px] text-rose-600">{error}</p>}

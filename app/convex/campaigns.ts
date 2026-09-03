@@ -28,6 +28,8 @@ const campaignStatusValidator = v.union(
 const campaignKindValidator = v.union(
   v.literal("template_broadcast"),
   v.literal("micro_lab"),
+  v.literal("channel_template"),
+  v.literal("channel_text"),
 );
 
 const microCampaignIntentValidator = v.union(
@@ -42,6 +44,8 @@ const E164_REGEX = /^\+[1-9]\d{6,14}$/;
 const DEFAULT_BATCH_SIZE = 1000;
 const MAX_BATCH_SIZE = 5000;
 const MICRO_CAMPAIGN_LOOKBACK_MS = 7 * 24 * 60 * 60 * 1_000;
+/** Legacy scans are bounded; the neutral engine (channelCampaigns) paginates. */
+const SCAN_LIMIT = 5_000;
 
 const continueCampaignRef = makeFunctionReference<"mutation">(
   "campaigns:_continueCampaign",
@@ -509,13 +513,13 @@ export const listContactLists = tenantQuery({
       .query("contactLists")
       .withIndex("by_tenant", (q) => q.eq("tenantId", ctx.tenantId))
       .order("desc")
-      .collect();
+      .take(SCAN_LIMIT);
     const out = [];
     for (const list of lists) {
       const members = await ctx.db
         .query("contactListMembers")
         .withIndex("by_list", (q) => q.eq("listId", list._id))
-        .collect();
+        .take(SCAN_LIMIT);
       out.push({
         _id: list._id,
         name: list.name,
@@ -584,6 +588,26 @@ export const createListFromSegment = tenantMutation({
   },
 });
 
+/**
+ * Template campaigns still run on the direct Meta stack (templates +
+ * phoneNumbers + messages). A workspace that only has the isolated Hub pilot
+ * channel would otherwise fail deep inside with TEMPLATE_NOT_APPROVED /
+ * PHONE_NUMBER_NOT_CONNECTED; fail early with an explainable code instead.
+ * Phase B moves campaigns onto the neutral channel and removes this guard.
+ */
+async function requireLegacyWabaConnection(ctx: {
+  db: any;
+  tenantId: Id<"tenants">;
+}) {
+  const account = await ctx.db
+    .query("whatsappAccounts")
+    .withIndex("by_tenant", (q: any) => q.eq("tenantId", ctx.tenantId))
+    .first();
+  if (!account) {
+    throw new ConvexError({ code: "LEGACY_WABA_REQUIRED" });
+  }
+}
+
 export const createDraftCampaign = tenantMutation({
   args: {
     name: v.string(),
@@ -593,6 +617,7 @@ export const createDraftCampaign = tenantMutation({
   returns: v.id("campaigns"),
   handler: async (ctx, args): Promise<Id<"campaigns">> => {
     requireCapability(ctx.role, "campaigns.create");
+    await requireLegacyWabaConnection(ctx);
     const name = assertName(args.name);
     const list = await loadByIdInTenant(
       ctx as Parameters<typeof loadByIdInTenant>[0],
@@ -623,7 +648,7 @@ export const createDraftCampaign = tenantMutation({
     const members = await ctx.db
       .query("contactListMembers")
       .withIndex("by_list", (q) => q.eq("listId", list._id))
-      .collect();
+      .take(SCAN_LIMIT);
     if (members.length === 0) {
       throw new ConvexError({ code: "EMPTY_CONTACT_LIST" });
     }
@@ -782,7 +807,7 @@ export const _recordMicroCampaignRecipient = internalMutation({
       const candidates = await ctx.db
         .query("campaignRecipients")
         .withIndex("by_campaign", (q) => q.eq("campaignId", campaign._id))
-        .collect();
+        .take(SCAN_LIMIT);
       recipient =
         candidates.find(
           (row) =>
@@ -893,7 +918,7 @@ export const _finishMicroCampaignLaunch = internalMutation({
     const recipients = await ctx.db
       .query("campaignRecipients")
       .withIndex("by_campaign", (q) => q.eq("campaignId", campaign._id))
-      .collect();
+      .take(SCAN_LIMIT);
     const failed = recipients.filter((row) => row.status === "failed").length;
     const accepted = recipients.length - failed;
     const status: "completed" | "failed" =
@@ -1065,6 +1090,7 @@ export const launchCampaign = tenantMutation({
   }),
   handler: async (ctx, args) => {
     requireCapability(ctx.role, "campaigns.start");
+    await requireLegacyWabaConnection(ctx);
     const campaign = await loadByIdInTenant(
       ctx as Parameters<typeof loadByIdInTenant>[0],
       "campaigns",
@@ -1107,7 +1133,7 @@ export const launchCampaign = tenantMutation({
     const recipients = await ctx.db
       .query("campaignRecipients")
       .withIndex("by_campaign", (q) => q.eq("campaignId", campaign._id))
-      .collect();
+      .take(SCAN_LIMIT);
     if (recipients.length === 0) {
       throw new ConvexError({ code: "CAMPAIGN_HAS_NO_RECIPIENTS" });
     }
@@ -1581,7 +1607,7 @@ export const retrySafeFailures = tenantMutation({
       .withIndex("by_campaign_status", (q) =>
         q.eq("campaignId", campaign._id).eq("status", "failed"),
       )
-      .collect();
+      .take(SCAN_LIMIT);
     const now = Date.now();
     let retried = 0;
     let skippedUnsafe = 0;
@@ -1615,7 +1641,7 @@ export const retrySafeFailures = tenantMutation({
         .withIndex("by_recipient", (q) =>
           q.eq("campaignRecipientId", recipient._id),
         )
-        .collect();
+        .take(SCAN_LIMIT);
       const retryNumber =
         previousRetryEvents.filter(
           (event: Doc<"campaignEvents">) =>
@@ -1706,7 +1732,7 @@ export const _markInboundEngagement = internalMutation({
       .withIndex("by_contact", (q) =>
         q.eq("tenantId", args.tenantId).eq("contactId", args.contactId),
       )
-      .collect();
+      .take(SCAN_LIMIT);
     const recipient = candidates
       .filter((row) =>
         ["queued", "dispatching", "sent", "delivered", "read", "replied"].includes(
@@ -1779,7 +1805,7 @@ export const listCampaigns = tenantQuery({
       .query("campaigns")
       .withIndex("by_tenant", (q) => q.eq("tenantId", ctx.tenantId))
       .order("desc")
-      .collect();
+      .take(SCAN_LIMIT);
     const out = [];
     for (const campaign of rows) {
       out.push(await describeCampaign(ctx, campaign));
@@ -1850,7 +1876,7 @@ export const getCampaign = tenantQuery({
     const recipients = await ctx.db
       .query("campaignRecipients")
       .withIndex("by_campaign", (q) => q.eq("campaignId", campaign._id))
-      .collect();
+      .take(SCAN_LIMIT);
     const recipientRows = [];
     for (const recipient of recipients) {
       const contact = await ctx.db.get(recipient.contactId);
@@ -2017,7 +2043,7 @@ export const exportFailedContacts = tenantQuery({
       .withIndex("by_campaign_status", (q) =>
         q.eq("campaignId", args.campaignId).eq("status", "failed"),
       )
-      .collect();
+      .take(SCAN_LIMIT);
     const rows = [];
     for (const recipient of recipients) {
       const contact = await ctx.db.get(recipient.contactId);
@@ -2053,7 +2079,7 @@ async function describeCampaign(
     ctx.db
       .query("campaignRecipients")
       .withIndex("by_campaign", (q: any) => q.eq("campaignId", campaign._id))
-      .collect(),
+      .take(SCAN_LIMIT),
   ]);
   return {
     _id: campaign._id,
@@ -2144,7 +2170,7 @@ async function collectSegmentContactIds(
     const conversations = await ctx.db
       .query("conversations")
       .withIndex("by_tenant_lastmsg", (q: any) => q.eq("tenantId", ctx.tenantId))
-      .collect();
+      .take(SCAN_LIMIT);
     for (const conversation of conversations) {
       if (conversation.leadSource === "ctwa") ids.add(conversation.contactId);
     }
@@ -2160,14 +2186,14 @@ async function collectSegmentContactIds(
   const campaigns = await ctx.db
     .query("campaigns")
     .withIndex("by_tenant", (q: any) => q.eq("tenantId", ctx.tenantId))
-    .collect();
+    .take(SCAN_LIMIT);
   for (const campaign of campaigns) {
     const recipients = await ctx.db
       .query("campaignRecipients")
       .withIndex("by_campaign_status", (q: any) =>
         q.eq("campaignId", campaign._id).eq("status", desiredStatus),
       )
-      .collect();
+      .take(SCAN_LIMIT);
     for (const recipient of recipients) {
       ids.add(recipient.contactId);
     }
@@ -2197,7 +2223,7 @@ export const _evaluateSafetyPause = internalMutation({
     const recipients = await ctx.db
       .query("campaignRecipients")
       .withIndex("by_campaign", (q) => q.eq("campaignId", args.campaignId))
-      .collect();
+      .take(SCAN_LIMIT);
     const considered = recipients.filter(
       (r) =>
         r.status === "sent" ||
@@ -2271,7 +2297,7 @@ async function queuePendingCampaignBatch(
     .withIndex("by_campaign_status", (q: any) =>
       q.eq("campaignId", args.campaign._id).eq("status", "pending"),
     )
-    .collect();
+    .take(SCAN_LIMIT);
   const orderedRecipients = pendingRecipients
     .slice()
     .sort(
@@ -2383,7 +2409,7 @@ async function queuePendingCampaignBatch(
     .withIndex("by_campaign_status", (q: any) =>
       q.eq("campaignId", args.campaign._id).eq("status", "pending"),
     )
-    .collect();
+    .take(SCAN_LIMIT);
 
   return {
     queued,
@@ -2442,7 +2468,7 @@ async function findCampaignPhoneNumber(
   const rows = await ctx.db
     .query("phoneNumbers")
     .withIndex("by_tenant", (q: any) => q.eq("tenantId", ctx.tenantId))
-    .collect();
+    .take(SCAN_LIMIT);
   return (
     rows.find(
       (phone: Doc<"phoneNumbers">) =>

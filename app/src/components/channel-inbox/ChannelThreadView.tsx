@@ -25,6 +25,7 @@ import {
   Star,
   Timer,
   UserRound,
+  UsersRound,
   Zap,
 } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
@@ -32,10 +33,26 @@ import type { Id } from "../../../convex/_generated/dataModel";
 import { cn } from "@/lib/cn";
 import { formatTime, relativeTime } from "@/lib/relativeTime";
 import { useI18n, type TranslationKey } from "@/lib/i18n";
+import { convexErrorMessage } from "@/lib/convexErrorMessage";
 import { templateCategoryLabel } from "@/lib/operationalLabels";
 import { PatientContextPanel } from "@/components/channel-inbox/PatientContextPanel";
+import { PilotBanner } from "@/components/channel-inbox/PilotBanner";
+import { LeadHeaderBar } from "@/components/channel-inbox/LeadHeaderBar";
+import { HandoffDialog } from "@/components/channel-inbox/HandoffDialog";
+import { HumanCaseChip } from "@/components/channel-inbox/HumanCaseChip";
+import { AiPresenceChip } from "@/components/channel-inbox/AiPresenceChip";
+import { AiComposerTools } from "@/components/channel-inbox/AiComposerTools";
+import { SnoozeMenu } from "@/components/channel-inbox/SnoozeMenu";
+import {
+  SystemEventRow,
+  type TimelineSystemItem,
+} from "@/components/channel-inbox/SystemEventRow";
 
-type BlockedReason = { title: string; detail: string } | null;
+type BlockedReason = {
+  kind: "legacy" | "disabled" | "allowlist" | "window";
+  title: string;
+  detail: string;
+} | null;
 
 type ThreadSummary = {
   _id: Id<"channelThreads">;
@@ -63,6 +80,11 @@ type ThreadSummary = {
   dnd?: boolean;
   automationMode?: string;
   automationChangeReason?: string;
+  pilotBlockedAt?: number;
+  intent?: string;
+  intentSource?: string;
+  originCampaignId?: Id<"campaigns">;
+  originCampaignName?: string;
   channelSendMode: string;
   channelProvider: string;
   channelDisplayName: string;
@@ -96,22 +118,12 @@ type ThreadEvent = {
   providerTimestamp?: number;
 };
 
+type TimelineItem =
+  | { type: "event"; at: number; event: ThreadEvent }
+  | { type: "system"; at: number; system: TimelineSystemItem };
+
 function errorMessage(error: unknown, locale: "pt" | "en"): string {
-  const data =
-    error && typeof error === "object" && "data" in error
-      ? (error as { data?: unknown }).data
-      : null;
-  if (data && typeof data === "object" && "message" in data) {
-    return String((data as { message: unknown }).message);
-  }
-  if (data && typeof data === "object" && "code" in data) {
-    return String((data as { code: unknown }).code);
-  }
-  return error instanceof Error
-    ? error.message
-    : locale === "pt"
-      ? "Falha ao enviar."
-      : "Send failed.";
+  return convexErrorMessage(error, locale, locale === "pt" ? "Falha ao enviar." : "Send failed.");
 }
 
 function object(value: unknown): Record<string, unknown> | null {
@@ -461,6 +473,11 @@ export function ChannelThreadView({
     threadKey,
     limit: 200,
   });
+  const timelineExtras = useQuery(
+    inboxApi.listThreadTimelineExtras,
+    thread ? { threadId: thread._id } : "skip",
+  );
+  const workspace = useQuery(api.tenantsQueries.getActiveOptional);
   const quickReplies = useQuery(api.quickReplies.list);
   const members = useQuery(api.memberInvites.listMembers, {});
   const templates = useQuery(api.channels.listTemplates, { channelId }) as
@@ -482,6 +499,16 @@ export function ChannelThreadView({
   const [templateVariables, setTemplateVariables] = useState<string[]>([]);
   const [quickReplySearch, setQuickReplySearch] = useState("");
   const [patientPanelOpen, setPatientPanelOpen] = useState(false);
+  const [handoffOpen, setHandoffOpen] = useState(false);
+  const [panelToolRequest, setPanelToolRequest] = useState<
+    { tool: "note" | "reminder" | "close"; nonce: number } | null
+  >(null);
+  const composerRef = useRef<HTMLTextAreaElement>(null);
+  const [headerNotice, setHeaderNotice] = useState<string | null>(null);
+  const threadOps = useQuery(
+    inboxApi.getThreadOps,
+    thread ? { threadId: thread._id } : "skip",
+  );
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const markedRef = useRef<string | null>(null);
@@ -502,11 +529,52 @@ export function ChannelThreadView({
     [events],
   );
 
+  const timeline = useMemo<TimelineItem[]>(() => {
+    const items: TimelineItem[] = ordered.map((event) => ({
+      type: "event",
+      at: event.receivedAt,
+      event,
+    }));
+    for (const row of timelineExtras?.systemEvents ?? []) {
+      const payload = (row.payload ?? {}) as { detail?: unknown };
+      items.push({
+        type: "system",
+        at: row.createdAt,
+        system: {
+          id: row._id,
+          kind: row.kind,
+          severity: row.severity as TimelineSystemItem["severity"],
+          code: row.code,
+          botName: row.botName,
+          actorName: row.actorName,
+          detail: typeof payload.detail === "string" ? payload.detail : undefined,
+          at: row.createdAt,
+        },
+      });
+    }
+    for (const row of timelineExtras?.failedOutbox ?? []) {
+      items.push({
+        type: "system",
+        at: row.updatedAt,
+        system: {
+          id: row._id,
+          kind: row.status === "unknown" ? "outbox.unknown" : "outbox.failed",
+          severity: row.status === "unknown" ? "warning" : "error",
+          code: row.code,
+          detail: row.preview,
+          at: row.updatedAt,
+        },
+      });
+    }
+    items.sort((a, b) => a.at - b.at);
+    return items;
+  }, [ordered, timelineExtras]);
+
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
     el.scrollTop = el.scrollHeight;
-  }, [ordered.length, threadKey]);
+  }, [timeline.length, threadKey]);
 
   const quickReplyNeedle = (
     quickReplySearch || (draft.startsWith("/") ? draft.slice(1) : "")
@@ -530,18 +598,21 @@ export function ChannelThreadView({
     if (!thread) return null;
     if (thread.channelProvider !== "iasolution_hub") {
       return {
+        kind: "legacy",
         title: t("inbox.blockedLegacyTitle"),
         detail: t("inbox.blockedLegacyDetail"),
       };
     }
     if (thread.channelSendMode === "disabled") {
       return {
+        kind: "disabled",
         title: t("inbox.blockedDisabledTitle"),
         detail: t("inbox.blockedDisabledDetail"),
       };
     }
     if (!thread.recipientAllowlisted) {
       return {
+        kind: "allowlist",
         title: t("inbox.blockedAllowlistTitle"),
         detail: t("inbox.blockedAllowlistDetail"),
       };
@@ -551,6 +622,7 @@ export function ChannelThreadView({
       thread.serviceWindowExpiresAt > Date.now();
     if (!windowOpen) {
       return {
+        kind: "window",
         title: t("inbox.blockedWindowTitle"),
         detail: t("inbox.blockedWindowDetail"),
       };
@@ -572,6 +644,7 @@ export function ChannelThreadView({
         clientNonce: crypto.randomUUID(),
       });
       setDraft("");
+      if (composerRef.current) composerRef.current.style.height = "auto";
     } catch (err) {
       setError(errorMessage(err, locale));
     } finally {
@@ -580,9 +653,29 @@ export function ChannelThreadView({
   }
 
   function insertQuickReply(content: string) {
-    setDraft(content);
+    const el = composerRef.current;
+    const current = draft;
+    let base = current;
+    let start = el?.selectionStart ?? current.length;
+    let end = el?.selectionEnd ?? start;
+    if (current.startsWith("/")) {
+      // The "/needle" token opened the picker; replace it entirely.
+      base = "";
+      start = 0;
+      end = 0;
+    }
+    const before = base.slice(0, start);
+    const after = base.slice(end);
+    const joiner = before && !/\s$/.test(before) ? " " : "";
+    const next = `${before}${joiner}${content}${after}`;
+    setDraft(next);
     setShowQuickReplies(false);
     setQuickReplySearch("");
+    const caret = before.length + joiner.length + content.length;
+    requestAnimationFrame(() => {
+      el?.focus();
+      el?.setSelectionRange(caret, caret);
+    });
   }
 
   function chooseTemplate(template: ChannelTemplate) {
@@ -687,9 +780,6 @@ export function ChannelThreadView({
   const summary = thread as ThreadSummary;
   const label = summary.displayName ?? summary.phone ?? summary.threadKey;
   const window = windowInfo(summary.serviceWindowExpiresAt, locale);
-  const responsibleName = members?.find(
-    (member) => member._id === summary.responsibleMemberId,
-  )?.email;
   const templateAllowed =
     summary.channelProvider === "iasolution_hub" &&
     summary.channelSendMode !== "disabled" &&
@@ -743,29 +833,53 @@ export function ChannelThreadView({
               >
                 <Star size={15} className={summary.starredAt ? "fill-current" : undefined} />
               </button>
+              <AiPresenceChip threadId={summary._id} ai={threadOps?.ai} canResume={!threadOps?.openCase} onNotice={setHeaderNotice} />
+              {threadOps?.openCase ? (
+                <HumanCaseChip threadId={summary._id} currentMemberId={workspace?.memberId} />
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setHandoffOpen(true)}
+                  className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-[10px] font-semibold text-slate-600 transition-colors hover:border-amber-300 hover:bg-amber-50 hover:text-amber-800"
+                  title={t("handoff.title")}
+                  data-handoff-button
+                >
+                  <UsersRound size={12} />
+                  <span className="hidden sm:inline">{t("handoff.button")}</span>
+                </button>
+              )}
               <button
                 type="button"
-                onClick={() => void updateThread({
-                  threadId: summary._id,
-                  automationMode: summary.automationMode === "bot" ? "human" : "bot",
-                })}
-                className="rounded-md p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-[#0a1b33]"
+                onClick={() => {
+                  if (summary.automationMode !== "bot" && threadOps?.openCase) {
+                    setHeaderNotice(t("handoff.aiBlocked"));
+                    return;
+                  }
+                  setHeaderNotice(null);
+                  void updateThread({
+                    threadId: summary._id,
+                    automationMode: summary.automationMode === "bot" ? "human" : "bot",
+                  }).catch((cause) => setHeaderNotice(errorMessage(cause, locale)));
+                }}
+                className={cn(
+                  "rounded-md p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-[#0a1b33]",
+                  summary.automationMode !== "bot" && threadOps?.openCase && "opacity-40",
+                )}
                 title={summary.automationMode === "bot" ? t("inbox.pauseAi") : t("inbox.resumeAi")}
               >
                 {summary.automationMode === "bot" ? <Pause size={15} /> : <Play size={15} />}
               </button>
-              <button
-                type="button"
-                onClick={() => void updateThread({
-                  threadId: summary._id,
-                  inboxStatus: "snoozed",
-                  snoozedUntil: Date.now() + 2 * 60 * 60 * 1000,
-                })}
-                className="rounded-md p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-[#0a1b33]"
-                title={t("inbox.snooze")}
-              >
-                <Clock size={15} />
-              </button>
+              <SnoozeMenu
+                snoozedUntil={summary.inboxStatus === "snoozed" ? summary.snoozedUntil : undefined}
+                onSnooze={(until) =>
+                  void updateThread({ threadId: summary._id, inboxStatus: "snoozed", snoozedUntil: until })
+                    .catch((cause) => setHeaderNotice(errorMessage(cause, locale)))
+                }
+                onUnsnooze={() =>
+                  void updateThread({ threadId: summary._id, inboxStatus: "open" })
+                    .catch((cause) => setHeaderNotice(errorMessage(cause, locale)))
+                }
+              />
               <button
                 type="button"
                 onClick={() => setPatientPanelOpen(true)}
@@ -777,43 +891,47 @@ export function ChannelThreadView({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 border-t border-slate-100 bg-[#fbfcfd] sm:grid-cols-4">
-            {[
-              [t("inbox.source"), summary.leadSource ?? "WhatsApp"],
-              [t("inbox.stage"), summary.leadStatus ? t(`status.${summary.leadStatus}` as TranslationKey) : t("status.new")],
-              [
-                t("inbox.owner"),
-                summary.automationMode === "bot"
-                  ? automationLabel(summary.automationMode, locale)
-                  : responsibleName ?? t("inbox.unassignedShort"),
-              ],
-              [t("inbox.nextAction"), summary.nextStep ?? "-"],
-            ].map(([key, value], index) => (
-              <div key={key} className={cn("min-w-0 px-3 py-2", index > 0 && "border-l border-slate-100", index > 1 && "border-t sm:border-t-0")}>
-                <div className="text-[8px] font-bold uppercase tracking-[0.12em] text-slate-400">{key}</div>
-                <div className="mt-0.5 truncate text-[10px] font-semibold text-slate-700" title={value}>{value}</div>
-              </div>
-            ))}
-          </div>
+          <LeadHeaderBar
+            thread={summary}
+            members={members}
+            currentMemberId={workspace?.memberId}
+          />
+          {headerNotice && (
+            <div className="border-t border-amber-100 bg-amber-50 px-3 py-1.5 text-[11px] text-amber-900">
+              {headerNotice}
+            </div>
+          )}
         </header>
 
         <div
           ref={scrollRef}
           className="flex-1 space-y-2 overflow-y-auto px-6 py-5"
         >
-          {ordered.length === 0 ? (
+          {timeline.length === 0 ? (
             <div className="py-10 text-center text-sm text-slate-400">
               {t("inbox.noMessages")}
             </div>
           ) : (
-            ordered.map((event) => (
-              <ChannelMessageBubble key={event._id} event={event} locale={locale} />
-            ))
+            timeline.map((item) =>
+              item.type === "event" ? (
+                <ChannelMessageBubble key={item.event._id} event={item.event} locale={locale} />
+              ) : (
+                <SystemEventRow key={item.system.id} item={item.system} />
+              ),
+            )
           )}
         </div>
 
         <div className="border-t border-slate-200 bg-white px-3 py-3 sm:px-4">
-          {blocked && (
+          {blocked?.kind === "allowlist" && (
+            <PilotBanner
+              threadId={summary._id}
+              recipient={summary.phone ?? summary.threadKey}
+              role={workspace?.role}
+              onHandoff={threadOps?.openCase ? undefined : () => setHandoffOpen(true)}
+            />
+          )}
+          {blocked && blocked.kind !== "allowlist" && (
             <div className="flex items-start gap-2.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
               <ShieldAlert
                 size={15}
@@ -997,6 +1115,18 @@ export function ChannelThreadView({
             className="hidden"
           />
 
+          {!blocked && workspace?.role !== "marketing" && (
+            <div className="mb-1.5">
+              <AiComposerTools
+                threadId={summary._id}
+                draft={draft}
+                onUse={(text) => {
+                  setDraft(text);
+                  composerRef.current?.focus();
+                }}
+              />
+            </div>
+          )}
           <div className={cn("mt-2 flex items-center gap-1.5", !blocked && "mt-0")}>
                 <button
                   type="button"
@@ -1027,25 +1157,40 @@ export function ChannelThreadView({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setPatientPanelOpen(true)}
+                  onClick={() => {
+                    setPatientPanelOpen(true);
+                    setPanelToolRequest({ tool: "reminder", nonce: Date.now() });
+                  }}
                   title={t("inbox.createReminder")}
-                  className="rounded-md p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-[#0a152d] xl:hidden"
+                  className="rounded-md p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-[#0a152d]"
+                  data-reminder-button
                 >
                   <Bell size={15} />
                 </button>
                 <form onSubmit={submit} className="flex min-w-0 flex-1 items-center gap-1.5">
-                <input
+                <textarea
+                  ref={composerRef}
                   value={draft}
+                  rows={1}
                   onChange={(event) => {
                     setDraft(event.target.value);
                     if (event.target.value.startsWith("/")) {
                       setShowQuickReplies(true);
                     }
+                    event.target.style.height = "auto";
+                    event.target.style.height = `${Math.min(event.target.scrollHeight, 160)}px`;
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && !event.shiftKey && !quickRepliesOpen) {
+                      event.preventDefault();
+                      event.currentTarget.form?.requestSubmit();
+                    }
                   }}
                   placeholder={blocked ? blocked.title : t("inbox.writeReply")}
+                  title={t("inbox.sendHint")}
                   maxLength={4096}
                   disabled={sending || Boolean(blocked)}
-                  className="h-10 min-w-0 flex-1 rounded-md border border-slate-200 px-3 text-[13px] outline-none focus:border-slate-400 disabled:bg-slate-50 disabled:text-slate-400"
+                  className="max-h-40 min-h-10 min-w-0 flex-1 resize-none rounded-md border border-slate-200 px-3 py-2.5 text-[13px] leading-5 outline-none focus:border-slate-400 disabled:bg-slate-50 disabled:text-slate-400"
                 />
                 <button
                   type="submit"
@@ -1071,7 +1216,21 @@ export function ChannelThreadView({
         </div>
       </section>
 
-      <PatientContextPanel thread={summary} className="hidden xl:flex" />
+      {handoffOpen && (
+        <HandoffDialog
+          threadId={summary._id}
+          intent={summary.intent}
+          lastPreview={summary.lastPreview}
+          members={members}
+          currentMemberId={workspace?.memberId}
+          onClose={() => setHandoffOpen(false)}
+          onCreated={() => {
+            setHandoffOpen(false);
+            setHeaderNotice(t("handoff.created"));
+          }}
+        />
+      )}
+      <PatientContextPanel thread={summary} className="hidden xl:flex" toolRequest={panelToolRequest} />
       {patientPanelOpen && (
         <div
           className="fixed inset-0 z-50 flex justify-end bg-slate-950/30 xl:hidden"
@@ -1083,6 +1242,7 @@ export function ChannelThreadView({
             thread={summary}
             onClose={() => setPatientPanelOpen(false)}
             className="w-full max-w-[360px] shadow-2xl"
+            toolRequest={panelToolRequest}
           />
         </div>
       )}

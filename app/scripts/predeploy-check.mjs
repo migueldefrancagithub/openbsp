@@ -77,6 +77,13 @@ for (const name of hubLabReadinessEnv) {
   }
 }
 
+const aiProviderEnv = ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY"];
+if (!aiProviderEnv.some((name) => process.env[name])) {
+  warnings.push(
+    `AI agents not ready for ${target}: none of ${aiProviderEnv.join(", ")} is set (clinics can still store their own key).`,
+  );
+}
+
 if (!process.env.CONVEX_DEPLOY_KEY) {
   warnings.push(
     "CONVEX_DEPLOY_KEY is absent. This is OK for local Convex deploys; set it only if CI/Vercel deploys Convex.",
@@ -126,6 +133,18 @@ if (target === "production") {
   warnings.push(
     "Before production: confirm DPA/DPIA are signed in the tenant before connecting real WABAs.",
   );
+}
+
+{
+  const { spawnSync } = await import("node:child_process");
+  const check = spawnSync(process.execPath, [
+    new URL("./check-error-codes.mjs", import.meta.url).pathname,
+  ]);
+  if (check.status !== 0) {
+    failures.push(
+      `Unmapped ConvexError codes:\n${check.stderr.toString().trim()}`,
+    );
+  }
 }
 
 console.log(`OpenBSP deploy preflight (${target})`);

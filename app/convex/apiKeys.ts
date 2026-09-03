@@ -7,9 +7,10 @@ import {
 } from "./_generated/server";
 import { internal } from "./_generated/api";
 import {
-  tenantQuery,
-  tenantMutation,
   loadByIdInTenant,
+  tenantAction,
+  tenantMutation,
+  tenantQuery,
 } from "./lib/customFunctions";
 import type { Id } from "./_generated/dataModel";
 
@@ -144,7 +145,7 @@ export const _insertKey = internalMutation({
  * Mint a new API key. Returns the plaintext token ONCE — store it on the
  * client; we only persist its SHA-256 hash. Per wakit-api parity.
  */
-export const mint = action({
+export const mint = tenantAction({
   args: { name: v.string(), role: roleValidator },
   returns: v.object({
     apiKeyId: v.id("apiKeys"),
@@ -157,12 +158,7 @@ export const mint = action({
     apiKeyId: Id<"apiKeys">;
     plaintextToken: string;
   }> => {
-    const me: {
-      tenantId: Id<"tenants">;
-      memberId: Id<"members">;
-      role: string;
-    } | null = await ctx.runQuery(internal.apiKeys._meTenant, {});
-    if (!me) throw new ConvexError({ code: "UNAUTHENTICATED" });
+    const me = { tenantId: ctx.tenantId, memberId: ctx.memberId, role: ctx.role };
     if (me.role !== "owner" && me.role !== "admin") {
       throw new ConvexError({
         code: "FORBIDDEN",

@@ -40,4 +40,49 @@ crons.interval(
   {},
 );
 
+// Stale channel-neutral automation runs (iaSolution Hub) → timed_out.
+// The legacy sweep above only covers chatbotFlowRuns; this one was written in
+// Phase 4 but never registered, so neutral runs could stay "active" forever.
+crons.interval(
+  "channel automation stale run sweep",
+  { hours: 1 },
+  internal.channelAutomation.sweepStaleRuns,
+  {},
+);
+
+// Reminders whose scheduled due-marker was lost become "due" within 5 min.
+crons.interval(
+  "thread reminder overdue sweep",
+  { minutes: 5 },
+  internal.inboxOperations.sweepOverdueReminders,
+  {},
+);
+
+// Retention policy report (no deletion in this phase).
+crons.daily(
+  "retention candidates report",
+  { hourUTC: 3, minuteUTC: 0 },
+  internal.retention.runDaily,
+  {},
+);
+
+// Durable follow-ups: claim due tasks every minute (≤10, ≤5 during campaigns).
+crons.interval("follow-up executor", { minutes: 1 }, internal.followUps.runDue, {});
+
+// Claims whose dispatch job never settled are requeued (or failed after 3).
+crons.interval("follow-up stale claim sweep", { minutes: 10 }, internal.followUps.sweepStaleClaims, {});
+
+// Ops alerts: unconfirmed outbox rows and human-case SLA breaches.
+crons.interval("ops unknown outbox sweep", { minutes: 10 }, internal.ops.sweepUnknownOutbox, {});
+crons.interval("ops sla breach sweep", { minutes: 5 }, internal.ops.sweepSlaBreaches, {});
+
+// Reports: rebuild today + yesterday per tenant from index-bounded scans.
+crons.interval("analytics daily rollups", { hours: 1 }, internal.analyticsRollups.runHourly, {});
+
+// AI turns stuck in processing (action lost) are failed and the team notified.
+crons.interval("ai stale turn sweep", { minutes: 10 }, internal.aiRuntime.sweepStaleTurns, {});
+
+// Outbound webhooks: signed deliveries with backoff; dead-letter after 8 tries.
+crons.interval("webhook delivery", { minutes: 1 }, internal.outboundWebhooks.deliverDue, {});
+
 export default crons;

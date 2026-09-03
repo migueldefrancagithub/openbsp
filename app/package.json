@@ -11,7 +11,8 @@
     "predeploy:check": "node scripts/predeploy-check.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "check:errors": "node scripts/check-error-codes.mjs"
   },
   "dependencies": {
     "@convex-dev/auth": "^0.0.95",

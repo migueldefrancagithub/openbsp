@@ -6,9 +6,10 @@ import {
 } from "./_generated/server";
 import { internal } from "./_generated/api";
 import {
+  loadByIdInTenant,
+  requireCapability,
   tenantMutation,
   tenantQuery,
-  loadByIdInTenant,
 } from "./lib/customFunctions";
 import {
   sendWhatsAppText,
@@ -226,6 +227,7 @@ export const sendText = tenantMutation({
   },
   returns: v.id("messages"),
   handler: async (ctx, args): Promise<Id<"messages">> => {
+    requireCapability(ctx.role, "messages.send");
     const trimmed = args.text.trim();
     if (trimmed.length === 0) {
       throw new ConvexError({ code: "EMPTY_TEXT" });
@@ -510,6 +512,7 @@ export const sendTemplate = tenantMutation({
   },
   returns: v.id("messages"),
   handler: async (ctx, args): Promise<Id<"messages">> => {
+    requireCapability(ctx.role, "messages.send_template");
     const conv = await loadByIdInTenant(
       ctx as Parameters<typeof loadByIdInTenant>[0],
       "conversations",

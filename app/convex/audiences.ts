@@ -1,4 +1,6 @@
 import { ConvexError, v } from "convex/values";
+import { threadLeadStatusValidator } from "./lib/channels/threadUpdate";
+import type { ChannelLeadStatus } from "./lib/channels/intents";
 import {
   requireCapability,
   tenantMutation,
@@ -58,6 +60,8 @@ const audienceCriteriaValidator = v.object({
   ),
   leadSources: v.optional(v.array(leadSourceValidator)),
   opportunityStatuses: v.optional(v.array(opportunityStatusValidator)),
+  /** Lead stage on the channel-neutral threads (the inbox vocabulary). */
+  leadStatuses: v.optional(v.array(threadLeadStatusValidator)),
   ctwaWindow: v.optional(
     v.union(
       v.literal("any"),
@@ -123,6 +127,7 @@ type AudienceCriteria = {
   transactionalConsent?: ConsentStatus | "any";
   leadSources?: LeadSource[];
   opportunityStatuses?: OpportunityStatus[];
+  leadStatuses?: ChannelLeadStatus[];
   ctwaWindow?: "any" | "open" | "expiring_6h" | "expired";
   createdAfter?: number;
   createdBefore?: number;
@@ -143,6 +148,7 @@ type NormalizedCriteria = AudienceCriteria & {
   transactionalConsent: ConsentStatus | "any";
   leadSources: LeadSource[];
   opportunityStatuses: OpportunityStatus[];
+  leadStatuses: ChannelLeadStatus[];
   ctwaWindow: "any" | "open" | "expiring_6h" | "expired";
   campaignRecipientStatuses: CampaignRecipientStatus[];
   excludeMarketingRevoked: boolean;
@@ -161,6 +167,7 @@ type AudienceProfile = {
   transactionalConsent: ConsentStatus;
   leadSources: LeadSource[];
   opportunityStatuses: OpportunityStatus[];
+  leadStatuses: ChannelLeadStatus[];
   lastMessageAt?: number;
   lastCtwaClickAt?: number;
   hasOpenCtwa: boolean;
@@ -294,6 +301,11 @@ async function evaluateAudience(
       .collect(),
   ]);
 
+  const channels = (await ctx.db
+    .query("channels")
+    .withIndex("by_tenant", (q: any) => q.eq("tenantId", ctx.tenantId))
+    .take(20)) as Array<Doc<"channels">>;
+
   const conversationsByContact = new Map<string, Array<Doc<"conversations">>>();
   for (const conversation of conversations) {
     const bucket = conversationsByContact.get(conversation.contactId) ?? [];
@@ -312,6 +324,7 @@ async function evaluateAudience(
     const profile = await buildProfile(ctx, {
       contact,
       conversations: conversationsByContact.get(contact._id) ?? [],
+      channels,
       campaignsById,
       criteria,
       now,
@@ -386,6 +399,7 @@ async function buildProfile(
   args: {
     contact: Doc<"contacts">;
     conversations: Array<Doc<"conversations">>;
+    channels: Array<Doc<"channels">>;
     campaignsById: Map<string, Doc<"campaigns">>;
     criteria: NormalizedCriteria;
     now: number;
@@ -416,6 +430,22 @@ async function buildProfile(
       (conversation) => conversation.opportunityStatus ?? "new",
     ),
   ) as OpportunityStatus[];
+  // Channel-neutral stage: one indexed read per channel (threadKey = digits).
+  const threadKey = args.contact.e164?.replace(/\D/g, "");
+  const leadStatuses: ChannelLeadStatus[] = [];
+  if (threadKey) {
+    for (const channel of args.channels) {
+      const thread = (await ctx.db
+        .query("channelThreads")
+        .withIndex("by_channel_thread", (q: any) =>
+          q.eq("channelId", channel._id).eq("threadKey", threadKey),
+        )
+        .unique()) as Doc<"channelThreads"> | null;
+      if (thread?.leadStatus && !leadStatuses.includes(thread.leadStatus)) {
+        leadStatuses.push(thread.leadStatus);
+      }
+    }
+  }
   const lastMessageAt = maxOptional(
     args.conversations.map((conversation) => conversation.lastMessageAt),
   );
@@ -475,6 +505,7 @@ async function buildProfile(
     transactionalConsent: transactional,
     leadSources: leadSources.length > 0 ? leadSources : ["unknown"],
     opportunityStatuses,
+    leadStatuses,
     lastMessageAt,
     lastCtwaClickAt,
     hasOpenCtwa,
@@ -555,6 +586,16 @@ function buildChecks(
       key: "opportunityStatuses",
       pass: Boolean(status),
       reason: status ? `status:${status}` : undefined,
+    });
+  }
+  if (criteria.leadStatuses.length > 0) {
+    const status = profile.leadStatuses.find((value) =>
+      criteria.leadStatuses.includes(value),
+    );
+    checks.push({
+      key: "leadStatuses",
+      pass: Boolean(status),
+      reason: status ? `lead:${status}` : undefined,
     });
   }
   if (criteria.ctwaWindow !== "any") {
@@ -651,6 +692,7 @@ function normalizeCriteria(criteria: AudienceCriteria): NormalizedCriteria {
     opportunityStatuses: uniqueNonEmpty(
       criteria.opportunityStatuses ?? [],
     ) as OpportunityStatus[],
+    leadStatuses: uniqueNonEmpty(criteria.leadStatuses ?? []) as ChannelLeadStatus[],
     ctwaWindow: criteria.ctwaWindow ?? "any",
     campaignRecipientStatuses: uniqueNonEmpty(
       criteria.campaignRecipientStatuses ?? [],

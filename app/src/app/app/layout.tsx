@@ -6,6 +6,9 @@ import { usePathname, useRouter } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import {
+  Bot,
+  ScrollText,
+  CalendarDays,
   BarChart3,
   Building2,
   Check,
@@ -27,6 +30,7 @@ import {
   Zap,
   type LucideIcon,
 } from "lucide-react";
+import { PresenceHeartbeat } from "@/components/app/PresenceHeartbeat";
 import { api } from "../../../convex/_generated/api";
 import { cn } from "@/lib/cn";
 import { CommandPalette, KbdHint } from "@/components/CommandPalette";
@@ -50,9 +54,11 @@ type NavItem = {
 
 type ActiveWorkspace = {
   tenantId: Id<"tenants">;
+  memberId?: Id<"members">;
   name: string;
   vertical: string;
   role: string;
+  locale?: "pt" | "en";
 };
 
 type WorkspaceMembership = ActiveWorkspace & {
@@ -63,12 +69,17 @@ type WorkspaceMembership = ActiveWorkspace & {
 const PRIMARY_NAV: NavItem[] = [
   { href: "/app/channel-inbox", labelKey: "nav.inbox", icon: Inbox },
   { href: "/app/leads", labelKey: "nav.leads", icon: MousePointerClick },
+  { href: "/app/agenda", labelKey: "nav.agenda", icon: CalendarDays },
   { href: "/app/campaigns", labelKey: "nav.campaigns", icon: Send },
-  { href: "/app/chatbots", labelKey: "nav.agents", icon: Workflow },
+  { href: "/app/agents", labelKey: "nav.agents", icon: Bot },
   { href: "/app", labelKey: "nav.operation", icon: LayoutDashboard, exact: true },
 ];
 
 const ADMIN_NAV: NavItem[] = [
+  { href: "/app/admin", labelKey: "nav.adminHome", icon: SlidersHorizontal, exact: true },
+  { href: "/app/admin/members", labelKey: "nav.members", icon: Users },
+  { href: "/app/admin/logs", labelKey: "nav.logs", icon: ScrollText },
+  { href: "/app/chatbots", labelKey: "nav.flows", icon: Workflow },
   { href: "/app/contacts", labelKey: "nav.contacts", icon: Users },
   { href: "/app/analytics", labelKey: "nav.analytics", icon: BarChart3 },
   { href: "/app/channels", labelKey: "nav.channels", icon: Network },
@@ -81,6 +92,7 @@ const ADMIN_NAV: NavItem[] = [
 export default function AppLayout({ children }: { children: ReactNode }) {
   const tenant = useQuery(api.tenantsQueries.getActiveOptional);
   const tenants = useQuery(api.tenantsQueries.listMine, {});
+  const setLocale = useMutation(api.members.setLocale);
   const router = useRouter();
 
   useEffect(() => {
@@ -96,7 +108,12 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   }
 
   return (
-    <I18nProvider storageScope={tenant.tenantId}>
+    <I18nProvider
+      storageScope={tenant.tenantId}
+      initialLocale={tenant.locale ?? null}
+      onLocaleChange={(locale) => void setLocale({ locale }).catch(() => undefined)}
+    >
+      <PresenceHeartbeat />
       <AppShell tenant={tenant} tenants={tenants}>{children}</AppShell>
     </I18nProvider>
   );

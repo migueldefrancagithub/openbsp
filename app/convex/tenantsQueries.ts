@@ -6,9 +6,11 @@ import { tenantQuery } from "./lib/customFunctions";
 
 const ActiveTenantValidator = v.object({
   tenantId: v.id("tenants"),
+  memberId: v.id("members"),
   name: v.string(),
   vertical: v.string(),
   role: v.string(),
+  locale: v.optional(v.union(v.literal("pt"), v.literal("en"))),
 });
 
 const TenantMembershipValidator = v.object({
@@ -27,11 +29,14 @@ export const getActive = tenantQuery({
   handler: async (ctx) => {
     const tenant = await ctx.db.get(ctx.tenantId);
     if (!tenant) throw new ConvexError({ code: "NOT_FOUND" });
+    const member = await ctx.db.get(ctx.memberId);
     return {
       tenantId: ctx.tenantId,
+      memberId: ctx.memberId,
       name: tenant.name,
       vertical: tenant.vertical,
       role: ctx.role,
+      locale: member?.locale,
     };
   },
 });
@@ -60,9 +65,11 @@ export const getActiveOptional = query({
     if (!tenant) return null;
     return {
       tenantId: session.activeTenantId,
+      memberId: member._id,
       name: tenant.name,
       vertical: tenant.vertical,
       role: member.role,
+      locale: member.locale,
     };
   },
 });
