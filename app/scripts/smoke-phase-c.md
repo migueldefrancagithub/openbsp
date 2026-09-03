@@ -162,3 +162,39 @@ Modo do agente em `/app/agents` (cabeçalho) e override por conversa no inbox
 5. Toggle no cabeçalho da conversa: Automático → a IA responde sozinha; Co-Piloto → volta a
    sugerir e a conversa passa a modo humano. Sandbox no agente → nenhuma conversa real é
    tocada (`AGENT_SANDBOX`).
+
+## P — Paridade DeskcommCRM (auditoria em `docs/DESKCOMMCRM_PARITY_AUDIT.md`)
+
+1. **Quem manda na conversa.** Abrir o inbox com um agente publicado: a lista
+   mostra "IA a responder" nas conversas do agente. Pausar a IA numa conversa →
+   a linha passa a "IA pausada". Abrir um caso humano → "Caso humano aberto" e o
+   botão de devolver desaparece. Marcar não contactar → "Não contactar", sem
+   botão de devolver.
+2. **Fila.** Filtro "Não atribuídas": cada linha mostra a posição (1º, 2º…) e
+   desde quando o paciente espera. Com todos os agentes em Sandbox, as conversas
+   do automático passam a contar como fila.
+3. **Atalhos.** Com o foco fora do composer: `j`/`k` mudam de conversa, `r` foca
+   a resposta, `?` abre a lista de atalhos.
+4. **Aviso ao paciente no handoff.** Forçar uma passagem à equipa (palavra-chave
+   de handoff) com toda a equipa offline → a mensagem enviada diz que o pedido
+   ficou registado, sem prometer contacto imediato. Com alguém online e com
+   folga → diz que vai ser atendido a seguir.
+5. **Motivo da retenção.** Enviar de um número fora da allowlist → acima do
+   composer aparece "Envio retido pela protecção do canal" com a explicação.
+6. **Sino de avisos.** Deixar uma sugestão em Co-Piloto sem aprovar mais de 2h
+   (ou correr `ops:sweepPendingWork`) → o sino no menu mostra o contador e o
+   aviso em português.
+7. **Promessa sem dono.** Em Automático, provocar uma resposta com "vou
+   confirmar com a equipa" sem nenhuma ferramenta → aviso "prometeu algo e
+   ninguém ficou responsável" e próximo passo preenchido na conversa. Em
+   Co-Piloto o cartão avisa ANTES de aprovar.
+8. **Propostas.** Escrever "o meu email é x@y.mz" → em Operação aparece a
+   proposta com o trecho; Aprovar grava no contacto, Ignorar fica no histórico.
+   Repetir o mesmo email → nada de novo na fila.
+9. **Radar de risco.** Operação mostra os baldes crítico/em risco/em voo e a
+   lista de conversas abertas sem próximo passo.
+10. **Correcção humana.** Deixar a IA mover a etapa e depois movê-la de volta →
+    o separador Evolução do agente conta a correcção.
+11. **Ferramentas.** No editor do agente, os pacotes ligam grupos de capacidades
+    e cada linha mostra o risco (só consulta · altera dados · não dá para
+    desfazer).

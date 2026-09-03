@@ -65,6 +65,10 @@ export const CONVEX_ERROR_MESSAGES: Record<string, Pair> = {
   SECRET_ENCRYPTION_NOT_CONFIGURED: ["A encriptação de segredos não está configurada nesta instalação.", "Secret encryption is not configured on this deployment."],
   HEALTHCARE_ADVICE: ["A resposta continha aconselhamento clínico e foi bloqueada.", "The reply contained clinical advice and was blocked."],
   UNVERIFIED_BOOKING: ["A resposta afirmava uma marcação que não foi feita e foi bloqueada.", "The reply claimed a booking that was not made and was blocked."],
+  TOOL_BREAKER_BLOCKED: [
+    "O agente repetiu a mesma ferramenta sem sair do sítio e ela foi travada neste turno.",
+    "The agent repeated the same tool without making progress and it was stopped for this turn.",
+  ],
   PROPOSAL_NOT_PENDING: [
     "Esta proposta já foi decidida por alguém.",
     "Someone has already decided on this proposal.",

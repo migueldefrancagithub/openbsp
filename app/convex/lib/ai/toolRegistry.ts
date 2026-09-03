@@ -207,3 +207,19 @@ export const HUMAN_GATED_TOOLS: AiToolName[] = ["propor_dado_paciente", "propor_
 export function isWriteTool(name: string): boolean {
   return isAiToolName(name) && !READ_ONLY_TOOLS.includes(name) && !HUMAN_GATED_TOOLS.includes(name as AiToolName);
 }
+
+/**
+ * Capabilities grouped by the job they do, because the person configuring an
+ * agent owns a clinic and is not an engineer: `atualizar_lead` configures
+ * nothing for them. The per-tool checkbox still exists inside each group; the
+ * group is the default path.
+ */
+export type ToolBundle = "atender" | "marcar" | "vender" | "reter" | "escalar";
+
+export const TOOL_BUNDLES: Array<{ id: ToolBundle; tools: AiToolName[] }> = [
+  { id: "atender", tools: ["consultar_agenda", "aplicar_tag", "criar_lembrete_equipa"] },
+  { id: "marcar", tools: ["consultar_agenda", "reservar_slot", "confirmar_consulta"] },
+  { id: "vender", tools: ["atualizar_lead", "propor_proxima_acao", "propor_dado_paciente"] },
+  { id: "reter", tools: ["agendar_follow_up", "enviar_template"] },
+  { id: "escalar", tools: ["abrir_caso_humano", "criar_lembrete_equipa"] },
+];
