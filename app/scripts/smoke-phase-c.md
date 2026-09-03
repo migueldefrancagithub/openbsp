@@ -119,3 +119,21 @@ evento "Agente IA respondeu"; falha de envio → conversa em modo humano + alert
 3. Um rascunho com linguagem clínica ou promessa de marcação aparece com aviso
    vermelho (guards) e não se envia sem edição.
 4. Utilizador `marketing` não vê as ferramentas (sem `ai.compose`).
+
+## C7 — Integrações (webhooks assinados + REST v1)
+
+### Cron
+| Cron | Cadência | Função |
+|---|---|---|
+| webhook delivery | 1 min | `webhooks:deliverDue` — reclama ≤20 entregas vencidas, entrega com assinatura HMAC, backoff 1 m→24 h, morto após 8, pausa após 20 falhas seguidas |
+
+### Verificações
+1. Definições › Integrações › "Novo webhook" (URL https de teste, p. ex. um n8n) →
+   segredo mostrado uma vez; lista mostra `••••XXXX`.
+2. Criar uma marcação → em ≤1 min o endpoint recebe `appointment.booked` com
+   `x-openbsp-signature` válida (ver `docs/INTEGRATIONS.md`); a lista de entregas mostra
+   `delivered 200`.
+3. Apontar o webhook para um URL que devolva 503 → entregas `pending` com nova
+   tentativa; após 20 falhas o webhook fica pausado e aparece o alerta; "Reativar".
+4. REST v1 neutra: só depois de o owner registar `registerApiV1Routes(http)` em
+   `http.ts` (ficheiro guardado); até lá, as rotas não existem.

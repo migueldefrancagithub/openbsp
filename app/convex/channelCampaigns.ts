@@ -4,6 +4,7 @@ import { internal } from "./_generated/api";
 import { internalMutation } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { writeAudit } from "./lib/audit";
+import { emitWebhookEvent } from "./lib/webhooks";
 import { markCampaignConversion } from "./lib/campaignAttribution";
 import {
   campaignStatsValidator,
@@ -1079,6 +1080,7 @@ export const _finalize = internalMutation({
       payload: { sent: rates.sent, failed: rates.failed, unknown: rates.unknown },
       createdAt: now,
     });
+    await emitWebhookEvent(ctx, { tenantId: campaign.tenantId, type: "campaign.completed", eventId: `campaign:${campaign._id}:${status}`, payload: { campaignId: campaign._id, name: campaign.name, status, sent: rates.sent, failed: rates.failed, replied: rates.replied, converted: rates.converted }, now });
     return { completed: status === "completed", waiting: false };
   },
 });

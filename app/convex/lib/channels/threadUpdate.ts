@@ -1,4 +1,5 @@
 import { pauseAiRun, resumeAiRun } from "../ai/control";
+import { emitWebhookEvent } from "../webhooks";
 import { stopThreadFollowUps } from "../followUpControl";
 import { ConvexError, v } from "convex/values";
 import type { Doc, Id } from "../../_generated/dataModel";
@@ -217,6 +218,9 @@ export async function applyThreadUpdate(
   }
 
   if (args.leadStatus !== undefined) patch.leadStatus = args.leadStatus;
+  if (args.leadStatus !== undefined && args.leadStatus !== thread.leadStatus) {
+    await emitWebhookEvent(ctx, { tenantId: ctx.tenantId, type: "thread.lead_status_changed", eventId: `thread:${thread._id}:lead:${args.leadStatus}:${now}`, payload: { threadId: thread._id, threadKey: thread.threadKey, from: thread.leadStatus, to: args.leadStatus, byMemberId: ctx.memberId }, now });
+  }
   if (args.clearIntent) {
     patch.intent = undefined;
     patch.intentSource = undefined;

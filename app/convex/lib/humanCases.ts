@@ -3,6 +3,7 @@ import type { Doc, Id } from "../_generated/dataModel";
 import { writeAudit } from "./audit";
 import { setThreadAutomationMode, stopActiveAutomationRun } from "./channels/automationControl";
 import { recordThreadSystemEvent } from "./channels/systemEvents";
+import { emitWebhookEvent } from "./webhooks";
 
 export const SLA_MINUTES_BY_URGENCY = { urgent: 30, high: 120, normal: 8 * 60, low: 24 * 60 } as const;
 export type HumanCaseUrgency = keyof typeof SLA_MINUTES_BY_URGENCY;
@@ -94,5 +95,6 @@ export async function openHumanCaseInternal(
     actorKind: args.actorKind,
     now,
   });
+  await emitWebhookEvent(ctx, { tenantId: ctx.tenantId, type: "human_case.opened", eventId: `human_case:${caseId}:opened`, payload: { caseId, threadKey: thread?.threadKey, reason: args.reason.slice(0, 80), urgency: args.urgency, slaDueAt, openedFrom: args.openedFrom }, now });
   return { caseId, created: true };
 }

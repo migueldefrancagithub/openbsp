@@ -3,6 +3,7 @@
 import { type ReactNode, useEffect, useState } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
 import {
+  Webhook,
   Stethoscope,
   AlertTriangle,
   Ban,
@@ -34,6 +35,7 @@ import { IaSolutionHubSection } from "@/components/settings/IaSolutionHubSection
 import { CustomFieldsSettingsSection } from "@/components/settings/CustomFieldsSettingsSection";
 import { ClinicSettingsSection } from "@/components/settings/ClinicSettingsSection";
 import { AiSettingsSection } from "@/components/settings/AiSettingsSection";
+import { IntegrationsSection } from "@/components/settings/IntegrationsSection";
 import { AssignmentRulesSection } from "@/components/settings/AssignmentRulesSection";
 import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
@@ -182,6 +184,7 @@ export default function SettingsPage() {
     { key: "team", label: tr("Equipa", "Team"), value: tr("Membros/API", "Members/API"), icon: Users },
     { key: "clinic", label: tr("Clínica", "Clinic"), value: tr("Agenda/SLAs", "Calendar/SLAs"), icon: Stethoscope },
     { key: "ai", label: tr("IA", "AI"), value: tr("Provedor/chaves", "Provider/keys"), icon: Bot },
+    { key: "integrations", label: tr("Integrações", "Integrations"), value: "Webhooks/API", icon: Webhook },
     { key: "workspace", label: tr("Espaço", "Workspace"), value: roleLabel(tenant.role, locale), icon: Building2 },
   ];
 
@@ -372,6 +375,7 @@ export default function SettingsPage() {
         {/* Workspace card */}
         {settingsTab === "clinic" && <ClinicSettingsSection />}
         {settingsTab === "ai" && <AiSettingsSection />}
+        {settingsTab === "integrations" && <IntegrationsSection />}
         {settingsTab === "workspace" && <CustomFieldsSettingsSection />}
         {settingsTab === "workspace" && (
         <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">

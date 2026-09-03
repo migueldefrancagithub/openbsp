@@ -1190,6 +1190,48 @@ export default defineSchema({
     updatedAt: v.number(),
   }).index("by_tenant_day", ["tenantId", "day"]),
 
+  // ===== Integrations (Phase C7) =====
+  /** Customer endpoints that receive signed events (n8n, Sheets bridges, CRMs). */
+  outboundWebhooks: defineTable({
+    tenantId: v.id("tenants"),
+    name: v.string(),
+    url: v.string(),
+    secretCiphertext: v.string(),
+    secretKeyVersion: v.number(),
+    secretLast4: v.string(),
+    events: v.array(v.string()),
+    active: v.boolean(),
+    consecutiveFailures: v.number(),
+    pausedAt: v.optional(v.number()),
+    pausedReason: v.optional(v.string()),
+    lastDeliveredAt: v.optional(v.number()),
+    createdBy: v.id("members"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_tenant_active", ["tenantId", "active"]),
+
+  /** One row per (event, webhook). Retried with backoff; dead after the cap. */
+  webhookDeliveries: defineTable({
+    tenantId: v.id("tenants"),
+    webhookId: v.id("outboundWebhooks"),
+    eventType: v.string(),
+    eventId: v.string(),
+    businessKey: v.string(),
+    payload: v.any(),
+    status: v.union(v.literal("pending"), v.literal("claimed"), v.literal("delivered"), v.literal("failed"), v.literal("dead")),
+    attempts: v.number(),
+    nextAttemptAt: v.number(),
+    lastStatus: v.optional(v.number()),
+    lastError: v.optional(v.string()),
+    deliveredAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_status_next", ["status", "nextAttemptAt"])
+    .index("by_webhook_created", ["webhookId", "createdAt"])
+    .index("by_business_key", ["webhookId", "businessKey"])
+    .index("by_tenant_created", ["tenantId", "createdAt"]),
+
   /** Heartbeat per member (every 30 s from the app shell). Online < 90 s. */
   presence: defineTable({
     tenantId: v.id("tenants"),

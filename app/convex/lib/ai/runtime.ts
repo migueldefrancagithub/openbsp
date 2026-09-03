@@ -1,6 +1,7 @@
 import type { Doc, Id } from "../../_generated/dataModel";
 import { extractErrorCode, recordThreadSystemEvent } from "../channels/systemEvents";
 import { upsertOpsAlert } from "../opsAlerts";
+import { emitWebhookEvent } from "../webhooks";
 
 /** Target for `iaSolutionHub.dispatchOutboundJob` (kind ai_reply). */
 export async function loadAiReplyTarget(
@@ -79,6 +80,7 @@ export async function settleAiReply(
         dedupeKey: `aiturn:${turn._id}:replied`,
         now,
       });
+      await emitWebhookEvent(ctx, { tenantId: turn.tenantId, type: "ai.replied", eventId: `ai_turn:${turn._id}:replied`, payload: { turnId: turn._id, threadId: thread._id, threadKey: thread.threadKey, stage: turn.stage, toolCalls: turn.toolCallCount, text: turn.replyText?.slice(0, 500) }, now });
       if (turn.stage === "handoff" || run?.status === "handed_off") {
         await ctx.db.patch(thread._id, { nextStep: "Equipa humana precisa continuar esta conversa.", nextStepDueAt: now, updatedAt: now });
       }

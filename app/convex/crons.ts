@@ -82,4 +82,7 @@ crons.interval("analytics daily rollups", { hours: 1 }, internal.analyticsRollup
 // AI turns stuck in processing (action lost) are failed and the team notified.
 crons.interval("ai stale turn sweep", { minutes: 10 }, internal.aiRuntime.sweepStaleTurns, {});
 
+// Outbound webhooks: signed deliveries with backoff; dead-letter after 8 tries.
+crons.interval("webhook delivery", { minutes: 1 }, internal.outboundWebhooks.deliverDue, {});
+
 export default crons;

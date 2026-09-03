@@ -13,6 +13,7 @@ import { setThreadAutomationMode } from "./lib/channels/automationControl";
 import { formatLocalDateTime, localDateOf } from "./lib/clinicTime";
 import { openHumanCaseInternal } from "./lib/humanCases";
 import { upsertOpsAlert } from "./lib/opsAlerts";
+import { emitWebhookEvent } from "./lib/webhooks";
 
 const OBJECTIVE_PRIORITY = ["reception", "sales", "confirmation", "support"] as const;
 const STALE_TURN_MS = 10 * 60_000;
@@ -366,6 +367,7 @@ export const _finishTurn = internalMutation({
       }
       await ctx.db.patch(run._id, { status: "handed_off", pausedReason: r.handoff?.reason ?? r.reason, updatedAt: now });
       await recordThreadSystemEvent(ctx, { thread, kind: "ai.handoff", severity: "warning", actorType: "automation", payload: { turnId: turn._id, reason: r.handoff?.reason ?? r.reason }, dedupeKey: `aiturn:${turn._id}:handoff`, now });
+      await emitWebhookEvent(ctx, { tenantId: turn.tenantId, type: "ai.handoff", eventId: `ai_turn:${turn._id}:handoff`, payload: { turnId: turn._id, threadId: thread._id, threadKey: thread.threadKey, reason: r.handoff?.reason ?? r.reason }, now });
       if (r.text && thread.serviceWindowExpiresAt && thread.serviceWindowExpiresAt > now) {
         await queueReply("handoff", { kind: "text", text: r.text });
       } else {

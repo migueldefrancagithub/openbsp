@@ -1,6 +1,7 @@
 import { ConvexError, v } from "convex/values";
 import { writeAudit } from "./lib/audit";
 import { openHumanCaseInternal } from "./lib/humanCases";
+import { emitWebhookEvent } from "./lib/webhooks";
 import {
   setThreadAutomationMode,
   stopActiveAutomationRun,
@@ -759,6 +760,7 @@ export const resolveHumanCase = tenantMutation({
       targetId: humanCase._id,
       payload: { returnToAi, threadId: thread?._id },
     });
+    await emitWebhookEvent(ctx, { tenantId: ctx.tenantId, type: "human_case.resolved", eventId: `human_case:${humanCase._id}:resolved`, payload: { caseId: humanCase._id, threadId: humanCase.threadId, decision: args.decision.slice(0, 200), returnToAi: args.returnToAi ?? false }, now });
     return { resolved: true };
   },
 });

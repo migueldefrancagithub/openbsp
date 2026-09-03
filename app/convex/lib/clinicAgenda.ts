@@ -1,6 +1,7 @@
 import { ConvexError } from "convex/values";
 import type { Doc, Id } from "../_generated/dataModel";
 import { writeAudit } from "./audit";
+import { emitWebhookEvent } from "./webhooks";
 import { markCampaignConversion } from "./campaignAttribution";
 import { recordThreadSystemEvent } from "./channels/systemEvents";
 import {
@@ -259,6 +260,13 @@ export async function reserveSlotInternal(
       now,
     });
   }
+  await emitWebhookEvent(ctx, {
+    tenantId: ctx.tenantId,
+    type: "appointment.booked",
+    eventId: `appointment:${appointmentId}:booked`,
+    payload: { appointmentId, serviceId: service._id, serviceName: service.name, professionalId: professional?._id, startAt: range.startAt, endAt: range.endAt, threadKey: thread?.threadKey, source: args.source },
+    now,
+  });
   await writeAudit(ctx, {
     action: "clinic.appointment.created",
     targetType: "clinicAppointment",
@@ -322,6 +330,7 @@ export async function confirmInternal(
       });
     }
   }
+  await emitWebhookEvent(ctx, { tenantId: ctx.tenantId, type: "appointment.confirmed", eventId: `appointment:${appointment._id}:confirmed`, payload: { appointmentId: appointment._id, startAt: appointment.startAt, via: args.via, threadId: appointment.threadId }, now });
   await writeAudit(ctx, {
     action: "clinic.appointment.confirmed",
     targetType: "clinicAppointment",
@@ -380,6 +389,7 @@ export async function cancelInternal(
     targetId: appointment._id,
     payload: { by: args.by, reason: args.reason?.slice(0, 120) },
   });
+  await emitWebhookEvent(ctx, { tenantId: ctx.tenantId, type: "appointment.cancelled", eventId: `appointment:${appointment._id}:cancelled`, payload: { appointmentId: appointment._id, startAt: appointment.startAt, by: args.by, reason: args.reason?.slice(0, 120), threadId: appointment.threadId }, now });
   return { cancelled: true };
 }
 
@@ -501,6 +511,7 @@ export async function outcomeInternal(
     targetType: "clinicAppointment",
     targetId: appointment._id,
   });
+  await emitWebhookEvent(ctx, { tenantId: ctx.tenantId, type: args.status === "completed" ? "appointment.attended" : "appointment.no_show", eventId: `appointment:${appointment._id}:${args.status}`, payload: { appointmentId: appointment._id, startAt: appointment.startAt, threadId: appointment.threadId }, now });
   return { updated: true, followUpTaskId };
 }
 
