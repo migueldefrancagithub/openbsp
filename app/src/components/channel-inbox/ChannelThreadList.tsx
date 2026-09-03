@@ -63,6 +63,9 @@ type ThreadRow = {
   firstResponseDueAt?: number;
   slaBreached?: boolean;
   aiSuggestionPending?: boolean;
+  command?: string;
+  commandReason?: string;
+  waitingSince?: number;
   openCaseUrgency?: string;
   dueReminderCount?: number;
 };
@@ -74,6 +77,47 @@ type FilterItem = {
 };
 
 const inboxApi = api.inboxOperations;
+
+const SILENCE_PT: Record<string, string> = {
+  member_in_command: "IA pausada — assumida",
+  paused: "IA pausada",
+  human_case_open: "Caso humano aberto",
+  opted_out: "Não contactar",
+  snoozed: "Adiada",
+};
+
+const SILENCE_EN: Record<string, string> = {
+  member_in_command: "AI paused — taken over",
+  paused: "AI paused",
+  human_case_open: "Human case open",
+  opted_out: "Do not contact",
+  snoozed: "Snoozed",
+};
+
+const COMMAND_PT: Record<string, string> = {
+  member: "Em atendimento",
+  ai: "IA a responder",
+  nobody: "Sem agente no ar",
+  waiting: "À espera da equipa",
+  closed: "Encerrada",
+};
+
+const COMMAND_EN: Record<string, string> = {
+  member: "Being handled",
+  ai: "AI answering",
+  nobody: "No agent live",
+  waiting: "Waiting for the team",
+  closed: "Closed",
+};
+
+function silenceLabel(reason: string, locale: "pt" | "en"): string {
+  return (locale === "pt" ? SILENCE_PT : SILENCE_EN)[reason] ?? reason;
+}
+
+function commandTitle(thread: { command?: string }, locale: "pt" | "en"): string | undefined {
+  if (!thread.command) return undefined;
+  return (locale === "pt" ? COMMAND_PT : COMMAND_EN)[thread.command];
+}
 
 const FILTERS: FilterItem[] = [
   { value: "all", labelKey: "inbox.all", icon: Inbox },
@@ -136,7 +180,7 @@ function routeWithState(
 }
 
 export function ChannelThreadList() {
-  const { locale, t } = useI18n();
+  const { locale, t, tr } = useI18n();
   const router = useRouter();
   const channels = useQuery(api.channels.list, {});
   const params = useParams<{ threadKey?: string }>();
@@ -286,13 +330,18 @@ export function ChannelThreadList() {
         ) : (
           <div className="flex-1 overflow-y-auto">
             <ul>
-              {threads.map((thread) => {
+              {threads.map((thread, index) => {
                 const label = thread.displayName ?? thread.phone ?? thread.threadKey;
+                // Position is only meaningful in the queue, where the rows ARE
+                // the queue and the oldest wait is what decides who goes first.
+                const queuePosition = filter === "unassigned" ? index + 1 : undefined;
                 const selected = selectedThreadKey === thread.threadKey;
                 const windowOpen = !!thread.serviceWindowExpiresAt && thread.serviceWindowExpiresAt > Date.now();
                 return (
                   <li key={thread._id}>
                     <Link
+                      data-thread-link
+                      aria-current={selected ? "true" : undefined}
                       href={routeWithState(
                         `/app/channel-inbox/${encodeURIComponent(thread.threadKey)}`,
                         activeChannelId,
@@ -350,6 +399,24 @@ export function ChannelThreadList() {
                             >
                               <Bell size={9} />
                               {thread.dueReminderCount}
+                            </span>
+                          )}
+                          {queuePosition !== undefined && (
+                            <span
+                              className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[#0a1b33]/10 px-1 text-[10px] font-semibold tabular-nums text-[#0a1b33]"
+                              aria-label={`${tr("Posição", "Position")} ${queuePosition}`}
+                              title={
+                                thread.waitingSince
+                                  ? `${tr("À espera desde", "Waiting since")} ${relativeTime(thread.waitingSince, Date.now(), locale)}`
+                                  : undefined
+                              }
+                            >
+                              {queuePosition}º
+                            </span>
+                          )}
+                          {thread.commandReason && (
+                            <span className="text-[10px] text-slate-400" title={commandTitle(thread, locale)}>
+                              {silenceLabel(thread.commandReason, locale)}
                             </span>
                           )}
                           {thread.aiSuggestionPending && (
