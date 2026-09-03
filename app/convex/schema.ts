@@ -710,6 +710,8 @@ export default defineSchema({
     ])
     .index("by_channel_status_created", ["channelId", "status", "createdAt"])
     .index("by_status_unknown_since", ["status", "unknownSince"])
+    /** Rows the provider never took, oldest first. */
+    .index("by_status_created", ["status", "createdAt"])
     .index("by_tenant_created", ["tenantId", "createdAt"]),
 
   channelTemplates: defineTable({
@@ -866,7 +868,9 @@ export default defineSchema({
     .index("by_tenant_inbox_status", ["tenantId", "inboxStatus", "lastEventAt"])
     .index("by_tenant_responsible", ["tenantId", "responsibleMemberId", "lastEventAt"])
     .index("by_tenant_team", ["tenantId", "assignedTeamId", "lastEventAt"])
-    .index("by_tenant_first_response_due", ["tenantId", "firstResponseDueAt"]),
+    .index("by_tenant_first_response_due", ["tenantId", "firstResponseDueAt"])
+    /** Snoozes whose time is up: a promise the team made to itself. */
+    .index("by_tenant_snoozed", ["tenantId", "snoozedUntil"]),
 
   threadInternalNotes: defineTable({
     tenantId: v.id("tenants"),

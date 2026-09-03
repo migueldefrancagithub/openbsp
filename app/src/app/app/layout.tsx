@@ -3,6 +3,7 @@
 import { ReactNode, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { AlertsBell } from "@/components/operation/AlertsBell";
 import { useMutation, useQuery } from "convex/react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import {
@@ -287,6 +288,10 @@ function AppShell({
           {PRIMARY_NAV.map((item) => (
             <NavLink key={item.href} item={item} active={isActive(item.href, item.exact)} />
           ))}
+
+          <div className="hidden lg:block lg:pt-2">
+            <AlertsBell />
+          </div>
 
           <div className="relative hidden pt-2 lg:block">
             <button

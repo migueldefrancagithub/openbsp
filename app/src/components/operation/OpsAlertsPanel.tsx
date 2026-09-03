@@ -10,30 +10,8 @@ import { cn } from "@/lib/cn";
 import { convexErrorMessage } from "@/lib/convexErrorMessage";
 import { useI18n } from "@/lib/i18n";
 import { relativeTime } from "@/lib/relativeTime";
+import { alertLabel } from "@/lib/alertCopy";
 
-function kindLabel(kind: string, locale: "pt" | "en"): string {
-  const pt: Record<string, string> = {
-    "campaign.auto_paused": "Campanha pausada",
-    "ai.provider_down": "IA sem resposta do provedor",
-    "ai.budget_exceeded": "Orçamento diário de IA esgotado",
-    "webhook.paused": "Webhook pausado",
-    "campaign.unknown_delivery": "Campanha sem confirmação",
-    "outbox.unknown": "Envios sem confirmação",
-    "sla.human_case": "SLA de caso humano",
-    "retention.candidates": "Retenção de dados",
-  };
-  const en: Record<string, string> = {
-    "campaign.auto_paused": "Campaign paused",
-    "ai.provider_down": "AI provider not responding",
-    "ai.budget_exceeded": "Daily AI budget exhausted",
-    "webhook.paused": "Webhook paused",
-    "campaign.unknown_delivery": "Campaign unconfirmed",
-    "outbox.unknown": "Unconfirmed sends",
-    "sla.human_case": "Human case SLA",
-    "retention.candidates": "Data retention",
-  };
-  return (locale === "pt" ? pt : en)[kind] ?? kind;
-}
 
 export function OpsAlertsPanel({ compact = false }: { compact?: boolean }) {
   const { locale, tr } = useI18n();
@@ -87,7 +65,7 @@ export function OpsAlertsPanel({ compact = false }: { compact?: boolean }) {
               </span>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-x-2 text-[13px] text-[#0a1b33]">
-                  <span className="font-semibold">{kindLabel(alert.kind, locale)}</span>
+                  <span className="font-semibold">{alertLabel(alert.kind, locale)}</span>
                   <span className="text-[11px] text-slate-400">{relativeTime(alert.updatedAt, now, locale)}</span>
                 </div>
                 <p className="text-[12px] text-slate-600">{alert.title}</p>

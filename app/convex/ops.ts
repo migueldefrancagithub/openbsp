@@ -18,6 +18,11 @@ const alertValidator = v.object({
   updatedAt: v.number(),
 });
 
+/** A suggestion waiting longer than this is a patient waiting for nothing. */
+export const SUGGESTION_STALE_MS = 2 * 60 * 60_000;
+/** An outbox row the provider never took within this window is stuck. */
+export const OUTBOX_STUCK_MS = 15 * 60_000;
+
 export const listAlerts = tenantQuery({
   args: { status: v.optional(v.union(v.literal("open"), v.literal("acknowledged"))) },
   returns: v.array(alertValidator),
@@ -181,5 +186,105 @@ export const sweepSlaBreaches = internalMutation({
       await ctx.scheduler.runAfter(0, internal.ops.sweepSlaBreaches, { cursor: page.continueCursor });
     }
     return { tenants: page.page.length, breached, isDone: page.isDone };
+  },
+});
+
+/**
+ * Two conditions the engine already produces and nobody was watching.
+ *
+ * A copilot suggestion nobody approves is a patient waiting with an answer
+ * already written; a snooze whose time is up is a promise the team made to
+ * itself and lost. Both are cheap to observe and both go silent otherwise.
+ */
+export const sweepPendingWork = internalMutation({
+  args: { cursor: v.optional(v.string()) },
+  returns: v.object({ tenants: v.number(), suggestions: v.number(), snoozes: v.number(), stuck: v.number(), isDone: v.boolean() }),
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    const page = await ctx.db.query("tenants").paginate({ cursor: args.cursor ?? null, numItems: 50 });
+    const day = new Date(now).toISOString().slice(0, 10);
+    let suggestions = 0;
+    let snoozes = 0;
+    let stuck = 0;
+    for (const tenant of page.page) {
+      // Suggestions waiting for a human longer than the stale window.
+      const waiting = (await ctx.db
+        .query("aiTurns")
+        .withIndex("by_tenant_created", (q) => q.eq("tenantId", tenant._id))
+        .order("desc")
+        .take(200)) as Doc<"aiTurns">[];
+      const overdue = waiting.filter(
+        (turn) => turn.status === "awaiting_approval" && now - turn.createdAt > SUGGESTION_STALE_MS,
+      );
+      if (overdue.length > 0) {
+        suggestions += overdue.length;
+        await upsertOpsAlert(ctx, {
+          tenantId: tenant._id,
+          kind: "ai.suggestion_stale",
+          businessKey: `ai:suggestion_stale:${day}`,
+          severity: overdue.length >= 5 ? "critical" : "warn",
+          title: `${overdue.length} sugestão(ões) da IA à espera de aprovação há mais de ${Math.round(SUGGESTION_STALE_MS / 3_600_000)}h.`,
+          payload: { count: overdue.length },
+          href: "/app/channel-inbox",
+          reopen: true,
+          now,
+        });
+      }
+
+      // Snoozes whose time is up on conversations still open and unassigned.
+      const snoozed = (await ctx.db
+        .query("channelThreads")
+        .withIndex("by_tenant_snoozed", (q) =>
+          q.eq("tenantId", tenant._id).gt("snoozedUntil", 0).lt("snoozedUntil", now),
+        )
+        .take(51)) as Doc<"channelThreads">[];
+      const expired = snoozed.filter((thread) => !thread.closedAt);
+      if (expired.length > 0) {
+        snoozes += expired.length;
+        await upsertOpsAlert(ctx, {
+          tenantId: tenant._id,
+          kind: "snooze.expired",
+          businessKey: `snooze:expired:${day}`,
+          severity: "warn",
+          title: `${expired.length >= 51 ? "50+" : expired.length} conversa(s) adiada(s) cujo prazo passou.`,
+          payload: { count: expired.length, sample: expired.slice(0, 5).map((row) => row.threadKey) },
+          href: "/app/channel-inbox?filter=snoozed",
+          reopen: true,
+          now,
+        });
+      }
+    }
+
+    // Outbox rows the provider never took: from the patient's side, a message
+    // that stayed "sending" forever is a message that never arrived.
+    const queued = (await ctx.db
+      .query("channelOutbox")
+      .withIndex("by_status_created", (q) => q.eq("status", "queued").lt("createdAt", now - OUTBOX_STUCK_MS))
+      .take(50)) as Doc<"channelOutbox">[];
+    const byTenant = new Map<string, Doc<"channelOutbox">[]>();
+    for (const row of queued) {
+      const list = byTenant.get(row.tenantId) ?? [];
+      list.push(row);
+      byTenant.set(row.tenantId, list);
+    }
+    for (const [tenantId, rows] of byTenant) {
+      stuck += rows.length;
+      await upsertOpsAlert(ctx, {
+        tenantId: tenantId as Id<"tenants">,
+        kind: "outbox.stuck",
+        businessKey: `outbox:stuck:${day}`,
+        severity: "critical",
+        title: `${rows.length} resposta(s) presa(s) sem sair para o paciente.`,
+        payload: { count: rows.length, oldestAt: Math.min(...rows.map((row) => row.createdAt)) },
+        href: "/app/admin/logs?tab=outbox",
+        reopen: true,
+        now,
+      });
+    }
+
+    if (!page.isDone) {
+      await ctx.scheduler.runAfter(0, internal.ops.sweepPendingWork, { cursor: page.continueCursor });
+    }
+    return { tenants: page.page.length, suggestions, snoozes, stuck, isDone: page.isDone };
   },
 });

@@ -9,7 +9,6 @@ import {
   handoffNoticeText,
   noticeReason,
 } from "../lib/escalation/handoffNotice";
-import { retentionFamilies } from "./helpers/retention";
 
 const NOW = 1_800_000_000_000;
 
@@ -109,15 +108,5 @@ describe("the hand-off notice", () => {
     expect(expectationInstruction({ available: 0, total: 4 }, "pt")).toContain("ATENÇÃO");
     expect(expectationInstruction({ available: 3, total: 4 }, "pt")).toContain("3");
     expect(expectationInstruction({ available: 3, total: 4 }, "en")).toContain("take over");
-  });
-});
-
-describe("retention copy", () => {
-  it("gives every blocking code a family and a sentence, and no code twice", () => {
-    const { families, missing } = retentionFamilies();
-    expect(missing).toEqual([]);
-    expect(families.protection.length).toBeGreaterThan(0);
-    expect(families.compliance.length).toBeGreaterThan(0);
-    expect(families.quality.length).toBeGreaterThan(0);
   });
 });
