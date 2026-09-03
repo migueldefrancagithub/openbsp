@@ -1160,6 +1160,23 @@ export default defineSchema({
     .index("by_turn", ["turnId", "createdAt"])
     .index("by_tenant_business_key", ["tenantId", "businessKey"]),
 
+  /** Composer help (suggest/translate/rewrite). Never sent by itself. */
+  aiSuggestions: defineTable({
+    tenantId: v.id("tenants"),
+    threadId: v.optional(v.id("channelThreads")),
+    memberId: v.id("members"),
+    kind: v.union(v.literal("suggest_reply"), v.literal("translate"), v.literal("rewrite_tone")),
+    input: v.string(),
+    output: v.string(),
+    provider: v.string(),
+    model: v.string(),
+    costUsdMicros: v.number(),
+    flagged: v.array(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_thread", ["threadId", "createdAt"])
+    .index("by_tenant_created", ["tenantId", "createdAt"]),
+
   /** Daily spend per provider/model (budget enforcement + reports). */
   aiCostLedger: defineTable({
     tenantId: v.id("tenants"),

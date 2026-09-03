@@ -41,6 +41,7 @@ import { LeadHeaderBar } from "@/components/channel-inbox/LeadHeaderBar";
 import { HandoffDialog } from "@/components/channel-inbox/HandoffDialog";
 import { HumanCaseChip } from "@/components/channel-inbox/HumanCaseChip";
 import { AiPresenceChip } from "@/components/channel-inbox/AiPresenceChip";
+import { AiComposerTools } from "@/components/channel-inbox/AiComposerTools";
 import { SnoozeMenu } from "@/components/channel-inbox/SnoozeMenu";
 import {
   SystemEventRow,
@@ -1114,6 +1115,18 @@ export function ChannelThreadView({
             className="hidden"
           />
 
+          {!blocked && workspace?.role !== "marketing" && (
+            <div className="mb-1.5">
+              <AiComposerTools
+                threadId={summary._id}
+                draft={draft}
+                onUse={(text) => {
+                  setDraft(text);
+                  composerRef.current?.focus();
+                }}
+              />
+            </div>
+          )}
           <div className={cn("mt-2 flex items-center gap-1.5", !blocked && "mt-0")}>
                 <button
                   type="button"

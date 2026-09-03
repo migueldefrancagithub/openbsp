@@ -106,3 +106,16 @@ evento "Agente IA respondeu"; falha de envio → conversa em modo humano + alert
    por provedor; link para a conversa.
 5. `channelAutomation:flowAnalytics` (fluxos por palavra-chave): execuções, conclusão,
    duração média, motivos de fim e nós de abandono.
+
+## C6 — IA no composer
+
+`aiComposer.suggestReply/translate/rewriteTone` (capacidade `ai.compose`): escrevem
+`aiSuggestions` e cobram o ledger; **nunca** criam outbox nem dispatch.
+
+### Verificações
+1. Inbox › composer: "Sugerir resposta" → faixa âmbar "Rascunho da IA · revê antes de
+   enviar" com "Usar"/"Descartar"; "Usar" só preenche o campo de texto.
+2. Com texto no campo: "Encurtar", "Mais formal", "Mais próximo", "Traduzir".
+3. Um rascunho com linguagem clínica ou promessa de marcação aparece com aviso
+   vermelho (guards) e não se envia sem edição.
+4. Utilizador `marketing` não vê as ferramentas (sem `ai.compose`).

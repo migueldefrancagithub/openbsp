@@ -107,6 +107,8 @@ export const CONVEX_ERROR_MESSAGES: Record<string, Pair> = {
   AI_TURN_FAILED: ["O agente de IA não conseguiu responder.", "The AI agent could not reply."],
   HUMAN_TAKEOVER: ["Um membro da equipa assumiu a conversa.", "A team member took over the conversation."],
   COALESCED: ["Mensagem agrupada com a resposta em curso.", "Message merged into the reply in progress."],
+  AI_PROVIDER_UNAVAILABLE: ["O provedor de IA não respondeu. Tente de novo em instantes.", "The AI provider did not respond. Try again shortly."],
+  AI_COMPOSER_EMPTY: ["A IA não devolveu texto. Tente de novo.", "The AI returned no text. Try again."],
   ACCEPTANCE_INCOMPLETE: ["Aceite o DPA e confirme a DPIA para continuar.", "Accept the DPA and confirm the DPIA to continue."],
   INVALID_CONTROLLER_NAME: ["Indique o nome da entidade responsável pelos dados.", "Enter the data controller name."],
   INVALID_CONTROLLER_EMAIL: ["Indique um email válido para o responsável pelos dados.", "Enter a valid email for the data controller."],
