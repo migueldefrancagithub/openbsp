@@ -76,6 +76,8 @@ export const listByStatus = tenantQuery({
     channelId: v.optional(v.id("channels")),
     /** Only leads that came from this campaign. */
     originCampaignId: v.optional(v.id("campaigns")),
+    /** Client clock bucket; makes risk and ownership transitions reactive. */
+    now: v.optional(v.number()),
     paginationOpts: paginationOptsValidator,
   },
   returns: v.object({
@@ -90,23 +92,48 @@ export const listByStatus = tenantQuery({
     }
     const numItems = Math.min(Math.max(args.paginationOpts.numItems, 1), 50);
     const cursor = args.paginationOpts.cursor;
+    const now = args.now ?? Date.now();
     const result = channel
-      ? await ctx.db
-          .query("channelThreads")
-          .withIndex("by_channel_lead_status", (q) =>
-            q.eq("channelId", channel._id).eq("leadStatus", args.leadStatus),
-          )
-          .filter((q) => q.eq(q.field("closedAt"), undefined))
-          .order("desc")
-          .paginate({ cursor, numItems })
-      : await ctx.db
-          .query("channelThreads")
-          .withIndex("by_tenant_lead_status", (q) =>
-            q.eq("tenantId", ctx.tenantId).eq("leadStatus", args.leadStatus),
-          )
-          .filter((q) => q.eq(q.field("closedAt"), undefined))
-          .order("desc")
-          .paginate({ cursor, numItems });
+      ? args.originCampaignId
+        ? await ctx.db
+            .query("channelThreads")
+            .withIndex("by_channel_lead_status_campaign", (q) =>
+              q
+                .eq("channelId", channel._id)
+                .eq("leadStatus", args.leadStatus)
+                .eq("originCampaignId", args.originCampaignId),
+            )
+            .filter((q) => q.eq(q.field("closedAt"), undefined))
+            .order("desc")
+            .paginate({ cursor, numItems })
+        : await ctx.db
+            .query("channelThreads")
+            .withIndex("by_channel_lead_status", (q) =>
+              q.eq("channelId", channel._id).eq("leadStatus", args.leadStatus),
+            )
+            .filter((q) => q.eq(q.field("closedAt"), undefined))
+            .order("desc")
+            .paginate({ cursor, numItems })
+      : args.originCampaignId
+        ? await ctx.db
+            .query("channelThreads")
+            .withIndex("by_tenant_lead_status_campaign", (q) =>
+              q
+                .eq("tenantId", ctx.tenantId)
+                .eq("leadStatus", args.leadStatus)
+                .eq("originCampaignId", args.originCampaignId),
+            )
+            .filter((q) => q.eq(q.field("closedAt"), undefined))
+            .order("desc")
+            .paginate({ cursor, numItems })
+        : await ctx.db
+            .query("channelThreads")
+            .withIndex("by_tenant_lead_status", (q) =>
+              q.eq("tenantId", ctx.tenantId).eq("leadStatus", args.leadStatus),
+            )
+            .filter((q) => q.eq(q.field("closedAt"), undefined))
+            .order("desc")
+            .paginate({ cursor, numItems });
     const channels = new Map<string, Doc<"channels"> | null>();
     const campaigns = new Map<string, string | undefined>();
     const members = new Map<string, string | undefined>();
@@ -114,7 +141,6 @@ export const listByStatus = tenantQuery({
     for (const thread of result.page) {
       if (thread.tenantId !== ctx.tenantId) continue;
       if (thread.closedAt || thread.inboxStatus === "closed") continue;
-      if (args.originCampaignId && thread.originCampaignId !== args.originCampaignId) continue;
       if (!(await threadHasMessageEvent(ctx, thread))) continue;
       if (!channels.has(thread.channelId)) {
         channels.set(thread.channelId, await ctx.db.get(thread.channelId));
@@ -132,10 +158,10 @@ export const listByStatus = tenantQuery({
       // The card carries the two facts that decide whether someone acts on it:
       // who holds the conversation, and whether it is going cold with nothing
       // planned. Both are the same rules the inbox and the radar use.
-      const command = threadCommand(thread, Date.now());
+      const command = threadCommand(thread, now);
       const risk = classifyRisk({
         lastActivityAt: Math.max(thread.lastInboundAt ?? 0, thread.lastOutboundAt ?? 0, thread.createdAt),
-        now: Date.now(),
+        now,
         inFlight: false,
         window: resolveStageWindow(thread.leadStatus),
       });
@@ -195,20 +221,42 @@ export const counts = tenantQuery({
     const result = [];
     for (const status of LEAD_STATUSES) {
       const rows = channel
-        ? await ctx.db
-            .query("channelThreads")
-            .withIndex("by_channel_lead_status", (q) =>
-              q.eq("channelId", channel._id).eq("leadStatus", status),
-            )
-            .filter((q) => q.eq(q.field("closedAt"), undefined))
-            .take(COUNT_CAP + 1)
-        : await ctx.db
-            .query("channelThreads")
-            .withIndex("by_tenant_lead_status", (q) =>
-              q.eq("tenantId", ctx.tenantId).eq("leadStatus", status),
-            )
-            .filter((q) => q.eq(q.field("closedAt"), undefined))
-            .take(COUNT_CAP + 1);
+        ? args.originCampaignId
+          ? await ctx.db
+              .query("channelThreads")
+              .withIndex("by_channel_lead_status_campaign", (q) =>
+                q
+                  .eq("channelId", channel._id)
+                  .eq("leadStatus", status)
+                  .eq("originCampaignId", args.originCampaignId),
+              )
+              .filter((q) => q.eq(q.field("closedAt"), undefined))
+              .take(COUNT_CAP + 1)
+          : await ctx.db
+              .query("channelThreads")
+              .withIndex("by_channel_lead_status", (q) =>
+                q.eq("channelId", channel._id).eq("leadStatus", status),
+              )
+              .filter((q) => q.eq(q.field("closedAt"), undefined))
+              .take(COUNT_CAP + 1)
+        : args.originCampaignId
+          ? await ctx.db
+              .query("channelThreads")
+              .withIndex("by_tenant_lead_status_campaign", (q) =>
+                q
+                  .eq("tenantId", ctx.tenantId)
+                  .eq("leadStatus", status)
+                  .eq("originCampaignId", args.originCampaignId),
+              )
+              .filter((q) => q.eq(q.field("closedAt"), undefined))
+              .take(COUNT_CAP + 1)
+          : await ctx.db
+              .query("channelThreads")
+              .withIndex("by_tenant_lead_status", (q) =>
+                q.eq("tenantId", ctx.tenantId).eq("leadStatus", status),
+              )
+              .filter((q) => q.eq(q.field("closedAt"), undefined))
+              .take(COUNT_CAP + 1);
       const open = rows.filter(
         (row) =>
           row.tenantId === ctx.tenantId &&

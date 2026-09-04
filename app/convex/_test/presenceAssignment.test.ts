@@ -113,7 +113,7 @@ describe("presence and assignment", () => {
     await t.run(async (ctx) => {
       await ctx.db.patch(thread._id, { firstResponseDueAt: Date.now() - 60_000 });
     });
-    const list = await s.asOwner.query(api.inboxOperations.listThreads, { channelId: s.channelId, filter: "all", paginationOpts: { cursor: null, numItems: 20 } } as never);
+    const list = await s.asOwner.query(api.inboxOperations.listThreads, { channelId: s.channelId, filter: "all", now: Date.now(), paginationOpts: { cursor: null, numItems: 20 } } as never);
     expect(list.page.find((row: { threadKey: string }) => row.threadKey === "258840000005")).toMatchObject({ slaBreached: true });
     const sweep = await t.mutation(internal.ops.sweepSlaBreaches, {});
     expect(sweep.breached).toBeGreaterThanOrEqual(1);

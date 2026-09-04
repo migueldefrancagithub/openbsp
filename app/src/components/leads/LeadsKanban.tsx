@@ -17,10 +17,12 @@ export function LeadsKanban({
   channelId,
   originCampaignId,
   counts,
+  now,
 }: {
   channelId?: Id<"channels">;
   originCampaignId?: Id<"campaigns">;
   counts: Counts | undefined;
+  now: number;
 }) {
   const { locale, t } = useI18n();
   const updateThread = useMutation(api.inboxOperations.updateThread);
@@ -53,6 +55,7 @@ export function LeadsKanban({
             status={status}
             channelId={channelId}
             originCampaignId={originCampaignId}
+            now={now}
             count={counts?.find((row) => row.status === status)}
             movingId={moving}
             onMove={move}
@@ -67,6 +70,7 @@ function KanbanColumn({
   status,
   channelId,
   originCampaignId,
+  now,
   count,
   movingId,
   onMove,
@@ -74,6 +78,7 @@ function KanbanColumn({
   status: LeadStatus;
   channelId?: Id<"channels">;
   originCampaignId?: Id<"campaigns">;
+  now: number;
   count?: { count: number; capped: boolean };
   movingId: Id<"channelThreads"> | null;
   onMove: (threadId: Id<"channelThreads">, leadStatus: string) => void;
@@ -82,7 +87,7 @@ function KanbanColumn({
   const [over, setOver] = useState(false);
   const { results, status: loadStatus, loadMore } = usePaginatedQuery(
     api.leads.listByStatus,
-    { leadStatus: status, channelId, originCampaignId },
+    { leadStatus: status, channelId, originCampaignId, now },
     { initialNumItems: 20 },
   );
   const tone = leadColumnTone(status);

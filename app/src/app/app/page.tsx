@@ -26,6 +26,7 @@ import Link from "next/link";
 import { api } from "../../../convex/_generated/api";
 import { relativeTime } from "@/lib/relativeTime";
 import { useI18n, type TranslationKey } from "@/lib/i18n";
+import { useMinuteNow } from "@/lib/useMinuteNow";
 import { ClinicOpsPanel } from "@/components/operation/ClinicOpsPanel";
 import { OpsAlertsPanel } from "@/components/operation/OpsAlertsPanel";
 import { ProposalsPanel } from "@/components/operation/ProposalsPanel";
@@ -117,8 +118,9 @@ const QUICK_CREATORS = [
 }>;
 
 export default function AppOverview() {
+  const now = useMinuteNow();
   const tenant = useQuery(api.tenantsQueries.getActive);
-  const dashboard = useQuery(api.operation.dashboard, {});
+  const dashboard = useQuery(api.operation.dashboard, now === null ? "skip" : { now });
   const alertSummary = useQuery(api.ops.summary, {});
   const { locale, t } = useI18n();
   const [operationTab, setOperationTab] = useState<OperationTab>("today");

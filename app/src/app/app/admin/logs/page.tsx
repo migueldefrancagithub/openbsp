@@ -12,6 +12,7 @@ import { useI18n } from "@/lib/i18n";
 import { relativeTime } from "@/lib/relativeTime";
 
 type Tab = "events" | "outbox" | "audit" | "followups";
+type AuditActorType = "member" | "system" | "scheduler" | "api_key" | "ai";
 
 function maskKey(value: string | undefined): string {
   if (!value) return "—";
@@ -50,12 +51,15 @@ export default function AdminLogsPage() {
   const members = useQuery(api.memberInvites.listMembers, tab === "audit" ? {} : "skip");
   const [auditActor, setAuditActor] = useState<string>("");
   const [auditArea, setAuditArea] = useState<string>("");
+  const auditActorType = auditActor.startsWith("type:")
+    ? (auditActor.slice(5) as AuditActorType)
+    : undefined;
   const audit = usePaginatedQuery(
     api.audit.listPaginated,
     tab === "audit"
       ? {
           ...(auditActor.startsWith("member:") ? { actorId: auditActor.slice(7) as Id<"members"> } : {}),
-          ...(auditActor.startsWith("type:") ? { actorType: auditActor.slice(5) } : {}),
+          ...(auditActorType ? { actorType: auditActorType } : {}),
           ...(auditArea ? { actionPrefix: auditArea } : {}),
         }
       : "skip",
@@ -132,6 +136,8 @@ export default function AdminLogsPage() {
                 <option value="">{tr("Qualquer autor", "Any author")}</option>
                 <option value="type:system">{tr("Sistema", "System")}</option>
                 <option value="type:ai">{tr("Agente de IA", "AI agent")}</option>
+                <option value="type:scheduler">{tr("Agendador", "Scheduler")}</option>
+                <option value="type:api_key">API</option>
                 {(members ?? []).map((member) => (
                   <option key={member._id} value={`member:${member._id}`}>
                     {member.name ?? member.email ?? member.role}

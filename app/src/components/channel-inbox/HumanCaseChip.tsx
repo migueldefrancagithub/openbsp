@@ -34,7 +34,6 @@ export function HumanCaseChip({
   compact?: boolean;
 }) {
   const { locale, t } = useI18n();
-  const ops = useQuery(api.inboxOperations.getThreadOps, { threadId });
   const resolveCase = useMutation(api.clinic.resolveHumanCase);
   const assignCase = useMutation(api.clinic.assignHumanCase);
   const [open, setOpen] = useState(false);
@@ -43,6 +42,7 @@ export function HumanCaseChip({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  const ops = useQuery(api.inboxOperations.getThreadOps, { threadId, now });
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 30_000);

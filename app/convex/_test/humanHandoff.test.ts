@@ -197,11 +197,12 @@ describe("human handoff", () => {
     expect(afterOpen.humanCase.previousLeadStatus).toBe("wants_booking");
     expect(afterOpen.humanCase.slaDueAt - afterOpen.humanCase.createdAt).toBe(120 * 60_000);
 
-    const ops = await asOwner.query(inboxApi.getThreadOps, { threadId });
+    const ops = await asOwner.query(inboxApi.getThreadOps, { threadId, now: Date.now() });
     expect(ops.openCase).toMatchObject({ _id: caseId, urgency: "high", status: "open" });
     const rows = await asOwner.query(inboxApi.listThreads, {
       channelId: owner.channelId,
       filter: "awaiting_team",
+      now: Date.now(),
       paginationOpts: { cursor: null, numItems: 10 },
     });
     expect(rows.page[0]).toMatchObject({ _id: threadId, openCaseUrgency: "high" });

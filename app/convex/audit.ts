@@ -18,12 +18,21 @@ const auditRowValidator = v.object({
   createdAt: v.number(),
 });
 
+const auditActorTypeValidator = v.union(
+  v.literal("member"),
+  v.literal("system"),
+  v.literal("scheduler"),
+  v.literal("api_key"),
+  /** Backward-compatible UI alias: AI writes are system rows with ai.* actions. */
+  v.literal("ai"),
+);
+
 export const listPaginated = tenantQuery({
   args: {
     paginationOpts: paginationOptsValidator,
     /** Narrow by who did it, or by what was done. */
     actorId: v.optional(v.id("members")),
-    actorType: v.optional(v.string()),
+    actorType: v.optional(auditActorTypeValidator),
     actionPrefix: v.optional(v.string()),
   },
   returns: v.object({
@@ -33,24 +42,76 @@ export const listPaginated = tenantQuery({
   }),
   handler: async (ctx, args) => {
     requireCapability(ctx.role, "audit.export");
-    const result = await ctx.db
-      .query("auditLog")
-      .withIndex("by_tenant_created", (q) => q.eq("tenantId", ctx.tenantId))
-      .order("desc")
-      .paginate({
-        cursor: args.paginationOpts.cursor,
-        numItems: Math.min(Math.max(args.paginationOpts.numItems, 1), 100),
-      });
-    // Filtering after the index keeps the chain order intact: the audit trail
-    // is only useful if what you read is what was written, in sequence.
-    const filtered = result.page.filter((row) => {
-      if (args.actorId && row.actorId !== args.actorId) return false;
-      if (args.actorType && row.actorType !== args.actorType) return false;
-      if (args.actionPrefix && !row.action.startsWith(args.actionPrefix)) return false;
-      return true;
-    });
+    const paginationOpts = {
+      cursor: args.paginationOpts.cursor,
+      numItems: Math.min(Math.max(args.paginationOpts.numItems, 1), 100),
+    };
+    const actorType = args.actorType === "ai" ? "system" : args.actorType;
+    const actionPrefix = args.actorType === "ai" ? (args.actionPrefix ?? "ai.") : args.actionPrefix;
+    const prefixEnd = actionPrefix ? `${actionPrefix}\uffff` : undefined;
+    const result = args.actorId
+      ? actionPrefix
+        ? await ctx.db
+            .query("auditLog")
+            .withIndex("by_tenant_actor_id_created", (q) =>
+              q.eq("tenantId", ctx.tenantId).eq("actorId", args.actorId!),
+            )
+            .filter((q) =>
+              q.and(
+                q.gte(q.field("action"), actionPrefix),
+                q.lt(q.field("action"), prefixEnd!),
+              ),
+            )
+            .order("desc")
+            .paginate(paginationOpts)
+        : await ctx.db
+            .query("auditLog")
+            .withIndex("by_tenant_actor_id_created", (q) =>
+              q.eq("tenantId", ctx.tenantId).eq("actorId", args.actorId!),
+            )
+            .order("desc")
+            .paginate(paginationOpts)
+      : actorType
+        ? actionPrefix
+          ? await ctx.db
+              .query("auditLog")
+              .withIndex("by_tenant_actor_type_created", (q) =>
+                q.eq("tenantId", ctx.tenantId).eq("actorType", actorType),
+              )
+              .filter((q) =>
+                q.and(
+                  q.gte(q.field("action"), actionPrefix),
+                  q.lt(q.field("action"), prefixEnd!),
+                ),
+              )
+              .order("desc")
+              .paginate(paginationOpts)
+          : await ctx.db
+              .query("auditLog")
+              .withIndex("by_tenant_actor_type_created", (q) =>
+                q.eq("tenantId", ctx.tenantId).eq("actorType", actorType),
+              )
+              .order("desc")
+              .paginate(paginationOpts)
+        : actionPrefix
+          ? await ctx.db
+              .query("auditLog")
+              .withIndex("by_tenant_created", (q) => q.eq("tenantId", ctx.tenantId))
+              .filter((q) =>
+                q.and(
+                  q.gte(q.field("action"), actionPrefix),
+                  q.lt(q.field("action"), prefixEnd!),
+                ),
+              )
+              .order("desc")
+              .paginate(paginationOpts)
+          : await ctx.db
+              .query("auditLog")
+              .withIndex("by_tenant_created", (q) => q.eq("tenantId", ctx.tenantId))
+              .order("desc")
+              .paginate(paginationOpts);
     return {
-      page: filtered.map((row) => ({
+      page: result.page.map((row) => ({
         _id: row._id,
         actorType: row.actorType,
         actorId: row.actorId,

@@ -38,9 +38,14 @@ export const recordClick = mutation({
       .unique()) as Doc<"trackedLinks"> | null;
     if (!link) return { counted: false };
     const now = Date.now();
+    if (link.firstClickedAt !== undefined) {
+      await ctx.db.patch(link._id, { lastClickedAt: now });
+      return { counted: false };
+    }
     await ctx.db.patch(link._id, {
-      clickCount: link.clickCount + 1,
-      firstClickedAt: link.firstClickedAt ?? now,
+      // Campaign analytics report unique recipients, not repeat opens.
+      clickCount: 1,
+      firstClickedAt: now,
       lastClickedAt: now,
     });
     if (link.campaignRecipientId) {

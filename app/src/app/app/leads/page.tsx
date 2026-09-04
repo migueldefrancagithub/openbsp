@@ -8,6 +8,7 @@ import type { Id } from "../../../../convex/_generated/dataModel";
 import { EmptyState, PageHeader } from "@/components/app/EmptyState";
 import { LeadsKanban } from "@/components/leads/LeadsKanban";
 import { useI18n } from "@/lib/i18n";
+import { useMinuteNow } from "@/lib/useMinuteNow";
 
 /**
  * Leads = open conversations grouped by `channelThreads.leadStatus` — the
@@ -15,6 +16,7 @@ import { useI18n } from "@/lib/i18n";
  * vocabulary; moving a card is the same audited mutation as the inbox.
  */
 export default function LeadsPage() {
+  const now = useMinuteNow();
   const { t } = useI18n();
   const channels = useQuery(api.channels.list);
   const productChannels = useMemo(
@@ -77,7 +79,14 @@ export default function LeadsPage() {
         <EmptyState icon={MousePointerClick} title={t("leads.title")} description={t("leads.noChannel")} />
       ) : (
         <div className="flex min-h-0 flex-1 flex-col pt-4">
-          <LeadsKanban channelId={channelId || undefined} originCampaignId={campaignId || undefined} counts={counts} />
+          {now !== null ? (
+            <LeadsKanban
+              channelId={channelId || undefined}
+              originCampaignId={campaignId || undefined}
+              counts={counts}
+              now={now}
+            />
+          ) : null}
         </div>
       )}
     </div>

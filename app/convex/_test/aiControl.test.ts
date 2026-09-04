@@ -49,7 +49,7 @@ describe("AI control, presence and telemetry", () => {
   it("pauses on operator pause, refuses resume with an open case, resumes with a handback note", async () => {
     const t = convexTest(schema);
     const s = await seed(t);
-    let ops = await s.asOwner.query(api.inboxOperations.getThreadOps, { threadId: s.threadId });
+    let ops = await s.asOwner.query(api.inboxOperations.getThreadOps, { threadId: s.threadId, now: Date.now() });
     expect(ops.ai).toMatchObject({ agentName: "Recepção", status: "responding", turns: 2 });
 
     await s.asOwner.mutation(api.inboxOperations.updateThread, { threadId: s.threadId, automationMode: "human" });
@@ -57,7 +57,7 @@ describe("AI control, presence and telemetry", () => {
     expect(paused.run.status).toBe("paused");
     expect(paused.turns.find((x) => x.businessKey === "event:b")?.status).toBe("skipped");
     expect(paused.events).toContain("ai.paused");
-    ops = await s.asOwner.query(api.inboxOperations.getThreadOps, { threadId: s.threadId });
+    ops = await s.asOwner.query(api.inboxOperations.getThreadOps, { threadId: s.threadId, now: Date.now() });
     expect(ops.ai?.status).toBe("paused");
 
     // Open case blocks the handback.

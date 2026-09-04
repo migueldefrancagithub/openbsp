@@ -137,6 +137,74 @@ describe("the audit trail filters without losing the chain", () => {
     const both = await asOwner.query(api.audit.listPaginated, { paginationOpts: page, actorId: other, actionPrefix: "ai." });
     expect(both.page).toHaveLength(1);
   });
+
+  it("fills a filtered page even when newer rows do not match", async () => {
+    const t = convexTest(schema);
+    const s = await seed(t);
+    const other = await t.run(async (ctx) => {
+      const userId = await ctx.db.insert("users", { name: "Colega" });
+      const memberId = await ctx.db.insert("members", {
+        tenantId: s.tenantId,
+        userId,
+        role: "admin",
+        status: "active",
+        createdAt: Date.now(),
+      });
+      const base = Date.now();
+      await ctx.db.insert("auditLog", {
+        tenantId: s.tenantId,
+        actorType: "member",
+        actorId: memberId,
+        action: "ai.proposal.approved",
+        prevHash: "",
+        selfHash: "target",
+        createdAt: base,
+      });
+      for (let index = 1; index <= 60; index += 1) {
+        await ctx.db.insert("auditLog", {
+          tenantId: s.tenantId,
+          actorType: "member",
+          actorId: s.memberId,
+          action: "inbox.thread.updated",
+          prevHash: "",
+          selfHash: `noise-${index}`,
+          createdAt: base + index,
+        });
+      }
+      return memberId;
+    });
+
+    const result = await t.withIdentity({ subject: s.userId }).query(api.audit.listPaginated, {
+      actorId: other,
+      actionPrefix: "ai.",
+      paginationOpts: { numItems: 10, cursor: null },
+    });
+    expect(result.page.map((row) => row.action)).toEqual(["ai.proposal.approved"]);
+  });
+
+  it("keeps the legacy AI actor filter meaningful", async () => {
+    const t = convexTest(schema);
+    const s = await seed(t);
+    await t.run(async (ctx) => {
+      for (const [index, action] of ["inbox.thread.updated", "ai.agent.mode_changed"].entries()) {
+        await ctx.db.insert("auditLog", {
+          tenantId: s.tenantId,
+          actorType: "system",
+          actorId: "runtime",
+          action,
+          prevHash: "",
+          selfHash: `system-${index}`,
+          createdAt: Date.now() + index,
+        });
+      }
+    });
+
+    const result = await t.withIdentity({ subject: s.userId }).query(api.audit.listPaginated, {
+      actorType: "ai",
+      paginationOpts: { numItems: 10, cursor: null },
+    });
+    expect(result.page.map((row) => row.action)).toEqual(["ai.agent.mode_changed"]);
+  });
 });
 
 describe("the one-click diagnostic", () => {
@@ -244,14 +312,75 @@ describe("the kanban filters by campaign", () => {
     });
     const asOwner = t.withIdentity({ subject: s.userId });
     const page = { numItems: 20, cursor: null };
-    const all = await asOwner.query(api.leads.listByStatus, { leadStatus: "interested", paginationOpts: page });
+    const all = await asOwner.query(api.leads.listByStatus, { leadStatus: "interested", now: Date.now(), paginationOpts: page });
     expect(all.page).toHaveLength(2);
     const filtered = await asOwner.query(api.leads.listByStatus, {
       leadStatus: "interested",
       originCampaignId: campaignId,
+      now: Date.now(),
       paginationOpts: page,
     });
     expect(filtered.page.map((row) => row.threadKey)).toEqual(["258840000091"]);
+    const counts = await asOwner.query(api.leads.counts, { originCampaignId: campaignId });
+    expect(counts.find((row) => row.status === "interested")?.count).toBe(1);
+  });
+
+  it("does not starve an older campaign lead behind newer unrelated leads", async () => {
+    const t = convexTest(schema);
+    const s = await seed(t);
+    const { campaignId, targetKey, now } = await t.run(async (ctx) => {
+      const base = Date.now();
+      const id = await ctx.db.insert("campaigns", {
+        tenantId: s.tenantId,
+        name: "Campanha antiga",
+        kind: "channel_template",
+        status: "completed",
+        channelId: s.channelId,
+        createdBy: s.memberId,
+        createdAt: base,
+        updatedAt: base,
+      } as never);
+      const targetKey = "258840009999";
+      for (let index = 0; index <= 25; index += 1) {
+        const key = index === 0 ? targetKey : `258840001${String(index).padStart(2, "0")}`;
+        await ctx.db.insert("channelThreads", {
+          tenantId: s.tenantId,
+          channelId: s.channelId,
+          threadKey: key,
+          leadStatus: "interested",
+          originCampaignId: index === 0 ? id : undefined,
+          lastEventAt: base + index,
+          lastEventKind: "message.text",
+          unreadCount: 0,
+          createdAt: base + index,
+          updatedAt: base + index,
+        });
+        await ctx.db.insert("channelEvents", {
+          tenantId: s.tenantId,
+          channelId: s.channelId,
+          eventKey: `starvation-${index}`,
+          eventKind: "message.text",
+          direction: "incoming",
+          threadKey: key,
+          payload: { text: "olá" },
+          rawPayload: "{}",
+          rawBodySha256: `s-${index}`,
+          status: "processed",
+          attempts: 1,
+          receivedAt: base + index,
+        } as never);
+      }
+      return { campaignId: id, targetKey, now: base + 30 };
+    });
+
+    const asOwner = t.withIdentity({ subject: s.userId });
+    const result = await asOwner.query(api.leads.listByStatus, {
+      leadStatus: "interested",
+      originCampaignId: campaignId,
+      now,
+      paginationOpts: { numItems: 10, cursor: null },
+    });
+    expect(result.page.map((row) => row.threadKey)).toEqual([targetKey]);
     const counts = await asOwner.query(api.leads.counts, { originCampaignId: campaignId });
     expect(counts.find((row) => row.status === "interested")?.count).toBe(1);
   });
