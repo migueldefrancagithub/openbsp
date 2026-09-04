@@ -105,12 +105,12 @@ describe("agent maturity modes", () => {
     expect(before.thread.automationMode).not.toBe("bot");
     expect(sent).toHaveLength(0);
 
-    const list = await s.asOwner.query(api.inboxOperations.listThreads, { channelId: s.channelId, filter: "all", paginationOpts: { cursor: null, numItems: 10 } } as never);
+    const list = await s.asOwner.query(api.inboxOperations.listThreads, { channelId: s.channelId, filter: "all", now: Date.now(), paginationOpts: { cursor: null, numItems: 10 } } as never);
     expect(list.page[0].aiSuggestionPending).toBe(true);
     const pending = await s.asOwner.query(api.aiCopilot.pendingForThread, { threadId: before.thread._id });
     expect(pending).toMatchObject({ turnId: claim.turnId, agentName: "Recepção", stage: "reply" });
     expect(pending!.actions[0]).toMatchObject({ index: 0, name: "reservar_slot" });
-    const ops = await s.asOwner.query(api.inboxOperations.getThreadOps, { threadId: before.thread._id });
+    const ops = await s.asOwner.query(api.inboxOperations.getThreadOps, { threadId: before.thread._id, now: Date.now() });
     expect(ops.ai).toMatchObject({ mode: "copilot", overridden: false, pendingSuggestion: true });
 
     const edited = "Olá Ana! Marquei a sua consulta para terça às 10h. Até lá!";
@@ -209,11 +209,11 @@ describe("agent maturity modes", () => {
     await t.action(internal.aiRuntime.processTurn, { turnId: c2.turnId! });
     expect((await t.run(async (ctx) => (await ctx.db.get(c2.turnId!)) as Doc<"aiTurns">)).status).toBe("awaiting_approval");
     expect(sent).toHaveLength(1);
-    const ops = await s.asOwner.query(api.inboxOperations.getThreadOps, { threadId });
+    const ops = await s.asOwner.query(api.inboxOperations.getThreadOps, { threadId, now: Date.now() });
     expect(ops.ai).toMatchObject({ mode: "copilot", overridden: true, pendingSuggestion: true });
     // Back to the agent default (autopilot).
     await s.asOwner.mutation(api.aiCopilot.setThreadMode, { threadId, mode: null });
-    expect((await s.asOwner.query(api.inboxOperations.getThreadOps, { threadId })).ai?.mode).toBe("autopilot");
+    expect((await s.asOwner.query(api.inboxOperations.getThreadOps, { threadId, now: Date.now() })).ai?.mode).toBe("autopilot");
 
     // Mode rules: unpublished agents cannot leave sandbox.
     const draft = await s.asOwner.mutation(api.aiAgents.create, { name: "Rascunho", objective: "support" });

@@ -43,6 +43,7 @@ describe("operation dashboard", () => {
           threadKey,
           lastEventAt: now - i * 1000,
           lastEventKind: "message.text",
+          serviceWindowExpiresAt: i === 0 ? now + 60_000 : undefined,
           unreadCount: 0,
           leadStatus: i % 3 === 0 ? "new" : i % 3 === 1 ? "interested" : "booked",
           createdAt: now - i * 1000,
@@ -63,12 +64,18 @@ describe("operation dashboard", () => {
           receivedAt: now - i * 1000,
         });
       }
-      return { userId };
+      return { userId, now };
     });
-    const dashboard = await t.withIdentity({ subject: s.userId }).query(api.operation.dashboard, {});
+    const dashboard = await t.withIdentity({ subject: s.userId }).query(api.operation.dashboard, { now: s.now });
     expect(dashboard.leads.total).toBe(300);
     expect(dashboard.leads.capped).toBe(false);
     expect(dashboard.leads.statusCounts.find((row) => row.status === "new")?.count).toBe(100);
     expect(dashboard.leads.statusCounts.find((row) => row.status === "booked")?.count).toBe(100);
+    expect(dashboard.attention.open24h).toBe(1);
+
+    const afterExpiry = await t
+      .withIdentity({ subject: s.userId })
+      .query(api.operation.dashboard, { now: s.now + 120_000 });
+    expect(afterExpiry.attention.open24h).toBe(0);
   });
 });

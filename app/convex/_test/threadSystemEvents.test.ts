@@ -279,6 +279,7 @@ describe("thread system events", () => {
     const page = await asOwner.query(inboxApi.listThreads, {
       channelId,
       filter: "all",
+      now: Date.now(),
       paginationOpts: { numItems: 10, cursor: null },
     });
     expect(page.page[0]).toMatchObject({ _id: threadId, pilotBlocked: true });

@@ -869,6 +869,18 @@ export default defineSchema({
     .index("by_tenant_last_event", ["tenantId", "lastEventAt"])
     .index("by_tenant_lead_status", ["tenantId", "leadStatus", "lastEventAt"])
     .index("by_channel_lead_status", ["channelId", "leadStatus", "lastEventAt"])
+    .index("by_tenant_lead_status_campaign", [
+      "tenantId",
+      "leadStatus",
+      "originCampaignId",
+      "lastEventAt",
+    ])
+    .index("by_channel_lead_status_campaign", [
+      "channelId",
+      "leadStatus",
+      "originCampaignId",
+      "lastEventAt",
+    ])
     .index("by_tenant_inbox_status", ["tenantId", "inboxStatus", "lastEventAt"])
     .index("by_tenant_responsible", ["tenantId", "responsibleMemberId", "lastEventAt"])
     .index("by_tenant_team", ["tenantId", "assignedTeamId", "lastEventAt"])
@@ -2476,6 +2488,8 @@ export default defineSchema({
     createdAt: v.number(),
   })
     .index("by_tenant_created", ["tenantId", "createdAt"])
+    .index("by_tenant_actor_id_created", ["tenantId", "actorId", "createdAt"])
+    .index("by_tenant_actor_type_created", ["tenantId", "actorType", "createdAt"])
     .index("by_target", ["targetType", "targetId"])
     .index("by_actor", ["actorType", "actorId"]),
 });

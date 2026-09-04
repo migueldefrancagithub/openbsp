@@ -97,6 +97,7 @@ describe("operational inbox", () => {
     const result = await asOwner.query(inboxApi.listThreads, {
       channelId,
       filter: "all",
+      now: Date.now(),
       paginationOpts: { cursor: null, numItems: 50 },
     });
     expect(result.page).toHaveLength(1);
@@ -137,6 +138,7 @@ describe("operational inbox", () => {
     const filtered = await asOwner.query(inboxApi.listThreads, {
       channelId,
       filter: "awaiting_team",
+      now: Date.now(),
       paginationOpts: { cursor: null, numItems: 50 },
     });
     expect(filtered.page[0]).toMatchObject({
@@ -234,12 +236,14 @@ describe("inbox roles, intents and history", () => {
     const mine = await asAgent.query(inboxApi.listThreads, {
       channelId,
       filter: "mine",
+      now: Date.now(),
       paginationOpts: { cursor: null, numItems: 10 },
     });
     expect(mine.page.map((row: any) => row._id)).toEqual([threadId]);
     const notMine = await t.withIdentity({ subject: owner.userId }).query(inboxApi.listThreads, {
       channelId,
       filter: "mine",
+      now: Date.now(),
       paginationOpts: { cursor: null, numItems: 10 },
     });
     expect(notMine.page).toHaveLength(0);

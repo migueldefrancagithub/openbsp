@@ -265,6 +265,7 @@ describe("leads kanban queries", () => {
     const first = await asOwner.query(api.leads.listByStatus, {
       leadStatus: "interested",
       channelId: owner.channelId,
+      now,
       paginationOpts: { cursor: null, numItems: 2 },
     });
     expect(first.page).toHaveLength(2);
@@ -273,6 +274,7 @@ describe("leads kanban queries", () => {
     const second = await asOwner.query(api.leads.listByStatus, {
       leadStatus: "interested",
       channelId: owner.channelId,
+      now,
       paginationOpts: { cursor: first.continueCursor, numItems: 10 },
     });
     expect(second.page.map((row: any) => row.threadKey)).toEqual(["258840000002"]);
@@ -289,6 +291,7 @@ describe("leads kanban queries", () => {
 
     const tenantWide = await asOwner.query(api.leads.listByStatus, {
       leadStatus: "interested",
+      now,
       paginationOpts: { cursor: null, numItems: 10 },
     });
     expect(tenantWide.page).toHaveLength(3);
@@ -302,6 +305,7 @@ describe("leads kanban queries", () => {
       t.withIdentity({ subject: a.userId }).query(api.leads.listByStatus, {
         leadStatus: "new",
         channelId: b.channelId,
+        now: Date.now(),
         paginationOpts: { cursor: null, numItems: 5 },
       }),
     ).rejects.toThrow(/CHANNEL_NOT_FOUND/);

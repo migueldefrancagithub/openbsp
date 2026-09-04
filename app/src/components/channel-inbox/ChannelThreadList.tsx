@@ -27,6 +27,7 @@ import type { Id } from "../../../convex/_generated/dataModel";
 import { cn } from "@/lib/cn";
 import { relativeTime } from "@/lib/relativeTime";
 import { useI18n, type TranslationKey } from "@/lib/i18n";
+import { useMinuteNow } from "@/lib/useMinuteNow";
 
 type InboxFilter =
   | "handling"
@@ -190,6 +191,7 @@ function routeWithState(
 }
 
 export function ChannelThreadList() {
+  const now = useMinuteNow();
   const { locale, t, tr } = useI18n();
   const router = useRouter();
   const channels = useQuery(api.channels.list, {});
@@ -210,16 +212,20 @@ export function ChannelThreadList() {
 
   const queryArgs = useMemo(
     () =>
-      activeChannelId
+      activeChannelId && now !== null
         ? {
             channelId: activeChannelId,
             filter,
             search: deferredSearch || undefined,
+            now,
           }
         : "skip",
-    [activeChannelId, filter, deferredSearch],
+    [activeChannelId, filter, deferredSearch, now],
   );
-  const counts = useQuery(inboxApi.tabCounts, activeChannelId ? { channelId: activeChannelId } : "skip");
+  const counts = useQuery(
+    inboxApi.tabCounts,
+    activeChannelId && now !== null ? { channelId: activeChannelId, now } : "skip",
+  );
   const { results, status, loadMore } = usePaginatedQuery(
     inboxApi.listThreads,
     queryArgs as any,

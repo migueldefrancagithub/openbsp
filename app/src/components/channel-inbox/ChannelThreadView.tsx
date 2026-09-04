@@ -35,6 +35,7 @@ import { formatTime, relativeTime } from "@/lib/relativeTime";
 import { useI18n, type TranslationKey } from "@/lib/i18n";
 import { convexErrorMessage } from "@/lib/convexErrorMessage";
 import { templateCategoryLabel } from "@/lib/operationalLabels";
+import { useMinuteNow } from "@/lib/useMinuteNow";
 import { PatientContextPanel } from "@/components/channel-inbox/PatientContextPanel";
 import { PilotBanner } from "@/components/channel-inbox/PilotBanner";
 import { LeadHeaderBar } from "@/components/channel-inbox/LeadHeaderBar";
@@ -527,9 +528,10 @@ export function ChannelThreadView({
   >(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const [headerNotice, setHeaderNotice] = useState<string | null>(null);
+  const now = useMinuteNow();
   const threadOps = useQuery(
     inboxApi.getThreadOps,
-    thread ? { threadId: thread._id } : "skip",
+    thread && now !== null ? { threadId: thread._id, now } : "skip",
   );
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);

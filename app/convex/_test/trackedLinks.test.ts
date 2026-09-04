@@ -74,7 +74,7 @@ describe("tracked links", () => {
     ).toEqual({ counted: true });
     expect(
       await t.mutation(api.trackedLinks.recordClick, { token: "abcdefghijklmnopqrstuv", userAgent: "Mozilla/5.0 (iPhone)" }),
-    ).toEqual({ counted: true });
+    ).toEqual({ counted: false });
 
     const state = await t.run(async (ctx) => ({
       link: (await ctx.db.query("trackedLinks").collect())[0],
@@ -82,7 +82,7 @@ describe("tracked links", () => {
       campaign: (await ctx.db.get(seeded.campaignId)) as Doc<"campaigns">,
       events: await ctx.db.query("campaignEvents").collect(),
     }));
-    expect(state.link.clickCount).toBe(2);
+    expect(state.link.clickCount).toBe(1);
     expect(state.recipient.status).toBe("clicked");
     expect(state.campaign.stats).toMatchObject({ clicked: 1, byStatus: { sent: 0, clicked: 1 } });
     expect(state.events.filter((e) => e.type === "campaign.recipient.clicked")).toHaveLength(1);

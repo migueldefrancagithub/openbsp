@@ -160,6 +160,7 @@ describe("Phase A end to end", () => {
     const list = await asAgent.query(inboxApi.listThreads, {
       channelId: s.channelId,
       filter: "all",
+      now: Date.now(),
       paginationOpts: { cursor: null, numItems: 10 },
     });
     expect(list.page[0]).toMatchObject({ _id: threadId, pilotBlocked: true, intent: "price_request" });
@@ -179,7 +180,7 @@ describe("Phase A end to end", () => {
       responsibleMemberId: s.ownerMemberId,
       openedFrom: "inbox",
     });
-    const ops = await asAgent.query(inboxApi.getThreadOps, { threadId });
+    const ops = await asAgent.query(inboxApi.getThreadOps, { threadId, now: Date.now() });
     expect(ops.openCase?._id).toBe(caseId);
     await expect(asAgent.mutation(inboxApi.updateThread, { threadId, automationMode: "bot" })).rejects.toThrow(/HUMAN_CASE_OPEN/);
 
@@ -191,7 +192,7 @@ describe("Phase A end to end", () => {
 
     // 6. Kanban: the agent moves the lead forward; the owner sees it in the column.
     await asAgent.mutation(inboxApi.updateThread, { threadId, leadStatus: "wants_booking", nextStep: "Propor 3 horários", nextStepDueAt: Date.now() + 3_600_000 });
-    const column = await asOwner.query(api.leads.listByStatus, { leadStatus: "wants_booking", channelId: s.channelId, paginationOpts: { cursor: null, numItems: 10 } });
+    const column = await asOwner.query(api.leads.listByStatus, { leadStatus: "wants_booking", channelId: s.channelId, now: Date.now(), paginationOpts: { cursor: null, numItems: 10 } });
     expect(column.page.map((row: any) => row._id)).toEqual([threadId]);
     const counts = await asOwner.query(api.leads.counts, { channelId: s.channelId });
     expect(counts.find((row) => row.status === "wants_booking")?.count).toBe(1);
