@@ -37,7 +37,7 @@ const campaignStatsValidator = v.object({
 export const dashboard = tenantQuery({
   args: {
     /** Client clock bucket; time passing must invalidate 24h/SLA projections. */
-    now: v.number(),
+    now: v.optional(v.number()),
   },
   returns: v.object({
     attention: v.object({
@@ -105,7 +105,7 @@ export const dashboard = tenantQuery({
     ),
   }),
   handler: async (ctx, args) => {
-    const now = args.now;
+    const now = args.now ?? Date.now();
     const [channels, rawThreads, campaigns, chatbots, runs] =
       await Promise.all([
         ctx.db

@@ -12,7 +12,7 @@ import { useI18n } from "@/lib/i18n";
 import { relativeTime } from "@/lib/relativeTime";
 
 type Tab = "events" | "outbox" | "audit" | "followups";
-type AuditActorType = "member" | "system" | "scheduler" | "api_key";
+type AuditActorType = "member" | "system" | "scheduler" | "api_key" | "ai";
 
 function maskKey(value: string | undefined): string {
   if (!value) return "—";
@@ -135,6 +135,7 @@ export default function AdminLogsPage() {
               >
                 <option value="">{tr("Qualquer autor", "Any author")}</option>
                 <option value="type:system">{tr("Sistema", "System")}</option>
+                <option value="type:ai">{tr("Agente de IA", "AI agent")}</option>
                 <option value="type:scheduler">{tr("Agendador", "Scheduler")}</option>
                 <option value="type:api_key">API</option>
                 {(members ?? []).map((member) => (

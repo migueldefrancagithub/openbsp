@@ -181,6 +181,30 @@ describe("the audit trail filters without losing the chain", () => {
     });
     expect(result.page.map((row) => row.action)).toEqual(["ai.proposal.approved"]);
   });
+
+  it("keeps the legacy AI actor filter meaningful", async () => {
+    const t = convexTest(schema);
+    const s = await seed(t);
+    await t.run(async (ctx) => {
+      for (const [index, action] of ["inbox.thread.updated", "ai.agent.mode_changed"].entries()) {
+        await ctx.db.insert("auditLog", {
+          tenantId: s.tenantId,
+          actorType: "system",
+          actorId: "runtime",
+          action,
+          prevHash: "",
+          selfHash: `system-${index}`,
+          createdAt: Date.now() + index,
+        });
+      }
+    });
+
+    const result = await t.withIdentity({ subject: s.userId }).query(api.audit.listPaginated, {
+      actorType: "ai",
+      paginationOpts: { numItems: 10, cursor: null },
+    });
+    expect(result.page.map((row) => row.action)).toEqual(["ai.agent.mode_changed"]);
+  });
 });
 
 describe("the one-click diagnostic", () => {

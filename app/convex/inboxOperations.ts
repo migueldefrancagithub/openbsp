@@ -282,7 +282,7 @@ export const listThreads = tenantQuery({
     filter: filterValidator,
     search: v.optional(v.string()),
     /** Client clock bucket for SLA, snooze, risk, and ownership transitions. */
-    now: v.number(),
+    now: v.optional(v.number()),
     paginationOpts: paginationOptsValidator,
   },
   returns: v.object({
@@ -303,7 +303,7 @@ export const listThreads = tenantQuery({
         cursor: args.paginationOpts.cursor,
         numItems: Math.min(Math.max(args.paginationOpts.numItems, 1), 100),
       });
-    const now = args.now;
+    const now = args.now ?? Date.now();
     const search = args.search?.trim().toLowerCase() ?? "";
     // One read per page, not per row: "does this channel have an agent live?"
     // is a channel-wide fact, and it changes what the queue means.
@@ -408,7 +408,7 @@ export const tabCounts = tenantQuery({
   args: {
     channelId: v.id("channels"),
     /** Client clock bucket for SLA and risk transitions. */
-    now: v.number(),
+    now: v.optional(v.number()),
   },
   returns: v.object({
     handling: v.number(),
@@ -420,7 +420,7 @@ export const tabCounts = tenantQuery({
   handler: async (ctx, args) => {
     const channel = await ctx.db.get(args.channelId);
     if (!channel || channel.tenantId !== ctx.tenantId) throw new ConvexError({ code: "CHANNEL_NOT_FOUND" });
-    const now = args.now;
+    const now = args.now ?? Date.now();
     const aiAvailable = await channelHasLiveAgent(ctx, ctx.tenantId, args.channelId);
     const threads = (await ctx.db
       .query("channelThreads")
@@ -582,7 +582,7 @@ export const getThreadOps = tenantQuery({
   args: {
     threadId: v.id("channelThreads"),
     /** Client clock bucket for command ownership transitions. */
-    now: v.number(),
+    now: v.optional(v.number()),
   },
   returns: v.object({
     openCase: v.union(
@@ -725,7 +725,7 @@ export const getThreadOps = tenantQuery({
     const open = recent.find((row) => row.status !== "resolved") ?? null;
     const command = threadCommand(
       { ...thread, aiAvailable: !!agentForMode && !!agentForMode.publishedVersionId && agentForMode.mode !== "sandbox" },
-      args.now,
+      args.now ?? Date.now(),
     );
     return {
       retention,

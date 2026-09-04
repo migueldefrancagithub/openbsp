@@ -77,7 +77,7 @@ export const listByStatus = tenantQuery({
     /** Only leads that came from this campaign. */
     originCampaignId: v.optional(v.id("campaigns")),
     /** Client clock bucket; makes risk and ownership transitions reactive. */
-    now: v.number(),
+    now: v.optional(v.number()),
     paginationOpts: paginationOptsValidator,
   },
   returns: v.object({
@@ -92,6 +92,7 @@ export const listByStatus = tenantQuery({
     }
     const numItems = Math.min(Math.max(args.paginationOpts.numItems, 1), 50);
     const cursor = args.paginationOpts.cursor;
+    const now = args.now ?? Date.now();
     const result = channel
       ? args.originCampaignId
         ? await ctx.db
@@ -157,10 +158,10 @@ export const listByStatus = tenantQuery({
       // The card carries the two facts that decide whether someone acts on it:
       // who holds the conversation, and whether it is going cold with nothing
       // planned. Both are the same rules the inbox and the radar use.
-      const command = threadCommand(thread, args.now);
+      const command = threadCommand(thread, now);
       const risk = classifyRisk({
         lastActivityAt: Math.max(thread.lastInboundAt ?? 0, thread.lastOutboundAt ?? 0, thread.createdAt),
-        now: args.now,
+        now,
         inFlight: false,
         window: resolveStageWindow(thread.leadStatus),
       });

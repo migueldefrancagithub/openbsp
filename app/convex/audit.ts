@@ -23,6 +23,8 @@ const auditActorTypeValidator = v.union(
   v.literal("system"),
   v.literal("scheduler"),
   v.literal("api_key"),
+  /** Backward-compatible UI alias: AI writes are system rows with ai.* actions. */
+  v.literal("ai"),
 );
 
 export const listPaginated = tenantQuery({
@@ -44,9 +46,11 @@ export const listPaginated = tenantQuery({
       cursor: args.paginationOpts.cursor,
       numItems: Math.min(Math.max(args.paginationOpts.numItems, 1), 100),
     };
-    const prefixEnd = args.actionPrefix ? `${args.actionPrefix}\uffff` : undefined;
+    const actorType = args.actorType === "ai" ? "system" : args.actorType;
+    const actionPrefix = args.actorType === "ai" ? (args.actionPrefix ?? "ai.") : args.actionPrefix;
+    const prefixEnd = actionPrefix ? `${actionPrefix}\uffff` : undefined;
     const result = args.actorId
-      ? args.actionPrefix
+      ? actionPrefix
         ? await ctx.db
             .query("auditLog")
             .withIndex("by_tenant_actor_id_created", (q) =>
@@ -54,7 +58,7 @@ export const listPaginated = tenantQuery({
             )
             .filter((q) =>
               q.and(
-                q.gte(q.field("action"), args.actionPrefix!),
+                q.gte(q.field("action"), actionPrefix),
                 q.lt(q.field("action"), prefixEnd!),
               ),
             )
@@ -67,16 +71,16 @@ export const listPaginated = tenantQuery({
             )
             .order("desc")
             .paginate(paginationOpts)
-      : args.actorType
-        ? args.actionPrefix
+      : actorType
+        ? actionPrefix
           ? await ctx.db
               .query("auditLog")
               .withIndex("by_tenant_actor_type_created", (q) =>
-                q.eq("tenantId", ctx.tenantId).eq("actorType", args.actorType!),
+                q.eq("tenantId", ctx.tenantId).eq("actorType", actorType),
               )
               .filter((q) =>
                 q.and(
-                  q.gte(q.field("action"), args.actionPrefix!),
+                  q.gte(q.field("action"), actionPrefix),
                   q.lt(q.field("action"), prefixEnd!),
                 ),
               )
@@ -85,17 +89,17 @@ export const listPaginated = tenantQuery({
           : await ctx.db
               .query("auditLog")
               .withIndex("by_tenant_actor_type_created", (q) =>
-                q.eq("tenantId", ctx.tenantId).eq("actorType", args.actorType!),
+                q.eq("tenantId", ctx.tenantId).eq("actorType", actorType),
               )
               .order("desc")
               .paginate(paginationOpts)
-        : args.actionPrefix
+        : actionPrefix
           ? await ctx.db
               .query("auditLog")
               .withIndex("by_tenant_created", (q) => q.eq("tenantId", ctx.tenantId))
               .filter((q) =>
                 q.and(
-                  q.gte(q.field("action"), args.actionPrefix!),
+                  q.gte(q.field("action"), actionPrefix),
                   q.lt(q.field("action"), prefixEnd!),
                 ),
               )
