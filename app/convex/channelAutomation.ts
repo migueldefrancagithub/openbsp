@@ -128,6 +128,35 @@ export const dispatchInbound = internalMutation({
       };
     }
 
+    const eventRoutine = await ctx.db
+      .query("agentRoutines")
+      .withIndex("by_tenant_status_trigger", (q) =>
+        q
+          .eq("tenantId", channel.tenantId)
+          .eq("status", "active")
+          .eq("triggerMode", "event"),
+      )
+      .first();
+    const hybridRoutine = eventRoutine
+      ? null
+      : await ctx.db
+          .query("agentRoutines")
+          .withIndex("by_tenant_status_trigger", (q) =>
+            q
+              .eq("tenantId", channel.tenantId)
+              .eq("status", "active")
+              .eq("triggerMode", "both"),
+          )
+          .first();
+    if (eventRoutine || hybridRoutine) {
+      // Event-driven routines observe a new inbound projection only when the
+      // tenant has explicitly activated one. Their own policy gates effects.
+      await ctx.scheduler.runAfter(0, internal.agentRoutines.onInbound, {
+        eventId: event._id,
+        threadId: thread._id,
+      });
+    }
+
     const inbound = extractInbound(event);
     const activeRun = await ctx.db
       .query("channelAutomationRuns")

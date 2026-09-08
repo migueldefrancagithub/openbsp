@@ -39,7 +39,7 @@ export default function AdminHomePage() {
 
   return (
     <div className="flex min-h-full flex-col">
-      <PageHeader eyebrow={tr("Administração", "Administration")} title="Admin" description={tr("Área da clínica para equipa, registos e configuração.", "The clinic's area for team, logs and configuration.")} />
+      <PageHeader eyebrow={tr("Administração", "Administration")} title="Admin" description={tr("Área do negócio para equipa, registos e configuração.", "The business area for team, logs and configuration.")} />
       <div className="mx-auto w-full max-w-6xl space-y-5 px-4 py-5 sm:px-6 xl:px-8">
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {cards.map((card) => {

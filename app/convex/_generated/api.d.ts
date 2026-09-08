@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as agentRoutines from "../agentRoutines.js";
 import type * as ai from "../ai.js";
 import type * as aiAgents from "../aiAgents.js";
 import type * as aiComposer from "../aiComposer.js";
@@ -112,6 +113,7 @@ import type * as lib_opsAlerts from "../lib/opsAlerts.js";
 import type * as lib_outboundJobs from "../lib/outboundJobs.js";
 import type * as lib_roles from "../lib/roles.js";
 import type * as lib_secrets from "../lib/secrets.js";
+import type * as lib_staffNotifications from "../lib/staffNotifications.js";
 import type * as lib_webhooks from "../lib/webhooks.js";
 import type * as me from "../me.js";
 import type * as memberInvites from "../memberInvites.js";
@@ -127,6 +129,8 @@ import type * as overview from "../overview.js";
 import type * as presence from "../presence.js";
 import type * as quickReplies from "../quickReplies.js";
 import type * as retention from "../retention.js";
+import type * as staffNotifications from "../staffNotifications.js";
+import type * as teamOperations from "../teamOperations.js";
 import type * as teams from "../teams.js";
 import type * as templates from "../templates.js";
 import type * as tenants from "../tenants.js";
@@ -142,6 +146,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  agentRoutines: typeof agentRoutines;
   ai: typeof ai;
   aiAgents: typeof aiAgents;
   aiComposer: typeof aiComposer;
@@ -246,6 +251,7 @@ declare const fullApi: ApiFromModules<{
   "lib/outboundJobs": typeof lib_outboundJobs;
   "lib/roles": typeof lib_roles;
   "lib/secrets": typeof lib_secrets;
+  "lib/staffNotifications": typeof lib_staffNotifications;
   "lib/webhooks": typeof lib_webhooks;
   me: typeof me;
   memberInvites: typeof memberInvites;
@@ -261,6 +267,8 @@ declare const fullApi: ApiFromModules<{
   presence: typeof presence;
   quickReplies: typeof quickReplies;
   retention: typeof retention;
+  staffNotifications: typeof staffNotifications;
+  teamOperations: typeof teamOperations;
   teams: typeof teams;
   templates: typeof templates;
   tenants: typeof tenants;

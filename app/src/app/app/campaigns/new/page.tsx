@@ -276,8 +276,8 @@ export default function NewCampaignPage() {
                 <span>
                   <ShieldCheck size={13} className="mr-1 inline text-chip-success-fg" />
                   {tr(
-                    "Confirmo que estes pacientes deram consentimento para receber mensagens da clínica e que a mensagem respeita as regras do WhatsApp.",
-                    "I confirm these patients consented to receive messages from the clinic and the message follows WhatsApp's rules.",
+                    "Confirmo que estes contactos deram consentimento para receber mensagens do negócio e que a mensagem respeita as regras do WhatsApp.",
+                    "I confirm these contacts consented to receive messages from the business and the message follows WhatsApp's rules.",
                   )}
                 </span>
               </label>

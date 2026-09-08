@@ -21,7 +21,7 @@ export function modeHint(mode: string, locale: "pt" | "en"): string {
   const pt: Record<string, string> = {
     sandbox: "Só responde no separador Sandbox. Não toca em conversas reais.",
     copilot: "Sugere resposta e acções no inbox; a equipa aprova ou edita antes de enviar.",
-    autopilot: "Responde e marca consultas sozinho, dentro das regras e do orçamento.",
+    autopilot: "Responde e executa ações autorizadas, dentro das regras e dos limites.",
   };
   const en: Record<string, string> = {
     sandbox: "Only answers in the Sandbox tab. Never touches real conversations.",
@@ -40,7 +40,7 @@ export function AgentModeToggle({ agentId, mode, published, onNotice }: { agentI
 
   async function change(next: AgentMode) {
     if (next === mode) return;
-    if (next === "autopilot" && !window.confirm(tr("Em Automático a IA responde e marca consultas sem aprovação. Confirmar?", "In Autopilot the AI replies and books without approval. Confirm?"))) return;
+    if (next === "autopilot" && !window.confirm(tr("Em Automático a IA responde e executa ações já autorizadas. Confirmar?", "In Autopilot the AI replies and executes previously authorized actions. Confirm?"))) return;
     setBusy(next);
     onNotice(null);
     try {

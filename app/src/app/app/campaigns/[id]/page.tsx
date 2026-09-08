@@ -34,8 +34,8 @@ function eventLabel(type: string, locale: "pt" | "en"): string {
     "campaign.recipient.sent": "Mensagem aceite pelo canal",
     "campaign.recipient.delivered": "Mensagem entregue",
     "campaign.recipient.read": "Mensagem lida",
-    "campaign.recipient.replied": "Paciente respondeu",
-    "campaign.recipient.clicked": "Paciente clicou no link",
+    "campaign.recipient.replied": "Contacto respondeu",
+    "campaign.recipient.clicked": "Contacto clicou no link",
     "campaign.recipient.converted": "Conversão registada",
     "campaign.recipient.failed": "Envio falhou",
     "campaign.recipient.unknown": "Envio sem confirmação",
@@ -284,7 +284,7 @@ export default function CampaignDetailPage() {
                   <table className="w-full text-[13px]">
                     <thead className="bg-surface-2 text-left text-[11px] uppercase tracking-[0.12em] text-faint">
                       <tr>
-                        <th className="px-4 py-2 font-medium">{tr("Paciente", "Patient")}</th>
+                        <th className="px-4 py-2 font-medium">{tr("Contacto", "Contact")}</th>
                         <th className="px-4 py-2 font-medium">{tr("Estado", "Status")}</th>
                         <th className="px-4 py-2 font-medium">{tr("Detalhe", "Detail")}</th>
                         <th className="px-4 py-2 font-medium">{tr("Atualizado", "Updated")}</th>

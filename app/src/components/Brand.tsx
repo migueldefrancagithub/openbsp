@@ -1,6 +1,6 @@
 import { cn } from "@/lib/cn";
 
-export const BRAND_NAME = "CXCast";
+export const BRAND_NAME = "OpenBSP";
 
 export function BrandMark({
   className,

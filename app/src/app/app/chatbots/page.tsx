@@ -406,7 +406,7 @@ export default function ChatbotsPage() {
         description: botDescription || undefined,
         folderId: selectedFolderId || undefined,
         triggerKind: template?.triggerKind ?? triggerKind,
-        model: "CXCast guardrail bot",
+        model: "OpenBSP guardrail bot",
         templateSlug: templateSlug || undefined,
         channelId: botChannelId || undefined,
       });
@@ -626,8 +626,8 @@ export default function ChatbotsPage() {
         eyebrow={tr("AUTOMAÇÃO CLÍNICA", "CLINIC AUTOMATION")}
         title={tr("Agentes", "Agents")}
         description={tr(
-          "Configure agentes que qualificam pacientes, executam tarefas autorizadas e chamam a equipa quando necessário.",
-          "Configure agents that qualify patients, run authorized tasks, and call the team when needed.",
+          "Configure agentes que qualificam contactos, executam tarefas autorizadas e chamam a equipa quando necessário.",
+          "Configure agents that qualify contacts, run authorized tasks, and call the team when needed.",
         )}
         action={
           <div className="flex flex-wrap gap-2">
@@ -997,7 +997,7 @@ export default function ChatbotsPage() {
                           <BotMeta
                             icon={BrainCircuit}
                             label={tr("Modelo", "Model")}
-                            value={bot.model ?? "CXCast guardrail bot"}
+                            value={bot.model ?? "OpenBSP guardrail bot"}
                           />
                           <BotMeta
                             icon={Radio}
@@ -1142,7 +1142,7 @@ function stepCatalog(locale: Locale): Array<{
   {
     type: "set_tag",
     label: pick(locale, "Aplicar etiqueta", "Set tag"),
-    detail: pick(locale, "Marca o paciente antes de continuar.", "Marks the patient before continuing."),
+    detail: pick(locale, "Marca o contacto antes de continuar.", "Marks the contact before continuing."),
     icon: Tag,
   },
   {

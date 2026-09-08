@@ -27,9 +27,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "CXCast · Operação clínica no WhatsApp",
+  title: "OpenBSP · Atendimento e vendas com IA",
   description:
-    "Atendimento, leads, campanhas, agentes de IA e operação clínica num único espaço de trabalho.",
+    "Conversas, oportunidades, campanhas, agentes de IA e operação num único espaço de trabalho.",
   manifest: "/site.webmanifest",
   icons: {
     icon: [

@@ -113,8 +113,8 @@ export function AiSuggestionCard({ threadId, onUseDraft, windowOpen }: { threadI
       {pending.promiseWarning && (
         <p className="mt-1 rounded bg-chip-warn px-1.5 py-1 text-[11px] text-chip-warn-fg">
           {tr(
-            `Esta resposta compromete a clínica a ${pending.promiseWarning}, e nada está agendado para isso. Aprove uma acção ou assuma a conversa.`,
-            `This reply commits the clinic to ${pending.promiseWarning}, and nothing is scheduled for it. Approve an action or take the conversation.`,
+            `Esta resposta compromete o negócio a ${pending.promiseWarning}, e nada está agendado para isso. Aprove uma ação ou assuma a conversa.`,
+            `This reply commits the business to ${pending.promiseWarning}, and nothing is scheduled for it. Approve an action or take the conversation.`,
           )}
         </p>
       )}
