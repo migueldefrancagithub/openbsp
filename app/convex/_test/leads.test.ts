@@ -311,3 +311,133 @@ describe("leads kanban queries", () => {
     ).rejects.toThrow(/CHANNEL_NOT_FOUND/);
   });
 });
+
+describe("editable CRM pipeline", () => {
+  it("creates, edits and reorders tenant-owned stages", async () => {
+    const t = convexTest(schema);
+    const owner = await seedTenant(t, "pipeline-a");
+    const asOwner = t.withIdentity({ subject: owner.userId });
+
+    const pipelineId = await asOwner.mutation(api.crmPipelines.ensureDefault, {});
+    const initial = await asOwner.query(api.crmPipelines.getDefault, {});
+    expect(initial?.pipeline._id).toBe(pipelineId);
+    expect(initial?.stages).toHaveLength(10);
+
+    const stageId = await asOwner.mutation(api.crmPipelines.createStage, {
+      pipelineId,
+      name: "Proposta enviada",
+      color: "#356fc3",
+      rules: { category: "open", requireNextStep: true, pauseAi: false },
+    });
+    await asOwner.mutation(api.crmPipelines.updateStage, {
+      stageId,
+      name: "Proposta em análise",
+      color: "#16877b",
+      rules: { category: "open", requireNextStep: true, pauseAi: true },
+    });
+
+    const configured = await asOwner.query(api.crmPipelines.getDefault, {});
+    const custom = configured?.stages.find((stage) => stage._id === stageId);
+    expect(custom).toMatchObject({
+      name: "Proposta em análise",
+      color: "#16877b",
+      useSystemLabel: false,
+      rules: { category: "open", requireNextStep: true, pauseAi: true },
+    });
+
+    const order = [stageId, ...(configured?.stages.filter((stage) => stage._id !== stageId).map((stage) => stage._id) ?? [])];
+    await asOwner.mutation(api.crmPipelines.reorderStages, { pipelineId, stageIds: order });
+    expect((await asOwner.query(api.crmPipelines.getDefault, {}))?.stages[0]._id).toBe(stageId);
+  });
+
+  it("persists card moves and redirects cards when a stage is removed", async () => {
+    const t = convexTest(schema);
+    const owner = await seedTenant(t, "pipeline-b");
+    const asOwner = t.withIdentity({ subject: owner.userId });
+    const pipelineId = await asOwner.mutation(api.crmPipelines.ensureDefault, {});
+    const pipeline = (await asOwner.query(api.crmPipelines.getDefault, {}))!;
+    const target = pipeline.stages.find((stage) => stage.legacyStatus === "new")!;
+    const customId = await asOwner.mutation(api.crmPipelines.createStage, {
+      pipelineId,
+      name: "Precisa de chamada",
+      color: "#d18a13",
+      rules: { category: "open", requireNextStep: true, pauseAi: true },
+    });
+    const threadId = await t.run(async (ctx) => await ctx.db.insert("channelThreads", {
+      tenantId: owner.tenantId,
+      channelId: owner.channelId,
+      threadKey: "258840001111",
+      lastEventAt: Date.now(),
+      lastEventKind: "message.text",
+      lastInboundAt: Date.now(),
+      unreadCount: 1,
+      leadStatus: "interested",
+      nextStep: "Ligar hoje",
+      automationMode: "bot",
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    }));
+
+    await asOwner.mutation(api.crmPipelines.moveLead, { threadId, stageId: customId });
+    let thread = (await t.run(async (ctx) => await ctx.db.get(threadId)))!;
+    expect(thread).toMatchObject({ crmPipelineId: pipelineId, crmStageId: customId, automationMode: "human" });
+    const customColumn = await asOwner.query(api.leads.listByStage, {
+      stageId: customId,
+      paginationOpts: { cursor: null, numItems: 10 },
+    });
+    expect(customColumn.page.map((row) => row._id)).toEqual([threadId]);
+
+    const result = await asOwner.mutation(api.crmPipelines.archiveStage, { stageId: customId, targetStageId: target._id });
+    expect(result.migrated).toBe(1);
+    thread = (await t.run(async (ctx) => await ctx.db.get(threadId)))!;
+    expect(thread.crmStageId).toBeUndefined();
+    expect(thread.leadStatus).toBe("new");
+    const targetColumn = await asOwner.query(api.leads.listByStage, {
+      stageId: target._id,
+      paginationOpts: { cursor: null, numItems: 10 },
+    });
+    expect(targetColumn.page.map((row) => row._id)).toContain(threadId);
+
+    const audit = await t.run(async (ctx) => await ctx.db.query("clinicAuditEvents").collect());
+    expect(audit.map((row) => row.action)).toContain("crm.lead_moved");
+    expect(audit.map((row) => row.action)).toContain("crm.stage_archived");
+  });
+
+  it("rejects cross-tenant stage changes", async () => {
+    const t = convexTest(schema);
+    const first = await seedTenant(t, "pipeline-c1");
+    const second = await seedTenant(t, "pipeline-c2");
+    const firstUser = t.withIdentity({ subject: first.userId });
+    const secondUser = t.withIdentity({ subject: second.userId });
+    await firstUser.mutation(api.crmPipelines.ensureDefault, {});
+    const stage = (await firstUser.query(api.crmPipelines.getDefault, {}))!.stages[0];
+    await expect(secondUser.mutation(api.crmPipelines.updateStage, {
+      stageId: stage._id,
+      name: "Não permitido",
+      color: "#356fc3",
+      rules: { category: "open", requireNextStep: false, pauseAi: false },
+    })).rejects.toThrow();
+  });
+
+  it("redirects future classifier events after a built-in stage is removed", async () => {
+    const t = convexTest(schema);
+    const owner = await seedTenant(t, "pipeline-d");
+    const asOwner = t.withIdentity({ subject: owner.userId });
+    await asOwner.mutation(api.crmPipelines.ensureDefault, {});
+    const pipeline = (await asOwner.query(api.crmPipelines.getDefault, {}))!;
+    const source = pipeline.stages.find((stage) => stage.legacyStatus === "new")!;
+    const target = pipeline.stages.find((stage) => stage.legacyStatus === "interested")!;
+    await asOwner.mutation(api.crmPipelines.archiveStage, { stageId: source._id, targetStageId: target._id });
+
+    await t.run(async (ctx) => {
+      const channel = (await ctx.db.get(owner.channelId))!;
+      await projectThreadFromEvent(ctx, { channel, event: inboundEvent("Olá", Date.now()), now: Date.now() });
+    });
+    const thread = await t.run(async (ctx) => await ctx.db
+      .query("channelThreads")
+      .withIndex("by_channel_thread", (q) => q.eq("channelId", owner.channelId).eq("threadKey", PATIENT))
+      .unique());
+    expect(thread?.leadStatus).toBe("interested");
+    expect(thread?.crmPipelineId).toBe(pipeline.pipeline._id);
+  });
+});

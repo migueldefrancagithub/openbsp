@@ -6,7 +6,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { findOriginCampaign } from "./lib/channels/projection";
 import { threadHasMessageEvent } from "./lib/channels/threadVisibility";
 import { threadLeadStatusValidator } from "./lib/channels/threadUpdate";
-import { tenantQuery } from "./lib/customFunctions";
+import { loadByIdInTenant, tenantQuery } from "./lib/customFunctions";
 import { classifyRisk, compareRisk, resolveStageWindow } from "./lib/leads/riskRadar";
 import { threadCommand } from "./lib/channels/threadCommand";
 
@@ -197,6 +197,131 @@ export const listByStatus = tenantQuery({
       });
     }
     return { page, isDone: result.isDone, continueCursor: result.continueCursor };
+  },
+});
+
+/** One editable CRM stage. Built-in stages read legacy rows; custom stages use
+ * their dedicated stage index. Both paths stay independently paginated. */
+export const listByStage = tenantQuery({
+  args: {
+    stageId: v.id("crmStages"),
+    channelId: v.optional(v.id("channels")),
+    originCampaignId: v.optional(v.id("campaigns")),
+    now: v.optional(v.number()),
+    paginationOpts: paginationOptsValidator,
+  },
+  returns: v.object({ page: v.array(leadCardValidator), isDone: v.boolean(), continueCursor: v.string() }),
+  handler: async (ctx, args) => {
+    const stage = await loadByIdInTenant(ctx, "crmStages", args.stageId);
+    if (stage.archivedAt) throw new ConvexError({ code: "STAGE_ARCHIVED" });
+    const channel = args.channelId ? await ctx.db.get(args.channelId) : null;
+    if (args.channelId && (!channel || channel.tenantId !== ctx.tenantId)) {
+      throw new ConvexError({ code: "CHANNEL_NOT_FOUND" });
+    }
+    const numItems = Math.min(Math.max(args.paginationOpts.numItems, 1), 50);
+    const pageArgs = { cursor: args.paginationOpts.cursor, numItems };
+    const systemStage = !!stage.isSystemStage && !!stage.legacyStatus;
+    const result = systemStage
+      ? channel
+        ? args.originCampaignId
+          ? await ctx.db.query("channelThreads").withIndex("by_channel_lead_status_campaign", (q) => q.eq("channelId", channel._id).eq("leadStatus", stage.legacyStatus!).eq("originCampaignId", args.originCampaignId)).filter((q) => q.and(q.eq(q.field("closedAt"), undefined), q.eq(q.field("crmStageId"), undefined))).order("desc").paginate(pageArgs)
+          : await ctx.db.query("channelThreads").withIndex("by_channel_lead_status", (q) => q.eq("channelId", channel._id).eq("leadStatus", stage.legacyStatus!)).filter((q) => q.and(q.eq(q.field("closedAt"), undefined), q.eq(q.field("crmStageId"), undefined))).order("desc").paginate(pageArgs)
+        : args.originCampaignId
+          ? await ctx.db.query("channelThreads").withIndex("by_tenant_lead_status_campaign", (q) => q.eq("tenantId", ctx.tenantId).eq("leadStatus", stage.legacyStatus!).eq("originCampaignId", args.originCampaignId)).filter((q) => q.and(q.eq(q.field("closedAt"), undefined), q.eq(q.field("crmStageId"), undefined))).order("desc").paginate(pageArgs)
+          : await ctx.db.query("channelThreads").withIndex("by_tenant_lead_status", (q) => q.eq("tenantId", ctx.tenantId).eq("leadStatus", stage.legacyStatus!)).filter((q) => q.and(q.eq(q.field("closedAt"), undefined), q.eq(q.field("crmStageId"), undefined))).order("desc").paginate(pageArgs)
+      : channel
+        ? args.originCampaignId
+          ? await ctx.db.query("channelThreads").withIndex("by_channel_crm_stage_campaign", (q) => q.eq("channelId", channel._id).eq("crmStageId", stage._id).eq("originCampaignId", args.originCampaignId)).filter((q) => q.eq(q.field("closedAt"), undefined)).order("desc").paginate(pageArgs)
+          : await ctx.db.query("channelThreads").withIndex("by_channel_crm_stage", (q) => q.eq("channelId", channel._id).eq("crmStageId", stage._id)).filter((q) => q.eq(q.field("closedAt"), undefined)).order("desc").paginate(pageArgs)
+        : args.originCampaignId
+          ? await ctx.db.query("channelThreads").withIndex("by_tenant_crm_stage_campaign", (q) => q.eq("tenantId", ctx.tenantId).eq("crmStageId", stage._id).eq("originCampaignId", args.originCampaignId)).filter((q) => q.eq(q.field("closedAt"), undefined)).order("desc").paginate(pageArgs)
+          : await ctx.db.query("channelThreads").withIndex("by_tenant_crm_stage", (q) => q.eq("tenantId", ctx.tenantId).eq("crmStageId", stage._id)).filter((q) => q.eq(q.field("closedAt"), undefined)).order("desc").paginate(pageArgs);
+
+    const now = args.now ?? Date.now();
+    const channels = new Map<string, Doc<"channels"> | null>();
+    const campaigns = new Map<string, string | undefined>();
+    const members = new Map<string, string | undefined>();
+    const page = [];
+    for (const thread of result.page) {
+      if (thread.tenantId !== ctx.tenantId || thread.closedAt || thread.inboxStatus === "closed") continue;
+      if (!(await threadHasMessageEvent(ctx, thread))) continue;
+      if (!channels.has(thread.channelId)) channels.set(thread.channelId, await ctx.db.get(thread.channelId));
+      const threadChannel = channels.get(thread.channelId);
+      const identity = thread.identityId ? await ctx.db.get(thread.identityId) : null;
+      const recipient = identity?.phone ?? thread.threadKey;
+      if (thread.originCampaignId && !campaigns.has(thread.originCampaignId)) {
+        const campaign = await ctx.db.get(thread.originCampaignId);
+        campaigns.set(thread.originCampaignId, campaign?.name);
+      }
+      if (thread.responsibleMemberId && !members.has(thread.responsibleMemberId)) {
+        members.set(thread.responsibleMemberId, await memberLabel(ctx, thread.responsibleMemberId));
+      }
+      const command = threadCommand(thread, now);
+      const risk = classifyRisk({
+        lastActivityAt: Math.max(thread.lastInboundAt ?? 0, thread.lastOutboundAt ?? 0, thread.createdAt),
+        now,
+        inFlight: false,
+        window: resolveStageWindow(thread.leadStatus),
+      });
+      page.push({
+        _id: thread._id,
+        channelId: thread.channelId,
+        threadKey: thread.threadKey,
+        displayName: identity?.displayName,
+        phone: identity?.phone,
+        command: command.who,
+        riskBucket: risk.onRadar ? risk.bucket : undefined,
+        hoursSinceActivity: Math.round(risk.hoursSinceActivity),
+        leadStatus: thread.leadStatus ?? stage.legacyStatus ?? "interested",
+        leadSource: thread.leadSource,
+        intent: thread.intent,
+        nextStep: thread.nextStep,
+        nextStepDueAt: thread.nextStepDueAt,
+        responsibleMemberId: thread.responsibleMemberId,
+        responsibleName: thread.responsibleMemberId ? members.get(thread.responsibleMemberId) : undefined,
+        unreadCount: thread.unreadCount,
+        lastEventAt: thread.lastEventAt,
+        lastPreview: thread.lastPreview,
+        serviceWindowExpiresAt: thread.serviceWindowExpiresAt,
+        originCampaignName: thread.originCampaignId ? campaigns.get(thread.originCampaignId) : undefined,
+        automationMode: thread.automationMode,
+        pilotBlocked: !!thread.pilotBlockedAt && !(threadChannel?.outboundAllowlist ?? []).includes(recipient),
+      });
+    }
+    return { page, isDone: result.isDone, continueCursor: result.continueCursor };
+  },
+});
+
+export const countsByPipeline = tenantQuery({
+  args: { pipelineId: v.id("crmPipelines"), channelId: v.optional(v.id("channels")), originCampaignId: v.optional(v.id("campaigns")) },
+  returns: v.array(v.object({ stageId: v.id("crmStages"), count: v.number(), capped: v.boolean() })),
+  handler: async (ctx, args) => {
+    await loadByIdInTenant(ctx, "crmPipelines", args.pipelineId);
+    const channel = args.channelId ? await ctx.db.get(args.channelId) : null;
+    if (args.channelId && (!channel || channel.tenantId !== ctx.tenantId)) throw new ConvexError({ code: "CHANNEL_NOT_FOUND" });
+    const stages = (await ctx.db.query("crmStages").withIndex("by_pipeline_position", (q) => q.eq("pipelineId", args.pipelineId)).take(100)).filter((stage) => !stage.archivedAt);
+    const output = [];
+    for (const stage of stages) {
+      const systemStage = !!stage.isSystemStage && !!stage.legacyStatus;
+      const rows = systemStage
+        ? channel
+          ? args.originCampaignId
+            ? await ctx.db.query("channelThreads").withIndex("by_channel_lead_status_campaign", (q) => q.eq("channelId", channel._id).eq("leadStatus", stage.legacyStatus!).eq("originCampaignId", args.originCampaignId)).filter((q) => q.and(q.eq(q.field("closedAt"), undefined), q.eq(q.field("crmStageId"), undefined))).take(COUNT_CAP + 1)
+            : await ctx.db.query("channelThreads").withIndex("by_channel_lead_status", (q) => q.eq("channelId", channel._id).eq("leadStatus", stage.legacyStatus!)).filter((q) => q.and(q.eq(q.field("closedAt"), undefined), q.eq(q.field("crmStageId"), undefined))).take(COUNT_CAP + 1)
+          : args.originCampaignId
+            ? await ctx.db.query("channelThreads").withIndex("by_tenant_lead_status_campaign", (q) => q.eq("tenantId", ctx.tenantId).eq("leadStatus", stage.legacyStatus!).eq("originCampaignId", args.originCampaignId)).filter((q) => q.and(q.eq(q.field("closedAt"), undefined), q.eq(q.field("crmStageId"), undefined))).take(COUNT_CAP + 1)
+            : await ctx.db.query("channelThreads").withIndex("by_tenant_lead_status", (q) => q.eq("tenantId", ctx.tenantId).eq("leadStatus", stage.legacyStatus!)).filter((q) => q.and(q.eq(q.field("closedAt"), undefined), q.eq(q.field("crmStageId"), undefined))).take(COUNT_CAP + 1)
+        : channel
+          ? args.originCampaignId
+            ? await ctx.db.query("channelThreads").withIndex("by_channel_crm_stage_campaign", (q) => q.eq("channelId", channel._id).eq("crmStageId", stage._id).eq("originCampaignId", args.originCampaignId)).filter((q) => q.eq(q.field("closedAt"), undefined)).take(COUNT_CAP + 1)
+            : await ctx.db.query("channelThreads").withIndex("by_channel_crm_stage", (q) => q.eq("channelId", channel._id).eq("crmStageId", stage._id)).filter((q) => q.eq(q.field("closedAt"), undefined)).take(COUNT_CAP + 1)
+          : args.originCampaignId
+            ? await ctx.db.query("channelThreads").withIndex("by_tenant_crm_stage_campaign", (q) => q.eq("tenantId", ctx.tenantId).eq("crmStageId", stage._id).eq("originCampaignId", args.originCampaignId)).filter((q) => q.eq(q.field("closedAt"), undefined)).take(COUNT_CAP + 1)
+            : await ctx.db.query("channelThreads").withIndex("by_tenant_crm_stage", (q) => q.eq("tenantId", ctx.tenantId).eq("crmStageId", stage._id)).filter((q) => q.eq(q.field("closedAt"), undefined)).take(COUNT_CAP + 1);
+      const open = rows.filter((row) => row.tenantId === ctx.tenantId && row.inboxStatus !== "closed");
+      output.push({ stageId: stage._id, count: Math.min(open.length, COUNT_CAP), capped: rows.length > COUNT_CAP });
+    }
+    return output;
   },
 });
 

@@ -14,12 +14,12 @@ import {
   Building2,
   Check,
   ChevronDown,
+  Columns3,
   FileText,
   Inbox,
   LayoutDashboard,
   LifeBuoy,
   LogOut,
-  MousePointerClick,
   Network,
   Plus,
   Search,
@@ -70,7 +70,7 @@ type WorkspaceMembership = ActiveWorkspace & {
 
 const PRIMARY_NAV: NavItem[] = [
   { href: "/app/channel-inbox", labelKey: "nav.inbox", icon: Inbox },
-  { href: "/app/leads", labelKey: "nav.leads", icon: MousePointerClick },
+  { href: "/app/leads", labelKey: "nav.leads", icon: Columns3 },
   { href: "/app/agenda", labelKey: "nav.agenda", icon: CalendarDays },
   { href: "/app/campaigns", labelKey: "nav.campaigns", icon: Send },
   { href: "/app/agents", labelKey: "nav.agents", icon: Bot },

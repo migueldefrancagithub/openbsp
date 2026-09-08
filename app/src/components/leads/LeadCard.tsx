@@ -6,7 +6,7 @@ import type { Id } from "../../../convex/_generated/dataModel";
 import { cn } from "@/lib/cn";
 import { relativeTime } from "@/lib/relativeTime";
 import { useI18n, type TranslationKey } from "@/lib/i18n";
-import { LEAD_STATUSES } from "@/components/leads/leadStatuses";
+import type { CrmStage } from "@/components/leads/leadStatuses";
 
 export type LeadCardData = {
   _id: Id<"channelThreads">;
@@ -34,11 +34,15 @@ export type LeadCardData = {
 
 export function LeadCard({
   lead,
+  currentStageId,
+  stages,
   onMove,
   moving,
 }: {
   lead: LeadCardData;
-  onMove: (leadStatus: string) => void;
+  currentStageId: string;
+  stages: CrmStage[];
+  onMove: (stageId: string) => void;
   moving: boolean;
 }) {
   const { locale, t } = useI18n();
@@ -161,8 +165,12 @@ export function LeadCard({
         className="mt-2 h-7 w-full rounded-md border border-line bg-surface px-1.5 text-[10px] font-semibold text-body outline-none focus:border-brand-solid/40"
       >
         <option value="">{t("leads.moveTo")}</option>
-        {LEAD_STATUSES.filter((status) => status !== lead.leadStatus).map((status) => (
-          <option key={status} value={status}>{t(`status.${status}` as TranslationKey)}</option>
+        {stages.filter((stage) => stage._id !== currentStageId).map((stage) => (
+          <option key={stage._id} value={stage._id}>
+            {stage.useSystemLabel && stage.legacyStatus
+              ? t(`status.${stage.legacyStatus}` as TranslationKey)
+              : stage.name}
+          </option>
         ))}
       </select>
     </article>
