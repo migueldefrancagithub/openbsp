@@ -848,6 +848,43 @@ export default defineSchema({
     ])
     .index("by_tenant_updated", ["tenantId", "updatedAt"]),
 
+  crmPipelines: defineTable({
+    tenantId: v.id("tenants"),
+    name: v.string(),
+    isDefault: v.boolean(),
+    active: v.boolean(),
+    createdBy: v.id("members"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_tenant", ["tenantId", "createdAt"])
+    .index("by_tenant_default", ["tenantId", "isDefault"]),
+
+  crmStages: defineTable({
+    tenantId: v.id("tenants"),
+    pipelineId: v.id("crmPipelines"),
+    name: v.string(),
+    color: v.string(),
+    position: v.number(),
+    /** Legacy status keeps existing automation and campaign filters compatible. */
+    legacyStatus: v.optional(channelLeadStatusValidator),
+    isSystemStage: v.optional(v.boolean()),
+    useSystemLabel: v.optional(v.boolean()),
+    rules: v.object({
+      category: v.union(v.literal("open"), v.literal("won"), v.literal("lost")),
+      requireNextStep: v.boolean(),
+      pauseAi: v.boolean(),
+    }),
+    redirectStageId: v.optional(v.id("crmStages")),
+    archivedAt: v.optional(v.number()),
+    createdBy: v.id("members"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_pipeline_position", ["pipelineId", "position"])
+    .index("by_tenant_legacy", ["tenantId", "legacyStatus"])
+    .index("by_tenant", ["tenantId", "createdAt"]),
+
   /**
    * Channel-neutral thread projection derived from channelEvents. This is the
    * read surface for the multichannel inbox. It is deliberately separate from
@@ -869,6 +906,8 @@ export default defineSchema({
     tags: v.optional(v.array(v.string())),
     leadSource: v.optional(leadSourceValidator),
     leadStatus: v.optional(channelLeadStatusValidator),
+    crmPipelineId: v.optional(v.id("crmPipelines")),
+    crmStageId: v.optional(v.id("crmStages")),
     /** Who last moved the stage: a human undoing the AI only counts when the AI moved it last. */
     leadStatusActor: v.optional(v.union(v.literal("ai"), v.literal("member"), v.literal("system"))),
     /** Where the AI took the stage FROM, so a revert can be told from a redirect. */
@@ -932,6 +971,20 @@ export default defineSchema({
     .index("by_channel_lead_status_campaign", [
       "channelId",
       "leadStatus",
+      "originCampaignId",
+      "lastEventAt",
+    ])
+    .index("by_tenant_crm_stage", ["tenantId", "crmStageId", "lastEventAt"])
+    .index("by_channel_crm_stage", ["channelId", "crmStageId", "lastEventAt"])
+    .index("by_tenant_crm_stage_campaign", [
+      "tenantId",
+      "crmStageId",
+      "originCampaignId",
+      "lastEventAt",
+    ])
+    .index("by_channel_crm_stage_campaign", [
+      "channelId",
+      "crmStageId",
       "originCampaignId",
       "lastEventAt",
     ])
@@ -2255,7 +2308,8 @@ export default defineSchema({
   })
     .index("by_tenant", ["tenantId"])
     .index("by_tenant_status", ["tenantId", "status"])
-    .index("by_tenant_business_key", ["tenantId", "businessKey"]),
+    .index("by_tenant_business_key", ["tenantId", "businessKey"])
+    .searchIndex("search_name", { searchField: "name", filterFields: ["tenantId", "status"] }),
 
   campaignRecipients: defineTable({
     tenantId: v.id("tenants"),

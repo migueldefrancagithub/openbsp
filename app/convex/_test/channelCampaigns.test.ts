@@ -521,5 +521,17 @@ describe("channel campaigns", () => {
     ).rejects.toThrow(/FORBIDDEN_CAPABILITY/);
     const list = await asOwner.query(api.channelCampaigns.list, { paginationOpts: { cursor: null, numItems: 10 } });
     expect(list.page.map((row) => row._id)).toEqual([campaignId]);
+    const drafts = await asOwner.query(api.channelCampaigns.list, {
+      status: "draft",
+      paginationOpts: { cursor: null, numItems: 10 },
+    });
+    expect(drafts.page.map((row) => row._id)).toEqual([campaignId]);
+    const search = await asOwner.query(api.channelCampaigns.list, {
+      search: "Privada",
+      paginationOpts: { cursor: null, numItems: 10 },
+    });
+    expect(search.page.map((row) => row._id)).toEqual([campaignId]);
+    const dashboard = await asOwner.query(api.channelCampaigns.dashboard, {});
+    expect(dashboard).toMatchObject({ campaignCount: 1, capped: false, statusCounts: { draft: 1 } });
   });
 });

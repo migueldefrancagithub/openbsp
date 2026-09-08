@@ -44,6 +44,15 @@ const SCHEDULE_MIN_MS = 60_000;
 const SCHEDULE_MAX_MS = 30 * 24 * 60 * 60 * 1000;
 
 const kindValidator = v.union(v.literal("channel_template"), v.literal("channel_text"));
+const campaignFilterStatusValidator = v.union(
+  v.literal("draft"),
+  v.literal("scheduled"),
+  v.literal("running"),
+  v.literal("paused"),
+  v.literal("completed"),
+  v.literal("failed"),
+  v.literal("cancelled"),
+);
 
 const leadStatusValidator = v.union(
   ...CHANNEL_LEAD_STATUSES.map((status) => v.literal(status)),
@@ -726,17 +735,37 @@ export const recordConversion = tenantMutation({
 // ---------------------------------------------------------------------------
 
 export const list = tenantQuery({
-  args: { paginationOpts: paginationOptsValidator },
+  args: { paginationOpts: paginationOptsValidator, status: v.optional(campaignFilterStatusValidator), search: v.optional(v.string()) },
   returns: v.object({
     page: v.array(campaignRowValidator),
     isDone: v.boolean(),
     continueCursor: v.string(),
   }),
   handler: async (ctx, args) => {
-    const result = await ctx.db
-      .query("campaigns")
-      .withIndex("by_tenant", (q) => q.eq("tenantId", ctx.tenantId))
-      .order("desc")
+    const search = args.search?.trim().slice(0, 80);
+    const pageArgs = {
+      cursor: args.paginationOpts.cursor,
+      numItems: Math.min(Math.max(args.paginationOpts.numItems, 1), 50),
+    };
+    const kindFilter = (q: any) =>
+      q.or(
+        q.eq(q.field("kind"), "channel_template"),
+        q.eq(q.field("kind"), "channel_text"),
+        q.eq(q.field("kind"), "micro_lab"),
+      );
+    const result = search
+      ? await ctx.db
+          .query("campaigns")
+          .withSearchIndex("search_name", (q) => {
+            const searched = q.search("name", search).eq("tenantId", ctx.tenantId);
+            return args.status ? searched.eq("status", args.status) : searched;
+          })
+          .filter(kindFilter)
+          .paginate(pageArgs)
+      : await (args.status
+          ? ctx.db.query("campaigns").withIndex("by_tenant_status", (q) => q.eq("tenantId", ctx.tenantId).eq("status", args.status))
+          : ctx.db.query("campaigns").withIndex("by_tenant", (q) => q.eq("tenantId", ctx.tenantId)))
+          .order("desc")
       .filter((q) =>
         q.or(
           q.eq(q.field("kind"), "channel_template"),
@@ -744,14 +773,59 @@ export const list = tenantQuery({
           q.eq(q.field("kind"), "micro_lab"),
         ),
       )
-      .paginate({
-        cursor: args.paginationOpts.cursor,
-        numItems: Math.min(Math.max(args.paginationOpts.numItems, 1), 50),
-      });
+          .paginate(pageArgs);
     return {
       page: result.page.map(rowOf),
       isDone: result.isDone,
       continueCursor: result.continueCursor,
+    };
+  },
+});
+
+/** Real aggregate for the campaigns home. The bounded flag is explicit so the
+ * UI never presents a partial total as an exact lifetime number. */
+export const dashboard = tenantQuery({
+  args: {},
+  returns: v.object({
+    capped: v.boolean(),
+    campaignCount: v.number(),
+    statusCounts: v.object({
+      draft: v.number(), scheduled: v.number(), running: v.number(), paused: v.number(),
+      completed: v.number(), failed: v.number(), cancelled: v.number(),
+    }),
+    rates: ratesValidator,
+  }),
+  handler: async (ctx) => {
+    const rows = await ctx.db
+      .query("campaigns")
+      .withIndex("by_tenant", (q) => q.eq("tenantId", ctx.tenantId))
+      .order("desc")
+      .filter((q) => q.or(q.eq(q.field("kind"), "channel_template"), q.eq(q.field("kind"), "channel_text"), q.eq(q.field("kind"), "micro_lab")))
+      .take(501);
+    const campaigns = rows.slice(0, 500);
+    const statusCounts = { draft: 0, scheduled: 0, running: 0, paused: 0, completed: 0, failed: 0, cancelled: 0 };
+    const totals = { attempted: 0, sent: 0, delivered: 0, read: 0, replied: 0, clicked: 0, converted: 0, failed: 0, skipped: 0, unknown: 0, pending: 0 };
+    for (const campaign of campaigns) {
+      const status = campaign.status ?? "draft";
+      if (status in statusCounts) statusCounts[status as keyof typeof statusCounts] += 1;
+      const rates = deriveCampaignRates(readCampaignStats(campaign.stats));
+      for (const key of Object.keys(totals) as Array<keyof typeof totals>) totals[key] += rates[key];
+    }
+    const denominator = Math.max(totals.attempted, 1);
+    const sentDenominator = Math.max(totals.sent, 1);
+    return {
+      capped: rows.length > 500,
+      campaignCount: campaigns.length,
+      statusCounts,
+      rates: {
+        ...totals,
+        deliveryRate: totals.delivered / sentDenominator,
+        readRate: totals.read / sentDenominator,
+        replyRate: totals.replied / sentDenominator,
+        clickRate: totals.clicked / sentDenominator,
+        conversionRate: totals.converted / sentDenominator,
+        failureRate: totals.failed / denominator,
+      },
     };
   },
 });

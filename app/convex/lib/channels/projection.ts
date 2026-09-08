@@ -4,6 +4,7 @@ import { autoConfirmFromReply } from "../clinicAgenda";
 import { bumpCampaignStats, markCampaignReply } from "../campaignAttribution";
 import type { CampaignRecipientStatus as CampaignRowStatus } from "../campaignStats";
 import type { Doc, Id } from "../../_generated/dataModel";
+import { stageAssignmentForStatus } from "../../crmPipelines";
 import type { MutationCtx } from "../../_generated/server";
 import {
   decideOutboxTransition,
@@ -389,6 +390,8 @@ export async function projectThreadFromEvent(
 
   if (!existing) {
     const slaMs = isInboundMessage ? await firstResponseSlaMs(ctx, channel.tenantId) : 0;
+    const initialLeadStatus = inferredLeadStatus ?? "new";
+    const crmAssignment = await stageAssignmentForStatus(ctx, channel.tenantId, initialLeadStatus);
     const threadId = await ctx.db.insert("channelThreads", {
       tenantId: channel.tenantId,
       channelId: channel._id,
@@ -404,7 +407,9 @@ export async function projectThreadFromEvent(
         ? eventAt + SERVICE_WINDOW_MS
         : undefined,
       leadSource: origin ? "campaign_reply" : incoming ? "organic" : undefined,
-      leadStatus: inferredLeadStatus ?? "new",
+      leadStatus: crmAssignment?.leadStatus ?? initialLeadStatus,
+      crmPipelineId: crmAssignment?.crmPipelineId,
+      crmStageId: crmAssignment?.crmStageId,
       intent: classified.intent,
       intentSource: classified.intent ? "inferred" : undefined,
       intentUpdatedAt: classified.intent ? eventAt : undefined,
@@ -447,7 +452,12 @@ export async function projectThreadFromEvent(
       inferredLeadStatus &&
       shouldAdvanceLeadStatus(existing.leadStatus, inferredLeadStatus)
     ) {
-      patch.leadStatus = inferredLeadStatus;
+      const crmAssignment = await stageAssignmentForStatus(ctx, channel.tenantId, inferredLeadStatus);
+      patch.leadStatus = crmAssignment?.leadStatus ?? inferredLeadStatus;
+      if (crmAssignment) {
+        patch.crmPipelineId = crmAssignment.crmPipelineId;
+        patch.crmStageId = crmAssignment.crmStageId;
+      }
       patch.nextStep = nextStepFor(inferredLeadStatus);
       patch.nextStepDueAt =
         inferredLeadStatus === "confirmed" || inferredLeadStatus === "lost"

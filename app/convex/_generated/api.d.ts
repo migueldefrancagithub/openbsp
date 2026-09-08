@@ -38,6 +38,7 @@ import type * as compliance from "../compliance.js";
 import type * as contactRequest from "../contactRequest.js";
 import type * as contacts from "../contacts.js";
 import type * as conversations from "../conversations.js";
+import type * as crmPipelines from "../crmPipelines.js";
 import type * as crons from "../crons.js";
 import type * as ctwa from "../ctwa.js";
 import type * as customFields from "../customFields.js";
@@ -176,6 +177,7 @@ declare const fullApi: ApiFromModules<{
   contactRequest: typeof contactRequest;
   contacts: typeof contacts;
   conversations: typeof conversations;
+  crmPipelines: typeof crmPipelines;
   crons: typeof crons;
   ctwa: typeof ctwa;
   customFields: typeof customFields;

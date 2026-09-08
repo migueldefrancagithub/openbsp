@@ -9,31 +9,33 @@ import { cn } from "@/lib/cn";
 import { useI18n, type TranslationKey } from "@/lib/i18n";
 import { convexErrorMessage } from "@/lib/convexErrorMessage";
 import { LeadCard, type LeadCardData } from "@/components/leads/LeadCard";
-import { LEAD_STATUSES, leadColumnTone, type LeadStatus } from "@/components/leads/leadStatuses";
+import type { CrmStage } from "@/components/leads/leadStatuses";
 
-type Counts = Array<{ status: string; count: number; capped: boolean }>;
+type Counts = Array<{ stageId: Id<"crmStages">; count: number; capped: boolean }>;
 
 export function LeadsKanban({
   channelId,
   originCampaignId,
   counts,
+  stages,
   now,
 }: {
   channelId?: Id<"channels">;
   originCampaignId?: Id<"campaigns">;
   counts: Counts | undefined;
+  stages: CrmStage[];
   now: number;
 }) {
   const { locale, t } = useI18n();
-  const updateThread = useMutation(api.inboxOperations.updateThread);
+  const moveLead = useMutation(api.crmPipelines.moveLead);
   const [moving, setMoving] = useState<Id<"channelThreads"> | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function move(threadId: Id<"channelThreads">, leadStatus: string) {
+  async function move(threadId: Id<"channelThreads">, stageId: string) {
     setMoving(threadId);
     setError(null);
     try {
-      await updateThread({ threadId, leadStatus: leadStatus as LeadStatus });
+      await moveLead({ threadId, stageId: stageId as Id<"crmStages"> });
     } catch (cause) {
       setError(convexErrorMessage(cause, locale));
     } finally {
@@ -49,14 +51,15 @@ export function LeadsKanban({
         </div>
       )}
       <div className="flex min-h-0 flex-1 gap-3 overflow-x-auto px-4 pb-4 sm:px-6" data-leads-kanban>
-        {LEAD_STATUSES.map((status) => (
+        {stages.map((stage) => (
           <KanbanColumn
-            key={status}
-            status={status}
+            key={stage._id}
+            stage={stage}
+            stages={stages}
             channelId={channelId}
             originCampaignId={originCampaignId}
             now={now}
-            count={counts?.find((row) => row.status === status)}
+            count={counts?.find((row) => row.stageId === stage._id)}
             movingId={moving}
             onMove={move}
           />
@@ -67,7 +70,8 @@ export function LeadsKanban({
 }
 
 function KanbanColumn({
-  status,
+  stage,
+  stages,
   channelId,
   originCampaignId,
   now,
@@ -75,23 +79,27 @@ function KanbanColumn({
   movingId,
   onMove,
 }: {
-  status: LeadStatus;
+  stage: CrmStage;
+  stages: CrmStage[];
   channelId?: Id<"channels">;
   originCampaignId?: Id<"campaigns">;
   now: number;
   count?: { count: number; capped: boolean };
   movingId: Id<"channelThreads"> | null;
-  onMove: (threadId: Id<"channelThreads">, leadStatus: string) => void;
+  onMove: (threadId: Id<"channelThreads">, stageId: string) => void;
 }) {
   const { t } = useI18n();
   const [over, setOver] = useState(false);
-  const { results, status: loadStatus, loadMore } = usePaginatedQuery(
-    api.leads.listByStatus,
-    { leadStatus: status, channelId, originCampaignId, now },
+  const stageQuery = usePaginatedQuery(
+    api.leads.listByStage,
+    { stageId: stage._id as Id<"crmStages">, channelId, originCampaignId, now },
     { initialNumItems: 20 },
   );
-  const tone = leadColumnTone(status);
-  const leads = results as LeadCardData[];
+  const { results: stageResults, status: stageLoadStatus, loadMore: loadMoreStage } = stageQuery;
+  const stageLeads = stageResults as LeadCardData[];
+  const label = stage.useSystemLabel && stage.legacyStatus
+    ? t(`status.${stage.legacyStatus}` as TranslationKey)
+    : stage.name;
 
   return (
     <section
@@ -111,15 +119,15 @@ function KanbanColumn({
         event.preventDefault();
         setOver(false);
         const threadId = event.dataTransfer.getData("text/openbsp-lead");
-        if (threadId) onMove(threadId as Id<"channelThreads">, status);
+        if (threadId) onMove(threadId as Id<"channelThreads">, stage._id);
       }}
-      data-lead-column={status}
+      data-lead-column={stage._id}
     >
       <header className="flex shrink-0 items-center justify-between gap-2 border-b border-line-soft px-3 py-2.5">
         <div className="flex min-w-0 items-center gap-2">
-          <span className={cn("h-2 w-2 shrink-0 rounded-full", tone.accent)} />
-          <h2 className={cn("truncate text-[12px] font-bold uppercase tracking-[0.08em]", tone.header)}>
-            {t(`status.${status}` as TranslationKey)}
+          <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: stage.color }} />
+          <h2 className="truncate text-[12px] font-bold uppercase tracking-[0.08em] text-ink">
+            {label}
           </h2>
         </div>
         <span className="rounded-full bg-surface px-2 py-0.5 text-[10px] font-semibold text-muted">
@@ -127,34 +135,36 @@ function KanbanColumn({
         </span>
       </header>
       <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-2 pb-2 pt-2">
-        {loadStatus === "LoadingFirstPage" ? (
+        {stageLoadStatus === "LoadingFirstPage" ? (
           <div className="flex items-center justify-center py-6 text-faint">
             <Loader2 size={14} className="animate-spin" />
           </div>
-        ) : leads.length === 0 ? (
+        ) : stageLeads.length === 0 ? (
           <div className="rounded-lg border border-dashed border-line px-3 py-6 text-center text-[11px] text-faint">
             {over ? t("leads.dropHere") : t("leads.emptyColumn")}
           </div>
         ) : (
-          leads.map((lead) => (
+          stageLeads.map((lead) => (
             <LeadCard
               key={lead._id}
               lead={lead}
+              currentStageId={stage._id}
+              stages={stages}
               moving={movingId === lead._id}
               onMove={(next) => onMove(lead._id, next)}
             />
           ))
         )}
-        {loadStatus === "CanLoadMore" && (
+        {stageLoadStatus === "CanLoadMore" && (
           <button
             type="button"
-            onClick={() => loadMore(20)}
+            onClick={() => loadMoreStage(20)}
             className="mt-1 rounded-md border border-line bg-surface px-3 py-1.5 text-[11px] font-semibold text-body hover:bg-surface-2"
           >
             {t("leads.loadMore")}
           </button>
         )}
-        {loadStatus === "LoadingMore" && (
+        {stageLoadStatus === "LoadingMore" && (
           <Loader2 size={14} className="mx-auto mt-1 animate-spin text-faint" />
         )}
       </div>

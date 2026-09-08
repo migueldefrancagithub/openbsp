@@ -13,6 +13,21 @@ export const LEAD_STATUSES = [
 
 export type LeadStatus = (typeof LEAD_STATUSES)[number];
 
+export type CrmStage = {
+  _id: string;
+  name: string;
+  color: string;
+  position: number;
+  legacyStatus?: LeadStatus;
+  isSystemStage: boolean;
+  useSystemLabel: boolean;
+  rules: {
+    category: "open" | "won" | "lost";
+    requireNextStep: boolean;
+    pauseAi: boolean;
+  };
+};
+
 /** Clinic palette per stage: navy default, agenda blue for booking, teal for
  * won stages, amber for the team queue, coral for lost/no-show. */
 export function leadColumnTone(status: LeadStatus): {
