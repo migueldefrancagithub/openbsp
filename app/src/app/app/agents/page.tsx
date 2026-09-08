@@ -68,6 +68,7 @@ export default function AgentsPage() {
         description={tr("Assistentes de IA com objetivo, tom, conhecimento e ferramentas verificáveis. Publicar só passa com a lista de verificação limpa.", "AI assistants with an objective, tone, knowledge and verifiable tools. Publishing only passes with a clean checklist.")}
         action={
           <div className="flex gap-2">
+            <Link href="/app/agents/autonomy" className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#0d6b61]/30 bg-chip-success px-3 text-[13px] font-semibold text-chip-success-fg"><ShieldCheck size={14} /> {tr("Centro de autonomia", "Autonomy center")}</Link>
             <Link href="/app/chatbots" className="inline-flex h-10 items-center gap-2 rounded-lg border border-line bg-surface px-3 text-[13px] font-semibold text-body"><Workflow size={14} /> {tr("Fluxos por palavra-chave", "Keyword flows")}</Link>
             <button type="button" onClick={() => setCreating({ name: "", objective: "reception", channelId: productChannels[0]?._id ?? "" })} className="inline-flex h-10 items-center gap-2 rounded-lg bg-brand-solid px-4 text-[13px] font-semibold text-white"><Plus size={14} /> {tr("Novo agente", "New agent")}</button>
           </div>
@@ -84,7 +85,7 @@ export default function AgentsPage() {
         {creating && (
           <section className="rounded-lg border border-line bg-surface p-5">
             <div className="grid gap-3 sm:grid-cols-3">
-              <label className="block text-[11px] font-medium text-muted">{tr("Nome", "Name")}<input value={creating.name} onChange={(e) => setCreating({ ...creating, name: e.target.value })} placeholder={tr("Recepção da clínica", "Clinic reception")} className={inputClass} /></label>
+              <label className="block text-[11px] font-medium text-muted">{tr("Nome", "Name")}<input value={creating.name} onChange={(e) => setCreating({ ...creating, name: e.target.value })} placeholder={tr("Atendimento comercial", "Sales assistant")} className={inputClass} /></label>
               <label className="block text-[11px] font-medium text-muted">{tr("Objetivo", "Objective")}
                 <select value={creating.objective} onChange={(e) => setCreating({ ...creating, objective: e.target.value as (typeof OBJECTIVES)[number] })} className={inputClass}>
                   {OBJECTIVES.map((o) => <option key={o} value={o}>{objectiveLabel(o, locale)}</option>)}
@@ -107,7 +108,7 @@ export default function AgentsPage() {
         {agents === undefined ? (
           <div className="flex items-center gap-2 px-2 py-8 text-sm text-faint"><Loader2 size={15} className="animate-spin" /> {tr("A carregar…", "Loading…")}</div>
         ) : agents.length === 0 && !creating ? (
-          <EmptyState icon={Bot} title={tr("Ainda sem agentes", "No agents yet")} description={tr("Crie um agente de recepção: ele acolhe, responde com o conhecimento da clínica e marca consultas reais.", "Create a reception agent: it welcomes patients, answers from the clinic's knowledge and books real appointments.")} action={<button type="button" onClick={() => setCreating({ name: "", objective: "reception", channelId: productChannels[0]?._id ?? "" })} className="inline-flex h-10 items-center gap-2 rounded-lg bg-brand-solid px-4 text-[13px] font-semibold text-white"><Plus size={14} /> {tr("Novo agente", "New agent")}</button>} />
+          <EmptyState icon={Bot} title={tr("Ainda sem agentes", "No agents yet")} description={tr("Crie um agente para atender, qualificar oportunidades e executar apenas as ações que autorizar.", "Create an agent to assist, qualify opportunities and execute only the actions you authorize.")} action={<button type="button" onClick={() => setCreating({ name: "", objective: "reception", channelId: productChannels[0]?._id ?? "" })} className="inline-flex h-10 items-center gap-2 rounded-lg bg-brand-solid px-4 text-[13px] font-semibold text-white"><Plus size={14} /> {tr("Novo agente", "New agent")}</button>} />
         ) : (
           <div className="grid gap-4 xl:grid-cols-[280px_1fr]">
             <ul className="space-y-1 rounded-lg border border-line bg-surface p-2">
@@ -279,10 +280,10 @@ function AgentEditor({ agentId, channels, knowledge, onDeleted }: { agentId: Id<
             <div className="rounded-lg border border-line bg-surface-2 p-3">
               <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.12em] text-faint">{tr("Passagem à equipa", "Handoff to the team")}</div>
               <label className="block text-[11px] font-medium text-muted">{tr("Palavras que obrigam a passar (separadas por vírgula)", "Words that force a handoff (comma separated)")}<input value={keywords} onChange={(e) => setKeywords(e.target.value)} className={inputClass} /></label>
-              <label className="mt-2 block text-[11px] font-medium text-muted">{tr("Mensagem ao paciente na passagem", "Message to the patient on handoff")}<input value={config.handoff.message} onChange={(e) => setConfig({ ...config, handoff: { ...config.handoff, message: e.target.value } })} className={inputClass} maxLength={500} /></label>
+              <label className="mt-2 block text-[11px] font-medium text-muted">{tr("Mensagem ao contacto na passagem", "Message to the contact on handoff")}<input value={config.handoff.message} onChange={(e) => setConfig({ ...config, handoff: { ...config.handoff, message: e.target.value } })} className={inputClass} maxLength={500} /></label>
               <div className="mt-2 flex flex-wrap gap-4 text-[12px] text-ink">
                 <label className="flex items-center gap-2"><input type="checkbox" checked={config.handoff.onLowConfidence} onChange={(e) => setConfig({ ...config, handoff: { ...config.handoff, onLowConfidence: e.target.checked } })} className="h-4 w-4 accent-[#0a1b33]" />{tr("Passar quando tiver dúvidas", "Hand off when unsure")}</label>
-                <label className="flex items-center gap-2"><input type="checkbox" checked={config.handoff.onClinicalQuestion} onChange={(e) => setConfig({ ...config, handoff: { ...config.handoff, onClinicalQuestion: e.target.checked } })} className="h-4 w-4 accent-[#0a1b33]" />{tr("Passar perguntas clínicas", "Hand off clinical questions")}</label>
+                <label className="flex items-center gap-2"><input type="checkbox" checked={config.handoff.onClinicalQuestion} onChange={(e) => setConfig({ ...config, handoff: { ...config.handoff, onClinicalQuestion: e.target.checked } })} className="h-4 w-4 accent-[#0a1b33]" />{tr("Passar perguntas sensíveis", "Hand off sensitive questions")}</label>
               </div>
             </div>
             <div className="rounded-xl border border-line bg-surface-2 p-4 text-[12px] text-body">
@@ -290,7 +291,7 @@ function AgentEditor({ agentId, channels, knowledge, onDeleted }: { agentId: Id<
                 {tr("Sempre ligados", "Always on")}
               </div>
               <ul className="space-y-1">
-                <li>{tr("Nunca dá orientação clínica.", "Never gives clinical advice.")}</li>
+                <li>{tr("Nunca dá orientação regulada sem fonte e permissão.", "Never gives regulated guidance without a source and permission.")}</li>
                 <li>{tr("Nunca afirma uma marcação que a agenda não confirmou.", "Never claims a booking the agenda did not confirm.")}</li>
                 <li>{tr("Apresenta-se como assistente na primeira mensagem.", "Introduces itself as an assistant on the first message.")}</li>
                 <li>{tr("Não usa vocabulário interno do sistema.", "Does not use internal system vocabulary.")}</li>
@@ -334,7 +335,7 @@ function AgentEditor({ agentId, channels, knowledge, onDeleted }: { agentId: Id<
             <div className="rounded-lg border border-line bg-surface-2 p-3">
               <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.12em] text-faint">{tr("Conhecimento usado", "Knowledge used")}</div>
               {knowledge.length === 0 ? (
-                <p className="text-[12px] text-muted">{tr("Sem conhecimento ativo. Crie em Operação › Clínica › Ensinar agente.", "No active knowledge. Create it in Operations › Clinic › Teach agent.")}</p>
+                <p className="text-[12px] text-muted">{tr("Sem conhecimento ativo. Crie em Operação › Conhecimento.", "No active knowledge. Create it in Operations › Knowledge.")}</p>
               ) : (
                 <div className="flex flex-wrap gap-1.5">
                   {knowledge.map((item) => {

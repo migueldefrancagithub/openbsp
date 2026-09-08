@@ -522,7 +522,7 @@ export function PatientContextPanel({
           </form>
           {context?.contact?.locale && (
             <div className="mt-2 text-[10px] text-faint">
-              {tr("Idioma do paciente", "Patient language")}: <span className="font-semibold text-body">{context.contact.locale}</span>
+              {tr("Idioma do contacto", "Contact language")}: <span className="font-semibold text-body">{context.contact.locale}</span>
             </div>
           )}
         </Section>

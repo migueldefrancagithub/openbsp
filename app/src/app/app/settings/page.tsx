@@ -183,7 +183,7 @@ export default function SettingsPage() {
     { key: "whatsapp", label: "WhatsApp", value: hasConnection ? tr("Ligado", "Connected") : tr("Configurar", "Setup"), icon: Smartphone },
     { key: "automation", label: tr("Automação", "Automation"), value: tr("Regras", "Rules"), icon: Bot },
     { key: "team", label: tr("Equipa", "Team"), value: tr("Membros/API", "Members/API"), icon: Users },
-    { key: "clinic", label: tr("Clínica", "Clinic"), value: tr("Agenda/SLAs", "Calendar/SLAs"), icon: Stethoscope },
+    { key: "clinic", label: tr("Operação", "Operations"), value: tr("Compromissos e prazos", "Appointments and deadlines"), icon: Stethoscope },
     { key: "ai", label: tr("IA", "AI"), value: tr("Provedor/chaves", "Provider/keys"), icon: Bot },
     { key: "integrations", label: tr("Integrações", "Integrations"), value: "Webhooks/API", icon: Webhook },
     { key: "workspace", label: tr("Espaço", "Workspace"), value: roleLabel(tenant.role, locale), icon: Building2 },
@@ -817,7 +817,7 @@ export default function SettingsPage() {
             <SettingsCard
               icon={MessageSquare}
               title={tr("Resposta automática", "Auto Reply")}
-              body={tr("Use uma resposta rápida quando o paciente esperar mais do que o período definido. O agente não deve responder ao mesmo contacto em duplicado.", "Use a quick reply when the patient has waited longer than the selected period. The agent must not reply to the same contact twice.")}
+              body={tr("Use uma resposta rápida quando o contacto esperar mais do que o período definido. O agente não deve responder ao mesmo contacto em duplicado.", "Use a quick reply when the contact has waited longer than the selected period. The agent must not reply to the same contact twice.")}
             >
               <ToggleRow
                 label={tr("Ativar", "Enable")}
@@ -850,7 +850,7 @@ export default function SettingsPage() {
             <SettingsCard
               icon={Ban}
               title="DND"
-              body={tr('Quando o paciente envia "STOP", as mensagens de marketing são pausadas. "START" remove a pausa.', 'When a patient sends "STOP", marketing messages are paused. "START" removes the pause.')}
+              body={tr('Quando o contacto envia "STOP", as mensagens de marketing são pausadas. "START" remove a pausa.', 'When a contact sends "STOP", marketing messages are paused. "START" removes the pause.')}
             >
               <QuickReplySelect
                 label={tr("Resposta ao ativar STOP", "STOP acknowledgement")}

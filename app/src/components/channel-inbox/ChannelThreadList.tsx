@@ -478,7 +478,7 @@ export function ChannelThreadList() {
                               )}
                               title={t("inbox.firstResponseSla")}
                             >
-                              SLA {relativeTime(thread.firstResponseDueAt, Date.now(), locale)}
+                              {tr("Prazo", "Due")} {relativeTime(thread.firstResponseDueAt, Date.now(), locale)}
                             </span>
                           )}
                           {thread.openCaseSlaDueAt && (

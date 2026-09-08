@@ -64,7 +64,7 @@ export function AgentFeedbackPanel({ agentId }: { agentId: Id<"aiAgents"> }) {
                   <span className="text-[10px] text-faint">{relativeTime(row.createdAt, now, locale)}</span>
                   <button type="button" onClick={() => void remove({ feedbackId: row._id })} className="text-faint hover:text-chip-danger-fg" title={tr("Remover exemplo", "Remove example")}><Trash2 size={12} /></button>
                 </div>
-                <p className="mt-1 text-muted"><span className="text-[10px] uppercase tracking-[0.12em]">{tr("Paciente", "Patient")}</span> {row.patientText}</p>
+                <p className="mt-1 text-muted"><span className="text-[10px] uppercase tracking-[0.12em]">{tr("Contacto", "Contact")}</span> {row.patientText}</p>
                 {row.outcome === "edited" && <p className="mt-0.5 text-faint line-through">{row.suggestedText}</p>}
                 {row.finalText && <p className="mt-0.5 text-ink"><span className="text-[10px] uppercase tracking-[0.12em] text-chip-success-fg">{tr("Equipa", "Team")}</span> {row.finalText}</p>}
                 {(row.approvedActions.length > 0 || row.rejectedActions.length > 0) && (

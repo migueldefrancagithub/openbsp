@@ -153,7 +153,7 @@ export default function AdminLogsPage() {
                 <option value="">{tr("Qualquer área", "Any area")}</option>
                 <option value="ai.">{tr("IA e agentes", "AI and agents")}</option>
                 <option value="inbox.">{tr("Atendimento", "Inbox")}</option>
-                <option value="clinic.">{tr("Clínica e agenda", "Clinic and agenda")}</option>
+                <option value="clinic.">{tr("Serviços e compromissos", "Services and appointments")}</option>
                 <option value="campaign">{tr("Campanhas", "Campaigns")}</option>
                 <option value="member">{tr("Equipa e acessos", "Team and access")}</option>
                 <option value="ops.">{tr("Operação", "Operations")}</option>

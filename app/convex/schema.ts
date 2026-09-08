@@ -301,6 +301,44 @@ const aiObjectiveValidator = v.union(
   v.literal("audit"),
 );
 
+const agentRoutineObjectiveValidator = v.union(
+  v.literal("hot_lead_call"),
+  v.literal("stale_lead_recovery"),
+  v.literal("proposal_followup"),
+  v.literal("appointment_confirmation"),
+  v.literal("business_monitoring"),
+  v.literal("owner_digest"),
+);
+
+const agentRoutineTriggerValidator = v.union(
+  v.literal("event"),
+  v.literal("schedule"),
+  v.literal("both"),
+);
+
+const agentDecisionModeValidator = v.union(
+  v.literal("suggest"),
+  v.literal("approval"),
+  v.literal("automatic"),
+);
+
+const agentRoutineActionValidator = v.union(
+  v.literal("assign_owner"),
+  v.literal("create_task"),
+  v.literal("open_human_case"),
+  v.literal("send_staff_briefing"),
+  v.literal("update_stage"),
+  v.literal("send_customer_message"),
+);
+
+const teamResponsibilityValidator = v.union(
+  v.literal("sales_calls"),
+  v.literal("support_calls"),
+  v.literal("appointment_calls"),
+  v.literal("follow_up_calls"),
+  v.literal("owner_updates"),
+);
+
 /** Editable agent config; frozen into aiAgentVersions on publish. */
 const aiAgentConfigValidator = v.object({
   instructions: v.string(),
@@ -550,6 +588,22 @@ export default defineSchema({
     .index("by_team", ["teamId"])
     .index("by_member", ["tenantId", "memberId"])
     .index("by_team_member", ["teamId", "memberId"]),
+
+  /** What each teammate can own when an agent needs a human. */
+  memberOperationalProfiles: defineTable({
+    tenantId: v.id("tenants"),
+    memberId: v.id("members"),
+    phoneE164: v.optional(v.string()),
+    responsibilities: v.array(teamResponsibilityValidator),
+    receivesWhatsappBriefings: v.boolean(),
+    priority: v.number(),
+    active: v.boolean(),
+    updatedBy: v.id("members"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_tenant_member", ["tenantId", "memberId"])
+    .index("by_tenant_active", ["tenantId", "active"]),
 
   // ===== Meta App (platform-controlled, single row in MVP) =====
   metaApps: defineTable({
@@ -1239,6 +1293,164 @@ export default defineSchema({
     .index("by_thread_status", ["threadId", "status"])
     .index("by_tenant_business_key", ["tenantId", "businessKey"])
     .index("by_status_expires", ["status", "expiresAt"]),
+
+  /** Durable proactive work configured per business and, optionally, per agent. */
+  agentRoutines: defineTable({
+    tenantId: v.id("tenants"),
+    agentId: v.optional(v.id("aiAgents")),
+    name: v.string(),
+    objective: agentRoutineObjectiveValidator,
+    triggerMode: agentRoutineTriggerValidator,
+    decisionMode: agentDecisionModeValidator,
+    allowedActions: v.array(agentRoutineActionValidator),
+    leadStatuses: v.array(channelLeadStatusValidator),
+    intents: v.array(threadIntentValidator),
+    staleAfterHours: v.number(),
+    intervalMinutes: v.number(),
+    maxItemsPerRun: v.number(),
+    maxAttemptsPerContact: v.number(),
+    workingHoursOnly: v.boolean(),
+    teamId: v.optional(v.id("teams")),
+    preferredMemberId: v.optional(v.id("members")),
+    status: v.union(v.literal("draft"), v.literal("active"), v.literal("paused")),
+    version: v.number(),
+    nextRunAt: v.optional(v.number()),
+    lastRunAt: v.optional(v.number()),
+    createdBy: v.id("members"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_tenant_updated", ["tenantId", "updatedAt"])
+    .index("by_tenant_status_trigger", ["tenantId", "status", "triggerMode", "updatedAt"])
+    .index("by_agent", ["tenantId", "agentId", "updatedAt"])
+    .index("by_status_next_run", ["status", "nextRunAt"]),
+
+  agentRoutineRuns: defineTable({
+    tenantId: v.id("tenants"),
+    routineId: v.id("agentRoutines"),
+    businessKey: v.string(),
+    status: v.union(
+      v.literal("running"),
+      v.literal("completed"),
+      v.literal("failed"),
+    ),
+    scanned: v.number(),
+    proposed: v.number(),
+    executed: v.number(),
+    failureReason: v.optional(v.string()),
+    startedAt: v.number(),
+    completedAt: v.optional(v.number()),
+  })
+    .index("by_routine_created", ["routineId", "startedAt"])
+    .index("by_tenant_created", ["tenantId", "startedAt"])
+    .index("by_business_key", ["tenantId", "businessKey"]),
+
+  /** Evidence-first queue: nothing automatic exists without an explainable decision. */
+  agentDecisions: defineTable({
+    tenantId: v.id("tenants"),
+    routineId: v.id("agentRoutines"),
+    runId: v.optional(v.id("agentRoutineRuns")),
+    agentId: v.optional(v.id("aiAgents")),
+    threadId: v.optional(v.id("channelThreads")),
+    assignedMemberId: v.optional(v.id("members")),
+    kind: v.union(
+      v.literal("call_required"),
+      v.literal("follow_up"),
+      v.literal("stage_change"),
+      v.literal("task"),
+      v.literal("summary"),
+      v.literal("alert"),
+    ),
+    title: v.string(),
+    evidence: v.array(v.string()),
+    reason: v.string(),
+    expectedOutcome: v.string(),
+    actions: v.array(agentRoutineActionValidator),
+    businessKey: v.string(),
+    sourceLastEventAt: v.optional(v.number()),
+    contextSnapshot: v.object({
+      contactName: v.optional(v.string()),
+      contactPhoneMasked: v.optional(v.string()),
+      lastPreview: v.optional(v.string()),
+      leadStatus: v.optional(v.string()),
+      intent: v.optional(v.string()),
+      nextStep: v.optional(v.string()),
+      inactiveHours: v.optional(v.number()),
+      responsibleName: v.optional(v.string()),
+    }),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("approved"),
+      v.literal("dismissed"),
+      v.literal("executing"),
+      v.literal("completed"),
+      v.literal("cancelled"),
+      v.literal("failed"),
+      v.literal("expired"),
+    ),
+    decisionMode: agentDecisionModeValidator,
+    decidedBy: v.optional(v.id("members")),
+    decidedAt: v.optional(v.number()),
+    result: v.optional(v.any()),
+    failureReason: v.optional(v.string()),
+    expiresAt: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_tenant_status_created", ["tenantId", "status", "createdAt"])
+    .index("by_member_status_created", ["tenantId", "assignedMemberId", "status", "createdAt"])
+    .index("by_tenant_business_key", ["tenantId", "businessKey"])
+    .index("by_routine_created", ["routineId", "createdAt"])
+    .index("by_status_expires", ["status", "expiresAt"]),
+
+  /** An isolated unofficial WhatsApp connection used only for staff briefings. */
+  staffNotificationConnections: defineTable({
+    tenantId: v.id("tenants"),
+    provider: v.literal("uazapi"),
+    baseUrl: v.string(),
+    tokenCiphertext: v.string(),
+    tokenKeyVersion: v.number(),
+    tokenLast4: v.string(),
+    active: v.boolean(),
+    consecutiveFailures: v.number(),
+    lastDeliveredAt: v.optional(v.number()),
+    pausedAt: v.optional(v.number()),
+    pausedReason: v.optional(v.string()),
+    createdBy: v.id("members"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_tenant_provider", ["tenantId", "provider"])
+    .index("by_active", ["active"]),
+
+  staffNotificationDeliveries: defineTable({
+    tenantId: v.id("tenants"),
+    connectionId: v.id("staffNotificationConnections"),
+    decisionId: v.id("agentDecisions"),
+    memberId: v.id("members"),
+    recipientE164: v.string(),
+    text: v.string(),
+    businessKey: v.string(),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("claimed"),
+      v.literal("delivered"),
+      v.literal("failed"),
+      v.literal("dead"),
+    ),
+    attempts: v.number(),
+    nextAttemptAt: v.number(),
+    lastStatus: v.optional(v.number()),
+    lastError: v.optional(v.string()),
+    providerMessageId: v.optional(v.string()),
+    deliveredAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_status_next", ["status", "nextAttemptAt"])
+    .index("by_tenant_created", ["tenantId", "createdAt"])
+    .index("by_tenant_business_key", ["tenantId", "businessKey"])
+    .index("by_decision", ["decisionId", "createdAt"]),
 
   /** Every tool call the AI makes, with input/output and its verdict. */
   aiToolInvocations: defineTable({

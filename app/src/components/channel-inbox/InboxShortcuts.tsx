@@ -9,7 +9,7 @@ const BINDINGS: Binding[] = [
   { keys: "j", pt: "Conversa seguinte", en: "Next conversation" },
   { keys: "k", pt: "Conversa anterior", en: "Previous conversation" },
   { keys: "r", pt: "Focar a resposta", en: "Focus the reply" },
-  { keys: "i", pt: "Abrir a ficha do paciente", en: "Open the patient record" },
+  { keys: "i", pt: "Abrir a ficha do contacto", en: "Open the contact record" },
   { keys: "⌘ + Enter", pt: "Aprovar a sugestão da IA", en: "Approve the AI suggestion" },
   { keys: "⌘ + K", pt: "Procurar em todo o lado", en: "Search everywhere" },
   { keys: "Enter", pt: "Enviar a mensagem", en: "Send the message" },

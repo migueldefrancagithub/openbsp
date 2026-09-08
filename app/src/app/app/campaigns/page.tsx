@@ -36,8 +36,8 @@ export default function CampaignsPage() {
         eyebrow={tr("Campanhas", "Campaigns")}
         title={tr("Campanhas", "Campaigns")}
         description={tr(
-          "Mensagens em lote no canal da clínica, com público real, ritmo do piloto e métricas por destinatário.",
-          "Batched messages on the clinic channel, with a real audience, pilot pacing and per-recipient metrics.",
+          "Mensagens em lote no canal do negócio, com público real, ritmo seguro e métricas por destinatário.",
+          "Batched messages on the business channel, with a real audience, safe pacing and per-recipient metrics.",
         )}
         action={
           productChannels.length > 0 ? (
@@ -55,7 +55,7 @@ export default function CampaignsPage() {
         {channels !== undefined && productChannels.length === 0 ? (
           <EmptyState
             icon={Send}
-            title={tr("Ligue o canal da clínica", "Connect the clinic channel")}
+            title={tr("Ligue o canal do negócio", "Connect the business channel")}
             description={tr(
               "As campanhas usam o canal WhatsApp ligado ao Hub. Configure-o em Definições › Canais.",
               "Campaigns use the WhatsApp channel connected to the Hub. Set it up in Settings › Channels.",

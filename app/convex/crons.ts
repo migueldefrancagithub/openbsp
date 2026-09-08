@@ -90,4 +90,11 @@ crons.interval("ai stale turn sweep", { minutes: 10 }, internal.aiRuntime.sweepS
 // Outbound webhooks: signed deliveries with backoff; dead-letter after 8 tries.
 crons.interval("webhook delivery", { minutes: 1 }, internal.outboundWebhooks.deliverDue, {});
 
+// Proactive agents evaluate stale opportunities independently of the web app.
+crons.interval("agent routine scheduler", { minutes: 5 }, internal.agentRoutines.runDue, {});
+crons.interval("agent decision expiry", { hours: 1 }, internal.agentRoutines.sweepExpired, {});
+
+// Internal staff briefings use a separate transport from all customer messages.
+crons.interval("staff briefing delivery", { minutes: 1 }, internal.staffNotifications.deliverDue, {});
+
 export default crons;
