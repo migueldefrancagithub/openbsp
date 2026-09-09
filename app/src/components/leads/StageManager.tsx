@@ -188,7 +188,7 @@ function StageForm({ form, setForm, onSave, onCancel, busy }: { form: FormState;
         {tr("Nome", "Name")}
         <div className="mt-1 flex gap-2">
           <input type="color" value={form.color} onChange={(event) => setForm({ ...form, color: event.target.value })} className="h-9 w-10 rounded-md border border-line bg-surface p-1" aria-label={tr("Cor", "Color")} />
-          <input autoFocus value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} className="h-9 min-w-0 flex-1 rounded-md border border-line bg-surface px-3 text-[13px] text-ink outline-none focus:border-brand-solid" />
+          <input autoFocus aria-label={tr("Nome da etapa", "Stage name")} value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} className="h-9 min-w-0 flex-1 rounded-md border border-line bg-surface px-3 text-[13px] text-ink outline-none focus:border-brand-solid" />
         </div>
       </label>
       <label className="text-[11px] font-semibold text-body">
