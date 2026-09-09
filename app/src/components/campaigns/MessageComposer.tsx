@@ -182,7 +182,7 @@ export function MessageComposer({
                         binding.source === "tracked_link"
                           ? "https://…"
                           : binding.source === "first_name"
-                            ? tr("Valor se não houver nome (ex.: paciente)", "Fallback when no name (e.g. patient)")
+                            ? tr("Valor se não houver nome (ex.: cliente)", "Fallback when no name (e.g. customer)")
                             : tr("Valor", "Value")
                       }
                       className={inputClass}
@@ -231,7 +231,7 @@ export function MessageComposer({
           hasMarketingOptIn
           serviceWindowOpen={draft.kind === "channel_text"}
           freeEntryWindowOpen={false}
-          title={locale === "pt" ? "Clínica" : "Clinic"}
+          title={tr("O teu negócio", "Your business")}
         />
       </aside>
     </div>

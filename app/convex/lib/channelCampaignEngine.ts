@@ -1,6 +1,7 @@
 import { ConvexError } from "convex/values";
 import { internal } from "../_generated/api";
 import type { Doc, Id } from "../_generated/dataModel";
+import type { DatabaseReader } from "../_generated/server";
 import { findOrCreateContactForThread } from "./channels/contactBridge";
 import { extractErrorCode } from "./channels/systemEvents";
 import { threadHasMessageEvent } from "./channels/threadVisibility";
@@ -41,6 +42,7 @@ export const CHANNEL_LEAD_STATUSES = [
 ] as const;
 
 export type CampaignAudience = {
+  crmStageIds?: Id<"crmStages">[];
   leadStatuses?: string[];
   tags?: string[];
   inboundWithinDays?: number;
@@ -120,28 +122,71 @@ export function normalizeAudience(raw: unknown): CampaignAudience {
     new Set((input.threadKeys ?? []).map((k) => k.trim()).filter((k) => k.length > 0)),
   ).slice(0, MAX_PICKED_THREADS);
   return {
+    crmStageIds: input.crmStageIds === undefined ? undefined : Array.from(new Set(input.crmStageIds)).slice(0, 30),
     leadStatuses: statuses.length > 0 ? statuses : undefined,
     tags: tags.length > 0 ? tags : undefined,
     inboundWithinDays: clampDays(input.inboundWithinDays),
     excludeDnd: input.excludeDnd ?? true,
     excludeLost: input.excludeLost ?? true,
     excludeRecentCampaignDays: clampDays(input.excludeRecentCampaignDays),
-    threadKeys: threadKeys.length > 0 ? threadKeys : undefined,
+    // An explicitly empty selection must never become a whole-channel send.
+    threadKeys: input.threadKeys === undefined ? undefined : threadKeys,
   };
+}
+
+export async function audienceStages(ctx: { db: DatabaseReader }, tenantId: Id<"tenants">, audience: CampaignAudience) {
+  const stages: Doc<"crmStages">[] = [];
+  for (const id of audience.crmStageIds ?? []) {
+    const stage = await ctx.db.get(id);
+    if (!stage || stage.tenantId !== tenantId) throw new ConvexError({ code: "NOT_FOUND" });
+    if (!stage.archivedAt) stages.push(stage);
+  }
+  return stages;
+}
+
+/** Exact opaque ID first; phone aliases are accepted only when unambiguous. */
+export async function resolvePickedThread(ctx: { db: DatabaseReader }, channel: Doc<"channels">, key: string) {
+  const find = (threadKey: string) => ctx.db.query("channelThreads")
+    .withIndex("by_channel_thread", (q) => q.eq("channelId", channel._id).eq("threadKey", threadKey)).unique();
+  const exact = await find(key);
+  if (exact) return exact.tenantId === channel.tenantId ? exact : null;
+  if (!/^\+?[\d ()-]+$/.test(key)) return null;
+  const phone = key.replace(/\D/g, "");
+  if (!/^\d{8,18}$/.test(phone)) return null;
+  const candidates = new Map<string, Doc<"channelThreads">>();
+  for (const value of [phone, `+${phone}`]) {
+    const direct = await find(value);
+    if (direct?.tenantId === channel.tenantId) candidates.set(direct._id, direct);
+    const identities = await ctx.db.query("channelIdentities")
+      .withIndex("by_channel_phone", (q) => q.eq("channelId", channel._id).eq("phone", value)).take(2);
+    if (identities.length > 1) return null;
+    for (const identity of identities) {
+      if (identity.tenantId !== channel.tenantId) continue;
+      const thread = await find(identity.providerScopedId);
+      if (thread?.tenantId === channel.tenantId) candidates.set(thread._id, thread);
+    }
+  }
+  return candidates.size === 1 ? candidates.values().next().value! : null;
 }
 
 export function recipientDigits(
   thread: Pick<Doc<"channelThreads">, "threadKey">,
   identity: Pick<Doc<"channelIdentities">, "phone"> | null,
 ): string {
-  return (identity?.phone ?? thread.threadKey).replace(/\D/g, "");
+  const value = identity?.phone ?? thread.threadKey;
+  return /^\+?[\d ()-]+$/.test(value) ? value.replace(/\D/g, "") : "";
 }
 
 export function matchesAudience(
   thread: Doc<"channelThreads">,
   audience: CampaignAudience,
   now: number,
+  stages: Doc<"crmStages">[] = [],
 ): boolean {
+  if (audience.crmStageIds && !stages.some((stage) =>
+    thread.crmStageId === stage._id ||
+    (!thread.crmStageId && stage.isSystemStage && stage.legacyStatus === (thread.leadStatus ?? "new")),
+  )) return false;
   if (audience.leadStatuses && !audience.leadStatuses.includes(thread.leadStatus ?? "new")) {
     return false;
   }
@@ -150,7 +195,8 @@ export function matchesAudience(
     if (!audience.tags.some((tag) => threadTags.includes(tag))) return false;
   }
   if (audience.inboundWithinDays !== undefined) {
-    if (thread.lastEventAt < now - audience.inboundWithinDays * DAY_MS) return false;
+    const lastInbound = thread.lastInboundAt ?? (thread.serviceWindowExpiresAt ? thread.serviceWindowExpiresAt - DAY_MS : 0);
+    if (lastInbound < now - audience.inboundWithinDays * DAY_MS) return false;
   }
   return true;
 }
@@ -187,14 +233,15 @@ export async function blockReasonFor(
     const cutoff = args.now - args.audience.excludeRecentCampaignDays * DAY_MS;
     const recent = (await ctx.db
       .query("campaignRecipients")
-      .withIndex("by_tenant_channel_thread", (q: any) =>
+      .withIndex("by_thread_sent", (q: any) =>
         q
           .eq("tenantId", args.thread.tenantId)
           .eq("channelId", args.channel._id)
-          .eq("threadKey", args.thread.threadKey),
+          .eq("threadKey", args.thread.threadKey)
+          .gte("sentAt", cutoff),
       )
       .order("desc")
-      .take(5)) as Doc<"campaignRecipients">[];
+      .take(2)) as Doc<"campaignRecipients">[];
     if (
       recent.some(
         (row) =>
@@ -278,6 +325,7 @@ export async function materializePage(
     throw new ConvexError({ code: "HUB_CHANNEL_NOT_FOUND" });
   }
   const audience = normalizeAudience(campaign.audience);
+  const stages = await audienceStages(ctx, campaign.tenantId, audience);
   const summary = readAudienceSummary(campaign.audienceSummary);
   let stats = readCampaignStats(campaign.stats);
   let inserted = 0;
@@ -303,12 +351,7 @@ export async function materializePage(
   if (audience.threadKeys) {
     for (const threadKey of audience.threadKeys) {
       summary.scanned += 1;
-      const thread = (await ctx.db
-        .query("channelThreads")
-        .withIndex("by_channel_thread", (q: any) =>
-          q.eq("channelId", channel._id).eq("threadKey", threadKey),
-        )
-        .unique()) as Doc<"channelThreads"> | null;
+      const thread = await resolvePickedThread(ctx, channel, threadKey);
       if (!thread || thread.tenantId !== campaign.tenantId) {
         summary.missing += 1;
         continue;
@@ -332,7 +375,7 @@ export async function materializePage(
         stop = true;
         break;
       }
-      if (!matchesAudience(thread, audience, now)) continue;
+      if (!matchesAudience(thread, audience, now, stages)) continue;
       if (summary.matched >= MAX_RECIPIENTS) {
         summary.capped = true;
         stop = true;

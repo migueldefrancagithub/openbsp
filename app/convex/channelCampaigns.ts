@@ -2,6 +2,7 @@ import { ConvexError, v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
 import { internal } from "./_generated/api";
 import { internalMutation } from "./_generated/server";
+import type { MutationCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { writeAudit } from "./lib/audit";
 import { emitWebhookEvent } from "./lib/webhooks";
@@ -14,6 +15,7 @@ import {
 } from "./lib/campaignStats";
 import {
   accumulateRecipient,
+  audienceStages,
   BATCH_INTERVAL_MS,
   BATCH_SIZE,
   blockReasonFor,
@@ -24,6 +26,7 @@ import {
   normalizeAudience,
   queueNextBatch,
   readAudienceSummary,
+  resolvePickedThread,
   SEND_SPACING_MS,
   UNKNOWN_SETTLE_GRACE_MS,
   type BlockReason,
@@ -59,6 +62,7 @@ const leadStatusValidator = v.union(
 );
 
 export const audienceValidator = v.object({
+  crmStageIds: v.optional(v.array(v.id("crmStages"))),
   leadStatuses: v.optional(v.array(leadStatusValidator)),
   tags: v.optional(v.array(v.string())),
   inboundWithinDays: v.optional(v.number()),
@@ -305,6 +309,7 @@ export const create = tenantMutation({
       templateFields = { messageText: assertText(args.messageText) };
     }
     const audience = normalizeAudience(args.audience);
+    await audienceStages(ctx, ctx.tenantId, audience);
     const campaignId = await ctx.db.insert("campaigns", {
       tenantId: ctx.tenantId,
       name,
@@ -343,6 +348,9 @@ export const create = tenantMutation({
 export const updateDraft = tenantMutation({
   args: {
     campaignId: v.id("campaigns"),
+    channelId: v.optional(v.id("channels")),
+    kind: v.optional(kindValidator),
+    audience: v.optional(audienceValidator),
     name: v.optional(v.string()),
     messageText: v.optional(v.string()),
     channelTemplateId: v.optional(v.id("channelTemplates")),
@@ -353,17 +361,24 @@ export const updateDraft = tenantMutation({
     requireCapability(ctx.role, "campaigns.create");
     const campaign = await loadChannelCampaign(ctx, args.campaignId);
     if ((campaign.status ?? "draft") !== "draft") throw new ConvexError({ code: "CAMPAIGN_INVALID_STATE" });
-    const patch: Partial<Doc<"campaigns">> = { updatedAt: Date.now() };
+    const channel = await loadByIdInTenant(ctx, "channels", args.channelId ?? campaign.channelId!);
+    if (!isHubChannel(channel)) throw new ConvexError({ code: "HUB_CHANNEL_NOT_FOUND" });
+    const kind = args.kind ?? campaign.kind;
+    const patch: Partial<Doc<"campaigns">> = { updatedAt: Date.now(), channelId: channel._id, kind };
     if (args.name !== undefined) patch.name = assertName(args.name);
-    if (campaign.kind === "channel_text" && args.messageText !== undefined) {
-      patch.messageText = assertText(args.messageText);
-    }
-    if (campaign.kind === "channel_template" && (args.channelTemplateId || args.variableBindings)) {
-      const channel = await loadByIdInTenant(ctx, "channels", campaign.channelId!);
+    if (kind === "channel_text") {
+      patch.messageText = assertText(args.messageText ?? campaign.messageText);
+      patch.channelTemplateId = undefined;
+      patch.templateName = undefined;
+      patch.templateLanguage = undefined;
+      patch.variableBindings = undefined;
+    } else {
+      const templateId = args.channelTemplateId ?? campaign.channelTemplateId;
+      if (!templateId) throw new ConvexError({ code: "CHANNEL_TEMPLATE_NOT_FOUND" });
       const template = await resolveTemplate(
         ctx,
         channel,
-        args.channelTemplateId ?? campaign.channelTemplateId!,
+        templateId,
       );
       const expected = templateBodyVariableCount(template.components);
       patch.channelTemplateId = template._id;
@@ -373,12 +388,34 @@ export const updateDraft = tenantMutation({
         args.variableBindings ?? campaign.variableBindings ?? [],
         expected,
       );
+      patch.messageText = undefined;
     }
     patch.contentPreview = previewOf({ ...campaign, ...patch });
     await ctx.db.patch(campaign._id, patch);
+    if (args.audience !== undefined || kind !== campaign.kind || channel._id !== campaign.channelId) {
+      await rebuildAudience(ctx, campaign, args.audience ?? campaign.audience);
+    }
+    await writeAudit(ctx, { action: "campaign.draft_updated", targetType: "campaign", targetId: campaign._id, payload: { kind, channelId: channel._id } });
     return null;
   },
 });
+
+async function rebuildAudience(ctx: Pick<MutationCtx, "db" | "scheduler">, campaign: Doc<"campaigns">, raw: unknown) {
+  const audience = normalizeAudience(raw);
+  await audienceStages(ctx, campaign.tenantId, audience);
+  const revision = (campaign.audienceRevision ?? 0) + 1;
+  await ctx.db.patch(campaign._id, {
+    audience,
+    audienceRevision: revision,
+    audienceClearing: true,
+    audienceStatus: "pending",
+    audienceCursor: undefined,
+    audienceSummary: emptyAudienceSummary(),
+    stats: emptyCampaignStats(),
+    updatedAt: Date.now(),
+  });
+  await ctx.scheduler.runAfter(0, internal.channelCampaigns._clearDraftRecipients, { campaignId: campaign._id, revision });
+}
 
 /** Replace the audience of a draft and rebuild its recipient rows. */
 export const setAudience = tenantMutation({
@@ -388,18 +425,7 @@ export const setAudience = tenantMutation({
     requireCapability(ctx.role, "campaigns.create");
     const campaign = await loadChannelCampaign(ctx, args.campaignId);
     if ((campaign.status ?? "draft") !== "draft") throw new ConvexError({ code: "CAMPAIGN_INVALID_STATE" });
-    const now = Date.now();
-    await ctx.db.patch(campaign._id, {
-      audience: normalizeAudience(args.audience),
-      audienceStatus: "pending",
-      audienceCursor: undefined,
-      audienceSummary: emptyAudienceSummary(),
-      stats: emptyCampaignStats(),
-      updatedAt: now,
-    });
-    await ctx.scheduler.runAfter(0, internal.channelCampaigns._clearDraftRecipients, {
-      campaignId: campaign._id,
-    });
+    await rebuildAudience(ctx, campaign, args.audience);
     return null;
   },
 });
@@ -409,7 +435,8 @@ export const setAudience = tenantMutation({
 // ---------------------------------------------------------------------------
 
 export const previewAudience = tenantQuery({
-  args: { channelId: v.id("channels"), audience: audienceValidator, kind: v.optional(kindValidator) },
+  // A changed refreshAt invalidates the preview cache; eligibility uses server time.
+  args: { channelId: v.id("channels"), audience: audienceValidator, kind: v.optional(kindValidator), refreshAt: v.optional(v.number()) },
   returns: v.object({
     scanned: v.number(),
     matched: v.number(),
@@ -431,6 +458,7 @@ export const previewAudience = tenantQuery({
     const channel = await loadByIdInTenant(ctx, "channels", args.channelId);
     if (!isHubChannel(channel)) throw new ConvexError({ code: "HUB_CHANNEL_NOT_FOUND" });
     const audience = normalizeAudience(args.audience);
+    const stages = await audienceStages(ctx, ctx.tenantId, audience);
     const kind = args.kind ?? "channel_template";
     const now = Date.now();
     const summary = emptyAudienceSummary();
@@ -442,7 +470,10 @@ export const previewAudience = tenantQuery({
       blocked?: string;
     }> = [];
 
+    const seen = new Set<string>();
     const consider = async (thread: Doc<"channelThreads">) => {
+      if (seen.has(thread._id)) return;
+      seen.add(thread._id);
       if (!(await threadHasMessageEvent(ctx, thread))) return;
       summary.matched += 1;
       const identity = thread.identityId ? await ctx.db.get(thread.identityId) : null;
@@ -470,10 +501,7 @@ export const previewAudience = tenantQuery({
     if (audience.threadKeys) {
       for (const threadKey of audience.threadKeys) {
         summary.scanned += 1;
-        const thread = await ctx.db
-          .query("channelThreads")
-          .withIndex("by_channel_thread", (q) => q.eq("channelId", channel._id).eq("threadKey", threadKey))
-          .unique();
+        const thread = await resolvePickedThread(ctx, channel, threadKey);
         if (!thread || thread.tenantId !== ctx.tenantId) {
           summary.missing += 1;
           continue;
@@ -496,7 +524,7 @@ export const previewAudience = tenantQuery({
           summary.capped = false;
           break;
         }
-        if (!matchesAudience(thread, audience, now)) continue;
+        if (!matchesAudience(thread, audience, now, stages)) continue;
         await consider(thread);
       }
     }
@@ -1014,11 +1042,12 @@ export const exportRecipients = tenantQuery({
 // ---------------------------------------------------------------------------
 
 export const _materializePage = internalMutation({
-  args: { campaignId: v.id("campaigns") },
+  args: { campaignId: v.id("campaigns"), revision: v.optional(v.number()) },
   returns: v.object({ done: v.boolean(), inserted: v.number() }),
   handler: async (ctx, args) => {
     const campaign = await ctx.db.get(args.campaignId);
     if (!campaign || (campaign.status ?? "draft") !== "draft") return { done: true, inserted: 0 };
+    if ((args.revision ?? 0) !== (campaign.audienceRevision ?? 0) || campaign.audienceClearing) return { done: true, inserted: 0 };
     if (campaign.audienceStatus === "ready" || campaign.audienceStatus === "empty") {
       return { done: true, inserted: 0 };
     }
@@ -1034,11 +1063,12 @@ export const _materializePage = internalMutation({
 });
 
 export const _clearDraftRecipients = internalMutation({
-  args: { campaignId: v.id("campaigns") },
+  args: { campaignId: v.id("campaigns"), revision: v.optional(v.number()) },
   returns: v.object({ deleted: v.number(), isDone: v.boolean() }),
   handler: async (ctx, args) => {
     const campaign = await ctx.db.get(args.campaignId);
     if (!campaign || (campaign.status ?? "draft") !== "draft") return { deleted: 0, isDone: true };
+    if ((args.revision ?? 0) !== (campaign.audienceRevision ?? 0) || !campaign.audienceClearing) return { deleted: 0, isDone: true };
     const rows = await ctx.db
       .query("campaignRecipients")
       .withIndex("by_campaign", (q) => q.eq("campaignId", campaign._id))
@@ -1046,6 +1076,7 @@ export const _clearDraftRecipients = internalMutation({
     for (const row of rows) await ctx.db.delete(row._id);
     const isDone = rows.length < 200;
     if (isDone) {
+      await ctx.db.patch(campaign._id, { audienceClearing: false });
       await ctx.scheduler.runAfter(0, internal.channelCampaigns._materializePage, args);
     } else {
       await ctx.scheduler.runAfter(0, internal.channelCampaigns._clearDraftRecipients, args);

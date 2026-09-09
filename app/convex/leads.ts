@@ -299,7 +299,7 @@ export const countsByPipeline = tenantQuery({
     await loadByIdInTenant(ctx, "crmPipelines", args.pipelineId);
     const channel = args.channelId ? await ctx.db.get(args.channelId) : null;
     if (args.channelId && (!channel || channel.tenantId !== ctx.tenantId)) throw new ConvexError({ code: "CHANNEL_NOT_FOUND" });
-    const stages = (await ctx.db.query("crmStages").withIndex("by_pipeline_position", (q) => q.eq("pipelineId", args.pipelineId)).take(100)).filter((stage) => !stage.archivedAt);
+    const stages = await ctx.db.query("crmStages").withIndex("by_pipeline_active_position", (q) => q.eq("pipelineId", args.pipelineId).eq("archivedAt", undefined)).take(100);
     const output = [];
     for (const stage of stages) {
       const systemStage = !!stage.isSystemStage && !!stage.legacyStatus;

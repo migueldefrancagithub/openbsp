@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "convex/react";
 import { AlertTriangle, CheckCircle2, Loader2, ShieldAlert, Users } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
@@ -8,11 +8,14 @@ import type { Id } from "../../../convex/_generated/dataModel";
 import { LEAD_STATUSES, leadColumnTone, type LeadStatus } from "@/components/leads/leadStatuses";
 import { cn } from "@/lib/cn";
 import { useI18n } from "@/lib/i18n";
+import { useMinuteNow } from "@/lib/useMinuteNow";
 import { blockReasonLabel, leadStatusLabel } from "./campaignLabels";
 
 export type AudienceDraft = {
   mode: "filters" | "picked";
   leadStatuses: LeadStatus[];
+  crmStageIds?: Id<"crmStages">[];
+  allStages?: boolean;
   tags: string;
   inboundWithinDays: number | undefined;
   excludeDnd: boolean;
@@ -36,9 +39,9 @@ export function toAudienceArgs(draft: AudienceDraft) {
   if (draft.mode === "picked") {
     return {
       threadKeys: draft.threadKeys
-        .split(/[\s,;]+/)
-        .map((v) => v.replace(/\D/g, ""))
-        .filter((v) => v.length >= 8),
+        .split(/[\n,;]+/)
+        .map((v) => v.trim())
+        .filter(Boolean),
       excludeDnd: draft.excludeDnd,
       excludeLost: draft.excludeLost,
       excludeRecentCampaignDays: draft.excludeRecentCampaignDays,
@@ -49,7 +52,8 @@ export function toAudienceArgs(draft: AudienceDraft) {
     .map((v) => v.trim())
     .filter(Boolean);
   return {
-    leadStatuses: draft.leadStatuses.length > 0 ? draft.leadStatuses : undefined,
+    leadStatuses: !draft.allStages && draft.crmStageIds === undefined && draft.leadStatuses.length > 0 ? draft.leadStatuses : undefined,
+    crmStageIds: draft.allStages ? undefined : draft.crmStageIds ?? (draft.leadStatuses.length === 0 ? [] : undefined),
     tags: tags.length > 0 ? tags : undefined,
     inboundWithinDays: draft.inboundWithinDays,
     excludeDnd: draft.excludeDnd,
@@ -80,11 +84,19 @@ export function AudienceBuilder({
   onChange: (next: AudienceDraft) => void;
 }) {
   const { locale, tr } = useI18n();
+  const refreshAt = useMinuteNow();
   const [showSample, setShowSample] = useState(false);
+  const pipeline = useQuery(api.crmPipelines.getDefault, {});
+  useEffect(() => {
+    if (!pipeline || draft.crmStageIds !== undefined || draft.allStages) return;
+    onChange({ ...draft, leadStatuses: [], crmStageIds: pipeline.stages
+      .filter((stage) => stage.legacyStatus && draft.leadStatuses.includes(stage.legacyStatus))
+      .map((stage) => stage._id) });
+  }, [pipeline, draft, onChange]);
   const args = useMemo(() => toAudienceArgs(draft), [draft]);
   const preview = useQuery(
     api.channelCampaigns.previewAudience,
-    channelId ? { channelId, audience: args, kind } : "skip",
+    channelId && refreshAt !== null ? { channelId, audience: args, kind, refreshAt } : "skip",
   );
 
   function toggleStatus(status: LeadStatus) {
@@ -93,6 +105,15 @@ export function AudienceBuilder({
       ...draft,
       leadStatuses: has ? draft.leadStatuses.filter((s) => s !== status) : [...draft.leadStatuses, status],
     });
+  }
+
+  const selectedStageIds = draft.crmStageIds ?? (pipeline?.stages ?? [])
+    .filter((stage) => stage.legacyStatus && draft.leadStatuses.includes(stage.legacyStatus))
+    .map((stage) => stage._id);
+
+  function toggleStage(id: Id<"crmStages">) {
+    onChange({ ...draft, allStages: false, leadStatuses: [], crmStageIds: selectedStageIds.includes(id)
+      ? selectedStageIds.filter((stageId) => stageId !== id) : [...selectedStageIds, id] });
   }
 
   const inputClass =
@@ -124,7 +145,21 @@ export function AudienceBuilder({
                 {tr("Etapas do lead", "Lead stages")}
               </div>
               <div className="flex flex-wrap gap-1.5">
-                {LEAD_STATUSES.map((status) => {
+                {pipeline && <button type="button" aria-pressed={!!draft.allStages}
+                  onClick={() => onChange({ ...draft, allStages: true, crmStageIds: undefined, leadStatuses: [] })}
+                  className={cn("rounded-md border px-2.5 py-1 text-[12px] font-semibold", draft.allStages ? "border-brand-solid bg-brand-solid text-white" : "border-line bg-surface text-body")}>
+                  {tr("Todas as etapas", "All stages")}
+                </button>}
+                {pipeline ? pipeline.stages.map((stage) => {
+                  const active = selectedStageIds.includes(stage._id);
+                  return (
+                    <button key={stage._id} type="button" aria-pressed={active} onClick={() => toggleStage(stage._id)}
+                      className={cn("inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[12px] font-semibold", active ? "border-brand-solid bg-brand-solid text-white" : "border-line bg-surface text-body")}>
+                      <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: active ? "#ffffff" : stage.color }} />
+                      {stage.useSystemLabel && stage.legacyStatus ? leadStatusLabel(stage.legacyStatus, locale) : stage.name}
+                    </button>
+                  );
+                }) : LEAD_STATUSES.map((status) => {
                   const active = draft.leadStatuses.includes(status);
                   const tone = leadColumnTone(status);
                   return (
@@ -143,14 +178,14 @@ export function AudienceBuilder({
                   );
                 })}
               </div>
-              <p className="mt-1.5 text-[11px] text-muted">
+              {!pipeline && <p className="mt-1.5 text-[11px] text-muted">
                 {tr("Sem etapas selecionadas = todas as conversas do canal.", "No stage selected = every conversation on the channel.")}
-              </p>
+              </p>}
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="block">
-                <span className="text-[11px] font-medium text-muted">{tr("Última mensagem há menos de", "Last message within")}</span>
+                <span className="text-[11px] font-medium text-muted">{tr("Última resposta do contacto", "Last contact reply")}</span>
                 <select
                   value={draft.inboundWithinDays ?? ""}
                   onChange={(e) => onChange({ ...draft, inboundWithinDays: e.target.value ? Number(e.target.value) : undefined })}
@@ -167,7 +202,7 @@ export function AudienceBuilder({
                 <input
                   value={draft.tags}
                   onChange={(e) => onChange({ ...draft, tags: e.target.value })}
-                  placeholder={tr("ex.: ortodontia, grupo:vip", "e.g. orthodontics, group:vip")}
+                  placeholder={tr("ex.: proposta, grupo:vip", "e.g. proposal, group:vip")}
                   className={`mt-1 ${inputClass}`}
                 />
               </label>

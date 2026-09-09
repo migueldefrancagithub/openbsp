@@ -313,6 +313,38 @@ describe("leads kanban queries", () => {
 });
 
 describe("editable CRM pipeline", () => {
+  it("keeps the chosen system column when its rule pauses AI, then synchronizes inbox edits", async () => {
+    const t = convexTest(schema);
+    const owner = await seedTenant(t, "pause-stage");
+    const user = t.withIdentity({ subject: owner.userId });
+    const pipelineId = await user.mutation(api.crmPipelines.ensureDefault, {});
+    const pipeline = (await user.query(api.crmPipelines.getDefault, {}))!;
+    const confirmed = pipeline.stages.find((stage) => stage.legacyStatus === "confirmed")!;
+    await user.mutation(api.crmPipelines.updateStage, { stageId: confirmed._id, name: confirmed.name, color: confirmed.color, rules: { ...confirmed.rules, pauseAi: true } });
+    const custom = await user.mutation(api.crmPipelines.createStage, { pipelineId, name: "Negotiation", color: "#16877b", rules: { category: "open", pauseAi: false, requireNextStep: false } });
+    const threadId = await t.run(async (ctx) => await ctx.db.insert("channelThreads", { tenantId: owner.tenantId, channelId: owner.channelId, threadKey: "test-stage", lastEventAt: Date.now(), lastInboundAt: Date.now(), lastEventKind: "message.text", leadStatus: "interested", automationMode: "bot", unreadCount: 0, createdAt: Date.now(), updatedAt: Date.now() }));
+    await user.mutation(api.crmPipelines.moveLead, { threadId, stageId: confirmed._id });
+    expect(await t.run(async (ctx) => await ctx.db.get(threadId))).toMatchObject({ leadStatus: "confirmed", automationMode: "human" });
+    await user.mutation(api.crmPipelines.moveLead, { threadId, stageId: custom });
+    await user.mutation(api.inboxOperations.updateThread, { threadId, leadStatus: "booked" });
+    const thread = (await t.run(async (ctx) => await ctx.db.get(threadId)))!;
+    expect(thread.crmStageId).toBeUndefined();
+    expect(thread.leadStatus).toBe("booked");
+  });
+
+  it("does not hide live columns behind a large archive", async () => {
+    const t = convexTest(schema);
+    const owner = await seedTenant(t, "archive-limit");
+    const user = t.withIdentity({ subject: owner.userId });
+    const pipelineId = await user.mutation(api.crmPipelines.ensureDefault, {});
+    await t.run(async (ctx) => {
+      for (let i = 0; i < 105; i += 1) {
+        await ctx.db.insert("crmStages", { tenantId: owner.tenantId, pipelineId, name: `Old ${i}`, color: "#16877b", position: -200 + i, rules: { category: "open", pauseAi: false, requireNextStep: false }, archivedAt: Date.now(), createdBy: owner.memberId, createdAt: Date.now(), updatedAt: Date.now() });
+      }
+    });
+    expect((await user.query(api.crmPipelines.getDefault, {}))?.stages).toHaveLength(10);
+    expect(await user.query(api.leads.countsByPipeline, { pipelineId })).toHaveLength(10);
+  });
   it("creates, edits and reorders tenant-owned stages", async () => {
     const t = convexTest(schema);
     const owner = await seedTenant(t, "pipeline-a");
@@ -427,7 +459,9 @@ describe("editable CRM pipeline", () => {
     const pipeline = (await asOwner.query(api.crmPipelines.getDefault, {}))!;
     const source = pipeline.stages.find((stage) => stage.legacyStatus === "new")!;
     const target = pipeline.stages.find((stage) => stage.legacyStatus === "interested")!;
+    const finalTarget = pipeline.stages.find((stage) => stage.legacyStatus === "asked_price")!;
     await asOwner.mutation(api.crmPipelines.archiveStage, { stageId: source._id, targetStageId: target._id });
+    await asOwner.mutation(api.crmPipelines.archiveStage, { stageId: target._id, targetStageId: finalTarget._id });
 
     await t.run(async (ctx) => {
       const channel = (await ctx.db.get(owner.channelId))!;
@@ -437,7 +471,7 @@ describe("editable CRM pipeline", () => {
       .query("channelThreads")
       .withIndex("by_channel_thread", (q) => q.eq("channelId", owner.channelId).eq("threadKey", PATIENT))
       .unique());
-    expect(thread?.leadStatus).toBe("interested");
+    expect(thread?.leadStatus).toBe("asked_price");
     expect(thread?.crmPipelineId).toBe(pipeline.pipeline._id);
   });
 });

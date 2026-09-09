@@ -49,11 +49,25 @@ export function ThemeToggle({ compact = false }: { compact?: boolean }) {
     { key: "system", Icon: Monitor, label: tr("Sistema", "System") },
   ];
 
+  if (compact) {
+    const SelectedIcon = options.find((option) => option.key === theme)!.Icon;
+    return (
+      <label className="relative flex h-9 w-9 items-center justify-center rounded-md border border-line bg-surface-2 text-muted focus-within:ring-2 focus-within:ring-brand-solid">
+        <SelectedIcon size={15} aria-hidden="true" />
+        <select aria-label={tr("Tema", "Theme")} title={tr("Tema", "Theme")} value={theme}
+          onChange={(event) => choose(event.target.value as Theme)}
+          className="absolute inset-0 h-full w-full cursor-pointer opacity-0">
+          {options.map((option) => <option key={option.key} value={option.key}>{option.label}</option>)}
+        </select>
+      </label>
+    );
+  }
+
   return (
     <div
       role="radiogroup"
       aria-label={tr("Tema", "Theme")}
-      className={cn("inline-flex rounded-lg border border-line bg-surface-2 p-0.5", compact && "scale-95")}
+      className="inline-flex rounded-lg border border-line bg-surface-2 p-0.5"
     >
       {options.map(({ key, Icon, label }) => (
         <button

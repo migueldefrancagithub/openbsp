@@ -71,7 +71,7 @@ export default function OnboardingPage() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 className="w-full px-3 py-2.5 rounded-lg border border-line text-sm text-ink focus:outline-none focus:ring-2 focus:ring-[#0a152d]/10 focus:border-[#0a152d] transition-all"
-                placeholder="Clínica Marisa Vaz"
+                placeholder="Nome do negócio"
               />
             </div>
 

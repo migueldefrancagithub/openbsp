@@ -1,4 +1,5 @@
 import { ConvexError, v } from "convex/values";
+import { stageAssignmentForStatus } from "./lib/crmStages";
 import { writeAudit } from "./lib/audit";
 import { openHumanCaseInternal } from "./lib/humanCases";
 import { emitWebhookEvent } from "./lib/webhooks";
@@ -716,6 +717,7 @@ export const resolveHumanCase = tenantMutation({
       await ctx.db.patch(thread._id, {
         openHumanCaseId: undefined,
         leadStatus: restoredLeadStatus,
+        ...await stageAssignmentForStatus(ctx, thread.tenantId, restoredLeadStatus),
         inboxStatus: returnToAi ? "open" : "active",
         nextStep: returnToAi
           ? "Devolvida à IA com a decisão registada."

@@ -137,8 +137,8 @@ export function TeamsSection() {
           </h2>
           <p className="mt-0.5 text-xs text-muted">
             {tr(
-              "Encaminhe conversas por equipa e mantenha responsáveis e SLAs visíveis.",
-              "Route conversations by team while leads keep members and SLAs visible.",
+              "Encaminhe conversas por equipa e mantenha responsáveis e prazos visíveis.",
+              "Route conversations by team and keep owners and deadlines visible.",
             )}
           </p>
         </div>

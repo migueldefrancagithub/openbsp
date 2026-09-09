@@ -144,7 +144,7 @@ describe("operational inbox", () => {
     expect(filtered.page[0]).toMatchObject({
       starred: true,
       inboxStatus: "awaiting_team",
-      leadStatus: "awaiting_human",
+      leadStatus: "wants_booking",
       automationMode: "human",
     });
 

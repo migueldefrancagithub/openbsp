@@ -11,6 +11,7 @@ import {
   tenantQuery,
 } from "./lib/customFunctions";
 import { applyThreadUpdate } from "./lib/channels/threadUpdate";
+import { assignmentFor, resolveActiveStage } from "./lib/crmStages";
 
 const MIGRATION_BATCH = 100;
 
@@ -83,19 +84,6 @@ function stageRow(stage: Doc<"crmStages">) {
   };
 }
 
-function categoryLeadStatus(category: "open" | "won" | "lost") {
-  return category === "won" ? "attended" as const : category === "lost" ? "lost" as const : "interested" as const;
-}
-
-function assignmentFor(stage: Doc<"crmStages">) {
-  const systemStage = !!stage.isSystemStage && !!stage.legacyStatus;
-  return {
-    crmPipelineId: stage.pipelineId,
-    crmStageId: systemStage ? undefined : stage._id,
-    leadStatus: stage.legacyStatus ?? categoryLeadStatus(stage.rules.category),
-  };
-}
-
 export const ensureDefault = tenantMutation({
   args: {},
   returns: v.id("crmPipelines"),
@@ -165,7 +153,7 @@ export const getDefault = tenantQuery({
     if (!pipeline || !pipeline.active) return null;
     const stages = await ctx.db
       .query("crmStages")
-      .withIndex("by_pipeline_position", (q) => q.eq("pipelineId", pipeline._id))
+      .withIndex("by_pipeline_active_position", (q) => q.eq("pipelineId", pipeline._id).eq("archivedAt", undefined))
       .take(100);
     return {
       pipeline: { _id: pipeline._id, name: pipeline.name },
@@ -183,7 +171,7 @@ export const createStage = tenantMutation({
     if (!pipeline.active) throw new ConvexError({ code: "PIPELINE_ARCHIVED" });
     const stages = await ctx.db
       .query("crmStages")
-      .withIndex("by_pipeline_position", (q) => q.eq("pipelineId", pipeline._id))
+      .withIndex("by_pipeline_active_position", (q) => q.eq("pipelineId", pipeline._id).eq("archivedAt", undefined))
       .take(100);
     if (stages.filter((stage) => !stage.archivedAt).length >= 30) {
       throw new ConvexError({ code: "STAGE_LIMIT_REACHED" });
@@ -236,7 +224,7 @@ export const reorderStages = tenantMutation({
     await loadByIdInTenant(ctx, "crmPipelines", args.pipelineId);
     const active = (await ctx.db
       .query("crmStages")
-      .withIndex("by_pipeline_position", (q) => q.eq("pipelineId", args.pipelineId))
+      .withIndex("by_pipeline_active_position", (q) => q.eq("pipelineId", args.pipelineId).eq("archivedAt", undefined))
       .take(100))
       .filter((stage) => !stage.archivedAt);
     if (args.stageIds.length !== active.length || new Set(args.stageIds).size !== active.length) {
@@ -271,7 +259,7 @@ export const moveLead = tenantMutation({
       leadStatus: assignment.leadStatus,
       ...(stage.rules.pauseAi && thread.automationMode !== "human" ? { automationMode: "human" as const } : {}),
     };
-    await applyThreadUpdate(ctx, thread, update, { auditAction: "crm.lead_stage_status_updated" });
+    await applyThreadUpdate(ctx, thread, update, { auditAction: "crm.lead_stage_status_updated", crmStage: stage });
     const now = Date.now();
     await ctx.db.patch(thread._id, {
       crmPipelineId: assignment.crmPipelineId,
@@ -306,7 +294,7 @@ async function migrateStageBatch(
         .query("channelThreads")
         .withIndex("by_tenant_crm_stage", (q: any) => q.eq("tenantId", args.tenantId).eq("crmStageId", source._id))
         .take(MIGRATION_BATCH);
-  const assignment = assignmentFor(target);
+  const assignment = assignmentFor(await resolveActiveStage(ctx, target));
   const now = Date.now();
   for (const thread of rows) {
     await ctx.db.patch(thread._id, { ...assignment, updatedAt: now });
@@ -347,23 +335,3 @@ export const _migrateArchivedStage = internalMutation({
   returns: v.number(),
   handler: async (ctx, args) => await migrateStageBatch(ctx, args),
 });
-
-/** Keep classifier-driven moves aligned with the tenant's active pipeline. */
-export async function stageAssignmentForStatus(
-  ctx: { db: any },
-  tenantId: Id<"tenants">,
-  legacyStatus: Doc<"channelThreads">["leadStatus"],
-) {
-  if (!legacyStatus) return undefined;
-  const candidates = (await ctx.db
-    .query("crmStages")
-    .withIndex("by_tenant_legacy", (q: any) => q.eq("tenantId", tenantId).eq("legacyStatus", legacyStatus))
-    .take(20)) as Doc<"crmStages">[];
-  const active = candidates.find((stage) => !stage.archivedAt && stage.isSystemStage);
-  if (active) return assignmentFor(active);
-  const archived = candidates.find((stage) => stage.archivedAt && stage.redirectStageId);
-  if (!archived?.redirectStageId) return undefined;
-  const target = (await ctx.db.get(archived.redirectStageId)) as Doc<"crmStages"> | null;
-  if (!target || target.archivedAt || target.tenantId !== tenantId) return undefined;
-  return assignmentFor(target);
-}

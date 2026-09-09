@@ -98,7 +98,7 @@ export function ClinicSettingsSection() {
           humanSlaMinutes: form.humanSlaMinutes,
           firstResponseSlaMinutes: form.firstResponseSlaMinutes,
         }),
-      tr("Definições da clínica guardadas.", "Clinic settings saved."),
+      tr("Definições do negócio guardadas.", "Business settings saved."),
     );
   }
 
@@ -202,11 +202,11 @@ export function ClinicSettingsSection() {
             <p className="text-[11px] text-muted">{tr("Variáveis: {{nome}}, {{servico}}, {{quando}}, {{clinica}}.", "Variables: {{nome}}, {{servico}}, {{quando}}, {{clinica}}.")}</p>
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               <label className="block text-[11px] font-medium text-muted">
-                {tr("SLA de casos humanos (min)", "Human case SLA (min)")}
+                {tr("Prazo da equipa (min)", "Team response deadline (min)")}
                 <input type="number" min={15} max={2880} value={form.humanSlaMinutes} onChange={(e) => setForm({ ...form, humanSlaMinutes: Number(e.target.value) })} className={inputClass} />
               </label>
               <label className="block text-[11px] font-medium text-muted">
-                {tr("SLA de primeira resposta (min)", "First response SLA (min)")}
+                {tr("Prazo da primeira resposta (min)", "First response deadline (min)")}
                 <input type="number" min={1} max={1440} value={form.firstResponseSlaMinutes} onChange={(e) => setForm({ ...form, firstResponseSlaMinutes: Number(e.target.value) })} className={inputClass} />
               </label>
               <label className="block text-[11px] font-medium text-muted">
