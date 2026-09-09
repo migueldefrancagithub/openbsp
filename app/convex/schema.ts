@@ -697,6 +697,7 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_channel_identity", ["channelId", "providerScopedId"])
+    .index("by_channel_phone", ["channelId", "phone"])
     .index("by_tenant", ["tenantId"]),
 
   channelEvents: defineTable({
@@ -882,6 +883,7 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_pipeline_position", ["pipelineId", "position"])
+    .index("by_pipeline_active_position", ["pipelineId", "archivedAt", "position"])
     .index("by_tenant_legacy", ["tenantId", "legacyStatus"])
     .index("by_tenant", ["tenantId", "createdAt"]),
 
@@ -2288,6 +2290,8 @@ export default defineSchema({
       ),
     ),
     audienceCursor: v.optional(v.string()),
+    audienceRevision: v.optional(v.number()),
+    audienceClearing: v.optional(v.boolean()),
     audienceSummary: v.optional(v.any()),
     stats: v.optional(v.any()),
     consentAttestedBy: v.optional(v.id("members")),
@@ -2350,6 +2354,7 @@ export default defineSchema({
     .index("by_message", ["messageId"])
     .index("by_contact", ["tenantId", "contactId"])
     .index("by_channel_outbox", ["channelOutboxId"])
+    .index("by_thread_sent", ["tenantId", "channelId", "threadKey", "sentAt"])
     .index("by_tenant_channel_thread", [
       "tenantId",
       "channelId",

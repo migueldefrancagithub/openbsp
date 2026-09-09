@@ -1,4 +1,5 @@
 import { ConvexError } from "convex/values";
+import { stageAssignmentForStatus } from "../crmStages";
 import type { Doc, Id } from "../../_generated/dataModel";
 import { nextStepFor, shouldAdvanceLeadStatus } from "../channels/projection";
 import { recordThreadSystemEvent } from "../channels/systemEvents";
@@ -134,6 +135,7 @@ export async function executeAiTool(ctx: ToolContext, name: string, rawInput: un
         const leadStatus = input.leadStatus ? String(input.leadStatus) : undefined;
         if (leadStatus && shouldAdvanceLeadStatus(thread.leadStatus, leadStatus as never)) {
           patch.leadStatus = leadStatus;
+          Object.assign(patch, await stageAssignmentForStatus(ctx, ctx.tenantId, leadStatus as Doc<"channelThreads">["leadStatus"]));
           // Stamp the author and where it came from: a human undoing this later
           // is only a signal about the assistant if the assistant moved it last.
           patch.leadStatusActor = "ai";

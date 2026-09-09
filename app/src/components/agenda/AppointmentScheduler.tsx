@@ -105,7 +105,7 @@ export function AppointmentScheduler({
   if (workspace !== undefined && services.length === 0) {
     return (
       <p className="rounded-lg border border-chip-warn-fg/25 bg-chip-warn px-3 py-2 text-[12px] text-chip-warn-fg">
-        {tr("Crie um serviço em Operação › Clínica antes de marcar.", "Create a service in Operations › Clinic before booking.")}
+        {tr("Crie um serviço em Operação › Atendimento antes de marcar.", "Create a service in Operations › Service before booking.")}
       </p>
     );
   }
@@ -167,7 +167,7 @@ export function AppointmentScheduler({
         <div className={cn("grid gap-2", compact ? "grid-cols-1" : "sm:grid-cols-2")}>
           {!mode.threadId && (
             <label className="block text-[11px] font-medium text-muted">
-              {tr("Paciente", "Patient")}
+              {tr("Contacto", "Contact")}
               <input value={patientName} onChange={(e) => setPatientName(e.target.value)} placeholder={tr("Nome", "Name")} className={inputClass} maxLength={120} />
             </label>
           )}
@@ -181,7 +181,7 @@ export function AppointmentScheduler({
         <label className="flex items-center gap-2 text-[12px] text-ink">
           <input type="checkbox" checked={askConfirmation} onChange={(e) => setAskConfirmation(e.target.checked)} className="h-4 w-4 accent-[#0a1b33]" />
           <Send size={12} className="text-chip-success-fg" />
-          {tr("Enviar pedido de confirmação ao paciente", "Send a confirmation request to the patient")}
+          {tr("Enviar pedido de confirmação ao contacto", "Send a confirmation request to the contact")}
         </label>
       )}
       {error && <p className="rounded-lg border border-[#e0533d]/30 bg-chip-danger px-3 py-2 text-[12px] text-chip-danger-fg">{error}</p>}

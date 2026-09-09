@@ -4,7 +4,7 @@ import { autoConfirmFromReply } from "../clinicAgenda";
 import { bumpCampaignStats, markCampaignReply } from "../campaignAttribution";
 import type { CampaignRecipientStatus as CampaignRowStatus } from "../campaignStats";
 import type { Doc, Id } from "../../_generated/dataModel";
-import { stageAssignmentForStatus } from "../../crmPipelines";
+import { stageAssignmentForStatus } from "../crmStages";
 import type { MutationCtx } from "../../_generated/server";
 import {
   decideOutboxTransition,

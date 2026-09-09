@@ -56,16 +56,16 @@ export function ClinicOpsPanel() {
   const [busy, setBusy] = useState<string | null>(null);
   const [clinicTab, setClinicTab] = useState<ClinicTab>("services");
 
-  const [serviceName, setServiceName] = useState(isPt ? "Consulta inicial" : "Initial consult");
+  const [serviceName, setServiceName] = useState(isPt ? "Atendimento inicial" : "Initial appointment");
   const [serviceDuration, setServiceDuration] = useState(45);
   const [serviceProfessional, setServiceProfessional] = useState("");
 
   const [knowledgeKind, setKnowledgeKind] = useState<KnowledgeKind>("faq");
-  const [knowledgeTitle, setKnowledgeTitle] = useState(isPt ? "Como marcar consulta" : "How to book");
+  const [knowledgeTitle, setKnowledgeTitle] = useState(isPt ? "Como marcar um compromisso" : "How to book");
   const [knowledgeBody, setKnowledgeBody] = useState(
     isPt
-      ? "Confirma o serviço pretendido, oferece horários reais e chama a equipa quando faltar informação clínica."
-      : "Confirm the requested service, offer real slots, and call the team when clinical information is missing.",
+      ? "Confirma o serviço pretendido, oferece horários reais e chama a equipa quando faltar informação."
+      : "Confirm the requested service, offer real slots, and call the team when information is missing.",
   );
 
   const [followName, setFollowName] = useState(isPt ? "Lead sem resposta" : "Lead no reply");
@@ -77,12 +77,12 @@ export function ClinicOpsPanel() {
       : "Hi! We are still here to help with your request. Should we check a slot for you?",
   );
 
-  const [caseReason, setCaseReason] = useState(isPt ? "Dúvida clínica" : "Clinical question");
+  const [caseReason, setCaseReason] = useState(isPt ? "Precisa de ajuda da equipa" : "Needs team assistance");
   const [caseUrgency, setCaseUrgency] = useState<HumanUrgency>("normal");
   const [caseQuestion, setCaseQuestion] = useState(
     isPt
-      ? "Paciente precisa de uma decisão da equipa antes da IA continuar."
-      : "Patient needs a team decision before AI continues.",
+      ? "Contacto precisa de uma decisão da equipa antes da IA continuar."
+      : "Contact needs a team decision before AI continues.",
   );
 
 
@@ -141,7 +141,7 @@ export function ClinicOpsPanel() {
       <section className="rounded-lg border border-line bg-surface p-5">
         <div className="flex items-center gap-2 text-sm text-muted">
           <Loader2 size={16} className="animate-spin" />
-          {isPt ? "A carregar centro da clínica..." : "Loading clinic center..."}
+          {isPt ? "A carregar atendimento..." : "Loading service workspace..."}
         </div>
       </section>
     );
@@ -152,7 +152,7 @@ export function ClinicOpsPanel() {
       <div className="flex flex-col gap-3 border-b border-line-soft px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-faint">
-            {isPt ? "Centro da clínica" : "Clinic center"}
+            {isPt ? "Centro de atendimento" : "Service workspace"}
           </div>
           <h2 className="mt-1 font-[var(--font-outfit)] text-xl font-medium text-ink">
             {isPt ? "Operação configurável em poucos cliques" : "Configurable operation in a few clicks"}
@@ -169,7 +169,7 @@ export function ClinicOpsPanel() {
             runAction(
               "bootstrap",
               () => bootstrap({}),
-              isPt ? "Base da clínica preparada." : "Clinic base prepared.",
+              isPt ? "Base do negócio preparada." : "Business workspace prepared.",
             )
           }
           disabled={busy !== null}
@@ -369,8 +369,8 @@ export function ClinicOpsPanel() {
           title="Follow-up"
           description={
             isPt
-              ? "Agenda lembretes e para sozinho quando o paciente responde."
-              : "Schedules reminders and stops when the patient replies."
+              ? "Agenda lembretes e para sozinho quando o contacto responde."
+              : "Schedules reminders and stops when the contact replies."
           }
         >
           <div className="grid gap-3 sm:grid-cols-[1fr_140px]">

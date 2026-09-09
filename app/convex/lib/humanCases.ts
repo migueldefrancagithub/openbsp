@@ -1,4 +1,5 @@
 import { ConvexError } from "convex/values";
+import { stageAssignmentForStatus } from "./crmStages";
 import type { Doc, Id } from "../_generated/dataModel";
 import { writeAudit } from "./audit";
 import { setThreadAutomationMode, stopActiveAutomationRun } from "./channels/automationControl";
@@ -67,6 +68,7 @@ export async function openHumanCaseInternal(
     await stopActiveAutomationRun(ctx, thread, "human_case_created", now);
     await ctx.db.patch(thread._id, {
       leadStatus: "awaiting_human",
+      ...await stageAssignmentForStatus(ctx, thread.tenantId, "awaiting_human"),
       inboxStatus: "awaiting_team",
       openHumanCaseId: caseId,
       responsibleMemberId: args.responsibleMemberId ?? thread.responsibleMemberId,

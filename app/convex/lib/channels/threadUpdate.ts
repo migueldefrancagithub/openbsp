@@ -1,5 +1,6 @@
 import { pauseAiRun, resumeAiRun } from "../ai/control";
 import { classifyCorrection } from "../ai/corrections";
+import { assignmentFor, stageAssignmentForStatus } from "../crmStages";
 import { emitWebhookEvent } from "../webhooks";
 import { stopThreadFollowUps } from "../followUpControl";
 import { ConvexError, v } from "convex/values";
@@ -167,7 +168,7 @@ export async function applyThreadUpdate(
   ctx: { db: any; tenantId: Id<"tenants">; memberId: Id<"members">; role: Role },
   thread: Doc<"channelThreads">,
   args: ThreadUpdateArgs,
-  options: { now?: number; auditAction?: string } = {},
+  options: { now?: number; auditAction?: string; crmStage?: Doc<"crmStages"> } = {},
 ): Promise<void> {
   assertCanUpdateThread(args, { memberId: ctx.memberId, role: ctx.role });
   if (args.automationMode === "bot" && thread.openHumanCaseId) {
@@ -247,9 +248,6 @@ export async function applyThreadUpdate(
       patch.leadStatusPrevious = thread.leadStatus;
     }
   }
-  if (args.leadStatus !== undefined && args.leadStatus !== thread.leadStatus) {
-    await emitWebhookEvent(ctx, { tenantId: ctx.tenantId, type: "thread.lead_status_changed", eventId: `thread:${thread._id}:lead:${args.leadStatus}:${now}`, payload: { threadId: thread._id, threadKey: thread.threadKey, from: thread.leadStatus, to: args.leadStatus, byMemberId: ctx.memberId }, now });
-  }
   if (args.clearIntent) {
     patch.intent = undefined;
     patch.intentSource = undefined;
@@ -290,10 +288,18 @@ export async function applyThreadUpdate(
     patch.automationChangeReason = "manual_inbox_control";
     if (args.automationMode === "human") {
       patch.inboxStatus = "awaiting_team";
-      patch.leadStatus = "awaiting_human";
+      patch.leadStatus = args.leadStatus ?? "awaiting_human";
     }
   }
 
+  if (patch.leadStatus !== undefined) {
+    const crm = options.crmStage ? assignmentFor(options.crmStage)
+      : await stageAssignmentForStatus(ctx, ctx.tenantId, patch.leadStatus as Doc<"channelThreads">["leadStatus"]);
+    if (crm) Object.assign(patch, crm);
+    if (patch.leadStatus !== thread.leadStatus) {
+      await emitWebhookEvent(ctx, { tenantId: ctx.tenantId, type: "thread.lead_status_changed", eventId: `thread:${thread._id}:lead:${patch.leadStatus}:${now}`, payload: { threadId: thread._id, threadKey: thread.threadKey, from: thread.leadStatus, to: patch.leadStatus, byMemberId: ctx.memberId }, now });
+    }
+  }
   await ctx.db.patch(thread._id, patch);
 
   const before = pickTracked(thread);

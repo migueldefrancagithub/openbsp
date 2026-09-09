@@ -75,7 +75,7 @@ export default function AgendaPage() {
       <PageHeader
         eyebrow={tr("Operação", "Operations")}
         title={tr("Agenda", "Calendar")}
-        description={tr("Marcações reais da clínica, por dia ou semana, com confirmação e lembretes pelo WhatsApp.", "The clinic's real appointments by day or week, with WhatsApp confirmation and reminders.")}
+        description={tr("Compromissos por dia ou semana, com confirmação e lembretes pelo WhatsApp.", "Appointments by day or week, with WhatsApp confirmation and reminders.")}
         action={
           <button type="button" onClick={() => setScheduler({ kind: "book", source: "agenda" })} className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#2b4f8a] px-4 text-[13px] font-semibold text-white hover:bg-[#244478]">
             <CalendarPlus size={15} /> {tr("Nova marcação", "New appointment")}

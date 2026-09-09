@@ -14,11 +14,13 @@ import { blockReasonLabel, estimateDurationMs, humanDuration } from "@/component
 import { cn } from "@/lib/cn";
 import { convexErrorMessage } from "@/lib/convexErrorMessage";
 import { useI18n } from "@/lib/i18n";
+import { useMinuteNow } from "@/lib/useMinuteNow";
 
 type Step = 1 | 2 | 3;
 
 export default function NewCampaignPage() {
   const { locale, tr } = useI18n();
+  const refreshAt = useMinuteNow();
   const router = useRouter();
   const channels = useQuery(api.channels.list);
   const productChannels = useMemo(
@@ -43,7 +45,6 @@ export default function NewCampaignPage() {
   const [error, setError] = useState<string | null>(null);
 
   const create = useMutation(api.channelCampaigns.create);
-  const setAudienceMutation = useMutation(api.channelCampaigns.setAudience);
   const updateDraft = useMutation(api.channelCampaigns.updateDraft);
   const launch = useMutation(api.channelCampaigns.launch);
   const detail = useQuery(api.channelCampaigns.get, campaignId ? { campaignId } : "skip");
@@ -51,7 +52,7 @@ export default function NewCampaignPage() {
   const audienceArgs = useMemo(() => toAudienceArgs(audience), [audience]);
   const preview = useQuery(
     api.channelCampaigns.previewAudience,
-    channelId ? { channelId, audience: audienceArgs, kind: message.kind } : "skip",
+    channelId && refreshAt !== null ? { channelId, audience: audienceArgs, kind: message.kind, refreshAt } : "skip",
   );
 
   const messageValid =
@@ -83,12 +84,14 @@ export default function NewCampaignPage() {
       if (campaignId) {
         await updateDraft({
           campaignId,
+          channelId: payload.channelId,
+          kind: payload.kind,
+          audience: audienceArgs,
           name: payload.name,
           messageText: payload.messageText,
           channelTemplateId: payload.channelTemplateId,
           variableBindings: payload.variableBindings,
         });
-        await setAudienceMutation({ campaignId, audience: audienceArgs });
         return campaignId;
       }
       const id = await create({ ...payload, clientNonce });
@@ -188,7 +191,7 @@ export default function NewCampaignPage() {
             <div className="flex justify-end">
               <button
                 type="button"
-                disabled={!nameValid || !channelId || (preview?.eligible ?? 0) === 0}
+                disabled={!nameValid || !channelId || (preview?.matched ?? 0) === 0}
                 onClick={() => setStep(2)}
                 className="inline-flex h-10 items-center gap-2 rounded-lg bg-brand-solid px-4 text-[13px] font-semibold text-white disabled:opacity-50"
               >

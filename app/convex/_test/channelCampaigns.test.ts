@@ -5,7 +5,7 @@ import { api, internal } from "../_generated/api";
 import type { Doc, Id } from "../_generated/dataModel";
 import schema from "../schema";
 import { deriveCampaignRates, emptyCampaignStats, transitionStats } from "../lib/campaignStats";
-import { renderCampaignText } from "../lib/channelCampaignEngine";
+import { matchesAudience, normalizeAudience, recipientDigits, renderCampaignText } from "../lib/channelCampaignEngine";
 import { templateBodyVariableCount } from "../channelCampaigns";
 import { encryptSecret } from "../lib/secrets";
 
@@ -145,13 +145,100 @@ async function seed(t: ReturnType<typeof convexTest>) {
 
 async function drain(t: ReturnType<typeof convexTest>, campaignId: Id<"campaigns">) {
   for (let i = 0; i < 20; i += 1) {
-    const result = await t.mutation(internal.channelCampaigns._materializePage, { campaignId });
+    const campaign = await t.run(async (ctx) => await ctx.db.get(campaignId));
+    const result = await t.mutation(internal.channelCampaigns._materializePage, { campaignId, revision: campaign?.audienceRevision ?? 0 });
     if (result.done) return;
   }
   throw new Error("materialization did not finish");
 }
 
 describe("channel campaigns", () => {
+  it("keeps an explicitly empty picked audience empty", async () => {
+    const t = convexTest(schema);
+    const s = await seed(t);
+    const owner = t.withIdentity({ subject: s.userId });
+    expect(normalizeAudience({ threadKeys: [" "] }).threadKeys).toEqual([]);
+    const preview = await owner.query(api.channelCampaigns.previewAudience, { channelId: s.channelId, audience: { threadKeys: [] } });
+    expect(preview.matched).toBe(0);
+    const id = await owner.mutation(api.channelCampaigns.create, { channelId: s.channelId, name: "Empty selection", kind: "channel_text", messageText: "Hello", audience: { threadKeys: [] } });
+    await drain(t, id);
+    const detail = await owner.query(api.channelCampaigns.get, { campaignId: id });
+    expect(detail.campaign.audienceStatus).toBe("empty");
+    expect(detail.stats.byStatus.pending).toBe(0);
+  });
+
+  it("resolves phone aliases and opaque IDs once without inventing a phone", async () => {
+    const t = convexTest(schema);
+    const s = await seed(t);
+    const owner = t.withIdentity({ subject: s.userId });
+    const key = "MZ.209000001";
+    await t.run(async (ctx) => {
+      const thread = (await ctx.db.get(s.threads[ALLOWED]))!;
+      await ctx.db.patch(thread._id, { threadKey: key, lastInboundAt: Date.now() });
+      await ctx.db.patch(thread.identityId!, { providerScopedId: key });
+    });
+    expect(recipientDigits({ threadKey: key }, null)).toBe("");
+    const audience = { threadKeys: [ALLOWED, `+${ALLOWED}`, key], excludeRecentCampaignDays: 0 };
+    const preview = await owner.query(api.channelCampaigns.previewAudience, { channelId: s.channelId, audience });
+    expect(preview.matched).toBe(1);
+    expect(preview.eligible).toBe(1);
+    const id = await owner.mutation(api.channelCampaigns.create, { channelId: s.channelId, name: "Aliases", kind: "channel_text", messageText: "Hello", audience });
+    await drain(t, id);
+    const detail = await owner.query(api.channelCampaigns.get, { campaignId: id });
+    expect(detail.stats.byStatus.pending).toBe(1);
+  });
+
+  it("filters by the actual custom CRM column and rejects another tenant's stage", async () => {
+    const t = convexTest(schema);
+    const s = await seed(t);
+    const owner = t.withIdentity({ subject: s.userId });
+    const pipelineId = await owner.mutation(api.crmPipelines.ensureDefault, {});
+    const stageId = await owner.mutation(api.crmPipelines.createStage, { pipelineId, name: "Proposal", color: "#16877b", rules: { category: "open", pauseAi: false, requireNextStep: false } });
+    await owner.mutation(api.crmPipelines.moveLead, { threadId: s.threads[ALLOWED], stageId });
+    const audience = { crmStageIds: [stageId] };
+    const preview = await owner.query(api.channelCampaigns.previewAudience, { channelId: s.channelId, audience });
+    expect(preview.sample.map((row) => row.threadId)).toEqual([s.threads[ALLOWED]]);
+    const id = await owner.mutation(api.channelCampaigns.create, { channelId: s.channelId, name: "Proposals", kind: "channel_text", messageText: "Hello", audience });
+    await drain(t, id);
+    expect((await owner.query(api.channelCampaigns.get, { campaignId: id })).stats.byStatus.pending).toBe(1);
+    const foreignStage = await t.run(async (ctx) => {
+      const tenantId = await ctx.db.insert("tenants", { name: "Other business", vertical: "clinic", plan: "starter", settings: { defaultLocale: "en", timezone: "UTC", retentionDays: 730 }, createdAt: Date.now() });
+      return await ctx.db.insert("crmStages", { tenantId, pipelineId, name: "Foreign", color: "#16877b", position: 0, rules: { category: "open", pauseAi: false, requireNextStep: false }, createdBy: s.memberId, createdAt: Date.now(), updatedAt: Date.now() });
+    });
+    await expect(owner.query(api.channelCampaigns.previewAudience, { channelId: s.channelId, audience: { crmStageIds: [foreignStage] } })).rejects.toThrow(/NOT_FOUND/);
+  });
+
+  it("atomically edits channel, kind and audience; stale scheduled workers cannot overwrite the edit", async () => {
+    const t = convexTest(schema);
+    const s = await seed(t);
+    const owner = t.withIdentity({ subject: s.userId });
+    const campaignId = await owner.mutation(api.channelCampaigns.create, { channelId: s.channelId, name: "Before", kind: "channel_text", messageText: "Old text", audience: { threadKeys: [ALLOWED] } });
+    await drain(t, campaignId);
+    const newChannel = await owner.mutation(api.iaSolutionHub.createPendingChannel, { displayName: "Second lab" });
+    const templateId = await t.run(async (ctx) => await ctx.db.insert("channelTemplates", { tenantId: s.tenantId, channelId: newChannel.channelId, name: "approved", languageCode: "en", category: "UTILITY", status: "APPROVED", components: [{ type: "BODY", text: "Hello" }], syncedAt: Date.now(), updatedAt: Date.now() }));
+    await owner.mutation(api.channelCampaigns.updateDraft, { campaignId, channelId: newChannel.channelId, kind: "channel_template", channelTemplateId: templateId, audience: { threadKeys: [] }, name: "After" });
+    await owner.mutation(api.channelCampaigns.updateDraft, { campaignId, channelId: s.channelId, kind: "channel_text", messageText: "Latest text", audience: { threadKeys: [ALLOWED] } });
+    await t.mutation(internal.channelCampaigns._clearDraftRecipients, { campaignId, revision: 1 });
+    await t.mutation(internal.channelCampaigns._materializePage, { campaignId });
+    let campaign = (await t.run(async (ctx) => await ctx.db.get(campaignId)))!;
+    expect(campaign).toMatchObject({ channelId: s.channelId, kind: "channel_text", messageText: "Latest text", audienceRevision: 2, audienceStatus: "pending", audienceClearing: true });
+    expect(campaign.channelTemplateId).toBeUndefined();
+    await t.mutation(internal.channelCampaigns._clearDraftRecipients, { campaignId, revision: 2 });
+    await drain(t, campaignId);
+    await t.mutation(internal.channelCampaigns._clearDraftRecipients, { campaignId, revision: 2 });
+    campaign = (await t.run(async (ctx) => await ctx.db.get(campaignId)))!;
+    expect(campaign.audienceStatus).toBe("ready");
+    expect((await owner.query(api.channelCampaigns.get, { campaignId })).stats.byStatus.pending).toBe(1);
+  });
+
+  it("does not treat delivery updates as recent replies", async () => {
+    const t = convexTest(schema);
+    const s = await seed(t);
+    const thread = (await t.run(async (ctx) => await ctx.db.get(s.threads[ALLOWED])))!;
+    const now = Date.now();
+    expect(matchesAudience({ ...thread, lastEventAt: now, lastInboundAt: now - 40 * 86_400_000 }, { inboundWithinDays: 7 }, now)).toBe(false);
+  });
+
   it("derives funnel rates that never exceed 100%", () => {
     let stats = emptyCampaignStats();
     stats = transitionStats(stats, null, "pending");

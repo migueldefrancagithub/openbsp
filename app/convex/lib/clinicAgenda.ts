@@ -1,4 +1,5 @@
 import { ConvexError } from "convex/values";
+import { stageAssignmentForStatus } from "./crmStages";
 import type { Doc, Id } from "../_generated/dataModel";
 import { writeAudit } from "./audit";
 import { emitWebhookEvent } from "./webhooks";
@@ -238,6 +239,7 @@ export async function reserveSlotInternal(
   if (thread) {
     await ctx.db.patch(thread._id, {
       leadStatus: "booked",
+      ...await stageAssignmentForStatus(ctx, thread.tenantId, "booked"),
       nextStep: "Agendamento criado. Confirmar presença antes da consulta.",
       nextStepDueAt: Math.max(now, range.startAt - 24 * 60 * 60_000),
       updatedAt: now,
@@ -307,6 +309,7 @@ export async function confirmInternal(
     if (thread) {
       await ctx.db.patch(thread._id, {
         leadStatus: "confirmed",
+        ...await stageAssignmentForStatus(ctx, thread.tenantId, "confirmed"),
         nextStep: "Consulta confirmada. Monitorar comparecimento.",
         nextStepDueAt: appointment.startAt,
         updatedAt: now,
@@ -367,6 +370,7 @@ export async function cancelInternal(
     if (thread) {
       await ctx.db.patch(thread._id, {
         leadStatus: "interested",
+        ...await stageAssignmentForStatus(ctx, thread.tenantId, "interested"),
         nextStep: "Consulta cancelada. Oferecer nova data.",
         nextStepDueAt: now + 24 * 60 * 60_000,
         updatedAt: now,
@@ -471,6 +475,7 @@ export async function outcomeInternal(
     if (thread) {
       await ctx.db.patch(thread._id, {
         leadStatus: args.status === "completed" ? "attended" : "no_show",
+        ...await stageAssignmentForStatus(ctx, thread.tenantId, args.status === "completed" ? "attended" : "no_show"),
         nextStep:
           args.status === "completed"
             ? "Atendimento concluído. Pode entrar em rotina de retenção."

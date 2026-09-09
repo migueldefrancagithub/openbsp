@@ -250,7 +250,7 @@ export default function AppOverview() {
             },
             {
               key: "clinic",
-              label: locale === "pt" ? "Clínica" : "Clinic",
+              label: locale === "pt" ? "Atendimento" : "Service",
               value: locale === "pt" ? "Agenda, IA e seguimento" : "Schedule, AI, and follow-up",
               icon: CalendarDays,
             },
